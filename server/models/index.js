@@ -2,10 +2,13 @@ import mongoose from 'mongoose'
 const { Schema, model } = mongoose
 
 const UserSchema = new Schema({
-  username: { type: String, required: true, unique: true, trim: true },
-  email:    { type: String, required: true, unique: true, lowercase: true },
-  password: { type: String, required: true },
-  avatar:   { type: String, default: '' },
+  username:         { type: String, required: true, unique: true, trim: true },
+  email:            { type: String, required: true, unique: true, lowercase: true },
+  password:         { type: String, required: true },
+  avatar:           { type: String, default: '' },
+  isPremium:        { type: Boolean, default: false },
+  stripeCustomerId: { type: String, default: '' },
+  stripeSubId:      { type: String, default: '' },
 }, { timestamps: true })
 
 const CampaignSchema = new Schema({
@@ -43,17 +46,20 @@ const StoryCardSchema = new Schema({
 }, { timestamps: true })
 
 const CharacterSchema = new Schema({
-  campaign:    { type: Schema.Types.ObjectId, ref: 'Campaign', required: true },
-  owner:       { type: Schema.Types.ObjectId, ref: 'User', required: true },
-  name:        String,
-  race:        String,
-  class:       String,
-  level:       Number,
+  campaign:     { type: Schema.Types.ObjectId, ref: 'Campaign', required: true },
+  owner:        { type: Schema.Types.ObjectId, ref: 'User', required: true },
+  name:         String,
+  race:         String,
+  class:        String,
+  level:        Number,
   dndBeyondUrl: String,
-  stats:       { str: Number, dex: Number, con: Number, int: Number, wis: Number, cha: Number },
-  hp:          { current: Number, max: Number },
-  ac:          Number,
-  notes:       String,
+  stats:        { str: Number, dex: Number, con: Number, int: Number, wis: Number, cha: Number },
+  hp:           { current: Number, max: Number },
+  ac:           Number,
+  profBonus:    Number,
+  // Array of skill names that are proficient e.g. ['Athletics', 'Investigation']
+  proficiencies: [{ type: String }],
+  notes:        String,
 }, { timestamps: true })
 
 export const User       = model('User', UserSchema)

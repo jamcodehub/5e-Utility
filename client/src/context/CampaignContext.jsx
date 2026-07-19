@@ -1,6 +1,5 @@
 import { createContext, useContext, useState, useEffect } from 'react'
-import { api } from './AuthContext'
-import { useAuth } from './AuthContext'
+import { api, useAuth } from './AuthContext'
 
 const CampaignContext = createContext(null)
 export const useCampaign = () => useContext(CampaignContext)
@@ -19,11 +18,16 @@ export function CampaignProvider({ children }) {
 
   useEffect(() => { load() }, [user])
 
+  // Returns null on success, error string on failure
   const createCampaign = async (body) => {
-    const c = await api('/campaigns', { method: 'POST', body })
-    setCampaigns(p => [c, ...p])
-    setActive(c)
-    return c
+    try {
+      const c = await api('/campaigns', { method: 'POST', body })
+      setCampaigns(p => [c, ...p])
+      setActive(c)
+      return null
+    } catch (e) {
+      return e.message
+    }
   }
 
   const updateCampaign = async (id, body) => {
@@ -35,7 +39,7 @@ export function CampaignProvider({ children }) {
   const deleteCampaign = async (id) => {
     await api(`/campaigns/${id}`, { method: 'DELETE' })
     setCampaigns(p => p.filter(x => x._id !== id))
-    if (activeCampaign?._id === id) setActive(null)
+    if (activeCampaign?._id === id) setActive(campaigns.find(x => x._id !== id) || null)
   }
 
   return (
