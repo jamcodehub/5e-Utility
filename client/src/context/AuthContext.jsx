@@ -3,9 +3,8 @@ import { createContext, useContext, useState, useEffect } from 'react'
 const AuthContext = createContext(null)
 export const useAuth = () => useContext(AuthContext)
 
-// In dev, Vite proxies /api → localhost:4000
-// In prod, set VITE_API_URL in Netlify env vars to your Render backend URL
 const API = import.meta.env.VITE_API_URL ? `${import.meta.env.VITE_API_URL}/api` : '/api'
+
 export const api = async (path, opts = {}) => {
   const token = localStorage.getItem('ll_token')
   const res = await fetch(`${API}${path}`, {
@@ -42,5 +41,15 @@ export function AuthProvider({ children }) {
 
   const logout = () => { localStorage.removeItem('ll_token'); setUser(null) }
 
-  return <AuthContext.Provider value={{ user, login, register, logout, loading }}>{children}</AuthContext.Provider>
+  // Call this after successful Stripe payment to refresh user premium status
+  const refreshUser = async () => {
+    const u = await api('/auth/me')
+    setUser(u)
+  }
+
+  return (
+    <AuthContext.Provider value={{ user, login, register, logout, loading, refreshUser, isPremium: user?.isPremium || false }}>
+      {children}
+    </AuthContext.Provider>
+  )
 }
