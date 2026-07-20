@@ -52,6 +52,8 @@ function BookSpread({ card, index }) {
   )
 }
 
+// CastleSlide moved to the Dice page — removed from Storyboard
+
 export default function Storyboard() {
   const { activeCampaign } = useCampaign()
   const { toast, ToastContainer } = useToast()

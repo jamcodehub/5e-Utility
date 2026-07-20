@@ -9,16 +9,22 @@ export default function SettingsModal({ onClose }) {
   const [feedbackMsg, setFeedbackMsg] = useState('')
   const [sending, setSending] = useState(false)
   const [sent, setSent] = useState(false)
+  const [error, setError] = useState('')
 
   const submitFeedback = async () => {
     if (!feedbackMsg.trim()) return
+    setError('')
     setSending(true)
     try {
       await api('/feedback', { method: 'POST', body: { type: feedbackType, message: feedbackMsg } })
-      setSent(true); setFeedbackMsg('')
+      setSent(true)
+      setFeedbackMsg('')
       setTimeout(() => setSent(false), 3000)
-    } catch { }
-    setSending(false)
+    } catch (err) {
+      setError(err?.message || 'Something went wrong while sending feedback.')
+    } finally {
+      setSending(false)
+    }
   }
 
   return (
@@ -69,6 +75,7 @@ export default function SettingsModal({ onClose }) {
           <textarea className="input" rows={4} placeholder="Tell us what you think, report a bug, or suggest a feature..."
             value={feedbackMsg} onChange={e => setFeedbackMsg(e.target.value)}
             style={{ resize: 'none', marginBottom: 10 }} />
+          {error && <div style={{ fontSize: 13, color: 'var(--red)', padding: '8px 0' }}>{error}</div>}
           {sent
             ? <div style={{ fontSize: 13, color: 'var(--green)', padding: '8px 0' }}>✓ Thanks for your feedback!</div>
             : <button className="btn btn-primary" onClick={submitFeedback} disabled={sending || !feedbackMsg.trim()}>

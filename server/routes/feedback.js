@@ -1,6 +1,6 @@
 import { Router } from 'express'
+import jwt from 'jsonwebtoken'
 import mongoose from 'mongoose'
-import { auth } from './campaigns.js'
 
 const router = Router()
 
@@ -12,11 +12,23 @@ const FeedbackSchema = new mongoose.Schema({
 
 const Feedback = mongoose.model('Feedback', FeedbackSchema)
 
-router.post('/', auth, async (req, res) => {
+router.post('/', async (req, res) => {
   try {
-    const fb = await Feedback.create({ ...req.body, user: req.userId })
+    let userId
+    const authHeader = req.headers.authorization
+    if (authHeader?.startsWith('Bearer ')) {
+      try {
+        userId = jwt.verify(authHeader.split(' ')[1], process.env.JWT_SECRET).id
+      } catch {
+        userId = undefined
+      }
+    }
+
+    const fb = await Feedback.create({ ...req.body, user: userId })
     res.json(fb)
-  } catch (e) { res.status(500).json({ error: e.message }) }
+  } catch (e) {
+    res.status(500).json({ error: e.message })
+  }
 })
 
 export default router
