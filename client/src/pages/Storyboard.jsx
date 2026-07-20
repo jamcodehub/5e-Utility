@@ -10,11 +10,12 @@ const pollinationsUrl = (prompt, width = 1200, height = 900) =>
   )}?width=${width}&height=${height}&nologo=true&enhance=true&seed=${Math.floor(Math.random() * 99999)}`
 
 function Cover({ campaignName }) {
-  // Single-page cover showing only the campaign name (right-page style)
+  // Single cover page (closed book front cover)
   return (
-    <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'radial-gradient(circle at top, rgba(255,255,255,0.02), transparent 35%), var(--bg)' }}>
-      <div style={{ width: '46%', height: '84%', borderRadius: 18, background: 'var(--surface)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24, boxShadow: 'inset 0 8px 20px rgba(0,0,0,0.08)' }}>
-        <div style={{ fontFamily: 'Cinzel, serif', fontSize: 28, color: 'var(--text)', textAlign: 'center', lineHeight: 1.2, fontWeight: 700 }}>{campaignName || 'Your Campaign'}</div>
+    <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--surface2)' }}>
+      <div style={{ textAlign: 'center', padding: 40, maxWidth: '80%' }}>
+        <div style={{ fontFamily: 'Cinzel, serif', fontSize: 36, color: 'var(--text)', lineHeight: 1.4, fontWeight: 700, letterSpacing: '0.02em' }}>{campaignName || 'Your Campaign'}</div>
+        <div style={{ fontSize: 13, color: 'var(--text-3)', marginTop: 24, letterSpacing: '0.1em', fontFamily: 'Cinzel, serif' }}>CHRONICLE</div>
       </div>
     </div>
   )
@@ -23,22 +24,22 @@ function Cover({ campaignName }) {
 function BookSpread({ card, index }) {
   return (
     <div style={{ position: 'absolute', inset: 0, display: 'flex', minWidth: 0 }}>
-      {/* Left — image */}
-      <div style={{ flex: 1, background: 'var(--surface)', borderRight: '2px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', position: 'relative', boxShadow: 'inset -8px 0 20px rgba(0,0,0,0.05)' }}>
+      {/* Left — image with responsive cropping */}
+      <div style={{ flex: 1, background: 'var(--surface)', borderRight: '2px solid #5a4a3a', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', position: 'relative', boxShadow: 'inset -8px 0 20px rgba(0,0,0,0.05)', padding: '4%' }}>
         <div style={{ position: 'absolute', top: 14, left: 18, fontFamily: 'Cinzel, serif', fontSize: 10, color: 'var(--text-3)', letterSpacing: '0.1em', zIndex: 1 }}>SCENE {index + 1}</div>
         {card.imageUrl
-          ? <img src={card.imageUrl} alt={card.title} style={{ width: '100%', height: '100%', minWidth: '100%', minHeight: '100%', objectFit: 'cover', display: 'block' }} onError={e => { e.target.style.display = 'none' }} />
+          ? <img src={card.imageUrl} alt={card.title} style={{ width: '100%', height: '100%', minWidth: '100%', minHeight: '100%', objectFit: 'cover', objectPosition: 'center', display: 'block', borderRadius: 8 }} onError={e => { e.target.style.display = 'none' }} />
           : <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, color: 'var(--text-3)' }}><div style={{ fontSize: 40, opacity: 0.3 }}>✦</div><div style={{ fontSize: 11, fontFamily: 'Cinzel, serif' }}>Generating...</div></div>
         }
         <div style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: 24, background: 'linear-gradient(to left, rgba(0,0,0,0.07), transparent)', pointerEvents: 'none' }} />
       </div>
-      {/* Right — text */}
-      <div style={{ flex: 1, background: 'var(--surface2)', padding: '44px 40px', display: 'flex', flexDirection: 'column', position: 'relative', backgroundImage: 'repeating-linear-gradient(transparent, transparent 27px, rgba(0,0,0,0.03) 28px)', backgroundPosition: '0 44px' }}>
+      {/* Right — text with book-like margins */}
+      <div style={{ flex: 1, background: 'var(--surface2)', padding: '48px 48px', display: 'flex', flexDirection: 'column', position: 'relative', backgroundImage: 'repeating-linear-gradient(transparent, transparent 27px, rgba(0,0,0,0.03) 28px)', backgroundPosition: '0 48px' }}>
         <div style={{ position: 'absolute', top: 14, right: 18, fontFamily: 'Cinzel, serif', fontSize: 10, color: 'var(--text-3)', letterSpacing: '0.1em' }}>{index * 2 + 2}</div>
-        <h2 style={{ fontFamily: 'Cinzel, serif', fontSize: 20, color: 'var(--text)', marginBottom: 20, lineHeight: 1.3, position: 'relative', zIndex: 1 }}>{card.title}</h2>
-        <p style={{ fontFamily: 'Georgia, serif', fontSize: 14, color: 'var(--text-2)', lineHeight: 1.9, position: 'relative', zIndex: 1, flex: 1 }}>{card.description}</p>
+        <h2 style={{ fontFamily: 'Cinzel, serif', fontSize: 20, color: 'var(--text)', marginBottom: 24, lineHeight: 1.4, position: 'relative', zIndex: 1 }}>{card.title}</h2>
+        <p style={{ fontFamily: 'Georgia, serif', fontSize: 14, color: 'var(--text-2)', lineHeight: 1.95, position: 'relative', zIndex: 1, flex: 1, overflow: 'auto' }}>{card.description}</p>
         {card.createdAt && (
-          <div style={{ fontSize: 10, color: 'var(--text-3)', fontFamily: 'Cinzel, serif', letterSpacing: '0.06em', marginTop: 20, position: 'relative', zIndex: 1 }}>
+          <div style={{ fontSize: 10, color: 'var(--text-3)', fontFamily: 'Cinzel, serif', letterSpacing: '0.06em', marginTop: 28, position: 'relative', zIndex: 1 }}>
             {new Date(card.createdAt).toLocaleDateString('en-AU', { day: 'numeric', month: 'long', year: 'numeric' })}
           </div>
         )}
@@ -188,7 +189,7 @@ export default function Storyboard() {
       <div ref={scrollRef} style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px', position: 'relative', overflow: 'hidden' }}>
         <div ref={bookRef} className="book-viewport" style={{ boxShadow: '0 24px 80px rgba(0,0,0,0.7), 0 0 0 1px rgba(200,160,96,0.15)', borderRadius: 3 }}>
           {/* Spine */}
-          <div style={{ position: 'absolute', left: '50%', top: 0, bottom: 0, width: 3, background: 'linear-gradient(to right, #3a2510, #8a6030, #3a2510)', zIndex: 10, transform: 'translateX(-50%)', boxShadow: '0 0 10px rgba(0,0,0,0.5)' }} />
+          <div style={{ position: 'absolute', left: '50%', top: 0, bottom: 0, width: 3, background: 'linear-gradient(to right, #2a1810, #4a3020, #2a1810)', zIndex: 10, transform: 'translateX(-50%)', boxShadow: '0 0 10px rgba(0,0,0,0.5)' }} />
 
           {/* Cover */}
           <div style={{ position: 'absolute', inset: 0, transition: 'opacity .35s', opacity: onCover ? 1 : 0, pointerEvents: onCover ? 'auto' : 'none' }}>

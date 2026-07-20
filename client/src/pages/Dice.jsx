@@ -7,7 +7,7 @@ export default function Dice() {
   const [showConfetti, setShowConfetti] = useState(false)
   const [showRain, setShowRain] = useState(false)
   const [sink, setSink] = useState(false)
-  const [d20Transform, setD20Transform] = useState('translate(0%, 0%) rotate(0deg)')
+  const [d20Transform, setD20Transform] = useState('translate(0%, -140%) rotate(0deg)')
   const [d20Transition, setD20Transition] = useState('transform 0ms')
 
   useEffect(() => {
@@ -29,21 +29,21 @@ export default function Dice() {
     setShowConfetti(false)
     setSink(false)
 
-    // reset d20 position instantly
+    // reset d20 position to outside tray (top center)
     setD20Transition('transform 0ms')
-    setD20Transform('translate(0%, 0%) rotate(0deg)')
+    setD20Transform('translate(0%, -140%) rotate(0deg)')
 
     // randomize throw: position offset (percent), rotation and duration
     const tx = Math.round((Math.random() * 90 - 45) * 10) / 10 // -45%..45%
     const ty = Math.round((Math.random() * 90 - 45) * 10) / 10
     const rot = Math.floor(Math.random() * 720) + 90
-    const duration = Math.floor(Math.random() * 700) + 600 // 600-1300ms
+    const duration = Math.floor(Math.random() * 900) + 800 // 800-1700ms — longer for arc
 
-    // small delay to allow zero-reset before animating
+    // animate from outside into the tray with an arcing path
     setTimeout(() => {
-      setD20Transition(`transform ${duration}ms cubic-bezier(.22,1,.36,1)`)
+      setD20Transition(`transform ${duration}ms cubic-bezier(.14,.68,.25,1)`)
       setD20Transform(`translate(${tx}%, ${ty}%) rotate(${rot}deg)`)
-    }, 30)
+    }, 50)
 
     // flicker display while throwing
     let count = 0
@@ -86,29 +86,12 @@ export default function Dice() {
 
   return (
     <div className="page-content" style={{ paddingBottom: 16 }}>
-      <div style={{ display: 'grid', gap: 12, maxWidth: 720, margin: '0 auto' }}>
-        <div className="card" style={{ padding: 24, display: 'grid', gap: 16 }}>
-          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 18, flexWrap: 'wrap' }}>
-            <div style={{ minWidth: 0 }}>
-              <div style={{ fontSize: 13, color: 'var(--text-3)', marginBottom: 8 }}>Result</div>
-              <div className={sink ? 'result-sink' : ''} style={{ fontSize: 72, fontFamily: 'Cinzel, serif', color: result ? 'var(--gold)' : 'var(--text)', minHeight: 98, display: 'flex', alignItems: 'center' }}>
-                {result || displayValue}
-              </div>
-            </div>
-            <button onClick={roll} disabled={rolling} style={{ background: 'var(--gold)', border: 'none', color: 'var(--text)', padding: '16px 26px', borderRadius: 14, fontSize: 18, fontWeight: 800, cursor: rolling ? 'default' : 'pointer', minWidth: 160, boxShadow: rolling ? 'none' : '0 18px 30px rgba(255,205,81,0.14)' }}>
-              Roll d20
-            </button>
-          </div>
-          <div style={{ fontSize: 14, color: 'var(--text-2)', lineHeight: 1.6 }}>
-            {result ? `Your dice landed on ${result}.` : 'Toss the d20 to see your next result.'}
-          </div>
-        </div>
-
-        <div className="card" style={{ padding: '16px 12px', background: 'var(--surface2)', border: '1px solid var(--border)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12, maxWidth: 320, margin: '0 auto' }}>
+        <div style={{ width: '100%', background: 'var(--surface2)', border: '1px solid var(--border)', padding: '16px 12px', borderRadius: 'var(--radius)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <style>{`
             .board-shell { width: 100%; max-width: 280px; aspect-ratio: 1 / 1; background: rgba(255,255,255,0.02); border: 2px solid var(--border); border-radius: 24px; position: relative; overflow: hidden; display:flex; align-items:center; justify-content:center; box-shadow: inset 0 10px 30px rgba(0,0,0,0.12); }
             .d20-spot { position: absolute; inset: 0; display:flex; align-items:center; justify-content:center; pointer-events:none; }
-            .d20 { display:flex; align-items:center; justify-content:center; width:96px; height:96px; }
+            .d20 { display:flex; align-items:center; justify-content:center; width:72px; height:72px; }
             .d20 svg { width:100%; height:100%; }
             .d20.rolling svg { animation: roll-spin 1200ms linear infinite; }
             @keyframes roll-spin { from { transform: rotate(0deg); } to { transform: rotate(720deg); } }
@@ -166,7 +149,14 @@ export default function Dice() {
           </div>
         </div>
 
-        
+        <div style={{ width: '100%', display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 12 }}>
+          <div className={sink ? 'result-sink' : ''} style={{ fontSize: 56, fontFamily: 'Cinzel, serif', color: result ? 'var(--gold)' : 'var(--text)' }}>
+            {result || displayValue}
+          </div>
+          <button onClick={roll} disabled={rolling} style={{ background: 'var(--gold)', border: 'none', color: 'var(--text)', padding: '12px 20px', borderRadius: 12, fontSize: 16, fontWeight: 800, cursor: rolling ? 'default' : 'pointer', whiteSpace: 'nowrap', boxShadow: rolling ? 'none' : '0 12px 24px rgba(255,205,81,0.14)' }}>
+            Roll d20
+          </button>
+        </div>
       </div>
     </div>
   )
