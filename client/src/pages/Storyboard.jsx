@@ -1,10 +1,57 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { api } from '../context/AuthContext'
 import { useCampaign } from '../context/CampaignContext'
 import { useToast } from '../hooks/useToast'
 
 const pollinationsUrl = (prompt) =>
-  `https://image.pollinations.ai/prompt/${encodeURIComponent(`fantasy dnd scene, ${prompt}, detailed illustration, dramatic lighting, high quality`)}?width=640&height=400&nologo=true&seed=${Math.floor(Math.random()*9999)}`
+  `https://image.pollinations.ai/prompt/${encodeURIComponent(
+    `fantasy dnd illustration, ${prompt}, detailed, dramatic lighting, painterly, high quality, no text`
+  )}?width=800&height=600&nologo=true&enhance=true&seed=${Math.floor(Math.random() * 99999)}`
+
+function Cover({ campaignName }) {
+  return (
+    <div style={{ position: 'absolute', inset: 0, display: 'flex' }}>
+      <div style={{ flex: 1, background: '#2d1f0e', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div style={{ fontSize: 64, opacity: 0.15 }}>⚔️</div>
+      </div>
+      <div style={{ flex: 1, background: 'radial-gradient(ellipse at center, #5c3a1e 0%, #2d1608 100%)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 48, gap: 12 }}>
+        <div style={{ width: 40, height: 2, background: '#c8a060' }} />
+        <div style={{ fontFamily: 'Cinzel, serif', fontSize: 11, color: '#c8a060', letterSpacing: '0.2em', textTransform: 'uppercase' }}>The Chronicles of</div>
+        <div style={{ fontFamily: 'Cinzel, serif', fontSize: 26, color: '#f0d090', textAlign: 'center', lineHeight: 1.3, fontWeight: 600 }}>{campaignName || 'Your Campaign'}</div>
+        <div style={{ width: 40, height: 2, background: '#c8a060' }} />
+        <div style={{ fontFamily: 'Georgia, serif', fontSize: 12, color: '#9a7a50', marginTop: 12, fontStyle: 'italic' }}>A visual storyboard</div>
+      </div>
+    </div>
+  )
+}
+
+function BookSpread({ card, index }) {
+  return (
+    <div style={{ position: 'absolute', inset: 0, display: 'flex' }}>
+      {/* Left — image */}
+      <div style={{ flex: 1, background: '#f8f5ef', borderRight: '2px solid #c8b89a', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', position: 'relative', boxShadow: 'inset -8px 0 20px rgba(0,0,0,0.08)' }}>
+        <div style={{ position: 'absolute', top: 14, left: 18, fontFamily: 'Cinzel, serif', fontSize: 10, color: '#a89070', letterSpacing: '0.1em', zIndex: 1 }}>SCENE {index + 1}</div>
+        {card.imageUrl
+          ? <img src={card.imageUrl} alt={card.title} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} onError={e => { e.target.style.display = 'none' }} />
+          : <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, color: '#c8b89a' }}><div style={{ fontSize: 40, opacity: 0.3 }}>✦</div><div style={{ fontSize: 11, fontFamily: 'Cinzel, serif' }}>Generating...</div></div>
+        }
+        <div style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: 24, background: 'linear-gradient(to left, rgba(0,0,0,0.07), transparent)', pointerEvents: 'none' }} />
+      </div>
+      {/* Right — text */}
+      <div style={{ flex: 1, background: '#fdfaf5', padding: '44px 40px', display: 'flex', flexDirection: 'column', position: 'relative', backgroundImage: 'repeating-linear-gradient(transparent, transparent 27px, #e8dcc8 28px)', backgroundPosition: '0 44px' }}>
+        <div style={{ position: 'absolute', top: 14, right: 18, fontFamily: 'Cinzel, serif', fontSize: 10, color: '#a89070', letterSpacing: '0.1em' }}>{index * 2 + 2}</div>
+        <h2 style={{ fontFamily: 'Cinzel, serif', fontSize: 20, color: '#2d1f0e', marginBottom: 20, lineHeight: 1.3, position: 'relative', zIndex: 1 }}>{card.title}</h2>
+        <p style={{ fontFamily: 'Georgia, serif', fontSize: 14, color: '#3d2d1a', lineHeight: 1.9, position: 'relative', zIndex: 1, flex: 1 }}>{card.description}</p>
+        {card.createdAt && (
+          <div style={{ fontSize: 10, color: '#a89070', fontFamily: 'Cinzel, serif', letterSpacing: '0.06em', marginTop: 20, position: 'relative', zIndex: 1 }}>
+            {new Date(card.createdAt).toLocaleDateString('en-AU', { day: 'numeric', month: 'long', year: 'numeric' })}
+          </div>
+        )}
+        <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: 24, background: 'linear-gradient(to right, rgba(0,0,0,0.04), transparent)', pointerEvents: 'none' }} />
+      </div>
+    </div>
+  )
+}
 
 export default function Storyboard() {
   const { activeCampaign } = useCampaign()
@@ -13,156 +60,162 @@ export default function Storyboard() {
   const [prompt, setPrompt] = useState('')
   const [title, setTitle] = useState('')
   const [generating, setGenerating] = useState(false)
-  const [chat, setChat] = useState([])
-  const [chatInput, setChatInput] = useState('')
-  const [chatLoading, setChatLoading] = useState(false)
+  const [currentPage, setCurrentPage] = useState(-1)
+  const [flipping, setFlipping] = useState(false)
+  const [showForm, setShowForm] = useState(false)
+  const scrollRef = useRef(null)
+  const scrollAccum = useRef(0)
+  const THRESHOLD = 80
 
   const load = useCallback(async () => {
     if (!activeCampaign) return
-    const data = await api(`/storyboard/${activeCampaign._id}`)
-    setCards(data)
+    setCards(await api(`/storyboard/${activeCampaign._id}`))
   }, [activeCampaign])
 
   useEffect(() => { load() }, [load])
+
+  const goTo = useCallback((dir) => {
+    if (flipping) return
+    const next = currentPage + dir
+    if (next < -1 || next > cards.length - 1) return
+    setFlipping(true)
+    setTimeout(() => { setCurrentPage(next); setFlipping(false) }, 350)
+  }, [currentPage, cards.length, flipping])
+
+  useEffect(() => {
+    const el = scrollRef.current
+    if (!el) return
+    const onWheel = (e) => {
+      e.preventDefault()
+      scrollAccum.current += e.deltaY
+      if (scrollAccum.current > THRESHOLD) { scrollAccum.current = 0; goTo(1) }
+      else if (scrollAccum.current < -THRESHOLD) { scrollAccum.current = 0; goTo(-1) }
+    }
+    el.addEventListener('wheel', onWheel, { passive: false })
+    return () => el.removeEventListener('wheel', onWheel)
+  }, [goTo])
+
+  useEffect(() => {
+    const el = scrollRef.current; if (!el) return
+    let startY = 0
+    const onStart = (e) => { startY = e.touches[0].clientY }
+    const onEnd = (e) => { const diff = startY - e.changedTouches[0].clientY; if (Math.abs(diff) > 40) goTo(diff > 0 ? 1 : -1) }
+    el.addEventListener('touchstart', onStart)
+    el.addEventListener('touchend', onEnd)
+    return () => { el.removeEventListener('touchstart', onStart); el.removeEventListener('touchend', onEnd) }
+  }, [goTo])
 
   const generate = async () => {
     if (!prompt.trim() || !activeCampaign) return
     setGenerating(true)
     const imageUrl = pollinationsUrl(prompt)
-    // Preload the image
-    await new Promise(resolve => { const img = new Image(); img.onload = img.onerror = resolve; img.src = imageUrl })
     try {
-      const card = await api(`/storyboard/${activeCampaign._id}`, {
-        method: 'POST',
-        body: { title: title || 'Scene', description: prompt, prompt, imageUrl }
-      })
-      setCards(p => [card, ...p])
-      setPrompt(''); setTitle('')
-      toast('Scene generated')
-    } catch { toast('Failed to save scene') }
+      const card = await api(`/storyboard/${activeCampaign._id}`, { method: 'POST', body: { title: title || 'Scene', description: prompt, prompt, imageUrl } })
+      const newCards = [...cards, card]
+      setCards(newCards)
+      setCurrentPage(newCards.length - 1)
+      setPrompt(''); setTitle(''); setShowForm(false)
+      toast('Scene added to your chronicle')
+    } catch { toast('Failed to save') }
     setGenerating(false)
   }
 
   const deleteCard = async (id) => {
     await api(`/storyboard/${id}`, { method: 'DELETE' })
     setCards(p => p.filter(c => c._id !== id))
-    toast('Removed')
+    setCurrentPage(p => Math.max(-1, p - 1))
+    toast('Scene removed')
   }
 
-  const sendChat = async () => {
-    if (!chatInput.trim()) return
-    const userMsg = chatInput.trim(); setChatInput('')
-    setChat(p => [...p, { role: 'user', text: userMsg }])
-    setChatLoading(true)
-    try {
-      const res = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          model: 'claude-sonnet-4-6', max_tokens: 400,
-          system: `You are a creative D&D storytelling assistant. Help the user craft vivid scene descriptions for their campaign storyboard. Keep responses concise and evocative. When the user describes a scene, suggest a great image prompt for it too, formatted as: IMAGE PROMPT: <prompt>`,
-          messages: [...chat.map(m => ({ role: m.role === 'user' ? 'user' : 'assistant', content: m.text })), { role: 'user', content: userMsg }]
-        })
-      })
-      const data = await res.json()
-      const text = data.content?.[0]?.text || 'No response'
-      setChat(p => [...p, { role: 'assistant', text }])
-      // Auto-fill prompt if AI suggested one
-      const match = text.match(/IMAGE PROMPT:\s*(.+)/i)
-      if (match) setPrompt(match[1].trim())
-    } catch { setChat(p => [...p, { role: 'assistant', text: 'Failed to get a response.' }]) }
-    setChatLoading(false)
-  }
+  if (!activeCampaign) return <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#c8a060', fontFamily: 'Cinzel, serif' }}>Select a campaign first.</div>
 
-  if (!activeCampaign) return (
-    <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-3)' }}>
-      Select a campaign first.
-    </div>
-  )
+  const onCover = currentPage === -1
+  const currentCard = cards[currentPage]
 
   return (
-    <div style={{ display: 'flex', height: '100%', overflow: 'hidden' }}>
-      {/* Gallery */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: 24 }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
-          <h2 style={{ fontSize: 18 }}>Storyboard</h2>
-          <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{cards.length} scenes</span>
+    <div style={{ height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden', background: '#1a1208' }}>
+      {/* Top bar */}
+      <div style={{ padding: '10px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#2d1f0e', borderBottom: '1px solid #4a3020', flexShrink: 0 }}>
+        <div style={{ fontFamily: 'Cinzel, serif', fontSize: 12, color: '#c8a060' }}>
+          {onCover ? activeCampaign.name : `Scene ${currentPage + 1} / ${cards.length}`}
         </div>
-
-        {/* Generate form */}
-        <div className="card" style={{ padding: 16, marginBottom: 20 }}>
-          <div style={{ display: 'flex', gap: 10, marginBottom: 10 }}>
-            <input className="input" placeholder="Scene title" value={title} onChange={e => setTitle(e.target.value)} style={{ width: 200 }} />
-            <input className="input" placeholder="Describe the scene to generate an image..." value={prompt} onChange={e => setPrompt(e.target.value)} style={{ flex: 1 }} onKeyDown={e => e.key === 'Enter' && !e.shiftKey && generate()} />
-            <button className="btn btn-gold" onClick={generate} disabled={generating || !prompt.trim()}>
-              {generating ? '...' : '✦ Generate'}
-            </button>
-          </div>
-          <div style={{ fontSize: 11, color: 'var(--text-3)' }}>
-            Tip: Use the AI chat → to describe your story and get image prompt suggestions.
-          </div>
-        </div>
-
-        {/* Cards grid */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 16 }}>
-          {cards.map(card => (
-            <div key={card._id} className="card" style={{ overflow: 'hidden' }}>
-              {card.imageUrl && (
-                <img src={card.imageUrl} alt={card.title}
-                  style={{ width: '100%', aspectRatio: '16/10', objectFit: 'cover', display: 'block' }}
-                  onError={e => e.target.style.display = 'none'} />
-              )}
-              <div style={{ padding: '12px 14px' }}>
-                <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
-                  <div style={{ fontFamily: 'Cinzel, serif', fontSize: 14, fontWeight: 600 }}>{card.title}</div>
-                  <button onClick={() => deleteCard(card._id)} style={{ background: 'none', border: 'none', color: 'var(--text-3)', cursor: 'pointer', fontSize: 16, flexShrink: 0 }}>✕</button>
-                </div>
-                <div style={{ fontSize: 12, color: 'var(--text-2)', marginTop: 4, lineHeight: 1.5 }}>{card.description}</div>
-              </div>
-            </div>
-          ))}
-          {!cards.length && (
-            <div style={{ gridColumn: '1/-1', textAlign: 'center', color: 'var(--text-3)', padding: 40, fontSize: 13 }}>
-              No scenes yet. Describe a moment above to generate the first one.
-            </div>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button onClick={() => setShowForm(f => !f)} style={{ background: showForm ? '#c8a060' : '#4a3020', border: 'none', color: showForm ? '#1a1208' : '#c8a060', padding: '6px 14px', borderRadius: 6, fontFamily: 'Cinzel, serif', fontSize: 11, cursor: 'pointer', letterSpacing: '0.05em' }}>
+            {showForm ? '✕ Close' : '+ Add Scene'}
+          </button>
+          {!onCover && currentCard && (
+            <button onClick={() => deleteCard(currentCard._id)} style={{ background: 'transparent', border: '1px solid #4a3020', color: '#8a6040', padding: '6px 10px', borderRadius: 6, fontSize: 12, cursor: 'pointer' }}>✕</button>
           )}
         </div>
       </div>
 
-      {/* AI Chat sidebar */}
-      <div style={{ width: 300, flexShrink: 0, borderLeft: '1px solid var(--border)', display: 'flex', flexDirection: 'column', background: 'var(--surface)' }}>
-        <div style={{ padding: '14px 16px', borderBottom: '1px solid var(--border)' }}>
-          <div style={{ fontFamily: 'Cinzel, serif', fontSize: 14, fontWeight: 600 }}>Story Assistant</div>
-          <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 2 }}>Describe your story — get image prompts</div>
+      {/* Form */}
+      {showForm && (
+        <div style={{ padding: '12px 20px', background: '#241808', borderBottom: '1px solid #4a3020', display: 'flex', gap: 10, alignItems: 'flex-end', flexShrink: 0 }}>
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <input className="input" placeholder="Scene title" value={title} onChange={e => setTitle(e.target.value)} style={{ background: '#3d2510', border: '1px solid #5a3a20', color: '#f0d090' }} />
+            <textarea className="input" rows={2} placeholder="Describe this scene — who was there, what happened, what it looked like..." value={prompt} onChange={e => setPrompt(e.target.value)} style={{ resize: 'none', background: '#3d2510', border: '1px solid #5a3a20', color: '#f0d090' }} />
+          </div>
+          <button onClick={generate} disabled={generating || !prompt.trim()} style={{ background: generating ? '#5a4020' : '#c8a060', border: 'none', color: '#1a1208', padding: '10px 18px', borderRadius: 6, fontFamily: 'Cinzel, serif', fontSize: 12, cursor: 'pointer', whiteSpace: 'nowrap', alignSelf: 'stretch', opacity: generating ? 0.7 : 1 }}>
+            {generating ? '✦ Writing...' : '✦ Generate'}
+          </button>
         </div>
-        <div style={{ flex: 1, overflowY: 'auto', padding: 14, display: 'flex', flexDirection: 'column', gap: 10 }}>
-          {!chat.length && (
-            <div style={{ fontSize: 12, color: 'var(--text-3)', lineHeight: 1.6 }}>
-              Tell me what happened in your last session. I'll help you write a scene description and suggest an image prompt.
+      )}
+
+      {/* Book viewport */}
+      <div ref={scrollRef} style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px', position: 'relative', overflow: 'hidden' }}>
+        <div style={{ width: '100%', maxWidth: 880, aspectRatio: '2/1.25', maxHeight: 'calc(100vh - 200px)', position: 'relative', boxShadow: '0 24px 80px rgba(0,0,0,0.7), 0 0 0 1px rgba(200,160,96,0.15)', borderRadius: 3 }}>
+          {/* Spine */}
+          <div style={{ position: 'absolute', left: '50%', top: 0, bottom: 0, width: 3, background: 'linear-gradient(to right, #3a2510, #8a6030, #3a2510)', zIndex: 10, transform: 'translateX(-50%)', boxShadow: '0 0 10px rgba(0,0,0,0.5)' }} />
+
+          {/* Cover */}
+          <div style={{ position: 'absolute', inset: 0, transition: 'opacity .35s', opacity: onCover ? 1 : 0, pointerEvents: onCover ? 'auto' : 'none' }}>
+            <Cover campaignName={activeCampaign?.name} />
+          </div>
+
+          {/* Pages with flip animation */}
+          {cards.map((card, i) => (
+            <div key={card._id} style={{
+              position: 'absolute', inset: 0,
+              opacity: i === currentPage ? 1 : 0,
+              transform: flipping && i === currentPage ? 'perspective(1200px) rotateY(-8deg) scale(0.98)' : 'perspective(1200px) rotateY(0deg) scale(1)',
+              transition: 'opacity .35s ease, transform .35s ease',
+              pointerEvents: i === currentPage ? 'auto' : 'none',
+              transformOrigin: 'left center',
+            }}>
+              <BookSpread card={card} index={i} />
+            </div>
+          ))}
+
+          {/* Empty */}
+          {cards.length === 0 && !onCover && (
+            <div style={{ position: 'absolute', inset: 0, background: '#fdfaf5', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 12, color: '#a89070' }}>
+              <div style={{ fontSize: 28, opacity: 0.3 }}>✦</div>
+              <div style={{ fontFamily: 'Cinzel, serif', fontSize: 13 }}>Your chronicle awaits</div>
             </div>
           )}
-          {chat.map((m, i) => (
-            <div key={i} style={{
-              padding: '8px 12px', borderRadius: 8, fontSize: 12, lineHeight: 1.6,
-              background: m.role === 'user' ? 'var(--gold-bg)' : 'var(--surface2)',
-              color: 'var(--text)', alignSelf: m.role === 'user' ? 'flex-end' : 'flex-start',
-              maxWidth: '90%', border: `1px solid ${m.role === 'user' ? 'var(--gold-border)' : 'var(--border)'}`,
-            }}>{m.text}</div>
-          ))}
-          {chatLoading && <div style={{ fontSize: 12, color: 'var(--text-3)' }}>Writing...</div>}
         </div>
-        <div style={{ padding: '10px 12px', borderTop: '1px solid var(--border)', display: 'flex', gap: 8 }}>
-          <textarea
-            className="input" rows={2}
-            style={{ flex: 1, resize: 'none', fontSize: 12, padding: '7px 10px' }}
-            placeholder="Describe your story..."
-            value={chatInput}
-            onChange={e => setChatInput(e.target.value)}
-            onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendChat() } }}
-          />
-          <button className="btn btn-primary btn-sm" onClick={sendChat} disabled={chatLoading} style={{ alignSelf: 'flex-end' }}>↑</button>
-        </div>
+
+        {/* Arrows */}
+        {[{ dir: -1, side: 'left', char: '‹', disabled: onCover }, { dir: 1, side: 'right', char: '›', disabled: currentPage >= cards.length - 1 }].map(({ dir, side, char, disabled }) => (
+          <button key={side} onClick={() => goTo(dir)} disabled={disabled || flipping} style={{
+            position: 'absolute', [side]: 12, top: '50%', transform: 'translateY(-50%)',
+            background: 'rgba(200,160,96,0.12)', border: '1px solid rgba(200,160,96,0.25)', color: '#c8a060',
+            width: 36, height: 36, borderRadius: '50%', fontSize: 20, cursor: 'pointer',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            opacity: disabled ? 0.2 : 0.8, transition: 'opacity .2s',
+          }}>{char}</button>
+        ))}
       </div>
+
+      {/* Dots */}
+      <div style={{ padding: '6px 0 10px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5, background: '#1a1208', flexShrink: 0 }}>
+        <div onClick={() => setCurrentPage(-1)} style={{ width: 5, height: 5, borderRadius: '50%', background: onCover ? '#c8a060' : '#4a3020', cursor: 'pointer', transition: 'background .2s' }} />
+        {cards.map((_, i) => (
+          <div key={i} onClick={() => setCurrentPage(i)} style={{ width: 5, height: 5, borderRadius: '50%', background: i === currentPage ? '#c8a060' : '#4a3020', cursor: 'pointer', transition: 'background .2s' }} />
+        ))}
+      </div>
+
       <ToastContainer />
     </div>
   )

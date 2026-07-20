@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import { CampaignProvider } from './context/CampaignContext'
+import { ThemeProvider } from './context/ThemeContext'
 import Shell from './components/Shell'
 import Auth from './pages/Auth'
 import Journal from './pages/Journal'
@@ -13,11 +14,7 @@ import Premium from './pages/Premium'
 
 function Guard() {
   const { user, loading } = useAuth()
-  if (loading) return (
-    <div style={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-3)', fontFamily: 'Cinzel, serif' }}>
-      Loading...
-    </div>
-  )
+  if (loading) return <div style={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-3)', fontFamily: 'Cinzel, serif' }}>Loading...</div>
   if (!user) return <Auth />
   return (
     <CampaignProvider>
@@ -40,10 +37,12 @@ function Guard() {
 
 export default function App() {
   return (
-    <BrowserRouter>
-      <AuthProvider>
-        <Guard />
-      </AuthProvider>
-    </BrowserRouter>
+    <ThemeProvider>
+      <BrowserRouter>
+        <AuthProvider>
+          <Guard />
+        </AuthProvider>
+      </BrowserRouter>
+    </ThemeProvider>
   )
 }
