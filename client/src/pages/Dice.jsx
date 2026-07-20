@@ -1,130 +1,119 @@
-import { useState, useMemo, useRef, useEffect } from 'react'
-
-const DEFAULT_DURATION = 2200
+import { useState, useEffect } from 'react'
 
 export default function Dice() {
   const [rolling, setRolling] = useState(false)
   const [result, setResult] = useState(null)
   const [displayValue, setDisplayValue] = useState(1)
-  const [slideDuration, setSlideDuration] = useState(DEFAULT_DURATION)
-  const d20Ref = useRef(null)
-
-  const track = useMemo(() => Array.from({ length: 20 }, (_, i) => 20 - i), [])
+  const [showConfetti, setShowConfetti] = useState(false)
+  const [sink, setSink] = useState(false)
 
   useEffect(() => {
-    const compute = () => {
-      const w = window.innerWidth
-      if (w <= 420) setSlideDuration(1600)
-      else if (w <= 768) setSlideDuration(2000)
-      else setSlideDuration(DEFAULT_DURATION)
-    }
-    compute()
-    window.addEventListener('resize', compute)
-    return () => window.removeEventListener('resize', compute)
-  }, [])
+    if (!showConfetti) return
+    const timeout = setTimeout(() => setShowConfetti(false), 1200)
+    return () => clearTimeout(timeout)
+  }, [showConfetti])
 
   const roll = () => {
     if (rolling) return
     setRolling(true)
     setResult(null)
+    setShowConfetti(false)
+    setSink(false)
+
     let count = 0
     const flick = setInterval(() => {
       count += 1
       setDisplayValue(Math.floor(Math.random() * 20) + 1)
-      if (count >= 24) clearInterval(flick)
+      if (count >= 18) clearInterval(flick)
     }, 60)
 
-    // reveal after animation duration
     setTimeout(() => {
       const finalValue = Math.floor(Math.random() * 20) + 1
       setDisplayValue(finalValue)
       setResult(finalValue)
+      if (finalValue === 20) setShowConfetti(true)
+      if (finalValue === 1) setSink(true)
       setRolling(false)
-    }, slideDuration)
+    }, 1200)
   }
 
   return (
     <div className="page-content" style={{ paddingBottom: 32 }}>
-      <div className="page-header-row" style={{ marginBottom: 24 }}>
-        <div>
-          <h2 style={{ fontSize: 22, marginBottom: 6 }}>Dice Tower</h2>
-          <p style={{ color: 'var(--text-2)', fontSize: 14, margin: 0 }}>Roll a d20 down the castle slide and see where it lands.</p>
-        </div>
-        <button className="btn btn-primary" onClick={roll} disabled={rolling} style={{ minWidth: 160 }}>
-          {rolling ? 'Rolling…' : 'Roll d20'}
-        </button>
-      </div>
-
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 18, maxWidth: 720, margin: '0 auto' }}>
-        <div className="card" style={{ padding: 20, background: 'var(--surface2)', border: '1px solid var(--border)' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-            <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)' }}>Castle Slide</div>
-            <div style={{ fontSize: 12, color: 'var(--text-3)' }}>1-20 random chance</div>
+      <div style={{ display: 'grid', gap: 18, maxWidth: 720, margin: '0 auto' }}>
+        <div className="card" style={{ padding: 24, display: 'grid', gap: 16 }}>
+          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 18, flexWrap: 'wrap' }}>
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontSize: 13, color: 'var(--text-3)', marginBottom: 8 }}>Result</div>
+              <div className={sink ? 'result-sink' : ''} style={{ fontSize: 72, fontFamily: 'Cinzel, serif', color: result ? 'var(--gold)' : 'var(--text)', minHeight: 98, display: 'flex', alignItems: 'center' }}>
+                {result || displayValue}
+              </div>
+            </div>
+            <button onClick={roll} disabled={rolling} style={{ background: 'var(--gold)', border: 'none', color: 'var(--text)', padding: '16px 26px', borderRadius: 14, fontSize: 18, fontWeight: 800, cursor: rolling ? 'default' : 'pointer', minWidth: 160, boxShadow: rolling ? 'none' : '0 18px 30px rgba(255,205,81,0.14)' }}>
+              Roll d20
+            </button>
           </div>
-          <div style={{ height: 420, overflow: 'hidden', background: 'linear-gradient(180deg, rgba(255,255,255,0.08), transparent 35%), var(--surface)', borderRadius: 20, border: '1px solid var(--border)', position: 'relative', padding: 16 }}>
-            <style>{`
-              .slide-wrap{ position:relative; width:100%; height:100%; }
-              .slide-svg{ width:100%; height:100%; display:block }
-              .d20{ position:absolute; width:56px; height:56px; background:linear-gradient(135deg,#f7ecd6,#e6caa0); border-radius:12px; display:flex; align-items:center; justify-content:center; font-weight:700; color:var(--text); box-shadow:0 6px 18px rgba(0,0,0,0.35); transform-origin:center; left:0; top:0 }
-              @keyframes slideMotion { from { offset-distance: 0%; transform: rotate(0deg); } to { offset-distance: 100%; transform: rotate(720deg); } }
-              .d20.rolling{ offset-path: path('M8 24 C80 14 160 18 240 36 C320 56 380 110 420 140'); -webkit-offset-path: path("M8 24 C80 14 160 18 240 36 C320 56 380 110 420 140"); animation: slideMotion ${slideDuration}ms cubic-bezier(.18,.9,.18,1) forwards; }
-            `}</style>
+          <div style={{ fontSize: 14, color: 'var(--text-2)', lineHeight: 1.6 }}>
+            {result ? `Your dice landed on ${result}.` : 'Toss the d20 to see your next result.'}
+          </div>
+        </div>
 
-            <div className="slide-wrap">
-              <svg className="slide-svg" viewBox="0 0 440 160" preserveAspectRatio="xMidYMid meet">
-                <defs>
-                  <linearGradient id="g1" x1="0" x2="1"><stop offset="0" stopColor="#e8d8b8" /><stop offset="1" stopColor="#caa879" /></linearGradient>
-                </defs>
-                <g stroke="#3a2510" strokeWidth="4" strokeLinecap="round">
-                  <line x1="40" y1="20" x2="40" y2="140" strokeOpacity="0.9" />
-                  <line x1="140" y1="30" x2="140" y2="140" strokeOpacity="0.9" />
-                  <line x1="240" y1="40" x2="240" y2="140" strokeOpacity="0.9" />
-                  <line x1="340" y1="60" x2="340" y2="140" strokeOpacity="0.9" />
-                </g>
-                <path d="M8 24 C80 14 160 18 240 36 C320 56 380 110 420 140" fill="none" stroke="url(#g1)" strokeWidth="18" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-                <div ref={d20Ref} className={`d20 ${rolling ? 'rolling' : ''}`} style={{ offsetDistance: '0%' }}>
-                  {/* SVG icosahedron-like face: stylized 2D projection with triangular facets */}
-                  <svg viewBox="0 0 100 100" width="56" height="56" style={{ display: 'block' }}>
-                    <defs>
-                      <linearGradient id="d20g" x1="0" x2="1"><stop offset="0" stopColor="#f7ecd6" /><stop offset="1" stopColor="#e6caa0" /></linearGradient>
-                    </defs>
-                    <g transform="translate(50,50) scale(0.9)">
-                      <circle r="46" fill="url(#d20g)" stroke="#3a2510" strokeWidth="2" />
-                      {/* simple triangular facet overlay to evoke a d20 */}
-                      <g stroke="#3a2510" strokeWidth="1" fill="none">
-                        <path d="M0,-42 L20,-8 L-20,-8 Z" />
-                        <path d="M-20,-8 L0,30 L-40,6 Z" />
-                        <path d="M20,-8 L40,6 L0,30 Z" />
-                        <path d="M-40,6 L-8,6 L-20,-8 Z" />
-                        <path d="M40,6 L8,6 L20,-8 Z" />
-                        <path d="M-8,6 L0,30 L8,6 Z" />
-                      </g>
-                      <text x="0" y="8" textAnchor="middle" fontFamily="Cinzel, serif" fontSize="28" fill="#2f2216">{rolling ? '' : (result || '?')}</text>
+        <div className="card" style={{ padding: 20, background: 'var(--surface2)', border: '1px solid var(--border)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: 360 }}>
+          <style>{`
+            .board-shell { width: 100%; max-width: 320px; aspect-ratio: 1 / 1; background: rgba(255,255,255,0.04); border: 2px solid var(--border); border-radius: 24px; position: relative; overflow: hidden; }
+            .board-grid { position: absolute; inset: 0; display: grid; grid-template-columns: repeat(4, 1fr); grid-template-rows: repeat(4, 1fr); gap: 10px; padding: 16px; }
+            .board-cell { border: 1px solid rgba(255,255,255,0.05); border-radius: 14px; background: rgba(255,255,255,0.02); }
+            .d20-spot { position: absolute; inset: 0; display:flex; align-items:center; justify-content:center; pointer-events:none; }
+            .d20 { display:flex; align-items:center; justify-content:center; width:96px; height:96px; }
+            .d20 svg { width:100%; height:100%; }
+            .d20.rolling svg { animation: roll-spin 1200ms linear infinite; }
+            @keyframes roll-spin { from { transform: rotate(0deg); } to { transform: rotate(720deg); } }
+            .confetti-piece { position:absolute; width:6px; height:16px; background:rgba(255,255,255,0.94); opacity:0.95; border-radius: 3px; animation: confetti-fall 1200ms ease-out forwards; }
+            @keyframes confetti-fall { 0%{ transform: translateY(0) rotate(0); opacity:1 } 100%{ transform: translateY(88px) rotate(720deg); opacity:0 } }
+            .result-sink { animation: sink 900ms ease-in-out forwards; }
+            @keyframes sink { 0%{ transform: translateY(0) scale(1) } 100%{ transform: translateY(14px) scale(0.94) } }
+          `}</style>
+
+          <div className="board-shell">
+            <div className="board-grid">
+              {Array.from({ length: 16 }).map((_, i) => <div key={i} className="board-cell" />)}
+            </div>
+            <div className="d20-spot">
+              <div className={`d20 ${rolling ? 'rolling' : ''}`}>
+                <svg viewBox="0 0 100 100" style={{ display: 'block' }}>
+                  <g transform="translate(50,50) scale(0.9)">
+                    <path d="M0,-42 L34,-13 L20,35 L-20,35 L-34,-13 Z" fill="none" stroke="var(--gold)" strokeWidth="4" />
+                    <g stroke="var(--text)" strokeWidth="2" fill="none">
+                      <path d="M0,-42 L0,35" />
+                      <path d="M34,-13 L-34,-13" />
+                      <path d="M20,35 L-20,35" />
+                      <path d="M0,-42 L20,35" />
+                      <path d="M0,-42 L-20,35" />
                     </g>
-                  </svg>
-                </div>
+                    <text x="0" y="8" textAnchor="middle" fontFamily="Cinzel, serif" fontSize="28" fill="var(--text)">{rolling ? '' : (result || '?')}</text>
+                  </g>
+                </svg>
+              </div>
             </div>
-
-            <div style={{ position: 'absolute', left: 12, right: 12, bottom: 12, display: 'grid', gridTemplateRows: 'repeat(20, 1fr)', gap: 8 }}>
-              {track.map((value, index) => (
-                <div key={value} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 12px', borderRadius: 8, background: index % 2 === 0 ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.03)', color: 'var(--text)', border: '1px solid rgba(0,0,0,0.04)' }}>
-                  <span style={{ fontWeight: 600 }}>{value}</span>
-                  {displayValue === value && rolling && <span style={{ fontSize: 11, color: 'var(--gold)' }}>Rolling</span>}
-                  {displayValue === value && result === value && !rolling && <span style={{ fontSize: 11, color: 'var(--green)' }}>Landed</span>}
-                </div>
-              ))}
-            </div>
+            {showConfetti && [10, 25, 40, 55, 70, 85].map((left, idx) => (
+              <div key={idx} className="confetti-piece" style={{ left: `${left}%`, top: `${10 + idx * 4}%`, animationDelay: `${idx * 80}ms` }} />
+            ))}
           </div>
         </div>
 
-        <div className="card" style={{ padding: 24, textAlign: 'center' }}>
-          <div style={{ fontSize: 13, color: 'var(--text-3)', marginBottom: 10 }}>Result</div>
-          <div style={{ fontSize: 72, fontFamily: 'Cinzel, serif', color: result ? 'var(--gold)' : 'var(--text)', minHeight: 100, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            {result || displayValue}
+        <div className="card" style={{ padding: 24, textAlign: 'center', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+          <div style={{ textAlign: 'left' }}>
+            <div style={{ fontSize: 13, color: 'var(--text-3)', marginBottom: 10 }}>Result</div>
+            <div className={sink ? 'result-sink' : ''} style={{ fontSize: 72, fontFamily: 'Cinzel, serif', color: result ? 'var(--gold)' : 'var(--text)', minHeight: 100, display: 'flex', alignItems: 'center', justifyContent: 'flex-start' }}>
+              {result || displayValue}
+            </div>
+            <div style={{ fontSize: 14, color: 'var(--text-2)' }}>
+              {result ? `Your dice landed on ${result}.` : 'Tap roll to send the d20 on the board.'}
+            </div>
           </div>
-          <div style={{ fontSize: 14, color: 'var(--text-2)' }}>
-            {result ? `Your dice landed on ${result}.` : 'Tap roll to send the d20 down the slide.'}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <button onClick={roll} disabled={rolling} style={{ background: 'var(--gold)', border: 'none', color: 'var(--text)', padding: '14px 22px', borderRadius: 12, fontSize: 18, fontWeight: 800, cursor: 'pointer', minWidth: 160 }}>
+              {rolling ? 'Rolling…' : 'Roll d20'}
+            </button>
           </div>
         </div>
       </div>
