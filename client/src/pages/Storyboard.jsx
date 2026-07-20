@@ -10,15 +10,11 @@ const pollinationsUrl = (prompt, width = 1200, height = 900) =>
   )}?width=${width}&height=${height}&nologo=true&enhance=true&seed=${Math.floor(Math.random() * 99999)}`
 
 function Cover({ campaignName }) {
-  // Single-front cover (no visible back)
+  // Single-page cover showing only the campaign name (right-page style)
   return (
-    <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'radial-gradient(circle at top, rgba(255,255,255,0.08), transparent 35%), var(--bg)' }}>
-      <div style={{ width: '74%', height: '80%', borderRadius: 18, background: 'var(--surface)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 36, boxShadow: 'inset 0 8px 30px rgba(0,0,0,0.12)' }}>
-        <div style={{ width: 40, height: 2, background: 'var(--gold)', marginBottom: 8 }} />
-        <div style={{ fontFamily: 'Cinzel, serif', fontSize: 11, color: 'var(--gold)', letterSpacing: '0.2em', textTransform: 'uppercase' }}>The Chronicles of</div>
-        <div style={{ fontFamily: 'Cinzel, serif', fontSize: 28, color: 'var(--text)', textAlign: 'center', lineHeight: 1.2, fontWeight: 700, marginTop: 8 }}>{campaignName || 'Your Campaign'}</div>
-        <div style={{ width: 40, height: 2, background: 'var(--gold)', marginTop: 10 }} />
-        <div style={{ fontFamily: 'Georgia, serif', fontSize: 12, color: 'var(--text-2)', marginTop: 12, fontStyle: 'italic' }}>A visual storyboard</div>
+    <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'radial-gradient(circle at top, rgba(255,255,255,0.02), transparent 35%), var(--bg)' }}>
+      <div style={{ width: '46%', height: '84%', borderRadius: 18, background: 'var(--surface)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24, boxShadow: 'inset 0 8px 20px rgba(0,0,0,0.08)' }}>
+        <div style={{ fontFamily: 'Cinzel, serif', fontSize: 28, color: 'var(--text)', textAlign: 'center', lineHeight: 1.2, fontWeight: 700 }}>{campaignName || 'Your Campaign'}</div>
       </div>
     </div>
   )
