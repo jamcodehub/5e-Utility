@@ -3,22 +3,20 @@ import { api } from '../context/AuthContext'
 import { useCampaign } from '../context/CampaignContext'
 import { useToast } from '../hooks/useToast'
 
-const pollinationsUrl = (prompt) =>
+const pollinationsUrl = (prompt, width = 1200, height = 900) =>
   `https://image.pollinations.ai/prompt/${encodeURIComponent(
-    `fantasy dnd illustration, ${prompt}, detailed, dramatic lighting, painterly, high quality, no text`
-  )}?width=800&height=600&nologo=true&enhance=true&seed=${Math.floor(Math.random() * 99999)}`
+    `fantasy cartoon illustration, consistent character style, ${prompt}, high detail, no text, clean linework, vibrant colors`
+  )}?width=${width}&height=${height}&nologo=true&enhance=true&seed=${Math.floor(Math.random() * 99999)}`
 
 function Cover({ campaignName }) {
+  // Single-front cover (no visible back)
   return (
-    <div style={{ position: 'absolute', inset: 0, display: 'flex' }}>
-      <div style={{ flex: 1, background: '#2d1f0e', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <div style={{ fontSize: 64, opacity: 0.15 }}>⚔️</div>
-      </div>
-      <div style={{ flex: 1, background: 'radial-gradient(ellipse at center, #5c3a1e 0%, #2d1608 100%)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 48, gap: 12 }}>
-        <div style={{ width: 40, height: 2, background: '#c8a060' }} />
+    <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'radial-gradient(ellipse at center, #5c3a1e 0%, #2d1608 100%)' }}>
+      <div style={{ width: '74%', height: '80%', borderRadius: 8, background: '#2d1f0e', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 36, boxShadow: 'inset 0 8px 30px rgba(0,0,0,0.4)' }}>
+        <div style={{ width: 40, height: 2, background: '#c8a060', marginBottom: 8 }} />
         <div style={{ fontFamily: 'Cinzel, serif', fontSize: 11, color: '#c8a060', letterSpacing: '0.2em', textTransform: 'uppercase' }}>The Chronicles of</div>
-        <div style={{ fontFamily: 'Cinzel, serif', fontSize: 26, color: '#f0d090', textAlign: 'center', lineHeight: 1.3, fontWeight: 600 }}>{campaignName || 'Your Campaign'}</div>
-        <div style={{ width: 40, height: 2, background: '#c8a060' }} />
+        <div style={{ fontFamily: 'Cinzel, serif', fontSize: 28, color: '#f0d090', textAlign: 'center', lineHeight: 1.2, fontWeight: 700, marginTop: 8 }}>{campaignName || 'Your Campaign'}</div>
+        <div style={{ width: 40, height: 2, background: '#c8a060', marginTop: 10 }} />
         <div style={{ fontFamily: 'Georgia, serif', fontSize: 12, color: '#9a7a50', marginTop: 12, fontStyle: 'italic' }}>A visual storyboard</div>
       </div>
     </div>
@@ -61,7 +59,7 @@ export default function Storyboard() {
   const [title, setTitle] = useState('')
   const [generating, setGenerating] = useState(false)
   const [currentPage, setCurrentPage] = useState(-1)
-  const [flipping, setFlipping] = useState(false)
+  const bookRef = useRef(null)
   const [showForm, setShowForm] = useState(false)
   const scrollRef = useRef(null)
   const scrollAccum = useRef(0)
@@ -75,12 +73,11 @@ export default function Storyboard() {
   useEffect(() => { load() }, [load])
 
   const goTo = useCallback((dir) => {
-    if (flipping) return
     const next = currentPage + dir
     if (next < -1 || next > cards.length - 1) return
-    setFlipping(true)
-    setTimeout(() => { setCurrentPage(next); setFlipping(false) }, 350)
-  }, [currentPage, cards.length, flipping])
+    // Snap immediately — no animation
+    setCurrentPage(next)
+  }, [currentPage, cards.length])
 
   useEffect(() => {
     const el = scrollRef.current
@@ -108,7 +105,17 @@ export default function Storyboard() {
   const generate = async () => {
     if (!prompt.trim() || !activeCampaign) return
     setGenerating(true)
-    const imageUrl = pollinationsUrl(prompt)
+    // compute left-page dimensions from book viewport (half width)
+    const rect = bookRef.current?.getBoundingClientRect()
+    let w = 1200, h = 900
+    if (rect) {
+      const leftW = Math.max(360, Math.round(rect.width / 2))
+      const pageH = Math.max(360, Math.round(rect.height))
+      // upscale for HD / retina
+      w = leftW * 2
+      h = pageH * 2
+    }
+    const imageUrl = pollinationsUrl(prompt, w, h)
     try {
       const card = await api(`/storyboard/${activeCampaign._id}`, { method: 'POST', body: { title: title || 'Scene', description: prompt, prompt, imageUrl } })
       const newCards = [...cards, card]
@@ -164,7 +171,7 @@ export default function Storyboard() {
 
       {/* Book viewport */}
       <div ref={scrollRef} style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px', position: 'relative', overflow: 'hidden' }}>
-        <div style={{ width: '100%', maxWidth: 880, aspectRatio: '2/1.25', maxHeight: 'calc(100vh - 200px)', position: 'relative', boxShadow: '0 24px 80px rgba(0,0,0,0.7), 0 0 0 1px rgba(200,160,96,0.15)', borderRadius: 3 }}>
+        <div className="book-viewport" style={{ boxShadow: '0 24px 80px rgba(0,0,0,0.7), 0 0 0 1px rgba(200,160,96,0.15)', borderRadius: 3 }}>
           {/* Spine */}
           <div style={{ position: 'absolute', left: '50%', top: 0, bottom: 0, width: 3, background: 'linear-gradient(to right, #3a2510, #8a6030, #3a2510)', zIndex: 10, transform: 'translateX(-50%)', boxShadow: '0 0 10px rgba(0,0,0,0.5)' }} />
 
@@ -178,10 +185,8 @@ export default function Storyboard() {
             <div key={card._id} style={{
               position: 'absolute', inset: 0,
               opacity: i === currentPage ? 1 : 0,
-              transform: flipping && i === currentPage ? 'perspective(1200px) rotateY(-8deg) scale(0.98)' : 'perspective(1200px) rotateY(0deg) scale(1)',
-              transition: 'opacity .35s ease, transform .35s ease',
+              transition: 'none',
               pointerEvents: i === currentPage ? 'auto' : 'none',
-              transformOrigin: 'left center',
             }}>
               <BookSpread card={card} index={i} />
             </div>

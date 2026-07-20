@@ -2,6 +2,7 @@ import { NavLink, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useCampaign } from '../context/CampaignContext'
 import { useState, useEffect } from 'react'
+import SettingsModal from './SettingsModal'
 
 const NAV = [
   { to: '/journal',    label: 'Journal',    icon: '📖' },
@@ -31,6 +32,7 @@ export default function Shell({ children }) {
   const [newName, setNewName]   = useState('')
   const [error, setError]       = useState('')
   const [showCampaigns, setShowCampaigns] = useState(false)
+  const [showSettings, setShowSettings] = useState(false)
 
   const handleCreate = async (e) => {
     e.preventDefault()
@@ -69,6 +71,7 @@ export default function Shell({ children }) {
               {activeCampaign?.name || 'Campaign'} ▾
             </button>
             {!isPremium && <button onClick={() => navigate('/premium')} style={{ background: 'none', border: 'none', color: 'var(--gold)', fontSize: 16, cursor: 'pointer' }}>✦</button>}
+            <button onClick={() => setShowSettings(true)} title="Settings" style={{ background: 'none', border: 'none', color: 'var(--text-3)', fontSize: 16, cursor: 'pointer' }}>⚙️</button>
             <button onClick={logout} style={{ background: 'none', border: 'none', color: 'var(--text-3)', fontSize: 16, cursor: 'pointer' }}>↩</button>
           </div>
         </div>
@@ -160,12 +163,14 @@ export default function Shell({ children }) {
               <div style={{ fontSize: 13, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user?.username}{isPremium && <span style={{ fontSize: 10, color: 'var(--gold)', marginLeft: 4 }}>✦ PRO</span>}</div>
               <div style={{ fontSize: 11, color: 'var(--text-3)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user?.email}</div>
             </div>
+            <button onClick={() => setShowSettings(true)} title="Settings" style={{ background: 'none', border: 'none', color: 'var(--text-3)', cursor: 'pointer', fontSize: 16, padding: 4 }}>⚙️</button>
             <button onClick={logout} title="Sign out" style={{ background: 'none', border: 'none', color: 'var(--text-3)', cursor: 'pointer', fontSize: 16, padding: 4 }}>↩</button>
           </div>
         </div>
       </aside>
 
       <main style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>{children}</main>
+      {showSettings && <SettingsModal onClose={() => setShowSettings(false)} />}
     </div>
   )
 }

@@ -55,9 +55,9 @@ export default function Journal() {
   )
 
   return (
-    <div style={{ display: 'flex', height: '100%', overflow: 'hidden' }}>
+    <div className="journal-layout" style={{ display: 'flex', height: '100%', overflow: 'hidden' }}>
       {/* Day list */}
-      <div style={{ width: 180, flexShrink: 0, borderRight: '1px solid var(--border)', overflowY: 'auto', background: 'var(--surface)' }}>
+      <div className="journal-day-list" style={{ width: 180, flexShrink: 0, borderRight: '1px solid var(--border)', overflowY: 'auto', background: 'var(--surface)' }}>
         <div style={{ padding: '14px 14px 8px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Days</span>
           <button className="btn btn-ghost btn-sm" onClick={newDay} style={{ padding: '3px 8px' }}>+</button>

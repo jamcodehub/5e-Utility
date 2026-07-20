@@ -60,6 +60,16 @@ input, textarea, select { font-family: inherit; }
   box-shadow: var(--shadow);
 }
 
+/* stat grid for character page */
+.stat-grid-6 { display: grid; grid-template-columns: repeat(6, 1fr); gap: 10px; }
+
+/* book viewport helper for storyboard */
+.book-viewport { width: 100%; max-width: 880px; aspect-ratio: 2 / 1.25; max-height: calc(100vh - 200px); position: relative; }
+
+/* journal defaults (overridden on mobile) */
+.journal-layout { display: flex; height: 100%; overflow: hidden; }
+.journal-day-list { width: 180px; flex-shrink: 0; border-right: 1px solid var(--border); overflow-y: auto; background: var(--surface); }
+
 .tag { display: inline-flex; align-items: center; padding: 2px 8px; border-radius: 20px; font-size: 11px; font-weight: 500; }
 .tag-npc      { background: #eff6ff; color: #1d4ed8; }
 .tag-location { background: #f0fdf4; color: #166534; }

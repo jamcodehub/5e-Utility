@@ -150,7 +150,7 @@ export default function Character() {
       </div>
 
       {tab === 'stats' && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 10 }}>
+        <div className="stat-grid-6">
           {STAT_KEYS.map(k => (
             <div key={k} className="card" style={{ padding: '12px 6px', textAlign: 'center' }}>
               <div style={{ fontSize: 9, fontWeight: 600, color: 'var(--text-3)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 4 }}>{STAT_LABELS[k]}</div>
@@ -164,7 +164,7 @@ export default function Character() {
       )}
 
       {tab === 'skills' && (
-        <div className="card" style={{ padding: 0, overflow: 'hidden', maxWidth: 420 }}>
+        <div className="card" style={{ padding: 0, overflow: 'hidden', maxWidth: 640 }}>
           <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <span style={{ fontSize: 11, color: 'var(--text-2)' }}>Click dot to toggle proficiency</span>
             <button className="btn btn-primary btn-sm" onClick={save}>Save</button>
@@ -175,8 +175,8 @@ export default function Character() {
             const bonus = Math.floor((statVal - 10) / 2) + (isProficient ? (F.profBonus ?? 2) : 0)
             return (
               <div key={s.name} style={{
-                display: 'grid', gridTemplateColumns: '20px 1fr 36px 36px',
-                alignItems: 'center', gap: 8, padding: '7px 14px',
+                display: 'grid', gridTemplateColumns: '20px 1fr 56px',
+                alignItems: 'center', gap: 8, padding: '8px 12px',
                 borderBottom: i < SKILLS.length - 1 ? '1px solid var(--border)' : 'none',
                 background: isProficient ? 'var(--gold-bg)' : 'transparent',
               }}>
@@ -186,8 +186,10 @@ export default function Character() {
                   border: `2px solid ${isProficient ? 'var(--gold)' : 'var(--border-strong)'}`,
                   transition: 'all .15s', padding: 0,
                 }} />
-                <div style={{ fontSize: 12, color: isProficient ? 'var(--text)' : 'var(--text-2)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{s.name}</div>
-                <div style={{ fontSize: 10, color: 'var(--text-3)', textAlign: 'center' }}>{STAT_LABELS[s.stat]}</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: isProficient ? 'var(--text)' : 'var(--text-2)' }}>
+                  <div style={{ flex: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{s.name}</div>
+                  <div style={{ fontSize: 10, color: 'var(--text-3)' }}>{STAT_LABELS[s.stat]}</div>
+                </div>
                 <div style={{ fontFamily: 'Cinzel, serif', textAlign: 'right', color: bonus >= 0 ? 'var(--green)' : 'var(--red)', fontSize: 13, fontWeight: 600 }}>
                   {bonus >= 0 ? `+${bonus}` : bonus}
                 </div>

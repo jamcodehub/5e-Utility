@@ -48,6 +48,7 @@ const StoryCardSchema = new Schema({
 const CharacterSchema = new Schema({
   campaign:     { type: Schema.Types.ObjectId, ref: 'Campaign', required: true },
   owner:        { type: Schema.Types.ObjectId, ref: 'User', required: true },
+  avatarUrl:    { type: String },
   name:         String,
   race:         String,
   class:        String,
