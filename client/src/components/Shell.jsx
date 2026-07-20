@@ -5,12 +5,12 @@ import { useState, useEffect } from 'react'
 import SettingsModal from './SettingsModal'
 
 const NAV = [
-  { to: '/journal',    label: 'Journal',    icon: '📖' },
-  { to: '/storyboard', label: 'Storyboard', icon: '🖼️' },
-  { to: '/lore',       label: 'Lore',       icon: '🗺️' },
-  { to: '/character',  label: 'Character',  icon: '⚔️' },
-  { to: '/inventory',  label: 'Inventory',  icon: '🎒' },
-  { to: '/dice',       label: 'Dice',       icon: '🎲' },
+  { to: '/journal',    label: 'Journal',    icon: '⋆' },
+  { to: '/storyboard', label: 'Storyboard', icon: '𖥔' },
+  { to: '/lore',       label: 'Lore',       icon: '݁' },
+  { to: '/character',  label: 'Character',  icon: '˖₊˚ʚ' },
+  { to: '/inventory',  label: 'Inventory',  icon: 'ᗢ₊˚✧' },
+  { to: '/dice',       label: 'Dice',       icon: '✧' },
 ]
 
 function useIsMobile() {

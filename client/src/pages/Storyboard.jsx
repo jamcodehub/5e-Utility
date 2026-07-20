@@ -12,10 +12,10 @@ const pollinationsUrl = (prompt, width = 1200, height = 900) =>
 function Cover({ campaignName }) {
   // Single cover page (closed book front cover)
   return (
-    <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--surface2)' }}>
-      <div style={{ textAlign: 'center', padding: 40, maxWidth: '80%' }}>
-        <div style={{ fontFamily: 'Cinzel, serif', fontSize: 36, color: 'var(--text)', lineHeight: 1.4, fontWeight: 700, letterSpacing: '0.02em' }}>{campaignName || 'Your Campaign'}</div>
-        <div style={{ fontSize: 13, color: 'var(--text-3)', marginTop: 24, letterSpacing: '0.1em', fontFamily: 'Cinzel, serif' }}>CHRONICLE</div>
+    <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(135deg, #4a3627, #402e22 35%, #513e2a 100%)' }}>
+      <div style={{ width: '100%', height: '100%', maxWidth: '760px', maxHeight: '100%', borderRadius: 28, border: '1px solid rgba(255,255,255,0.08)', boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.04), inset 0 0 20px rgba(0,0,0,0.15)', padding: 40, display: 'flex', flexDirection: 'column', justifyContent: 'center', background: 'linear-gradient(180deg, rgba(131,92,64,0.95), rgba(95,65,46,0.95)), radial-gradient(circle at 20% 20%, rgba(255,255,255,0.05), transparent 25%)' }}>
+        <div style={{ fontFamily: 'Cinzel, serif', fontSize: 34, color: '#f3e7cd', lineHeight: 1.2, fontWeight: 700, letterSpacing: '0.06em', textAlign: 'center', textShadow: '0 1px 2px rgba(0,0,0,0.3)' }}>{campaignName || 'Your Campaign'}</div>
+        <div style={{ marginTop: 18, fontSize: 12, color: '#e6d7b0', letterSpacing: '0.2em', fontFamily: 'Cinzel, serif', textAlign: 'center' }}>CHRONICLE</div>
       </div>
     </div>
   )
