@@ -115,7 +115,15 @@ export default function Storyboard() {
       w = leftW * 2
       h = pageH * 2
     }
-    const imageUrl = pollinationsUrl(prompt, w, h)
+    // include saved character appearance prompt for consistency, if present
+    let finalPrompt = prompt
+    try {
+      const char = await api(`/campaigns/${activeCampaign._id}/character`)
+      if (char?.appearancePrompt) finalPrompt = `${char.appearancePrompt}, ${prompt}`
+    } catch (e) {
+      // ignore — fallback to user prompt
+    }
+    const imageUrl = pollinationsUrl(finalPrompt, w, h)
     try {
       const card = await api(`/storyboard/${activeCampaign._id}`, { method: 'POST', body: { title: title || 'Scene', description: prompt, prompt, imageUrl } })
       const newCards = [...cards, card]
@@ -171,7 +179,7 @@ export default function Storyboard() {
 
       {/* Book viewport */}
       <div ref={scrollRef} style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px', position: 'relative', overflow: 'hidden' }}>
-        <div className="book-viewport" style={{ boxShadow: '0 24px 80px rgba(0,0,0,0.7), 0 0 0 1px rgba(200,160,96,0.15)', borderRadius: 3 }}>
+        <div ref={bookRef} className="book-viewport" style={{ boxShadow: '0 24px 80px rgba(0,0,0,0.7), 0 0 0 1px rgba(200,160,96,0.15)', borderRadius: 3 }}>
           {/* Spine */}
           <div style={{ position: 'absolute', left: '50%', top: 0, bottom: 0, width: 3, background: 'linear-gradient(to right, #3a2510, #8a6030, #3a2510)', zIndex: 10, transform: 'translateX(-50%)', boxShadow: '0 0 10px rgba(0,0,0,0.5)' }} />
 
@@ -202,8 +210,8 @@ export default function Storyboard() {
         </div>
 
         {/* Arrows */}
-        {[{ dir: -1, side: 'left', char: '‹', disabled: onCover }, { dir: 1, side: 'right', char: '›', disabled: currentPage >= cards.length - 1 }].map(({ dir, side, char, disabled }) => (
-          <button key={side} onClick={() => goTo(dir)} disabled={disabled || flipping} style={{
+          {[{ dir: -1, side: 'left', char: '‹', disabled: onCover }, { dir: 1, side: 'right', char: '›', disabled: currentPage >= cards.length - 1 }].map(({ dir, side, char, disabled }) => (
+          <button key={side} onClick={() => goTo(dir)} disabled={disabled} style={{
             position: 'absolute', [side]: 12, top: '50%', transform: 'translateY(-50%)',
             background: 'rgba(200,160,96,0.12)', border: '1px solid rgba(200,160,96,0.25)', color: '#c8a060',
             width: 36, height: 36, borderRadius: '50%', fontSize: 20, cursor: 'pointer',

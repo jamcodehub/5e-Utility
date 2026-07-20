@@ -59,17 +59,21 @@ export default function Premium() {
   }
 
   return (
-    <div style={{ height: '100%', overflowY: 'auto', padding: 36 }}>
+    <div className="page-content">
       {banner && (
         <div style={{ background: 'var(--gold-bg)', border: '1px solid var(--gold-border)', borderRadius: 8, padding: '12px 16px', marginBottom: 24, fontSize: 14, color: 'var(--gold)' }}>
           {banner}
         </div>
       )}
 
-      <h2 style={{ fontSize: 22, marginBottom: 4 }}>Premium</h2>
-      <p style={{ color: 'var(--text-2)', marginBottom: 32, fontSize: 14 }}>Unlock the full Lore &amp; Ledger experience for your campaigns.</p>
+      <div className="page-header-row" style={{ marginBottom: 24 }}>
+        <div>
+          <h2 style={{ fontSize: 22, marginBottom: 4 }}>Premium</h2>
+          <p style={{ color: 'var(--text-2)', fontSize: 14, margin: 0 }}>Unlock the full Lore &amp; Ledger experience for your campaigns.</p>
+        </div>
+      </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, maxWidth: 720 }}>
+      <div className="page-panel">
         {/* Free */}
         <div className="card" style={{ padding: 24 }}>
           <div style={{ fontFamily: 'Cinzel, serif', fontSize: 16, marginBottom: 4 }}>Free</div>

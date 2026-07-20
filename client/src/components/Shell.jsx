@@ -9,7 +9,6 @@ const NAV = [
   { to: '/storyboard', label: 'Storyboard', icon: '🖼️' },
   { to: '/lore',       label: 'Lore',       icon: '🗺️' },
   { to: '/character',  label: 'Character',  icon: '⚔️' },
-  { to: '/spells',     label: 'Spells',     icon: '✦'  },
   { to: '/inventory',  label: 'Inventory',  icon: '🎒' },
 ]
 
@@ -67,12 +66,11 @@ export default function Shell({ children }) {
         <div style={{ background: 'var(--surface)', borderBottom: '1px solid var(--border)', padding: '10px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
           <div style={{ fontFamily: 'Cinzel, serif', fontSize: 16, fontWeight: 600, color: 'var(--gold)' }}>Lore &amp; Ledger</div>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-            <button onClick={() => setShowCampaigns(s => !s)} style={{ background: 'var(--gold-bg)', border: '1px solid var(--gold-border)', color: 'var(--gold)', padding: '5px 10px', borderRadius: 6, fontSize: 11, cursor: 'pointer', fontFamily: 'Cinzel, serif', maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            <button onClick={() => setShowCampaigns(s => !s)} style={{ background: 'var(--gold-bg)', border: '1px solid var(--gold-border)', color: 'var(--gold)', padding: '8px 12px', borderRadius: 10, fontSize: 11, cursor: 'pointer', fontFamily: 'Cinzel, serif', maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
               {activeCampaign?.name || 'Campaign'} ▾
             </button>
-            {!isPremium && <button onClick={() => navigate('/premium')} style={{ background: 'none', border: 'none', color: 'var(--gold)', fontSize: 16, cursor: 'pointer' }}>✦</button>}
-            <button onClick={() => setShowSettings(true)} title="Settings" style={{ background: 'none', border: 'none', color: 'var(--text-3)', fontSize: 16, cursor: 'pointer' }}>⚙️</button>
-            <button onClick={logout} style={{ background: 'none', border: 'none', color: 'var(--text-3)', fontSize: 16, cursor: 'pointer' }}>↩</button>
+            {!isPremium && <button onClick={() => navigate('/premium')} style={{ background: 'none', border: 'none', color: 'var(--gold)', fontSize: 18, padding: 8, borderRadius: 10, cursor: 'pointer' }}>✦</button>}
+            <button onClick={() => setShowSettings(true)} title="Settings" style={{ background: 'none', border: 'none', color: 'var(--text-3)', fontSize: 18, cursor: 'pointer', padding: 8, borderRadius: 10, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>⚙️</button>
           </div>
         </div>
 
@@ -100,10 +98,28 @@ export default function Shell({ children }) {
         )}
 
         {/* Main content */}
-        <main style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>{children}</main>
+        <main style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column', paddingBottom: '96px' }}>{children}</main>
 
         {/* Bottom nav */}
-        <nav style={{ background: 'var(--surface)', borderTop: '1px solid var(--border)', display: 'flex', overflow: 'x-auto', flexShrink: 0 }}>
+        <nav style={{
+          position: 'fixed',
+          left: '50%',
+          bottom: 'calc(12px + env(safe-area-inset-bottom, 12px))',
+          transform: 'translateX(-50%)',
+          width: 'min(96%, 560px)',
+          display: 'flex',
+          justifyContent: 'space-between',
+          gap: 8,
+          background: 'rgba(255,255,255,0.98)',
+          border: '1px solid rgba(228,224,216,0.95)',
+          borderRadius: 999,
+          padding: '10px 14px',
+          boxShadow: '0 18px 45px rgba(0,0,0,0.12)',
+          zIndex: 40,
+          overflowX: 'auto',
+          backdropFilter: 'blur(12px)',
+          WebkitBackdropFilter: 'blur(12px)',
+        }}>
           {NAV.map(item => (
             <NavLink key={item.to} to={item.to} style={({ isActive }) => navLinkStyle(isActive)}>
               <span style={{ fontSize: 18 }}>{item.icon}</span>

@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
+import UpgradeModal from '../components/UpgradeModal'
 import { api } from '../context/AuthContext'
 import { useCampaign } from '../context/CampaignContext'
 import { useToast } from '../hooks/useToast'
@@ -30,12 +31,24 @@ export default function Journal() {
   const newDay = async () => {
     if (!activeCampaign) return
     const maxDay = entries.reduce((m, e) => Math.max(m, e.day), 0)
-    const entry = await api(`/journal/${activeCampaign._id}`, {
-      method: 'POST', body: { day: maxDay + 1, title: `Day ${maxDay + 1}`, content: '' }
-    })
-    setEntries(p => [...p, entry])
-    setActiveId(entry._id); setContent('')
+    try {
+      const entry = await api(`/journal/${activeCampaign._id}`, {
+        method: 'POST', body: { day: maxDay + 1, title: `Day ${maxDay + 1}`, content: '' }
+      })
+      setEntries(p => [...p, entry])
+      setActiveId(entry._id); setContent('')
+    } catch (err) {
+      // If backend signals limit (403), show upgrade modal
+      if (err && (err.status === 403 || String(err.message || '').toLowerCase().includes('limited'))) {
+        setShowUpgrade(true)
+        return
+      }
+      console.error(err)
+      toast('Failed to create day')
+    }
   }
+
+  const [showUpgrade, setShowUpgrade] = useState(false)
 
   const save = async () => {
     if (!activeId) return
@@ -111,6 +124,7 @@ export default function Journal() {
         </div>
       </div>
       <ToastContainer />
+      {showUpgrade && <UpgradeModal onClose={() => setShowUpgrade(false)} />}
     </div>
   )
 }

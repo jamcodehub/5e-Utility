@@ -22,6 +22,7 @@ const SKILLS = [
 const DEFAULT = {
   name: '', race: '', class: '', level: 1,
   dndBeyondUrl: '', notes: '',
+  appearancePrompt: '',
   hp: { current: 10, max: 10 }, ac: 10, profBonus: 2,
   stats: { str: 10, dex: 10, con: 10, int: 10, wis: 10, cha: 10 },
   proficiencies: [], avatarUrl: '',
@@ -74,7 +75,7 @@ export default function Character() {
   if (!activeCampaign) return <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-3)' }}>Select a campaign.</div>
 
   return (
-    <div style={{ height: '100%', overflowY: 'auto', padding: 24 }}>
+    <div className="page-content">
       {/* Header card */}
       <div className="card" style={{ padding: '16px 20px', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
         {/* Avatar */}
@@ -201,7 +202,13 @@ export default function Character() {
 
       {tab === 'notes' && (
         <div className="card" style={{ padding: 16 }}>
-          <textarea className="input" rows={14} style={{ resize: 'vertical', fontFamily: 'Georgia, serif', fontSize: 14, lineHeight: 1.7 }}
+          {editing && (
+            <div style={{ marginBottom: 10 }}>
+              <div style={{ fontSize: 12, color: 'var(--text-2)', marginBottom: 6 }}>Appearance prompt (used by image generator)</div>
+              <input className="input" placeholder="e.g. Tall elven ranger with silver hair, green cloak" value={F.appearancePrompt || ''} onChange={e => setForm(p => ({ ...p, appearancePrompt: e.target.value }))} />
+            </div>
+          )}
+          <textarea className="input" rows={editing ? 10 : 14} style={{ resize: 'vertical', fontFamily: 'Georgia, serif', fontSize: 14, lineHeight: 1.7 }}
             placeholder="Character notes, backstory, personality traits, bonds, flaws..."
             value={F.notes || ''} onChange={e => setForm(p => ({ ...p, notes: e.target.value }))} />
           <button className="btn btn-primary btn-sm" style={{ marginTop: 10 }} onClick={save}>Save notes</button>
@@ -215,7 +222,7 @@ export default function Character() {
             <input className="input" style={{ flex: 1 }} placeholder="https://www.dndbeyond.com/characters/..." value={F.dndBeyondUrl || ''} onChange={e => setForm(p => ({ ...p, dndBeyondUrl: e.target.value }))} />
             <button className="btn btn-primary" onClick={save}>Link</button>
           </div>
-          {F.dndBeyondUrl && <iframe src={F.dndBeyondUrl} title="D&D Beyond" style={{ width: '100%', height: 700, border: 'none', borderRadius: 8 }} sandbox="allow-scripts allow-same-origin" />}
+          {F.dndBeyondUrl && <iframe src={F.dndBeyondUrl} title="D&D Beyond" style={{ width: '100%', minHeight: 360, maxHeight: 560, border: 'none', borderRadius: 8 }} sandbox="allow-scripts allow-same-origin" />}
         </div>
       )}
       <ToastContainer />

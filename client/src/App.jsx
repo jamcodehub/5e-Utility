@@ -8,7 +8,6 @@ import Journal from './pages/Journal'
 import Storyboard from './pages/Storyboard'
 import Lore from './pages/Lore'
 import Character from './pages/Character'
-import Spells from './pages/Spells'
 import Inventory from './pages/Inventory'
 import Premium from './pages/Premium'
 
@@ -25,7 +24,6 @@ function Guard() {
           <Route path="/storyboard" element={<Storyboard />} />
           <Route path="/lore"       element={<Lore />} />
           <Route path="/character"  element={<Character />} />
-          <Route path="/spells"     element={<Spells />} />
           <Route path="/inventory"  element={<Inventory />} />
           <Route path="/premium"    element={<Premium />} />
           <Route path="*"           element={<Navigate to="/journal" replace />} />

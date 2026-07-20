@@ -50,8 +50,8 @@ export default function Lore() {
   if (!activeCampaign) return <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-3)' }}>Select a campaign.</div>
 
   return (
-    <div style={{ height: '100%', overflowY: 'auto', padding: 24 }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
+    <div className="page-content">
+      <div className="page-header-row" style={{ marginBottom: 20 }}>
         <h2 style={{ fontSize: 18, flex: 1 }}>Info & Lore</h2>
         <div style={{ display: 'flex', gap: 4 }}>
           {['all', ...TAGS].map(t => (

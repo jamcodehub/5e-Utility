@@ -1,9 +1,10 @@
 import { useState } from 'react'
 import { useTheme, THEMES } from '../context/ThemeContext'
-import { api } from '../context/AuthContext'
+import { api, useAuth } from '../context/AuthContext'
 
 export default function SettingsModal({ onClose }) {
   const { theme, setTheme } = useTheme()
+  const { logout } = useAuth()
   const [feedbackType, setFeedbackType] = useState('general')
   const [feedbackMsg, setFeedbackMsg] = useState('')
   const [sending, setSending] = useState(false)
@@ -74,6 +75,13 @@ export default function SettingsModal({ onClose }) {
                 {sending ? 'Sending...' : 'Send feedback'}
               </button>
           }
+        </div>
+
+        <div style={{ marginTop: 24, paddingTop: 24, borderTop: '1px solid var(--border)' }}>
+          <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-2)', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 10 }}>Account</div>
+          <button onClick={() => { logout(); onClose() }} style={{ width: '100%', padding: '10px 14px', borderRadius: 10, border: '1px solid var(--red)', background: 'transparent', color: 'var(--red)', fontWeight: 600, cursor: 'pointer' }}>
+            Logout
+          </button>
         </div>
       </div>
     </div>

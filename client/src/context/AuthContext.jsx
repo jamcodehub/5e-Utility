@@ -13,7 +13,12 @@ export const api = async (path, opts = {}) => {
     body: opts.body ? JSON.stringify(opts.body) : undefined,
   })
   const data = await res.json()
-  if (!res.ok) throw new Error(data.error || 'Request failed')
+  if (!res.ok) {
+    const err = new Error(data.error || 'Request failed')
+    err.status = res.status
+    err.payload = data
+    throw err
+  }
   return data
 }
 
