@@ -48,8 +48,8 @@ input, textarea, select { font-family: inherit; }
   font-size: 13px; font-weight: 500; border: none;
   transition: all .15s; line-height: 1;
 }
-.btn-primary { background: var(--text); color: #fff; }
-.btn-primary:hover { background: #333; }
+.btn-primary { background: var(--gold); color: var(--text); }
+.btn-primary:hover { background: #b8914a; }
 .btn-ghost { background: transparent; color: var(--text-2); border: 1px solid var(--border); }
 .btn-ghost:hover { background: var(--surface2); color: var(--text); }
 .btn-gold { background: var(--gold-bg); color: var(--gold); border: 1px solid var(--gold-border); }
