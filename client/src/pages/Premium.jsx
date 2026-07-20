@@ -115,27 +115,6 @@ export default function Premium() {
             {isPremium ? 'Your previous plan' : 'Current plan'}
           </div>
         </div>
-          <div style={{ fontSize: 28, fontWeight: 600, marginBottom: 20, color: 'var(--gold)' }}>$5 <span style={{ fontSize: 13, fontWeight: 400, color: 'var(--text-2)' }}>/month</span></div>
-          {FEATURES.premium.map(f => (
-            <div key={f} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10, fontSize: 13, color: 'var(--text)' }}>
-              <span style={{ color: 'var(--gold)' }}>✦</span> {f}
-            </div>
-          ))}
-          <div style={{ marginTop: 20 }}>
-            {isPremium ? (
-              <div>
-                <div style={{ fontSize: 13, color: 'var(--gold)', fontWeight: 500, marginBottom: 10 }}>✦ Active — you're on Premium</div>
-                <button className="btn btn-ghost" style={{ width: '100%', justifyContent: 'center' }} onClick={portal} disabled={portalLoading}>
-                  {portalLoading ? 'Loading...' : 'Manage subscription'}
-                </button>
-              </div>
-            ) : (
-              <button className="btn btn-primary" style={{ width: '100%', justifyContent: 'center' }} onClick={checkout} disabled={loading}>
-                {loading ? 'Loading...' : 'Upgrade now →'}
-              </button>
-            )}
-          </div>
-        </div>
       </div>
     </div>
   )
