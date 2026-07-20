@@ -1,14 +1,27 @@
-import { useState, useMemo, useRef } from 'react'
+import { useState, useMemo, useRef, useEffect } from 'react'
 
-const SLIDE_DURATION = 2200
+const DEFAULT_DURATION = 2200
 
 export default function Dice() {
   const [rolling, setRolling] = useState(false)
   const [result, setResult] = useState(null)
   const [displayValue, setDisplayValue] = useState(1)
+  const [slideDuration, setSlideDuration] = useState(DEFAULT_DURATION)
   const d20Ref = useRef(null)
 
   const track = useMemo(() => Array.from({ length: 20 }, (_, i) => 20 - i), [])
+
+  useEffect(() => {
+    const compute = () => {
+      const w = window.innerWidth
+      if (w <= 420) setSlideDuration(1600)
+      else if (w <= 768) setSlideDuration(2000)
+      else setSlideDuration(DEFAULT_DURATION)
+    }
+    compute()
+    window.addEventListener('resize', compute)
+    return () => window.removeEventListener('resize', compute)
+  }, [])
 
   const roll = () => {
     if (rolling) return
@@ -21,13 +34,13 @@ export default function Dice() {
       if (count >= 24) clearInterval(flick)
     }, 60)
 
-    // start CSS animation by toggling class on D20 (handled via rolling state)
+    // reveal after animation duration
     setTimeout(() => {
       const finalValue = Math.floor(Math.random() * 20) + 1
       setDisplayValue(finalValue)
       setResult(finalValue)
       setRolling(false)
-    }, SLIDE_DURATION)
+    }, slideDuration)
   }
 
   return (
@@ -54,7 +67,7 @@ export default function Dice() {
               .slide-svg{ width:100%; height:100%; display:block }
               .d20{ position:absolute; width:56px; height:56px; background:linear-gradient(135deg,#f7ecd6,#e6caa0); border-radius:12px; display:flex; align-items:center; justify-content:center; font-weight:700; color:var(--text); box-shadow:0 6px 18px rgba(0,0,0,0.35); transform-origin:center; left:0; top:0 }
               @keyframes slideMotion { from { offset-distance: 0%; transform: rotate(0deg); } to { offset-distance: 100%; transform: rotate(720deg); } }
-              .d20.rolling{ offset-path: path('M8 24 C80 14 160 18 240 36 C320 56 380 110 420 140'); -webkit-offset-path: path("M8 24 C80 14 160 18 240 36 C320 56 380 110 420 140"); animation: slideMotion ${SLIDE_DURATION}ms cubic-bezier(.18,.9,.18,1) forwards; }
+              .d20.rolling{ offset-path: path('M8 24 C80 14 160 18 240 36 C320 56 380 110 420 140'); -webkit-offset-path: path("M8 24 C80 14 160 18 240 36 C320 56 380 110 420 140"); animation: slideMotion ${slideDuration}ms cubic-bezier(.18,.9,.18,1) forwards; }
             `}</style>
 
             <div className="slide-wrap">
@@ -70,9 +83,27 @@ export default function Dice() {
                 </g>
                 <path d="M8 24 C80 14 160 18 240 36 C320 56 380 110 420 140" fill="none" stroke="url(#g1)" strokeWidth="18" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
-              <div ref={d20Ref} className={`d20 ${rolling ? 'rolling' : ''}`} style={{ offsetDistance: '0%' }}>
-                <div style={{ fontSize: 18 }}>{rolling ? '' : result || '?'}</div>
-              </div>
+                <div ref={d20Ref} className={`d20 ${rolling ? 'rolling' : ''}`} style={{ offsetDistance: '0%' }}>
+                  {/* SVG icosahedron-like face: stylized 2D projection with triangular facets */}
+                  <svg viewBox="0 0 100 100" width="56" height="56" style={{ display: 'block' }}>
+                    <defs>
+                      <linearGradient id="d20g" x1="0" x2="1"><stop offset="0" stopColor="#f7ecd6" /><stop offset="1" stopColor="#e6caa0" /></linearGradient>
+                    </defs>
+                    <g transform="translate(50,50) scale(0.9)">
+                      <circle r="46" fill="url(#d20g)" stroke="#3a2510" strokeWidth="2" />
+                      {/* simple triangular facet overlay to evoke a d20 */}
+                      <g stroke="#3a2510" strokeWidth="1" fill="none">
+                        <path d="M0,-42 L20,-8 L-20,-8 Z" />
+                        <path d="M-20,-8 L0,30 L-40,6 Z" />
+                        <path d="M20,-8 L40,6 L0,30 Z" />
+                        <path d="M-40,6 L-8,6 L-20,-8 Z" />
+                        <path d="M40,6 L8,6 L20,-8 Z" />
+                        <path d="M-8,6 L0,30 L8,6 Z" />
+                      </g>
+                      <text x="0" y="8" textAnchor="middle" fontFamily="Cinzel, serif" fontSize="28" fill="#2f2216">{rolling ? '' : (result || '?')}</text>
+                    </g>
+                  </svg>
+                </div>
             </div>
 
             <div style={{ position: 'absolute', left: 12, right: 12, bottom: 12, display: 'grid', gridTemplateRows: 'repeat(20, 1fr)', gap: 8 }}>
