@@ -170,7 +170,7 @@ export default function Storyboard() {
             {showForm ? '✕ Close' : '+ Add Scene'}
           </button>
           {!onCover && currentCard && (
-            <button onClick={() => deleteCard(currentCard._id)} style={{ background: 'transparent', border: '1px solid #4a3020', color: '#8a6040', padding: '6px 10px', borderRadius: 6, fontSize: 12, cursor: 'pointer' }}>✕</button>
+            <button onClick={() => { if (!window.confirm('Are you sure you want to delete this page?')) return; deleteCard(currentCard._id) }} style={{ background: 'transparent', border: '1px solid #4a3020', color: '#8a6040', padding: '6px 10px', borderRadius: 6, fontSize: 12, cursor: 'pointer' }}>✕</button>
           )}
         </div>
       </div>
