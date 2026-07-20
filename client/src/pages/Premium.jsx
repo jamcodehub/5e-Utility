@@ -7,17 +7,16 @@ const FEATURES = {
   free: [
     '1 campaign',
     '1 character sheet',
-    'Journal entries',
+    '5 Journal entries',
     'Lore board',
     'Storyboard (5 scenes)',
   ],
   premium: [
     'Unlimited campaigns',
     'Unlimited characters',
-    'Journal entries',
-    'Lore board',
+    'Unlimited journal entries',
     'Unlimited storyboard scenes',
-    'AI story assistant',
+    'Lore board',
     'Priority support',
   ]
 }
