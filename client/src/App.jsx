@@ -9,6 +9,7 @@ import Storyboard from './pages/Storyboard'
 import Lore from './pages/Lore'
 import Character from './pages/Character'
 import Inventory from './pages/Inventory'
+import Dice from './pages/Dice'
 import Premium from './pages/Premium'
 
 function Guard() {
@@ -25,6 +26,7 @@ function Guard() {
           <Route path="/lore"       element={<Lore />} />
           <Route path="/character"  element={<Character />} />
           <Route path="/inventory"  element={<Inventory />} />
+          <Route path="/dice"       element={<Dice />} />
           <Route path="/premium"    element={<Premium />} />
           <Route path="*"           element={<Navigate to="/journal" replace />} />
         </Routes>

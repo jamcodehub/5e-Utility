@@ -10,6 +10,7 @@ const NAV = [
   { to: '/lore',       label: 'Lore',       icon: '🗺️' },
   { to: '/character',  label: 'Character',  icon: '⚔️' },
   { to: '/inventory',  label: 'Inventory',  icon: '🎒' },
+  { to: '/dice',       label: 'Dice',       icon: '🎲' },
 ]
 
 function useIsMobile() {
@@ -44,19 +45,19 @@ export default function Shell({ children }) {
   const canCreate = isPremium || campaigns.length === 0
 
   const navLinkStyle = (isActive) => ({
-    display: 'flex', flexDirection: isMobile ? 'column' : 'row',
-    alignItems: 'center', gap: isMobile ? 2 : 10,
-    padding: isMobile ? '8px 12px' : '9px 12px',
-    borderRadius: isMobile ? 0 : 8,
+    display: 'flex', flexDirection: 'row',
+    alignItems: 'center', justifyContent: isMobile ? 'center' : 'flex-start',
+    gap: 8,
+    padding: isMobile ? '10px 14px' : '9px 12px',
+    borderRadius: isMobile ? 999 : 8,
     marginBottom: isMobile ? 0 : 2,
-    fontSize: isMobile ? 10 : 13,
-    fontWeight: isActive ? 500 : 400,
-    color: isActive ? (isMobile ? 'var(--gold)' : 'var(--text)') : 'var(--text-2)',
-    background: isActive && !isMobile ? 'var(--surface2)' : 'transparent',
+    fontSize: isMobile ? 12 : 13,
+    fontWeight: isActive ? 600 : 500,
+    color: isActive ? 'var(--gold)' : 'var(--text-2)',
+    background: isActive ? (isMobile ? 'rgba(255,255,255,0.22)' : 'var(--surface2)') : 'transparent',
     textDecoration: 'none', transition: 'all .12s',
     borderLeft: !isMobile && isActive ? '2px solid var(--gold)' : '2px solid transparent',
-    borderBottom: isMobile && isActive ? '2px solid var(--gold)' : isMobile ? '2px solid transparent' : 'none',
-    whiteSpace: 'nowrap',
+    minWidth: 0,
   })
 
   if (isMobile) {
@@ -110,23 +111,23 @@ export default function Shell({ children }) {
           display: 'flex',
           justifyContent: 'space-between',
           gap: 8,
-          background: 'rgba(255,255,255,0.98)',
-          border: '1px solid rgba(228,224,216,0.95)',
+          background: 'rgba(255,255,255,0.12)',
+          border: '1px solid rgba(255,255,255,0.14)',
           borderRadius: 999,
           padding: '10px 14px',
-          boxShadow: '0 18px 45px rgba(0,0,0,0.12)',
+          boxShadow: '0 24px 60px rgba(0,0,0,0.08)',
           zIndex: 40,
           overflowX: 'auto',
-          backdropFilter: 'blur(12px)',
-          WebkitBackdropFilter: 'blur(12px)',
+          backdropFilter: 'blur(20px)',
+          WebkitBackdropFilter: 'blur(20px)',
         }}>
           {NAV.map(item => (
             <NavLink key={item.to} to={item.to} style={({ isActive }) => navLinkStyle(isActive)}>
-              <span style={{ fontSize: 18 }}>{item.icon}</span>
               <span>{item.label}</span>
             </NavLink>
           ))}
         </nav>
+        {showSettings && <SettingsModal onClose={() => setShowSettings(false)} />}
       </div>
     )
   }

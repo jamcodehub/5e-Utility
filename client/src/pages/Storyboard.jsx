@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { api } from '../context/AuthContext'
 import { useCampaign } from '../context/CampaignContext'
 import { useToast } from '../hooks/useToast'
+import UpgradeModal from '../components/UpgradeModal'
 
 const pollinationsUrl = (prompt, width = 1200, height = 900) =>
   `https://image.pollinations.ai/prompt/${encodeURIComponent(
@@ -11,13 +12,13 @@ const pollinationsUrl = (prompt, width = 1200, height = 900) =>
 function Cover({ campaignName }) {
   // Single-front cover (no visible back)
   return (
-    <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'radial-gradient(ellipse at center, #5c3a1e 0%, #2d1608 100%)' }}>
-      <div style={{ width: '74%', height: '80%', borderRadius: 8, background: '#2d1f0e', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 36, boxShadow: 'inset 0 8px 30px rgba(0,0,0,0.4)' }}>
-        <div style={{ width: 40, height: 2, background: '#c8a060', marginBottom: 8 }} />
-        <div style={{ fontFamily: 'Cinzel, serif', fontSize: 11, color: '#c8a060', letterSpacing: '0.2em', textTransform: 'uppercase' }}>The Chronicles of</div>
-        <div style={{ fontFamily: 'Cinzel, serif', fontSize: 28, color: '#f0d090', textAlign: 'center', lineHeight: 1.2, fontWeight: 700, marginTop: 8 }}>{campaignName || 'Your Campaign'}</div>
-        <div style={{ width: 40, height: 2, background: '#c8a060', marginTop: 10 }} />
-        <div style={{ fontFamily: 'Georgia, serif', fontSize: 12, color: '#9a7a50', marginTop: 12, fontStyle: 'italic' }}>A visual storyboard</div>
+    <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'radial-gradient(circle at top, rgba(255,255,255,0.08), transparent 35%), var(--bg)' }}>
+      <div style={{ width: '74%', height: '80%', borderRadius: 18, background: 'var(--surface)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 36, boxShadow: 'inset 0 8px 30px rgba(0,0,0,0.12)' }}>
+        <div style={{ width: 40, height: 2, background: 'var(--gold)', marginBottom: 8 }} />
+        <div style={{ fontFamily: 'Cinzel, serif', fontSize: 11, color: 'var(--gold)', letterSpacing: '0.2em', textTransform: 'uppercase' }}>The Chronicles of</div>
+        <div style={{ fontFamily: 'Cinzel, serif', fontSize: 28, color: 'var(--text)', textAlign: 'center', lineHeight: 1.2, fontWeight: 700, marginTop: 8 }}>{campaignName || 'Your Campaign'}</div>
+        <div style={{ width: 40, height: 2, background: 'var(--gold)', marginTop: 10 }} />
+        <div style={{ fontFamily: 'Georgia, serif', fontSize: 12, color: 'var(--text-2)', marginTop: 12, fontStyle: 'italic' }}>A visual storyboard</div>
       </div>
     </div>
   )
@@ -25,23 +26,23 @@ function Cover({ campaignName }) {
 
 function BookSpread({ card, index }) {
   return (
-    <div style={{ position: 'absolute', inset: 0, display: 'flex' }}>
+    <div style={{ position: 'absolute', inset: 0, display: 'flex', minWidth: 0 }}>
       {/* Left — image */}
-      <div style={{ flex: 1, background: '#f8f5ef', borderRight: '2px solid #c8b89a', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', position: 'relative', boxShadow: 'inset -8px 0 20px rgba(0,0,0,0.08)' }}>
-        <div style={{ position: 'absolute', top: 14, left: 18, fontFamily: 'Cinzel, serif', fontSize: 10, color: '#a89070', letterSpacing: '0.1em', zIndex: 1 }}>SCENE {index + 1}</div>
+      <div style={{ flex: 1, background: 'var(--surface)', borderRight: '2px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', position: 'relative', boxShadow: 'inset -8px 0 20px rgba(0,0,0,0.05)' }}>
+        <div style={{ position: 'absolute', top: 14, left: 18, fontFamily: 'Cinzel, serif', fontSize: 10, color: 'var(--text-3)', letterSpacing: '0.1em', zIndex: 1 }}>SCENE {index + 1}</div>
         {card.imageUrl
-          ? <img src={card.imageUrl} alt={card.title} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} onError={e => { e.target.style.display = 'none' }} />
-          : <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, color: '#c8b89a' }}><div style={{ fontSize: 40, opacity: 0.3 }}>✦</div><div style={{ fontSize: 11, fontFamily: 'Cinzel, serif' }}>Generating...</div></div>
+          ? <img src={card.imageUrl} alt={card.title} style={{ width: '100%', height: '100%', minWidth: '100%', minHeight: '100%', objectFit: 'cover', display: 'block' }} onError={e => { e.target.style.display = 'none' }} />
+          : <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, color: 'var(--text-3)' }}><div style={{ fontSize: 40, opacity: 0.3 }}>✦</div><div style={{ fontSize: 11, fontFamily: 'Cinzel, serif' }}>Generating...</div></div>
         }
         <div style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: 24, background: 'linear-gradient(to left, rgba(0,0,0,0.07), transparent)', pointerEvents: 'none' }} />
       </div>
       {/* Right — text */}
-      <div style={{ flex: 1, background: '#fdfaf5', padding: '44px 40px', display: 'flex', flexDirection: 'column', position: 'relative', backgroundImage: 'repeating-linear-gradient(transparent, transparent 27px, #e8dcc8 28px)', backgroundPosition: '0 44px' }}>
-        <div style={{ position: 'absolute', top: 14, right: 18, fontFamily: 'Cinzel, serif', fontSize: 10, color: '#a89070', letterSpacing: '0.1em' }}>{index * 2 + 2}</div>
-        <h2 style={{ fontFamily: 'Cinzel, serif', fontSize: 20, color: '#2d1f0e', marginBottom: 20, lineHeight: 1.3, position: 'relative', zIndex: 1 }}>{card.title}</h2>
-        <p style={{ fontFamily: 'Georgia, serif', fontSize: 14, color: '#3d2d1a', lineHeight: 1.9, position: 'relative', zIndex: 1, flex: 1 }}>{card.description}</p>
+      <div style={{ flex: 1, background: 'var(--surface2)', padding: '44px 40px', display: 'flex', flexDirection: 'column', position: 'relative', backgroundImage: 'repeating-linear-gradient(transparent, transparent 27px, rgba(0,0,0,0.03) 28px)', backgroundPosition: '0 44px' }}>
+        <div style={{ position: 'absolute', top: 14, right: 18, fontFamily: 'Cinzel, serif', fontSize: 10, color: 'var(--text-3)', letterSpacing: '0.1em' }}>{index * 2 + 2}</div>
+        <h2 style={{ fontFamily: 'Cinzel, serif', fontSize: 20, color: 'var(--text)', marginBottom: 20, lineHeight: 1.3, position: 'relative', zIndex: 1 }}>{card.title}</h2>
+        <p style={{ fontFamily: 'Georgia, serif', fontSize: 14, color: 'var(--text-2)', lineHeight: 1.9, position: 'relative', zIndex: 1, flex: 1 }}>{card.description}</p>
         {card.createdAt && (
-          <div style={{ fontSize: 10, color: '#a89070', fontFamily: 'Cinzel, serif', letterSpacing: '0.06em', marginTop: 20, position: 'relative', zIndex: 1 }}>
+          <div style={{ fontSize: 10, color: 'var(--text-3)', fontFamily: 'Cinzel, serif', letterSpacing: '0.06em', marginTop: 20, position: 'relative', zIndex: 1 }}>
             {new Date(card.createdAt).toLocaleDateString('en-AU', { day: 'numeric', month: 'long', year: 'numeric' })}
           </div>
         )}
@@ -59,6 +60,7 @@ export default function Storyboard() {
   const [title, setTitle] = useState('')
   const [generating, setGenerating] = useState(false)
   const [currentPage, setCurrentPage] = useState(-1)
+  const [showUpgrade, setShowUpgrade] = useState(false)
   const bookRef = useRef(null)
   const [showForm, setShowForm] = useState(false)
   const scrollRef = useRef(null)
@@ -131,7 +133,14 @@ export default function Storyboard() {
       setCurrentPage(newCards.length - 1)
       setPrompt(''); setTitle(''); setShowForm(false)
       toast('Scene added to your chronicle')
-    } catch { toast('Failed to save') }
+    } catch (err) {
+      console.error(err)
+      if (err.status === 403) {
+        setShowUpgrade(true)
+        return
+      }
+      toast(err.message || 'Failed to save')
+    }
     setGenerating(false)
   }
 
@@ -148,10 +157,10 @@ export default function Storyboard() {
   const currentCard = cards[currentPage]
 
   return (
-    <div style={{ height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden', background: '#1a1208' }}>
+    <div style={{ height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden', background: 'var(--bg)', color: 'var(--text)' }}>
       {/* Top bar */}
-      <div style={{ padding: '10px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#2d1f0e', borderBottom: '1px solid #4a3020', flexShrink: 0 }}>
-        <div style={{ fontFamily: 'Cinzel, serif', fontSize: 12, color: '#c8a060' }}>
+      <div style={{ padding: '10px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'var(--surface)', borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
+        <div style={{ fontFamily: 'Cinzel, serif', fontSize: 12, color: 'var(--text-3)' }}>
           {onCover ? activeCampaign.name : `Scene ${currentPage + 1} / ${cards.length}`}
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
@@ -166,12 +175,12 @@ export default function Storyboard() {
 
       {/* Form */}
       {showForm && (
-        <div style={{ padding: '12px 20px', background: '#241808', borderBottom: '1px solid #4a3020', display: 'flex', gap: 10, alignItems: 'flex-end', flexShrink: 0 }}>
+        <div style={{ padding: '12px 20px', background: 'var(--surface2)', borderBottom: '1px solid var(--border)', display: 'flex', gap: 10, alignItems: 'flex-end', flexShrink: 0 }}>
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 8 }}>
-            <input className="input" placeholder="Scene title" value={title} onChange={e => setTitle(e.target.value)} style={{ background: '#3d2510', border: '1px solid #5a3a20', color: '#f0d090' }} />
-            <textarea className="input" rows={2} placeholder="Describe this scene — who was there, what happened, what it looked like..." value={prompt} onChange={e => setPrompt(e.target.value)} style={{ resize: 'none', background: '#3d2510', border: '1px solid #5a3a20', color: '#f0d090' }} />
+            <input className="input" placeholder="Scene title" value={title} onChange={e => setTitle(e.target.value)} style={{ background: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--text)' }} />
+            <textarea className="input" rows={2} placeholder="Describe this scene — who was there, what happened, what it looked like..." value={prompt} onChange={e => setPrompt(e.target.value)} style={{ resize: 'none', background: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--text)' }} />
           </div>
-          <button onClick={generate} disabled={generating || !prompt.trim()} style={{ background: generating ? '#5a4020' : '#c8a060', border: 'none', color: '#1a1208', padding: '10px 18px', borderRadius: 6, fontFamily: 'Cinzel, serif', fontSize: 12, cursor: 'pointer', whiteSpace: 'nowrap', alignSelf: 'stretch', opacity: generating ? 0.7 : 1 }}>
+          <button onClick={generate} disabled={generating || !prompt.trim()} style={{ background: generating ? 'var(--border)' : 'var(--gold)', border: 'none', color: 'var(--text)', padding: '10px 18px', borderRadius: 6, fontFamily: 'Cinzel, serif', fontSize: 12, cursor: 'pointer', whiteSpace: 'nowrap', alignSelf: 'stretch', opacity: generating ? 0.7 : 1 }}>
             {generating ? '✦ Writing...' : '✦ Generate'}
           </button>
         </div>
@@ -230,6 +239,7 @@ export default function Storyboard() {
       </div>
 
       <ToastContainer />
+      {showUpgrade && <UpgradeModal onClose={() => setShowUpgrade(false)} />}
     </div>
   )
 }

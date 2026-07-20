@@ -36,15 +36,17 @@ export default function Character() {
   const [form, setForm]     = useState(DEFAULT)
   const [editing, setEditing] = useState(false)
   const [avatarPreview, setAvatarPreview] = useState('')
+  const [loaded, setLoaded] = useState(false)
 
   const load = useCallback(async () => {
     if (!activeCampaign) return
     const data = await api(`/campaigns/${activeCampaign._id}/character`)
     if (data) { setChar(data); setForm(data); setAvatarPreview(data.avatarUrl || '') }
-    else { setForm(DEFAULT); setAvatarPreview('') }
+    else { setChar(null); setForm(DEFAULT); setAvatarPreview('') }
+    setLoaded(true)
   }, [activeCampaign])
 
-  useEffect(() => { load() }, [load])
+  useEffect(() => { if (!activeCampaign) return; setLoaded(false); load() }, [activeCampaign, load])
 
   const handleAvatar = (e) => {
     const file = e.target.files[0]
@@ -73,6 +75,7 @@ export default function Character() {
   const profs = F.proficiencies || []
 
   if (!activeCampaign) return <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-3)' }}>Select a campaign.</div>
+  if (!loaded) return <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-3)' }}>Loading character...</div>
 
   return (
     <div className="page-content">
