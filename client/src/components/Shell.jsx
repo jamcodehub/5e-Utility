@@ -4,13 +4,26 @@ import { useCampaign } from '../context/CampaignContext'
 import { useState, useEffect } from 'react'
 import SettingsModal from './SettingsModal'
 
-const NAV = [
-  { to: '/journal',    label: 'Journal',    icon: '⋆' },
-  { to: '/storyboard', label: 'Storyboard', icon: '𖥔' },
-  { to: '/lore',       label: 'Lore',       icon: '˖' },
-  { to: '/character',  label: 'Character',  icon: '˖₊˚ʚ' },
-  { to: '/inventory',  label: 'Inventory',  icon: 'ᗢ₊˚✧' },
-  { to: '/dice',       label: 'Dice',       icon: '˚✧' },
+const NAV_PLAYER = [
+  { to: '/journal',    label: 'Journal' },
+  { to: '/storyboard', label: 'Storyboard' },
+  { to: '/lore',       label: 'Lore' },
+  { to: '/character',  label: 'Character' },
+  { to: '/inventory',  label: 'Inventory' },
+  { to: '/dice',       label: 'Dice' },
+]
+
+const NAV_DM = [
+  { to: '/journal',    label: 'Journal' },
+  { to: '/storyboard', label: 'Storyboard' },
+  { to: '/lore',       label: 'Lore' },
+  { to: '/character',  label: 'Character' },
+  { to: '/inventory',  label: 'Inventory' },
+  { to: '/dice',       label: 'Dice' },
+  { to: '/ideas',      label: 'Ideas' },
+  { to: '/levels',     label: 'Levels' },
+  { to: '/rules',      label: 'Rules' },
+  { to: '/music',      label: 'Music' },
 ]
 
 function useIsMobile() {
@@ -25,12 +38,17 @@ function useIsMobile() {
 
 export default function Shell({ children }) {
   const { user, logout, isPremium } = useAuth()
-  const { campaigns, activeCampaign, setActive, createCampaign } = useCampaign()
+  const { campaigns, activeCampaign, setActive, createCampaign, joinCampaign } = useCampaign()
   const navigate = useNavigate()
   const isMobile = useIsMobile()
+  const isDM = user?.role === 'dm'
+  const NAV = isDM ? NAV_DM : NAV_PLAYER
   const [creating, setCreating] = useState(false)
   const [newName, setNewName]   = useState('')
   const [error, setError]       = useState('')
+  const [joining, setJoining]   = useState(false)
+  const [joinCode, setJoinCode] = useState('')
+  const [joinError, setJoinError] = useState('')
   const [showCampaigns, setShowCampaigns] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
 
@@ -42,7 +60,15 @@ export default function Shell({ children }) {
     setNewName(''); setCreating(false); setError(''); setShowCampaigns(false)
   }
 
-  const canCreate = isPremium || campaigns.length === 0
+  const handleJoin = async (e) => {
+    e.preventDefault()
+    if (!joinCode.trim()) return
+    const err = await joinCampaign(joinCode.trim())
+    if (err) { setJoinError(err); return }
+    setJoinCode(''); setJoining(false); setJoinError(''); setShowCampaigns(false)
+  }
+
+  const canCreate = isDM && (isPremium || campaigns.length === 0)
 
   const navLinkStyle = (isActive) => ({
     display: 'flex', flexDirection: 'row',
@@ -81,6 +107,9 @@ export default function Shell({ children }) {
             {campaigns.map(c => (
               <button key={c._id} onClick={() => { setActive(c); setShowCampaigns(false) }} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '8px 10px', borderRadius: 6, border: 'none', background: activeCampaign?._id === c._id ? 'var(--gold-bg)' : 'transparent', color: activeCampaign?._id === c._id ? 'var(--gold)' : 'var(--text-2)', fontSize: 13, cursor: 'pointer', marginBottom: 2 }}>{c.name}</button>
             ))}
+            {isDM && activeCampaign?.joinCode && (
+              <div style={{ fontSize: 11, color: 'var(--text-3)', padding: '4px 10px 8px' }}>Join code: <span style={{ color: 'var(--gold)', fontWeight: 600 }}>{activeCampaign.joinCode}</span></div>
+            )}
             {creating ? (
               <form onSubmit={handleCreate} style={{ marginTop: 6 }}>
                 <input autoFocus className="input" style={{ marginBottom: 6, padding: '6px 8px', fontSize: 12 }} placeholder="Campaign name..." value={newName} onChange={e => setNewName(e.target.value)} />
@@ -90,10 +119,22 @@ export default function Shell({ children }) {
                   <button type="button" className="btn btn-ghost btn-sm" onClick={() => { setCreating(false); setError('') }}>✕</button>
                 </div>
               </form>
-            ) : canCreate ? (
-              <button onClick={() => setCreating(true)} style={{ fontSize: 12, color: 'var(--text-3)', background: 'none', border: 'none', cursor: 'pointer', padding: '6px 4px' }}>+ New campaign</button>
+            ) : joining ? (
+              <form onSubmit={handleJoin} style={{ marginTop: 6 }}>
+                <input autoFocus className="input" style={{ marginBottom: 6, padding: '6px 8px', fontSize: 12, textTransform: 'uppercase' }} placeholder="Join code..." value={joinCode} onChange={e => setJoinCode(e.target.value)} />
+                {joinError && <div style={{ fontSize: 11, color: 'var(--red)', marginBottom: 6 }}>{joinError}</div>}
+                <div style={{ display: 'flex', gap: 4 }}>
+                  <button type="submit" className="btn btn-primary btn-sm" style={{ flex: 1 }}>Join</button>
+                  <button type="button" className="btn btn-ghost btn-sm" onClick={() => { setJoining(false); setJoinError('') }}>✕</button>
+                </div>
+              </form>
             ) : (
-              <button onClick={() => { navigate('/premium'); setShowCampaigns(false) }} style={{ fontSize: 12, color: 'var(--gold)', background: 'none', border: 'none', cursor: 'pointer', padding: '6px 4px' }}>✦ Upgrade for more</button>
+              <div style={{ display: 'flex', gap: 6, marginTop: 4 }}>
+                {isDM && (canCreate
+                  ? <button onClick={() => setCreating(true)} style={{ fontSize: 12, color: 'var(--text-3)', background: 'none', border: 'none', cursor: 'pointer', padding: '6px 4px' }}>+ New campaign</button>
+                  : <button onClick={() => { navigate('/premium'); setShowCampaigns(false) }} style={{ fontSize: 12, color: 'var(--gold)', background: 'none', border: 'none', cursor: 'pointer', padding: '6px 4px' }}>✦ Upgrade for more</button>)}
+                <button onClick={() => setJoining(true)} style={{ fontSize: 12, color: 'var(--text-3)', background: 'none', border: 'none', cursor: 'pointer', padding: '6px 4px' }}>+ Join campaign</button>
+              </div>
             )}
           </div>
         )}
@@ -123,7 +164,6 @@ export default function Shell({ children }) {
         }}>
           {NAV.map(item => (
             <NavLink key={item.to} to={item.to} style={({ isActive }) => navLinkStyle(isActive)}>
-              <span style={{ fontSize: 12, opacity: 0.9 }}>{item.icon}</span>
               <span>{item.label}</span>
             </NavLink>
           ))}
@@ -147,6 +187,9 @@ export default function Shell({ children }) {
           {campaigns.map(c => (
             <button key={c._id} onClick={() => setActive(c)} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '7px 10px', borderRadius: 8, border: 'none', background: activeCampaign?._id === c._id ? 'var(--gold-bg)' : 'transparent', color: activeCampaign?._id === c._id ? 'var(--gold)' : 'var(--text-2)', fontSize: 13, fontWeight: activeCampaign?._id === c._id ? 500 : 400, cursor: 'pointer', marginBottom: 2, borderLeft: activeCampaign?._id === c._id ? '2px solid var(--gold)' : '2px solid transparent' }}>{c.name}</button>
           ))}
+          {isDM && activeCampaign?.joinCode && (
+            <div style={{ fontSize: 11, color: 'var(--text-3)', padding: '2px 10px 6px' }}>Join code: <span style={{ color: 'var(--gold)', fontWeight: 600 }}>{activeCampaign.joinCode}</span></div>
+          )}
           {creating ? (
             <form onSubmit={handleCreate} style={{ marginTop: 4 }}>
               <input autoFocus className="input" style={{ marginBottom: 4, padding: '6px 8px', fontSize: 12 }} placeholder="Campaign name..." value={newName} onChange={e => setNewName(e.target.value)} />
@@ -156,17 +199,29 @@ export default function Shell({ children }) {
                 <button type="button" className="btn btn-ghost btn-sm" onClick={() => { setCreating(false); setError('') }}>✕</button>
               </div>
             </form>
-          ) : canCreate ? (
-            <button onClick={() => setCreating(true)} style={{ display: 'flex', alignItems: 'center', gap: 6, width: '100%', padding: '6px 10px', borderRadius: 8, border: 'none', background: 'transparent', color: 'var(--text-3)', fontSize: 12, cursor: 'pointer', marginTop: 4 }}>+ New campaign</button>
+          ) : joining ? (
+            <form onSubmit={handleJoin} style={{ marginTop: 4 }}>
+              <input autoFocus className="input" style={{ marginBottom: 4, padding: '6px 8px', fontSize: 12, textTransform: 'uppercase' }} placeholder="Join code..." value={joinCode} onChange={e => setJoinCode(e.target.value)} />
+              {joinError && <div style={{ fontSize: 11, color: 'var(--red)', marginBottom: 6 }}>{joinError}</div>}
+              <div style={{ display: 'flex', gap: 4 }}>
+                <button type="submit" className="btn btn-primary btn-sm" style={{ flex: 1 }}>Join</button>
+                <button type="button" className="btn btn-ghost btn-sm" onClick={() => { setJoining(false); setJoinError('') }}>✕</button>
+              </div>
+            </form>
           ) : (
-            <button onClick={() => navigate('/premium')} style={{ display: 'flex', alignItems: 'center', gap: 6, width: '100%', padding: '6px 10px', borderRadius: 8, border: 'none', background: 'var(--gold-bg)', color: 'var(--gold)', fontSize: 12, cursor: 'pointer', marginTop: 4, borderLeft: '2px solid var(--gold-border)' }}>✦ Upgrade for more campaigns</button>
+            <div style={{ display: 'flex', gap: 4, marginTop: 4 }}>
+              {isDM && (canCreate
+                ? <button onClick={() => setCreating(true)} style={{ display: 'flex', alignItems: 'center', gap: 6, flex: 1, padding: '6px 10px', borderRadius: 8, border: 'none', background: 'transparent', color: 'var(--text-3)', fontSize: 12, cursor: 'pointer' }}>+ New</button>
+                : <button onClick={() => navigate('/premium')} style={{ display: 'flex', alignItems: 'center', gap: 6, flex: 1, padding: '6px 10px', borderRadius: 8, border: 'none', background: 'var(--gold-bg)', color: 'var(--gold)', fontSize: 12, cursor: 'pointer', borderLeft: '2px solid var(--gold-border)' }}>✦ Upgrade</button>)}
+              <button onClick={() => setJoining(true)} style={{ display: 'flex', alignItems: 'center', gap: 6, flex: 1, padding: '6px 10px', borderRadius: 8, border: 'none', background: 'transparent', color: 'var(--text-3)', fontSize: 12, cursor: 'pointer' }}>+ Join</button>
+            </div>
           )}
         </div>
 
         <nav style={{ padding: '10px', flex: 1, overflowY: 'auto' }}>
           {NAV.map(item => (
             <NavLink key={item.to} to={item.to} style={({ isActive }) => navLinkStyle(isActive)}>
-              <span style={{ fontSize: 15 }}>{item.icon}</span>{item.label}
+              {item.label}
             </NavLink>
           ))}
         </nav>
@@ -182,7 +237,6 @@ export default function Shell({ children }) {
               <div style={{ fontSize: 11, color: 'var(--text-3)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user?.email}</div>
             </div>
             <button onClick={() => setShowSettings(true)} title="Settings" style={{ background: 'none', border: 'none', color: 'var(--text-3)', cursor: 'pointer', fontSize: 16, padding: 4 }}>⚙️</button>
-            <button onClick={logout} title="Sign out" style={{ background: 'none', border: 'none', color: 'var(--text-3)', cursor: 'pointer', fontSize: 16, padding: 4 }}>↩</button>
           </div>
         </div>
       </aside>

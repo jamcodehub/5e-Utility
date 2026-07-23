@@ -1,5 +1,5 @@
 import { Router } from 'express'
-import { StoryCard } from '../models/index.js'
+import { StoryCard, Campaign } from '../models/index.js'
 import { auth } from './campaigns.js'
 import { User } from '../models/index.js'
 
@@ -11,10 +11,11 @@ router.get('/:campaignId', auth, async (req, res) => {
 
 router.post('/:campaignId', auth, async (req, res) => {
   try {
-    const user = await User.findById(req.userId)
-    if (!user.isPremium) {
+    const campaign = await Campaign.findById(req.params.campaignId)
+    const owner = campaign ? await User.findById(campaign.owner) : null
+    if (!owner?.isPremium) {
       const count = await StoryCard.countDocuments({ campaign: req.params.campaignId })
-      if (count >= 5) return res.status(403).json({ error: 'Free accounts are limited to 5 storyboard scenes. Upgrade to Premium for unlimited scenes.' })
+      if (count >= 10) return res.status(403).json({ error: 'Free campaigns are limited to 10 storyboard scenes. The DM can upgrade to the Ultimate toolkit for unlimited scenes.' })
     }
     res.json(await StoryCard.create({ ...req.body, campaign: req.params.campaignId }))
   } catch (e) { res.status(500).json({ error: e.message }) }

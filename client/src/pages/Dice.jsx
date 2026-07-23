@@ -88,7 +88,7 @@ export default function Dice() {
   }
 
   return (
-    <div className="page-content" style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: '100vh', gap: 20, padding: '18px 18px 24px' }}>
+    <div className="page-content dice-page" style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0, height: '100%', gap: 14, padding: '14px' }}>
       <div style={{ flex: 1, width: '100%', maxWidth: 1280, margin: '0 auto', position: 'relative' }}>
         <style>{`
           .board-shell { width: 100%; height: 100%; background: rgba(255,255,255,0.02); border: 2px solid rgba(255,255,255,0.07); border-radius: 32px; position: relative; overflow: hidden; display:flex; align-items:center; justify-content:center; box-shadow: inset 0 12px 34px rgba(0,0,0,0.28); }
@@ -98,12 +98,15 @@ export default function Dice() {
           .d20 svg { width:100%; height:100%; }
           .d20.rolling svg { animation: roll-spin 1100ms linear infinite; }
           @keyframes roll-spin { from { transform: rotate(0deg); } to { transform: rotate(720deg); } }
-          .dice-controls { display:flex; justify-content:center; align-items:center; gap:10px; width:100%; max-width:1280px; margin:0 auto; flex-wrap:wrap; }
-          .dice-btn { border:none; border-radius:14px; padding:12px 18px; font-family: 'Cinzel, serif'; font-size:16px; font-weight:700; line-height:1; transition: transform .08s ease, filter .12s ease, opacity .12s ease; }
+          .dice-controls { display:flex; justify-content:space-between; align-items:center; gap:8px; width:100%; max-width:1280px; margin:0 auto; }
+          .dice-btn { border:none; border-radius:14px; padding:10px 16px; font-family: 'Cinzel, serif'; font-size:14px; font-weight:700; line-height:1; transition: transform .08s ease, filter .12s ease, opacity .12s ease; white-space: nowrap; flex-shrink: 0; }
           .dice-roll-btn { background: var(--gold); color: var(--text); }
           .dice-roll-btn:not(:disabled):active { transform: translateY(2px); filter: brightness(0.96); }
           .dice-roll-btn:disabled { opacity: .75; cursor: default; }
-          .dice-result-btn { background: var(--surface); color: var(--text); border: 1px solid var(--border); cursor: default; }
+          .dice-result-btn { background: var(--surface); color: var(--text); border: 1px solid var(--border); cursor: default; overflow: hidden; text-overflow: ellipsis; }
+          @media (max-width: 768px) {
+            .dice-btn { padding: 9px 12px; font-size: 12px; border-radius: 12px; }
+          }
           .confetti-overlay { position:fixed; inset:0; pointer-events:none; overflow:hidden; z-index:9999; }
           .confetti-piece { position:absolute; background:white; opacity:0.95; border-radius: 3px; animation: confetti-up 1200ms cubic-bezier(.2,.9,.2,1) forwards; }
           @keyframes confetti-up { 0%{ transform: translateY(0) rotate(0); opacity:1 } 100%{ transform: translateY(-120vh) rotate(720deg); opacity:0 } }
@@ -158,13 +161,13 @@ export default function Dice() {
       </div>
 
       <div className="dice-controls">
-        <button className="dice-btn dice-roll-btn" onClick={roll} disabled={rolling}>Roll d20</button>
         <button className={`dice-btn dice-result-btn ${sink ? 'result-sink' : ''}`} disabled style={{
           color: isClassic ? '#111111' : 'var(--text)',
           textShadow: isClassic ? '0 0 1px #fff, 0 0 2px #fff' : 'none',
         }}>
           Result: {result || displayValue}
         </button>
+        <button className="dice-btn dice-roll-btn" onClick={roll} disabled={rolling}>Roll d20</button>
       </div>
     </div>
   )

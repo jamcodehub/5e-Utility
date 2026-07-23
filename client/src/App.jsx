@@ -11,6 +11,10 @@ import Character from './pages/Character'
 import Inventory from './pages/Inventory'
 import Dice from './pages/Dice'
 import Premium from './pages/Premium'
+import IdeaGenerator from './pages/IdeaGenerator'
+import RulesReference from './pages/RulesReference'
+import MusicPlayer from './pages/MusicPlayer'
+import LevelBuilder from './pages/LevelBuilder'
 
 function Guard() {
   const { user, loading } = useAuth()
@@ -28,6 +32,10 @@ function Guard() {
           <Route path="/inventory"  element={<Inventory />} />
           <Route path="/dice"       element={<Dice />} />
           <Route path="/premium"    element={<Premium />} />
+          <Route path="/ideas"      element={<IdeaGenerator />} />
+          <Route path="/rules"      element={<RulesReference />} />
+          <Route path="/music"      element={<MusicPlayer />} />
+          <Route path="/levels"     element={<LevelBuilder />} />
           <Route path="*"           element={<Navigate to="/journal" replace />} />
         </Routes>
       </Shell>

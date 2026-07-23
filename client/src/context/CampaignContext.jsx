@@ -42,8 +42,20 @@ export function CampaignProvider({ children }) {
     if (activeCampaign?._id === id) setActive(campaigns.find(x => x._id !== id) || null)
   }
 
+  // Returns null on success, error string on failure
+  const joinCampaign = async (code) => {
+    try {
+      const c = await api('/campaigns/join', { method: 'POST', body: { code } })
+      setCampaigns(p => p.some(x => x._id === c._id) ? p.map(x => x._id === c._id ? c : x) : [c, ...p])
+      setActive(c)
+      return null
+    } catch (e) {
+      return e.message
+    }
+  }
+
   return (
-    <CampaignContext.Provider value={{ campaigns, activeCampaign, setActive, createCampaign, updateCampaign, deleteCampaign, reload: load }}>
+    <CampaignContext.Provider value={{ campaigns, activeCampaign, setActive, createCampaign, updateCampaign, deleteCampaign, joinCampaign, reload: load }}>
       {children}
     </CampaignContext.Provider>
   )

@@ -44,6 +44,7 @@ const sendOtp = async (user, code) => {
 const publicUser = (user) => ({
   id: user._id, username: user.username, email: user.email,
   phone: user.phone || '', isPremium: user.isPremium,
+  role: user.role || 'player',
   twoFactorEnabled: user.twoFactorEnabled || false,
 })
 
@@ -59,12 +60,12 @@ const authMiddleware = async (req, res, next) => {
 
 router.post('/register', async (req, res) => {
   try {
-    const { username, email, password, phone } = req.body
+    const { username, email, password, phone, role } = req.body
     if (!username || !email || !password) return res.status(400).json({ error: 'All fields required' })
     const exists = await User.findOne({ $or: [{ email }, { username }] })
     if (exists) return res.status(400).json({ error: 'Email or username already taken' })
     const hashed = await bcrypt.hash(password, 12)
-    const user = await User.create({ username, email, password: hashed, phone: phone || '' })
+    const user = await User.create({ username, email, password: hashed, phone: phone || '', role: role === 'dm' ? 'dm' : 'player' })
     res.json({ token: sign(user._id), user: publicUser(user) })
   } catch (e) { res.status(500).json({ error: e.message }) }
 })

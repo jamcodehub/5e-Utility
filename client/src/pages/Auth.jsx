@@ -34,7 +34,7 @@ function GoogleButton({ onCredential }) {
 export default function Auth() {
   const { login, register, verifyTwoFactor, loginWithGoogle } = useAuth()
   const [mode, setMode] = useState('login')
-  const [form, setForm] = useState({ username: '', email: '', password: '', phone: '' })
+  const [form, setForm] = useState({ username: '', email: '', password: '', phone: '', role: 'player' })
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
@@ -51,7 +51,7 @@ export default function Auth() {
         const result = await login(form.email, form.password)
         if (result?.requires2FA) setTwoFA({ userId: result.userId })
       } else {
-        await register(form.username, form.email, form.password, form.phone)
+        await register(form.username, form.email, form.password, form.phone, form.role)
       }
     } catch (err) { setError(err.message) }
     setLoading(false)
@@ -135,6 +135,22 @@ export default function Auth() {
             <label style={{ display: 'block', fontSize: 12, fontWeight: 500, color: 'var(--text-2)', marginBottom: 5 }}>Email</label>
             <input className="input" type="email" placeholder="adventurer@realm.com" value={form.email} onChange={set('email')} required />
           </div>
+          {mode === 'register' && (
+            <div style={{ marginBottom: 12 }}>
+              <label style={{ display: 'block', fontSize: 12, fontWeight: 500, color: 'var(--text-2)', marginBottom: 5 }}>I am a...</label>
+              <div style={{ display: 'flex', gap: 8 }}>
+                {[{ v: 'player', label: 'Player' }, { v: 'dm', label: 'Dungeon Master' }].map(opt => (
+                  <button key={opt.v} type="button" onClick={() => setForm(p => ({ ...p, role: opt.v }))} style={{
+                    flex: 1, padding: '9px 10px', borderRadius: 8, cursor: 'pointer', fontSize: 13,
+                    border: `2px solid ${form.role === opt.v ? 'var(--gold)' : 'var(--border)'}`,
+                    background: form.role === opt.v ? 'var(--gold-bg)' : 'transparent',
+                    color: form.role === opt.v ? 'var(--gold)' : 'var(--text-2)',
+                    fontWeight: form.role === opt.v ? 600 : 400,
+                  }}>{opt.label}</button>
+                ))}
+              </div>
+            </div>
+          )}
           {mode === 'register' && (
             <div style={{ marginBottom: 12 }}>
               <label style={{ display: 'block', fontSize: 12, fontWeight: 500, color: 'var(--text-2)', marginBottom: 5 }}>Phone <span style={{ color: 'var(--text-3)', fontWeight: 400 }}>(optional, for future SMS 2FA)</span></label>

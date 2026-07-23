@@ -5,6 +5,7 @@ const UserSchema = new Schema({
   username:         { type: String, required: true, unique: true, trim: true },
   email:            { type: String, required: true, unique: true, lowercase: true },
   password:         { type: String },
+  role:             { type: String, enum: ['dm', 'player'], default: 'player' },
   phone:            { type: String, default: '' },
   googleId:         { type: String, default: '', index: true, sparse: true },
   avatar:           { type: String, default: '' },
@@ -22,6 +23,7 @@ const CampaignSchema = new Schema({
   description: String,
   setting:     String,
   coverImage:  String,
+  joinCode:    { type: String, unique: true, sparse: true, index: true },
   members:     [{ type: Schema.Types.ObjectId, ref: 'User' }],
 }, { timestamps: true })
 
@@ -69,9 +71,17 @@ const CharacterSchema = new Schema({
   notes:        String,
 }, { timestamps: true })
 
+const LevelPlanSchema = new Schema({
+  campaign: { type: Schema.Types.ObjectId, ref: 'Campaign', required: true },
+  owner:    { type: Schema.Types.ObjectId, ref: 'User', required: true },
+  title:    { type: String, required: true },
+  content:  { type: String, default: '' },
+}, { timestamps: true })
+
 export const User       = model('User', UserSchema)
 export const Campaign   = model('Campaign', CampaignSchema)
 export const Journal    = model('Journal', JournalSchema)
 export const Lore       = model('Lore', LoreSchema)
 export const StoryCard  = model('StoryCard', StoryCardSchema)
 export const Character  = model('Character', CharacterSchema)
+export const LevelPlan  = model('LevelPlan', LevelPlanSchema)

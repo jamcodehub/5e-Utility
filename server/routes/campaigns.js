@@ -1,6 +1,6 @@
 import { Router } from 'express'
 import jwt from 'jsonwebtoken'
-import { Campaign, Character } from '../models/index.js'
+import { Campaign, Character, User } from '../models/index.js'
 
 const router = Router()
 
@@ -12,6 +12,8 @@ export const auth = (req, res, next) => {
   } catch { res.status(401).json({ error: 'Unauthorized' }) }
 }
 
+const genCode = () => Math.random().toString(36).slice(2, 8).toUpperCase()
+
 router.get('/', auth, async (req, res) => {
   const campaigns = await Campaign.find({
     $or: [{ owner: req.userId }, { members: req.userId }]
@@ -19,9 +21,41 @@ router.get('/', auth, async (req, res) => {
   res.json(campaigns)
 })
 
+// Only DMs can create campaigns.
 router.post('/', auth, async (req, res) => {
   try {
-    const campaign = await Campaign.create({ ...req.body, owner: req.userId })
+    const user = await User.findById(req.userId)
+    if (user?.role !== 'dm') return res.status(403).json({ error: 'Only Dungeon Masters can create campaigns.' })
+
+    let joinCode
+    do { joinCode = genCode() } while (await Campaign.findOne({ joinCode }))
+
+    const campaign = await Campaign.create({ ...req.body, owner: req.userId, joinCode })
+    res.json(campaign)
+  } catch (e) { res.status(500).json({ error: e.message }) }
+})
+
+// Players (or anyone) join a campaign using the DM's share code.
+router.post('/join', auth, async (req, res) => {
+  try {
+    const { code } = req.body
+    if (!code) return res.status(400).json({ error: 'Join code required' })
+    const campaign = await Campaign.findOne({ joinCode: code.trim().toUpperCase() })
+    if (!campaign) return res.status(404).json({ error: 'Invalid join code' })
+
+    const user = await User.findById(req.userId)
+    if (user.role === 'player' && !user.isPremium) {
+      const already = await Campaign.countDocuments({ members: req.userId })
+      const owned = String(campaign.owner) === String(req.userId)
+      if (!owned && already >= 1) {
+        return res.status(403).json({ error: 'Free players can join 1 campaign. Upgrade to Premium for unlimited campaigns.' })
+      }
+    }
+
+    if (String(campaign.owner) !== String(req.userId) && !campaign.members.some(m => String(m) === String(req.userId))) {
+      campaign.members.push(req.userId)
+      await campaign.save()
+    }
     res.json(campaign)
   } catch (e) { res.status(500).json({ error: e.message }) }
 })
@@ -46,12 +80,25 @@ router.get('/:id/character', auth, async (req, res) => {
 })
 
 router.put('/:id/character', auth, async (req, res) => {
-  const char = await Character.findOneAndUpdate(
-    { campaign: req.params.id, owner: req.userId },
-    { ...req.body, campaign: req.params.id, owner: req.userId },
-    { upsert: true, new: true }
-  )
-  res.json(char)
+  try {
+    const existing = await Character.findOne({ campaign: req.params.id, owner: req.userId })
+    if (!existing) {
+      const user = await User.findById(req.userId)
+      if (!user.isPremium) {
+        const count = await Character.countDocuments({ owner: req.userId })
+        const limit = user.role === 'dm' ? 10 : 1
+        if (count >= limit) {
+          return res.status(403).json({ error: `Free ${user.role === 'dm' ? 'DMs are limited to 10 characters' : 'players are limited to 1 character sheet'}. Upgrade for unlimited characters.` })
+        }
+      }
+    }
+    const char = await Character.findOneAndUpdate(
+      { campaign: req.params.id, owner: req.userId },
+      { ...req.body, campaign: req.params.id, owner: req.userId },
+      { upsert: true, new: true }
+    )
+    res.json(char)
+  } catch (e) { res.status(500).json({ error: e.message }) }
 })
 
 export default router

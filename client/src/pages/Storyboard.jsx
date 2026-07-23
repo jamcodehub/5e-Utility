@@ -24,6 +24,31 @@ function Cover({ campaignName }) {
   )
 }
 
+function CandidateImage({ url, index, alt }) {
+  const [armed, setArmed] = useState(false)
+  const [failed, setFailed] = useState(false)
+  const [attempt, setAttempt] = useState(0)
+
+  useEffect(() => {
+    setFailed(false)
+    const t = setTimeout(() => setArmed(true), index * 500)
+    return () => clearTimeout(t)
+  }, [index, attempt])
+
+  if (!armed) {
+    return <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#8a6040', fontSize: 11, fontFamily: 'Cinzel, serif' }}>Queued...</div>
+  }
+  if (failed) {
+    return (
+      <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8, color: '#8a6040' }}>
+        <div style={{ fontSize: 11, fontFamily: 'Cinzel, serif' }}>Failed to load</div>
+        <button onClick={(e) => { e.stopPropagation(); setArmed(false); setAttempt(a => a + 1) }} style={{ background: 'transparent', border: '1px solid #4a3020', color: '#c8a060', padding: '3px 10px', borderRadius: 6, fontSize: 11, cursor: 'pointer' }}>Retry</button>
+      </div>
+    )
+  }
+  return <img src={url} alt={alt} onError={() => setFailed(true)} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+}
+
 function BookSpread({ card, index }) {
   return (
     <div style={{ position: 'absolute', inset: 0, display: 'flex', minWidth: 0 }}>
@@ -262,7 +287,7 @@ export default function Storyboard() {
               {candidates.map((url, i) => (
                 <button key={i} onClick={() => chooseCandidate(url)} style={{ padding: 0, border: '2px solid transparent', borderRadius: 8, overflow: 'hidden', cursor: 'pointer', background: 'none', aspectRatio: '4 / 3', transition: 'border-color .15s' }}
                   onMouseEnter={e => e.currentTarget.style.borderColor = '#c8a060'} onMouseLeave={e => e.currentTarget.style.borderColor = 'transparent'}>
-                  <img src={url} alt={`Option ${i + 1}`} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                  <CandidateImage url={url} index={i} alt={`Option ${i + 1}`} />
                 </button>
               ))}
             </div>

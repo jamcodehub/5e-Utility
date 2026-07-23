@@ -63,7 +63,7 @@ export default function Character() {
     try {
       const updated = await api(`/campaigns/${activeCampaign._id}/character`, { method: 'PUT', body: form })
       setChar(updated); setForm(updated); setEditing(false); toast('Character saved')
-    } catch { toast('Save failed') }
+    } catch (e) { toast(e.message || 'Save failed') }
   }
 
   const toggleProf = (name) => setForm(p => {
@@ -149,8 +149,8 @@ export default function Character() {
               )}
               {label === 'HP' && !editing && (
                 <div style={{ display: 'flex', gap: 4, justifyContent: 'center', marginTop: 4 }}>
-                  <button onClick={() => adjustHp(-1)} title="Take damage" style={{ width: 20, height: 20, borderRadius: 5, border: '1px solid var(--red)', background: 'transparent', color: 'var(--red)', fontSize: 12, fontWeight: 700, cursor: 'pointer', lineHeight: 1, padding: 0 }}>−</button>
                   <button onClick={() => adjustHp(1)} title="Heal" style={{ width: 20, height: 20, borderRadius: 5, border: '1px solid var(--green)', background: 'transparent', color: 'var(--green)', fontSize: 12, fontWeight: 700, cursor: 'pointer', lineHeight: 1, padding: 0 }}>+</button>
+                  <button onClick={() => adjustHp(-1)} title="Take damage" style={{ width: 20, height: 20, borderRadius: 5, border: '1px solid var(--red)', background: 'transparent', color: 'var(--red)', fontSize: 12, fontWeight: 700, cursor: 'pointer', lineHeight: 1, padding: 0 }}>−</button>
                 </div>
               )}
             </div>
