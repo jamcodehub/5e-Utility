@@ -12,14 +12,13 @@ const pollinationsUrl = (prompt, width = 1200, height = 900, seed = Math.floor(M
     `fantasy landscape painting artstyle portrait, epic matte painting, consistent character style, ${prompt}, dramatic lighting, high detail, no text, painterly brushwork`
   )}?width=${width}&height=${height}&nologo=true&enhance=true&seed=${seed}`
 
-// Variation modifiers so the 4 candidates don't all look like near-duplicates
-// of the same composition/angle/lighting — each candidate gets a distinct
-// framing + lighting + palette twist appended to the shared base prompt.
+// Variation modifiers so the 2 candidates don't look like near-duplicates of
+// the same composition/angle/lighting. Kept to 2 (not 4) because Pollinations'
+// free tier rate-limits aggressively — fewer simultaneous requests means a
+// much higher chance both actually succeed.
 const VARIANTS = [
   { angle: 'wide establishing shot, low camera angle', light: 'dramatic side lighting', palette: 'warm amber and shadow tones' },
   { angle: 'close-up dynamic composition', light: 'cool moonlit lighting', palette: 'cold blue and silver tones' },
-  { angle: 'over-the-shoulder perspective', light: 'firelit glow', palette: 'deep red and orange tones' },
-  { angle: 'birds-eye dramatic framing', light: 'misty diffused lighting', palette: 'muted green and grey tones' },
 ]
 
 function Cover({ campaignName }) {
@@ -34,31 +33,21 @@ function Cover({ campaignName }) {
   )
 }
 
-// Pollinations free tier rate-limits bursts — cap concurrency at 2 in-flight
-// requests instead of fully serializing, so all 4 arrive noticeably faster
-// while still avoiding the 429s a full 4-at-once burst causes.
-const MAX_CONCURRENT = 2
-let activeLoads = 0
-const waitQueue = []
+// Pollinations free tier rate-limits bursts hard — fully serialize candidate
+// loads (one at a time, never overlapping) with a cooldown between each, and
+// auto-retry with backoff on failure before giving up.
+let candidateQueue = Promise.resolve()
 function enqueueCandidateLoad(task) {
-  return new Promise((resolveOuter) => {
-    const run = () => {
-      activeLoads++
-      task().catch(() => {}).finally(() => {
-        activeLoads--
-        resolveOuter()
-        if (waitQueue.length) waitQueue.shift()()
-      })
-    }
-    if (activeLoads < MAX_CONCURRENT) run()
-    else waitQueue.push(run)
-  })
+  const run = candidateQueue.then(() => task().catch(() => {}))
+  candidateQueue = run.then(() => new Promise(r => setTimeout(r, 2500)))
+  return run
 }
 
 function CandidateImage({ url, index, alt }) {
   const [armed, setArmed] = useState(false)
   const [failed, setFailed] = useState(false)
   const [attempt, setAttempt] = useState(0)
+  const MAX_AUTO_RETRIES = 3
 
   useEffect(() => {
     setFailed(false)
@@ -68,7 +57,16 @@ function CandidateImage({ url, index, alt }) {
       if (cancelled) return resolve()
       const img = new Image()
       img.onload = () => { if (!cancelled) { setArmed(true) }; resolve() }
-      img.onerror = () => { if (!cancelled) { setFailed(true) }; reject() }
+      img.onerror = () => {
+        if (cancelled) return reject()
+        if (attempt < MAX_AUTO_RETRIES) {
+          // auto-retry with growing backoff — 429s are usually transient
+          setTimeout(() => { if (!cancelled) setAttempt(a => a + 1) }, 1500 * (attempt + 1))
+        } else {
+          setFailed(true)
+        }
+        reject()
+      }
       img.src = url
     }))
     return () => { cancelled = true }

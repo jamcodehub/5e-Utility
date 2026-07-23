@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { api } from '../context/AuthContext'
 import { useCampaign } from '../context/CampaignContext'
 import { useToast } from '../hooks/useToast'
@@ -71,18 +71,27 @@ export default function Character() {
     return { ...p, proficiencies: profs.includes(name) ? profs.filter(s => s !== name) : [...profs, name] }
   })
 
-  // Quick HP adjust — heal (+) or take damage (-), clamped to [0, max], saved immediately.
-  const adjustHp = async (delta) => {
-    const max = form.hp?.max ?? char?.hp?.max ?? 10
-    const current = form.hp?.current ?? char?.hp?.current ?? 10
-    const next = Math.max(0, Math.min(max, current + delta))
-    const nextHp = { current: next, max }
-    setForm(p => ({ ...p, hp: nextHp }))
-    if (!activeCampaign) return
-    try {
-      const updated = await api(`/campaigns/${activeCampaign._id}/character`, { method: 'PUT', body: { ...form, hp: nextHp } })
-      setChar(updated); setForm(updated)
-    } catch { toast('Could not save HP change') }
+  // Quick HP adjust — heal (+) or take damage (-), clamped to [0, max].
+  // Updates the number instantly (no waiting on the network), then saves in
+  // the background debounced so rapid clicking never feels laggy.
+  const hpSaveTimer = useRef(null)
+  const adjustHp = (delta) => {
+    setForm(p => {
+      const max = p.hp?.max ?? 10
+      const current = p.hp?.current ?? 10
+      const next = Math.max(0, Math.min(max, current + delta))
+      const nextForm = { ...p, hp: { current: next, max } }
+      if (activeCampaign) {
+        clearTimeout(hpSaveTimer.current)
+        hpSaveTimer.current = setTimeout(async () => {
+          try {
+            const updated = await api(`/campaigns/${activeCampaign._id}/character`, { method: 'PUT', body: nextForm })
+            setChar(updated)
+          } catch { toast('Could not save HP change') }
+        }, 400)
+      }
+      return nextForm
+    })
   }
 
   const F = form

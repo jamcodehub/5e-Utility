@@ -29,7 +29,7 @@ function MusicMiniPlayer({ bottomOffset }) {
                 color: current === m.id ? 'var(--gold)' : 'var(--text-2)',
               }}>
                 <span>{m.label}</span>
-                {current === m.id && <span style={{ fontSize: 10 }}>⏸</span>}
+                <span style={{ fontSize: 12, width: 16, textAlign: 'center' }}>{current === m.id ? '⏸' : '▶'}</span>
               </button>
             ))}
           </div>
@@ -250,7 +250,7 @@ export default function Shell({ children }) {
           </div>
         )}
         {showSettings && <SettingsModal onClose={() => setShowSettings(false)} />}
-        <MusicMiniPlayer bottomOffset="calc(84px + env(safe-area-inset-bottom, 12px))" />
+        {isDM && <MusicMiniPlayer bottomOffset="calc(84px + env(safe-area-inset-bottom, 12px))" />}
       </div>
     )
   }
@@ -325,7 +325,7 @@ export default function Shell({ children }) {
 
       <main style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>{children}</main>
       {showSettings && <SettingsModal onClose={() => setShowSettings(false)} />}
-      <MusicMiniPlayer bottomOffset="20px" />
+      {isDM && <MusicMiniPlayer bottomOffset="20px" />}
     </div>
   )
 }

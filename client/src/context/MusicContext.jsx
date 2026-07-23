@@ -135,26 +135,31 @@ function startMood(ctx, master, mood) {
     const scheduleDrip = () => { drip(ctx, master, 0.03 + Math.random() * 0.02); intervals.push(setTimeout(scheduleDrip, 2200 + Math.random() * 3800)) }
     intervals.push(setTimeout(scheduleDrip, 1500))
   } else if (mood === 'dramatic') {
-    addOsc(jitter(49, 2), 'sawtooth', 0.15)
-    addOsc(jitter(73.5, 2), 'sine', 0.1, -6)
-    addOsc(jitter(98, 2), 'triangle', 0.05, 5)
-    addNoise(0.03, 1800, 'bandpass')
+    // Softer, more subtle medieval/vampiric drone — lower volumes across the
+    // board and a gentler bell so it sits in the background instead of
+    // dominating the mix.
+    addOsc(jitter(49, 2), 'sawtooth', 0.07)
+    addOsc(jitter(73.5, 2), 'sine', 0.06, -6)
+    addOsc(jitter(98, 2), 'triangle', 0.03, 5)
+    addNoise(0.015, 1600, 'bandpass')
     const { gain: bellGain } = addOsc(220, 'sine', 0)
     const tollBell = () => {
       const t = ctx.currentTime
       bellGain.gain.cancelScheduledValues(t)
-      bellGain.gain.setValueAtTime(0.09, t)
+      bellGain.gain.setValueAtTime(0.045, t)
       bellGain.gain.exponentialRampToValueAtTime(0.0001, t + 2.2)
-      intervals.push(setTimeout(tollBell, 3800 + Math.random() * 2400))
+      intervals.push(setTimeout(tollBell, 4200 + Math.random() * 2600))
     }
-    intervals.push(setTimeout(tollBell, 1000))
+    intervals.push(setTimeout(tollBell, 1200))
   }
 
   return () => {
     intervals.forEach(id => { clearInterval(id); clearTimeout(id) })
+    // Hard-stop quickly (short ramp, then stop) rather than a long crossfade
+    // — a slow fade let the outgoing and incoming moods audibly overlap.
     const t = ctx.currentTime
-    nodes.forEach(n => { if (n.gain) { try { n.gain.linearRampToValueAtTime(0, t + 0.4) } catch { /* noop */ } } })
-    setTimeout(() => nodes.forEach(n => { try { n.stop && n.stop() } catch { /* noop */ } }), 500)
+    nodes.forEach(n => { if (n.gain) { try { n.gain.cancelScheduledValues(t); n.gain.linearRampToValueAtTime(0, t + 0.12) } catch { /* noop */ } } })
+    setTimeout(() => nodes.forEach(n => { try { n.stop && n.stop() } catch { /* noop */ } }), 160)
   }
 }
 
@@ -165,6 +170,7 @@ export function MusicProvider({ children }) {
   const ctxRef = useRef(null)
   const masterRef = useRef(null)
   const stopRef = useRef(null)
+  const genRef = useRef(0)
   const [current, setCurrent] = useState(null)
   const [volume, setVolume] = useState(0.5)
 
@@ -185,17 +191,29 @@ export function MusicProvider({ children }) {
   const play = (moodId) => {
     const ctx = ensureCtx()
     if (ctx.state === 'suspended') ctx.resume()
+    const myGen = ++genRef.current
     if (current === moodId) {
       stopRef.current?.(); stopRef.current = null
       setCurrent(null)
       return
     }
-    stopRef.current?.()
-    stopRef.current = startMood(ctx, masterRef.current, moodId)
+    const previousStop = stopRef.current
+    stopRef.current = null
     setCurrent(moodId)
+    if (previousStop) {
+      // Wait for the outgoing mood to fully silence before starting the next
+      // one, so the two never audibly overlap.
+      previousStop()
+      setTimeout(() => {
+        if (genRef.current !== myGen) return // a newer switch happened meanwhile
+        stopRef.current = startMood(ctx, masterRef.current, moodId)
+      }, 170)
+    } else {
+      stopRef.current = startMood(ctx, masterRef.current, moodId)
+    }
   }
 
-  const stop = () => { stopRef.current?.(); stopRef.current = null; setCurrent(null) }
+  const stop = () => { genRef.current++; stopRef.current?.(); stopRef.current = null; setCurrent(null) }
 
   const setVol = (v) => {
     setVolume(v)
