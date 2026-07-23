@@ -34,14 +34,36 @@ export function AuthProvider({ children }) {
 
   const login = async (email, password) => {
     const data = await api('/auth/login', { method: 'POST', body: { email, password } })
+    if (data.requires2FA) return data // { requires2FA: true, userId }
+    localStorage.setItem('ll_token', data.token)
+    setUser(data.user)
+    return data
+  }
+
+  const verifyTwoFactor = async (userId, code) => {
+    const data = await api('/auth/2fa/verify', { method: 'POST', body: { userId, code } })
+    localStorage.setItem('ll_token', data.token)
+    setUser(data.user)
+    return data
+  }
+
+  const loginWithGoogle = async (credential) => {
+    const data = await api('/auth/google', { method: 'POST', body: { credential } })
+    localStorage.setItem('ll_token', data.token)
+    setUser(data.user)
+    return data
+  }
+
+  const register = async (username, email, password, phone) => {
+    const data = await api('/auth/register', { method: 'POST', body: { username, email, password, phone } })
     localStorage.setItem('ll_token', data.token)
     setUser(data.user)
   }
 
-  const register = async (username, email, password) => {
-    const data = await api('/auth/register', { method: 'POST', body: { username, email, password } })
-    localStorage.setItem('ll_token', data.token)
-    setUser(data.user)
+  const setTwoFactor = async (enable, phone) => {
+    const u = await api('/auth/2fa/toggle', { method: 'POST', body: { enable, phone } })
+    setUser(p => ({ ...p, ...u }))
+    return u
   }
 
   const logout = () => { localStorage.removeItem('ll_token'); setUser(null) }
@@ -53,7 +75,7 @@ export function AuthProvider({ children }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user, login, register, logout, loading, refreshUser, isPremium: user?.isPremium || false }}>
+    <AuthContext.Provider value={{ user, login, register, logout, loading, refreshUser, verifyTwoFactor, loginWithGoogle, setTwoFactor, isPremium: user?.isPremium || false }}>
       {children}
     </AuthContext.Provider>
   )

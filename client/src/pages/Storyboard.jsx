@@ -4,16 +4,19 @@ import { useCampaign } from '../context/CampaignContext'
 import { useToast } from '../hooks/useToast'
 import UpgradeModal from '../components/UpgradeModal'
 
-const pollinationsUrl = (prompt, width = 1200, height = 900) =>
+// Pollinations (flux model) — free, no API key, decent quality, and scales
+// fine for a small/medium app. Prompt is engineered for painterly fantasy
+// landscape-portrait artwork rather than flat cartoon illustration.
+const pollinationsUrl = (prompt, width = 1200, height = 900, seed = Math.floor(Math.random() * 99999)) =>
   `https://image.pollinations.ai/prompt/${encodeURIComponent(
-    `fantasy cartoon illustration, consistent character style, ${prompt}, high detail, no text, clean linework, vibrant colors`
-  )}?width=${width}&height=${height}&nologo=true&enhance=true&seed=${Math.floor(Math.random() * 99999)}`
+    `fantasy landscape painting artstyle portrait, epic matte painting, consistent character style, ${prompt}, dramatic lighting, high detail, no text, painterly brushwork`
+  )}?width=${width}&height=${height}&nologo=true&enhance=true&seed=${seed}`
 
 function Cover({ campaignName }) {
   // Single cover page (closed book front cover)
   return (
-    <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(135deg, #4a3627, #402e22 35%, #513e2a 100%)' }}>
-      <div style={{ width: '100%', height: '100%', maxWidth: '760px', maxHeight: '100%', borderRadius: 28, border: '1px solid rgba(255,255,255,0.08)', boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.04), inset 0 0 20px rgba(0,0,0,0.15)', padding: 40, display: 'flex', flexDirection: 'column', justifyContent: 'center', background: 'linear-gradient(180deg, rgba(131,92,64,0.95), rgba(95,65,46,0.95)), radial-gradient(circle at 20% 20%, rgba(255,255,255,0.05), transparent 25%)' }}>
+    <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(135deg, #3f2b1d, #352417 38%, #4a3322 100%)' }}>
+      <div style={{ width: '100%', height: '100%', maxWidth: '760px', maxHeight: '100%', borderRadius: 28, border: '1px solid rgba(245,220,180,0.14)', boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.03), inset 0 0 32px rgba(0,0,0,0.22)', padding: 40, display: 'flex', flexDirection: 'column', justifyContent: 'center', background: 'radial-gradient(circle at 25% 18%, rgba(255,255,255,0.05), transparent 28%), repeating-linear-gradient(135deg, rgba(255,255,255,0.015) 0 3px, rgba(0,0,0,0.02) 3px 6px), linear-gradient(180deg, #7d563b, #6b492f 45%, #5a3f2a 100%)' }}>
         <div style={{ fontFamily: 'Cinzel, serif', fontSize: 34, color: '#f3e7cd', lineHeight: 1.2, fontWeight: 700, letterSpacing: '0.06em', textAlign: 'center', textShadow: '0 1px 2px rgba(0,0,0,0.3)' }}>{campaignName || 'Your Campaign'}</div>
         <div style={{ marginTop: 18, fontSize: 12, color: '#e6d7b0', letterSpacing: '0.2em', fontFamily: 'Cinzel, serif', textAlign: 'center' }}>CHRONICLE</div>
       </div>
@@ -25,25 +28,26 @@ function BookSpread({ card, index }) {
   return (
     <div style={{ position: 'absolute', inset: 0, display: 'flex', minWidth: 0 }}>
       {/* Left — image with responsive cropping */}
-      <div style={{ flex: 1, background: 'var(--surface)', borderRight: '2px solid #5a4a3a', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', position: 'relative', boxShadow: 'inset -8px 0 20px rgba(0,0,0,0.05)', padding: '4%' }}>
+      <div style={{ flex: 1, background: 'linear-gradient(180deg, #f6eddc, #efe3cc)', borderRight: '2px solid #b39b74', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', position: 'relative', boxShadow: 'inset -10px 0 20px rgba(86,61,34,0.08)', padding: '4%' }}>
         <div style={{ position: 'absolute', top: 14, left: 18, fontFamily: 'Cinzel, serif', fontSize: 10, color: 'var(--text-3)', letterSpacing: '0.1em', zIndex: 1 }}>SCENE {index + 1}</div>
         {card.imageUrl
           ? <img src={card.imageUrl} alt={card.title} style={{ width: '100%', height: '100%', minWidth: '100%', minHeight: '100%', objectFit: 'cover', objectPosition: 'center', display: 'block', borderRadius: 8 }} onError={e => { e.target.style.display = 'none' }} />
           : <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, color: 'var(--text-3)' }}><div style={{ fontSize: 40, opacity: 0.3 }}>✦</div><div style={{ fontSize: 11, fontFamily: 'Cinzel, serif' }}>Generating...</div></div>
         }
-        <div style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: 24, background: 'linear-gradient(to left, rgba(0,0,0,0.07), transparent)', pointerEvents: 'none' }} />
+        <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', background: 'radial-gradient(circle at 18% 16%, rgba(128,94,59,0.10), transparent 30%), radial-gradient(circle at 84% 78%, rgba(128,94,59,0.08), transparent 28%)' }} />
+        <div style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: 24, background: 'linear-gradient(to left, rgba(60,40,20,0.10), transparent)', pointerEvents: 'none' }} />
       </div>
       {/* Right — text with book-like margins */}
-      <div style={{ flex: 1, background: 'var(--surface2)', padding: '48px 48px', display: 'flex', flexDirection: 'column', position: 'relative', backgroundImage: 'repeating-linear-gradient(transparent, transparent 27px, rgba(0,0,0,0.03) 28px)', backgroundPosition: '0 48px' }}>
+      <div style={{ flex: 1, background: 'linear-gradient(180deg, #f7efde, #f0e4cd)', padding: '48px 48px', display: 'flex', flexDirection: 'column', position: 'relative', backgroundImage: 'radial-gradient(circle at 12% 20%, rgba(125,89,53,0.08), transparent 26%), radial-gradient(circle at 82% 74%, rgba(125,89,53,0.06), transparent 24%), repeating-linear-gradient(transparent, transparent 27px, rgba(0,0,0,0.032) 28px)', backgroundPosition: '0 0, 0 0, 0 48px' }}>
         <div style={{ position: 'absolute', top: 14, right: 18, fontFamily: 'Cinzel, serif', fontSize: 10, color: 'var(--text-3)', letterSpacing: '0.1em' }}>{index * 2 + 2}</div>
-        <h2 style={{ fontFamily: 'Cinzel, serif', fontSize: 20, color: 'var(--text)', marginBottom: 24, lineHeight: 1.4, position: 'relative', zIndex: 1 }}>{card.title}</h2>
-        <p style={{ fontFamily: 'Georgia, serif', fontSize: 14, color: 'var(--text-2)', lineHeight: 1.95, position: 'relative', zIndex: 1, flex: 1, overflow: 'auto' }}>{card.description}</p>
+        <h2 style={{ fontFamily: 'Cinzel, serif', fontSize: 20, color: '#3f2b1f', marginBottom: 24, lineHeight: 1.4, position: 'relative', zIndex: 1 }}>{card.title}</h2>
+        <p style={{ fontFamily: 'Georgia, serif', fontSize: 14, color: '#5b4431', lineHeight: 1.95, position: 'relative', zIndex: 1, flex: 1, overflow: 'auto' }}>{card.description}</p>
         {card.createdAt && (
-          <div style={{ fontSize: 10, color: 'var(--text-3)', fontFamily: 'Cinzel, serif', letterSpacing: '0.06em', marginTop: 28, position: 'relative', zIndex: 1 }}>
+          <div style={{ fontSize: 10, color: '#7c624a', fontFamily: 'Cinzel, serif', letterSpacing: '0.06em', marginTop: 28, position: 'relative', zIndex: 1 }}>
             {new Date(card.createdAt).toLocaleDateString('en-AU', { day: 'numeric', month: 'long', year: 'numeric' })}
           </div>
         )}
-        <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: 24, background: 'linear-gradient(to right, rgba(0,0,0,0.04), transparent)', pointerEvents: 'none' }} />
+        <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: 24, background: 'linear-gradient(to right, rgba(92,66,37,0.11), transparent)', pointerEvents: 'none' }} />
       </div>
     </div>
   )
@@ -60,6 +64,8 @@ export default function Storyboard() {
   const [generating, setGenerating] = useState(false)
   const [currentPage, setCurrentPage] = useState(-1)
   const [showUpgrade, setShowUpgrade] = useState(false)
+  const [candidates, setCandidates] = useState(null) // array of 4 image urls awaiting user pick
+  const [pendingMeta, setPendingMeta] = useState(null) // { title, prompt }
   const bookRef = useRef(null)
   const [showForm, setShowForm] = useState(false)
   const scrollRef = useRef(null)
@@ -124,24 +130,32 @@ export default function Storyboard() {
     } catch (e) {
       // ignore — fallback to user prompt
     }
-    const imageUrl = pollinationsUrl(finalPrompt, w, h)
+    // Offer 4 variations (different seeds) so the user can pick their favourite.
+    const seeds = [...Array(4)].map(() => Math.floor(Math.random() * 99999))
+    const urls = seeds.map(seed => pollinationsUrl(finalPrompt, w, h, seed))
+    setCandidates(urls)
+    setPendingMeta({ title: title || 'Scene', prompt })
+    setGenerating(false)
+  }
+
+  const chooseCandidate = async (imageUrl) => {
+    if (!pendingMeta) return
     try {
-      const card = await api(`/storyboard/${activeCampaign._id}`, { method: 'POST', body: { title: title || 'Scene', description: prompt, prompt, imageUrl } })
+      const card = await api(`/storyboard/${activeCampaign._id}`, { method: 'POST', body: { title: pendingMeta.title, description: pendingMeta.prompt, prompt: pendingMeta.prompt, imageUrl } })
       const newCards = [...cards, card]
       setCards(newCards)
       setCurrentPage(newCards.length - 1)
       setPrompt(''); setTitle(''); setShowForm(false)
+      setCandidates(null); setPendingMeta(null)
       toast('Scene added to your chronicle')
     } catch (err) {
       console.error(err)
-      if (err.status === 403) {
-        setShowUpgrade(true)
-        return
-      }
+      if (err.status === 403) { setShowUpgrade(true); return }
       toast(err.message || 'Failed to save')
     }
-    setGenerating(false)
   }
+
+  const cancelCandidates = () => { setCandidates(null); setPendingMeta(null) }
 
   const deleteCard = async (id) => {
     await api(`/storyboard/${id}`, { method: 'DELETE' })
@@ -240,6 +254,24 @@ export default function Storyboard() {
 
       <ToastContainer />
       {showUpgrade && <UpgradeModal onClose={() => setShowUpgrade(false)} />}
+      {candidates && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }} onClick={cancelCandidates}>
+          <div style={{ width: '100%', maxWidth: 720, background: '#1a1208', border: '1px solid #4a3020', borderRadius: 12, padding: 20 }} onClick={e => e.stopPropagation()}>
+            <div style={{ fontFamily: 'Cinzel, serif', fontSize: 14, color: '#c8a060', marginBottom: 14, textAlign: 'center' }}>Choose your favourite</div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 12 }}>
+              {candidates.map((url, i) => (
+                <button key={i} onClick={() => chooseCandidate(url)} style={{ padding: 0, border: '2px solid transparent', borderRadius: 8, overflow: 'hidden', cursor: 'pointer', background: 'none', aspectRatio: '4 / 3', transition: 'border-color .15s' }}
+                  onMouseEnter={e => e.currentTarget.style.borderColor = '#c8a060'} onMouseLeave={e => e.currentTarget.style.borderColor = 'transparent'}>
+                  <img src={url} alt={`Option ${i + 1}`} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                </button>
+              ))}
+            </div>
+            <div style={{ textAlign: 'center', marginTop: 14 }}>
+              <button onClick={cancelCandidates} style={{ background: 'transparent', border: '1px solid #4a3020', color: '#8a6040', padding: '6px 16px', borderRadius: 6, fontSize: 12, cursor: 'pointer' }}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

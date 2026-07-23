@@ -71,6 +71,20 @@ export default function Character() {
     return { ...p, proficiencies: profs.includes(name) ? profs.filter(s => s !== name) : [...profs, name] }
   })
 
+  // Quick HP adjust — heal (+) or take damage (-), clamped to [0, max], saved immediately.
+  const adjustHp = async (delta) => {
+    const max = form.hp?.max ?? char?.hp?.max ?? 10
+    const current = form.hp?.current ?? char?.hp?.current ?? 10
+    const next = Math.max(0, Math.min(max, current + delta))
+    const nextHp = { current: next, max }
+    setForm(p => ({ ...p, hp: nextHp }))
+    if (!activeCampaign) return
+    try {
+      const updated = await api(`/campaigns/${activeCampaign._id}/character`, { method: 'PUT', body: { ...form, hp: nextHp } })
+      setChar(updated); setForm(updated)
+    } catch { toast('Could not save HP change') }
+  }
+
   const F = form
   const profs = F.proficiencies || []
 
@@ -132,6 +146,12 @@ export default function Character() {
                 )
               ) : (
                 <div style={{ fontFamily: 'Cinzel, serif', fontSize: 18, fontWeight: 600, color }}>{label === 'HP' ? `${F.hp?.current ?? 10}/${F.hp?.max ?? 10}` : label === 'AC' ? F.ac ?? 10 : `+${F.profBonus ?? 2}`}</div>
+              )}
+              {label === 'HP' && !editing && (
+                <div style={{ display: 'flex', gap: 4, justifyContent: 'center', marginTop: 4 }}>
+                  <button onClick={() => adjustHp(-1)} title="Take damage" style={{ width: 20, height: 20, borderRadius: 5, border: '1px solid var(--red)', background: 'transparent', color: 'var(--red)', fontSize: 12, fontWeight: 700, cursor: 'pointer', lineHeight: 1, padding: 0 }}>−</button>
+                  <button onClick={() => adjustHp(1)} title="Heal" style={{ width: 20, height: 20, borderRadius: 5, border: '1px solid var(--green)', background: 'transparent', color: 'var(--green)', fontSize: 12, fontWeight: 700, cursor: 'pointer', lineHeight: 1, padding: 0 }}>+</button>
+                </div>
               )}
             </div>
           ))}

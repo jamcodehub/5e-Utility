@@ -4,11 +4,16 @@ const { Schema, model } = mongoose
 const UserSchema = new Schema({
   username:         { type: String, required: true, unique: true, trim: true },
   email:            { type: String, required: true, unique: true, lowercase: true },
-  password:         { type: String, required: true },
+  password:         { type: String },
+  phone:            { type: String, default: '' },
+  googleId:         { type: String, default: '', index: true, sparse: true },
   avatar:           { type: String, default: '' },
   isPremium:        { type: Boolean, default: false },
   stripeCustomerId: { type: String, default: '' },
   stripeSubId:      { type: String, default: '' },
+  twoFactorEnabled:     { type: Boolean, default: false },
+  twoFactorCode:        { type: String, default: '' },
+  twoFactorCodeExpires: { type: Date },
 }, { timestamps: true })
 
 const CampaignSchema = new Schema({

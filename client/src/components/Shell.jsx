@@ -7,10 +7,10 @@ import SettingsModal from './SettingsModal'
 const NAV = [
   { to: '/journal',    label: 'Journal',    icon: '⋆' },
   { to: '/storyboard', label: 'Storyboard', icon: '𖥔' },
-  { to: '/lore',       label: 'Lore',       icon: '݁' },
+  { to: '/lore',       label: 'Lore',       icon: '˖' },
   { to: '/character',  label: 'Character',  icon: '˖₊˚ʚ' },
   { to: '/inventory',  label: 'Inventory',  icon: 'ᗢ₊˚✧' },
-  { to: '/dice',       label: 'Dice',       icon: '✧' },
+  { to: '/dice',       label: 'Dice',       icon: '˚✧' },
 ]
 
 function useIsMobile() {
@@ -123,6 +123,7 @@ export default function Shell({ children }) {
         }}>
           {NAV.map(item => (
             <NavLink key={item.to} to={item.to} style={({ isActive }) => navLinkStyle(isActive)}>
+              <span style={{ fontSize: 12, opacity: 0.9 }}>{item.icon}</span>
               <span>{item.label}</span>
             </NavLink>
           ))}

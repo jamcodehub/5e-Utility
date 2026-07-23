@@ -8,6 +8,7 @@ import journalRoutes from './routes/journal.js'
 import loreRoutes from './routes/lore.js'
 import storyboardRoutes from './routes/storyboard.js'
 import paymentRoutes from './routes/payments.js'
+import feedbackRoutes from './routes/feedback.js'
 
 dotenv.config()
 
@@ -25,6 +26,7 @@ app.use('/api/journal',   journalRoutes)
 app.use('/api/lore',      loreRoutes)
 app.use('/api/storyboard', storyboardRoutes)
 app.use('/api/payments',  paymentRoutes)
+app.use('/api/feedback',  feedbackRoutes)
 
 mongoose.connect(process.env.MONGO_URI).then(() => {
   console.log('MongoDB connected')
