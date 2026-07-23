@@ -96,7 +96,6 @@ export default function Dice() {
           .dice-controls { display:flex; justify-content:stretch; align-items:stretch; gap:20px; width:100%; max-width:1280px; margin:0 auto; }
           .dice-btn { border:none; border-radius:22px; padding:32px 24px; font-family: 'Cinzel, serif'; font-size:26px; font-weight:700; line-height:1; transition: transform .08s ease, filter .12s ease, opacity .12s ease, box-shadow .08s ease; white-space: nowrap; flex:1 1 0; text-align:center; }
           .dice-roll-btn {
-            background: linear-gradient(180deg, #f6d788 0%, var(--gold) 55%, #b8860b 100%);
             color: #2a1a00;
             box-shadow: 0 5px 0 #8a5a00, 0 8px 14px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.55);
           }

@@ -12,6 +12,16 @@ const pollinationsUrl = (prompt, width = 1200, height = 900, seed = Math.floor(M
     `fantasy landscape painting artstyle portrait, epic matte painting, consistent character style, ${prompt}, dramatic lighting, high detail, no text, painterly brushwork`
   )}?width=${width}&height=${height}&nologo=true&enhance=true&seed=${seed}`
 
+// Variation modifiers so the 4 candidates don't all look like near-duplicates
+// of the same composition/angle/lighting — each candidate gets a distinct
+// framing + lighting + palette twist appended to the shared base prompt.
+const VARIANTS = [
+  { angle: 'wide establishing shot, low camera angle', light: 'dramatic side lighting', palette: 'warm amber and shadow tones' },
+  { angle: 'close-up dynamic composition', light: 'cool moonlit lighting', palette: 'cold blue and silver tones' },
+  { angle: 'over-the-shoulder perspective', light: 'firelit glow', palette: 'deep red and orange tones' },
+  { angle: 'birds-eye dramatic framing', light: 'misty diffused lighting', palette: 'muted green and grey tones' },
+]
+
 function Cover({ campaignName }) {
   // Single cover page (closed book front cover)
   return (
@@ -24,14 +34,25 @@ function Cover({ campaignName }) {
   )
 }
 
-// Pollinations free tier is strict about concurrent requests — serialize
-// candidate image loads through a shared queue so only one loads at a time,
-// each waiting for the previous to finish (load or error) plus a cooldown.
-let candidateQueue = Promise.resolve()
+// Pollinations free tier rate-limits bursts — cap concurrency at 2 in-flight
+// requests instead of fully serializing, so all 4 arrive noticeably faster
+// while still avoiding the 429s a full 4-at-once burst causes.
+const MAX_CONCURRENT = 2
+let activeLoads = 0
+const waitQueue = []
 function enqueueCandidateLoad(task) {
-  const run = candidateQueue.then(() => task().catch(() => {}))
-  candidateQueue = run.then(() => new Promise(r => setTimeout(r, 1800)))
-  return run
+  return new Promise((resolveOuter) => {
+    const run = () => {
+      activeLoads++
+      task().catch(() => {}).finally(() => {
+        activeLoads--
+        resolveOuter()
+        if (waitQueue.length) waitQueue.shift()()
+      })
+    }
+    if (activeLoads < MAX_CONCURRENT) run()
+    else waitQueue.push(run)
+  })
 }
 
 function CandidateImage({ url, index, alt }) {
@@ -173,9 +194,13 @@ export default function Storyboard() {
     } catch (e) {
       // ignore — fallback to user prompt
     }
-    // Offer 4 variations (different seeds) so the user can pick their favourite.
-    const seeds = [...Array(4)].map(() => Math.floor(Math.random() * 99999))
-    const urls = seeds.map(seed => pollinationsUrl(finalPrompt, w, h, seed))
+    // Offer 4 real variations — distinct framing/lighting/palette per
+    // candidate (not just a different seed) so they look meaningfully different.
+    const urls = VARIANTS.map(v => {
+      const seed = Math.floor(Math.random() * 99999)
+      const variedPrompt = `${finalPrompt}, ${v.angle}, ${v.light}, ${v.palette}`
+      return pollinationsUrl(variedPrompt, w, h, seed)
+    })
     setCandidates(urls)
     setPendingMeta({ title: title || 'Scene', prompt })
     setGenerating(false)

@@ -21,6 +21,26 @@ const TILES = [
 
 const blankGrid = () => Array.from({ length: GRID_H }, () => Array.from({ length: GRID_W }, () => 'empty'))
 
+function tileColor(id) {
+  const t = TILES.find(x => x.id === id)
+  return t && t.color !== 'transparent' ? t.color : '#fff'
+}
+
+function MapPreview({ content }) {
+  let grid = null
+  try { const parsed = JSON.parse(content); if (Array.isArray(parsed)) grid = parsed } catch { /* legacy */ }
+  if (!grid) return (
+    <div style={{ width: '100%', aspectRatio: `${GRID_W} / ${GRID_H}`, background: '#fff', border: '1px solid rgba(0,0,0,0.15)', borderRadius: 4, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, color: '#999' }}>No preview</div>
+  )
+  return (
+    <div style={{ width: '100%', aspectRatio: `${GRID_W} / ${GRID_H}`, display: 'grid', gridTemplateColumns: `repeat(${GRID_W}, 1fr)`, border: '1px solid rgba(0,0,0,0.15)', borderRadius: 4, overflow: 'hidden' }}>
+      {grid.map((row, r) => row.map((cellId, c) => (
+        <div key={`${r}-${c}`} style={{ background: tileColor(cellId) }} />
+      )))}
+    </div>
+  )
+}
+
 export default function LevelBuilder() {
   const { activeCampaign } = useCampaign()
   const { isPremium } = useAuth()
@@ -80,7 +100,14 @@ export default function LevelBuilder() {
     if (activePlanId === id) newMap()
   }
 
-  const printMap = () => window.print()
+  const [printTarget, setPrintTarget] = useState(null) // grid array to print, or null
+
+  const printMap = (content) => {
+    let parsedGrid = null
+    try { const parsed = JSON.parse(content); if (Array.isArray(parsed)) parsedGrid = parsed } catch { /* legacy */ }
+    setPrintTarget(parsedGrid || blankGrid())
+    setTimeout(() => { window.print(); setPrintTarget(null) }, 50)
+  }
 
   if (!activeCampaign) return <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-3)' }}>Select a campaign.</div>
 
@@ -93,18 +120,20 @@ export default function LevelBuilder() {
           #level-print { position: fixed; inset: 0; }
         }
         .lb-cell { aspect-ratio: 1; border: 1px solid rgba(0,0,0,0.12); cursor: pointer; touch-action: none; }
+        .lb-map-card { transition: transform .1s ease, box-shadow .1s ease, border-color .1s ease; }
+        .lb-map-card:hover { transform: translateY(-2px); box-shadow: 0 6px 16px rgba(0,0,0,0.25); border-color: var(--gold) !important; }
       `}</style>
 
       <div className="page-header-row" style={{ marginBottom: 16 }}>
         <div>
           <h2 style={{ fontSize: 22, marginBottom: 4 }}>Level Builder</h2>
           <p style={{ color: 'var(--text-2)', fontSize: 14, margin: 0 }}>
-            Paint a sky-view tile map, then print it for the table. {!isPremium && `(${plans.length}/5 free maps used)`}
+            Paint a sky-view tile map, save it, then print from the map list. {!isPremium && `(${plans.length}/5 free maps used)`}
           </p>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
           <button className="btn btn-ghost btn-sm" onClick={newMap}>+ New map</button>
-          <button className="btn btn-ghost btn-sm" onClick={printMap}>🖨 Print</button>
+
         </div>
       </div>
 
@@ -127,40 +156,62 @@ export default function LevelBuilder() {
         <button className="btn btn-primary btn-sm" onClick={save} disabled={!title.trim()}>{activePlanId ? 'Update' : 'Save'} map</button>
       </div>
 
-      <div
-        id="level-print"
-        onMouseUp={() => setPainting(false)}
-        onMouseLeave={() => setPainting(false)}
-        style={{
-          display: 'grid', gridTemplateColumns: `repeat(${GRID_W}, 1fr)`, maxWidth: 720,
-          background: '#fff', border: '2px solid #4a3f33', borderRadius: 4, overflow: 'hidden', userSelect: 'none',
-        }}
-      >
-        {grid.map((row, r) => row.map((cellId, c) => {
-          const t = TILES.find(x => x.id === cellId) || TILES[TILES.length - 1]
-          return (
+      <div style={{ display: 'flex', gap: 24, alignItems: 'flex-start', flexWrap: 'wrap' }}>
+        <div style={{ flex: '1 1 480px', minWidth: 0 }}>
+          <div
+            onMouseUp={() => setPainting(false)}
+            onMouseLeave={() => setPainting(false)}
+            style={{
+              display: 'grid', gridTemplateColumns: `repeat(${GRID_W}, 1fr)`, maxWidth: 720,
+              background: '#fff', border: '2px solid #4a3f33', borderRadius: 4, overflow: 'hidden', userSelect: 'none',
+            }}
+          >
+            {grid.map((row, r) => row.map((cellId, c) => {
+              const t = TILES.find(x => x.id === cellId) || TILES[TILES.length - 1]
+              return (
+                <div
+                  key={`${r}-${c}`}
+                  className="lb-cell"
+                  onMouseDown={() => { setPainting(true); paint(r, c) }}
+                  onMouseEnter={() => { if (painting) paint(r, c) }}
+                  onTouchStart={() => paint(r, c)}
+                  style={{ background: t.color === 'transparent' ? '#fff' : t.color }}
+                />
+              )
+            }))}
+          </div>
+        </div>
+
+        <div style={{ flex: '0 1 260px', minWidth: 220, display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <div style={{ fontSize: 11, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Saved maps</div>
+          {plans.map(p => (
             <div
-              key={`${r}-${c}`}
-              className="lb-cell"
-              onMouseDown={() => { setPainting(true); paint(r, c) }}
-              onMouseEnter={() => { if (painting) paint(r, c) }}
-              onTouchStart={() => paint(r, c)}
-              style={{ background: t.color === 'transparent' ? '#fff' : t.color }}
-            />
-          )
-        }))}
+              key={p._id}
+              className="card lb-map-card"
+              onClick={() => openPlan(p)}
+              style={{ padding: 10, cursor: 'pointer', border: activePlanId === p._id ? '2px solid var(--gold)' : '1px solid var(--border)' }}
+            >
+              <MapPreview content={p.content} />
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 8 }}>
+                <span style={{ color: activePlanId === p._id ? 'var(--gold)' : 'var(--text)', fontFamily: 'Cinzel, serif', fontSize: 13 }}>{p.title}</span>
+                <div style={{ display: 'flex', gap: 4 }}>
+                  <button onClick={(e) => { e.stopPropagation(); printMap(p.content) }} title="Print this map" style={{ background: 'none', border: 'none', color: 'var(--text-3)', cursor: 'pointer', fontSize: 13 }}>🖰</button>
+                  <button onClick={(e) => { e.stopPropagation(); remove(p._id) }} style={{ background: 'none', border: 'none', color: 'var(--text-3)', cursor: 'pointer', fontSize: 13 }}>✕</button>
+                </div>
+              </div>
+            </div>
+          ))}
+          {plans.length === 0 && <div style={{ color: 'var(--text-3)', fontSize: 13 }}>No maps yet.</div>}
+        </div>
       </div>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxWidth: 640, marginTop: 24 }}>
-        <div style={{ fontSize: 11, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Saved maps</div>
-        {plans.map(p => (
-          <div key={p._id} className="card" style={{ padding: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <button onClick={() => openPlan(p)} style={{ background: 'none', border: 'none', color: activePlanId === p._id ? 'var(--gold)' : 'var(--text)', cursor: 'pointer', fontFamily: 'Cinzel, serif', fontSize: 14, textAlign: 'left' }}>{p.title}</button>
-            <button onClick={() => remove(p._id)} style={{ background: 'none', border: 'none', color: 'var(--text-3)', cursor: 'pointer', fontSize: 13 }}>✕</button>
-          </div>
-        ))}
-        {plans.length === 0 && <div style={{ color: 'var(--text-3)', fontSize: 13 }}>No maps yet.</div>}
-      </div>
+      {printTarget && (
+        <div id="level-print" style={{ display: 'grid', gridTemplateColumns: `repeat(${GRID_W}, 1fr)`, position: 'fixed', top: 0, left: 0, width: '100vw', background: '#fff' }}>
+          {printTarget.map((row, r) => row.map((cellId, c) => (
+            <div key={`${r}-${c}`} style={{ aspectRatio: 1, background: tileColor(cellId), border: '1px solid rgba(0,0,0,0.12)' }} />
+          )))}
+        </div>
+      )}
       <ToastContainer />
     </div>
   )

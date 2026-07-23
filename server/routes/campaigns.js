@@ -94,9 +94,9 @@ router.put('/:id/character', auth, async (req, res) => {
       const user = await User.findById(req.userId)
       if (!user.isPremium) {
         const count = await Character.countDocuments({ owner: req.userId })
-        const limit = user.role === 'dm' ? 10 : 1
+        const limit = user.role === 'dm' ? 20 : 1
         if (count >= limit) {
-          return res.status(403).json({ error: `Free ${user.role === 'dm' ? 'DMs are limited to 10 characters' : 'players are limited to 1 character sheet'}. Upgrade for unlimited characters.` })
+          return res.status(403).json({ error: `Free ${user.role === 'dm' ? 'DMs are limited to 20 characters' : 'players are limited to 1 character sheet'}. Upgrade for unlimited characters.` })
         }
       }
     }

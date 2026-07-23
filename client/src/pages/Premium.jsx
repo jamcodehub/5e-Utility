@@ -7,7 +7,7 @@ const FEATURES = {
   dm: {
     free: [
       'NPC / World Lore ledger',
-      'Character Builder x10',
+      'Character Builder x20',
       'Storyboard generation x10',
       'Idea generator',
       'HP tracker',

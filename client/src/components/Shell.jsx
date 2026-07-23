@@ -1,8 +1,63 @@
 import { NavLink, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useCampaign } from '../context/CampaignContext'
+import { useMusic, MOODS } from '../context/MusicContext'
 import { useState, useEffect } from 'react'
 import SettingsModal from './SettingsModal'
+
+function MusicMiniPlayer({ bottomOffset }) {
+  const { current, volume, play, stop, setVol } = useMusic()
+  const [open, setOpen] = useState(false)
+  if (!current && !open) {
+    // Only show the floating launcher once something is worth multitasking with,
+    // but still allow opening it manually via a subtle always-present dot.
+  }
+  return (
+    <div style={{ position: 'fixed', right: 16, bottom: bottomOffset, zIndex: 60 }}>
+      {open && (
+        <div style={{
+          marginBottom: 10, width: 220, background: 'var(--surface)', border: '1px solid var(--border)',
+          borderRadius: 12, padding: 12, boxShadow: '0 12px 32px rgba(0,0,0,0.35)',
+        }}>
+          <div style={{ fontSize: 11, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 8 }}>Ambient Music</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 10 }}>
+            {MOODS.map(m => (
+              <button key={m.id} onClick={() => play(m.id)} style={{
+                display: 'flex', justifyContent: 'space-between', alignItems: 'center', textAlign: 'left',
+                padding: '6px 8px', borderRadius: 8, border: 'none', cursor: 'pointer', fontSize: 12,
+                background: current === m.id ? 'var(--gold-bg)' : 'transparent',
+                color: current === m.id ? 'var(--gold)' : 'var(--text-2)',
+              }}>
+                <span>{m.label}</span>
+                {current === m.id && <span style={{ fontSize: 10 }}>⏸</span>}
+              </button>
+            ))}
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ fontSize: 11, color: 'var(--text-3)' }}>Vol</span>
+            <input type="range" min={0} max={1} step={0.05} value={volume} onChange={e => setVol(+e.target.value)} style={{ flex: 1 }} />
+          </div>
+          {current && (
+            <button onClick={stop} style={{ marginTop: 8, width: '100%', background: 'transparent', border: '1px solid var(--border)', color: 'var(--text-3)', borderRadius: 8, padding: '5px 0', fontSize: 11, cursor: 'pointer' }}>Stop</button>
+          )}
+        </div>
+      )}
+      <button
+        onClick={() => setOpen(o => !o)}
+        title="Music"
+        style={{
+          width: 48, height: 48, borderRadius: '50%', border: 'none', cursor: 'pointer',
+          background: current ? 'var(--gold)' : 'var(--surface)', color: current ? '#2a1a00' : 'var(--text-2)',
+          boxShadow: '0 8px 20px rgba(0,0,0,0.3)', fontSize: 18,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          border: current ? 'none' : '1px solid var(--border)',
+        }}
+      >
+        {current ? '♪' : '♫'}
+      </button>
+    </div>
+  )
+}
 
 const NAV_PLAYER = [
   { to: '/journal',    label: 'Journal' },
@@ -195,6 +250,7 @@ export default function Shell({ children }) {
           </div>
         )}
         {showSettings && <SettingsModal onClose={() => setShowSettings(false)} />}
+        <MusicMiniPlayer bottomOffset="calc(84px + env(safe-area-inset-bottom, 12px))" />
       </div>
     )
   }
@@ -269,6 +325,7 @@ export default function Shell({ children }) {
 
       <main style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>{children}</main>
       {showSettings && <SettingsModal onClose={() => setShowSettings(false)} />}
+      <MusicMiniPlayer bottomOffset="20px" />
     </div>
   )
 }

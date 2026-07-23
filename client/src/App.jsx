@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import { CampaignProvider } from './context/CampaignContext'
 import { ThemeProvider } from './context/ThemeContext'
+import { MusicProvider } from './context/MusicContext'
 import Shell from './components/Shell'
 import Auth from './pages/Auth'
 import Journal from './pages/Journal'
@@ -22,23 +23,25 @@ function Guard() {
   if (!user) return <Auth />
   return (
     <CampaignProvider>
-      <Shell>
-        <Routes>
-          <Route path="/"           element={<Navigate to="/journal" replace />} />
-          <Route path="/journal"    element={<Journal />} />
-          <Route path="/storyboard" element={<Storyboard />} />
-          <Route path="/lore"       element={<Lore />} />
-          <Route path="/character"  element={<Character />} />
-          <Route path="/inventory"  element={<Inventory />} />
-          <Route path="/dice"       element={<Dice />} />
-          <Route path="/premium"    element={<Premium />} />
-          <Route path="/ideas"      element={<IdeaGenerator />} />
-          <Route path="/rules"      element={<RulesReference />} />
-          <Route path="/music"      element={<MusicPlayer />} />
-          <Route path="/levels"     element={<LevelBuilder />} />
-          <Route path="*"           element={<Navigate to="/journal" replace />} />
-        </Routes>
-      </Shell>
+      <MusicProvider>
+        <Shell>
+          <Routes>
+            <Route path="/"           element={<Navigate to="/journal" replace />} />
+            <Route path="/journal"    element={<Journal />} />
+            <Route path="/storyboard" element={<Storyboard />} />
+            <Route path="/lore"       element={<Lore />} />
+            <Route path="/character"  element={<Character />} />
+            <Route path="/inventory"  element={<Inventory />} />
+            <Route path="/dice"       element={<Dice />} />
+            <Route path="/premium"    element={<Premium />} />
+            <Route path="/ideas"      element={<IdeaGenerator />} />
+            <Route path="/rules"      element={<RulesReference />} />
+            <Route path="/music"      element={<MusicPlayer />} />
+            <Route path="/levels"     element={<LevelBuilder />} />
+            <Route path="*"           element={<Navigate to="/journal" replace />} />
+          </Routes>
+        </Shell>
+      </MusicProvider>
     </CampaignProvider>
   )
 }
