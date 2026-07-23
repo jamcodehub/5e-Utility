@@ -24,6 +24,16 @@ function Cover({ campaignName }) {
   )
 }
 
+// Pollinations free tier is strict about concurrent requests — serialize
+// candidate image loads through a shared queue so only one loads at a time,
+// each waiting for the previous to finish (load or error) plus a cooldown.
+let candidateQueue = Promise.resolve()
+function enqueueCandidateLoad(task) {
+  const run = candidateQueue.then(() => task().catch(() => {}))
+  candidateQueue = run.then(() => new Promise(r => setTimeout(r, 1800)))
+  return run
+}
+
 function CandidateImage({ url, index, alt }) {
   const [armed, setArmed] = useState(false)
   const [failed, setFailed] = useState(false)
@@ -31,20 +41,28 @@ function CandidateImage({ url, index, alt }) {
 
   useEffect(() => {
     setFailed(false)
-    const t = setTimeout(() => setArmed(true), index * 500)
-    return () => clearTimeout(t)
-  }, [index, attempt])
+    setArmed(false)
+    let cancelled = false
+    enqueueCandidateLoad(() => new Promise((resolve, reject) => {
+      if (cancelled) return resolve()
+      const img = new Image()
+      img.onload = () => { if (!cancelled) { setArmed(true) }; resolve() }
+      img.onerror = () => { if (!cancelled) { setFailed(true) }; reject() }
+      img.src = url
+    }))
+    return () => { cancelled = true }
+  }, [index, attempt, url])
 
-  if (!armed) {
-    return <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#8a6040', fontSize: 11, fontFamily: 'Cinzel, serif' }}>Queued...</div>
-  }
   if (failed) {
     return (
       <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8, color: '#8a6040' }}>
         <div style={{ fontSize: 11, fontFamily: 'Cinzel, serif' }}>Failed to load</div>
-        <button onClick={(e) => { e.stopPropagation(); setArmed(false); setAttempt(a => a + 1) }} style={{ background: 'transparent', border: '1px solid #4a3020', color: '#c8a060', padding: '3px 10px', borderRadius: 6, fontSize: 11, cursor: 'pointer' }}>Retry</button>
+        <button onClick={(e) => { e.stopPropagation(); setAttempt(a => a + 1) }} style={{ background: 'transparent', border: '1px solid #4a3020', color: '#c8a060', padding: '3px 10px', borderRadius: 6, fontSize: 11, cursor: 'pointer' }}>Retry</button>
       </div>
     )
+  }
+  if (!armed) {
+    return <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#8a6040', fontSize: 11, fontFamily: 'Cinzel, serif' }}>Queued...</div>
   }
   return <img src={url} alt={alt} onError={() => setFailed(true)} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
 }
@@ -190,6 +208,7 @@ export default function Storyboard() {
   }
 
   if (!activeCampaign) return <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#c8a060', fontFamily: 'Cinzel, serif' }}>Select a campaign first.</div>
+  if (activeCampaign.isPersonal) return <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', textAlign: 'center', color: '#c8a060', fontFamily: 'Cinzel, serif', padding: 24 }}>The Storyboard is a shared party feature.<br/>Join or create a real campaign to use it.</div>
 
   const onCover = currentPage === -1
   const currentCard = cards[currentPage]

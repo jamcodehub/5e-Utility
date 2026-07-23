@@ -43,6 +43,10 @@ export default function Shell({ children }) {
   const isMobile = useIsMobile()
   const isDM = user?.role === 'dm'
   const NAV = isDM ? NAV_DM : NAV_PLAYER
+  const NAV_PAGE_SIZE = 5
+  const navPages = []
+  for (let i = 0; i < NAV.length; i += NAV_PAGE_SIZE) navPages.push(NAV.slice(i, i + NAV_PAGE_SIZE))
+  const [navPage, setNavPage] = useState(0)
   const [creating, setCreating] = useState(false)
   const [newName, setNewName]   = useState('')
   const [error, setError]       = useState('')
@@ -150,24 +154,46 @@ export default function Shell({ children }) {
           transform: 'translateX(-50%)',
           width: 'min(96%, 560px)',
           display: 'flex',
-          justifyContent: 'space-between',
-          gap: 8,
+          alignItems: 'center',
+          gap: 4,
           background: 'rgba(255,255,255,0.12)',
           border: '1px solid rgba(255,255,255,0.14)',
           borderRadius: 999,
-          padding: '10px 14px',
+          padding: '8px 8px',
           boxShadow: '0 24px 60px rgba(0,0,0,0.08)',
           zIndex: 40,
-          overflowX: 'auto',
           backdropFilter: 'blur(20px)',
           WebkitBackdropFilter: 'blur(20px)',
         }}>
-          {NAV.map(item => (
-            <NavLink key={item.to} to={item.to} style={({ isActive }) => navLinkStyle(isActive)}>
-              <span>{item.label}</span>
-            </NavLink>
-          ))}
+          {navPages.length > 1 && (
+            <button
+              onClick={() => setNavPage(p => (p - 1 + navPages.length) % navPages.length)}
+              aria-label="Previous nav page"
+              style={{ flexShrink: 0, background: 'transparent', border: 'none', color: 'var(--text-2)', fontSize: 16, padding: '6px 4px', cursor: 'pointer' }}
+            >&lsaquo;</button>
+          )}
+          <div style={{ flex: 1, display: 'flex', justifyContent: 'space-between', gap: 4, minWidth: 0 }}>
+            {navPages[navPage].map(item => (
+              <NavLink key={item.to} to={item.to} style={({ isActive }) => navLinkStyle(isActive)}>
+                <span>{item.label}</span>
+              </NavLink>
+            ))}
+          </div>
+          {navPages.length > 1 && (
+            <button
+              onClick={() => setNavPage(p => (p + 1) % navPages.length)}
+              aria-label="Next nav page"
+              style={{ flexShrink: 0, background: 'transparent', border: 'none', color: 'var(--text-2)', fontSize: 16, padding: '6px 4px', cursor: 'pointer' }}
+            >&rsaquo;</button>
+          )}
         </nav>
+        {navPages.length > 1 && (
+          <div style={{ position: 'fixed', left: '50%', transform: 'translateX(-50%)', bottom: 'calc(4px + env(safe-area-inset-bottom, 4px))', display: 'flex', gap: 4, zIndex: 40 }}>
+            {navPages.map((_, i) => (
+              <span key={i} style={{ width: 5, height: 5, borderRadius: '50%', background: i === navPage ? 'var(--gold)' : 'rgba(255,255,255,0.25)' }} />
+            ))}
+          </div>
+        )}
         {showSettings && <SettingsModal onClose={() => setShowSettings(false)} />}
       </div>
     )

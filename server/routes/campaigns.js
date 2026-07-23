@@ -15,9 +15,17 @@ export const auth = (req, res, next) => {
 const genCode = () => Math.random().toString(36).slice(2, 8).toUpperCase()
 
 router.get('/', auth, async (req, res) => {
-  const campaigns = await Campaign.find({
+  let campaigns = await Campaign.find({
     $or: [{ owner: req.userId }, { members: req.userId }]
   }).sort({ updatedAt: -1 })
+
+  // Give every user a personal solo space (Journal/Lore) even without joining a DM's campaign.
+  if (!campaigns.length) {
+    const personal = await Campaign.create({
+      owner: req.userId, name: 'My Journal', isPersonal: true,
+    })
+    campaigns = [personal]
+  }
   res.json(campaigns)
 })
 

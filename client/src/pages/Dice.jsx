@@ -36,15 +36,17 @@ export default function Dice() {
     setD20Transition('transform 0ms')
     setD20Transform('translate(0%, -140%) rotate(0deg)')
 
-    // randomize throw: exaggerated target area across the full tray
-    const tx = Math.round((Math.random() * 136 - 68) * 10) / 10 // -68%..68%
-    const ty = Math.round((Math.random() * 136 - 68) * 10) / 10
-    const rot = Math.floor(Math.random() * 900) + 180
-    const duration = Math.floor(Math.random() * 900) + 900 // 900-1800ms for a bigger arc
+    // Pick a random direction and slam all the way to a wall/corner every time.
+    const angle = Math.random() * Math.PI * 2
+    const edge = 92 // percent — always reaches the tray wall
+    const tx = Math.round(Math.cos(angle) * edge * 10) / 10
+    const ty = Math.round(Math.sin(angle) * edge * 10) / 10
+    const rot = Math.floor(Math.random() * 1080) + 360
+    const duration = Math.floor(Math.random() * 500) + 550 // fast, forceful throw
 
-    // animate from outside into the tray with a sweeping, full-space throw
+    // animate from outside straight into the wall with a forceful throw
     setTimeout(() => {
-      setD20Transition(`transform ${duration}ms cubic-bezier(.14,.68,.25,1)`)
+      setD20Transition(`transform ${duration}ms cubic-bezier(.35,.8,.2,1)`)
       setD20Transform(`translate(${tx}%, ${ty}%) rotate(${rot}deg)`)
     }, 50)
 
@@ -65,25 +67,18 @@ export default function Dice() {
       if (finalValue === 1) { setSink(true); setShowRain(true) }
       setRolling(false)
 
-      // ease in slight settle (a tiny inward move)
-      const settleTx = tx * 0.45
-      const settleTy = ty * 0.45
-      setD20Transition('transform 280ms ease-out')
-      setD20Transform(`translate(${settleTx}%, ${settleTy}%) rotate(${rot}deg)`)
+      // Smack into the wall — sharp overshoot then rebound, then settle near the wall.
+      const overshootTx = Math.round((tx * 1.08) * 10) / 10
+      const overshootTy = Math.round((ty * 1.08) * 10) / 10
+      setD20Transition('transform 90ms cubic-bezier(.5,0,.9,.4)')
+      setD20Transform(`translate(${overshootTx}%, ${overshootTy}%) rotate(${rot + 40}deg)`)
 
-      // Bounce out to the wall and back into the tray
       setTimeout(() => {
-        const bounceOutTx = Math.round((Math.sign(settleTx) * Math.min(92, Math.abs(settleTx) * 1.25 + 12)) * 10) / 10
-        const bounceOutTy = Math.round((Math.sign(settleTy) * Math.min(92, Math.abs(settleTy) * 1.25 + 12)) * 10) / 10
-        setD20Transition('transform 220ms cubic-bezier(.34,1.56,.64,1)')
-        setD20Transform(`translate(${bounceOutTx}%, ${bounceOutTy}%) rotate(${rot}deg)`)
-
-        // return to settled position
-        setTimeout(() => {
-          setD20Transition('transform 260ms ease-out')
-          setD20Transform(`translate(${settleTx}%, ${settleTy}%) rotate(${rot}deg)`)
-        }, 220)
-      }, 320)
+        const settleTx = Math.round((tx * 0.86) * 10) / 10
+        const settleTy = Math.round((ty * 0.86) * 10) / 10
+        setD20Transition('transform 260ms cubic-bezier(.34,1.56,.64,1)')
+        setD20Transform(`translate(${settleTx}%, ${settleTy}%) rotate(${rot}deg)`)
+      }, 90)
     }, duration + 180)
   }
 
@@ -98,14 +93,23 @@ export default function Dice() {
           .d20 svg { width:100%; height:100%; }
           .d20.rolling svg { animation: roll-spin 1100ms linear infinite; }
           @keyframes roll-spin { from { transform: rotate(0deg); } to { transform: rotate(720deg); } }
-          .dice-controls { display:flex; justify-content:space-between; align-items:center; gap:8px; width:100%; max-width:1280px; margin:0 auto; }
-          .dice-btn { border:none; border-radius:14px; padding:10px 16px; font-family: 'Cinzel, serif'; font-size:14px; font-weight:700; line-height:1; transition: transform .08s ease, filter .12s ease, opacity .12s ease; white-space: nowrap; flex-shrink: 0; }
-          .dice-roll-btn { background: var(--gold); color: var(--text); }
-          .dice-roll-btn:not(:disabled):active { transform: translateY(2px); filter: brightness(0.96); }
+          .dice-controls { display:flex; justify-content:stretch; align-items:stretch; gap:20px; width:100%; max-width:1280px; margin:0 auto; }
+          .dice-btn { border:none; border-radius:22px; padding:32px 24px; font-family: 'Cinzel, serif'; font-size:26px; font-weight:700; line-height:1; transition: transform .08s ease, filter .12s ease, opacity .12s ease, box-shadow .08s ease; white-space: nowrap; flex:1 1 0; text-align:center; }
+          .dice-roll-btn {
+            background: linear-gradient(180deg, #f6d788 0%, var(--gold) 55%, #b8860b 100%);
+            color: #2a1a00;
+            box-shadow: 0 5px 0 #8a5a00, 0 8px 14px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.55);
+          }
           .dice-roll-btn:disabled { opacity: .75; cursor: default; }
-          .dice-result-btn { background: var(--surface); color: var(--text); border: 1px solid var(--border); cursor: default; overflow: hidden; text-overflow: ellipsis; }
+          .dice-result-btn {
+            background: linear-gradient(180deg, rgba(255,255,255,0.08), var(--surface) 55%, rgba(0,0,0,0.15));
+            color: var(--text); border: 1px solid var(--border); cursor: default; overflow: hidden; text-overflow: ellipsis;
+            box-shadow: 0 5px 0 rgba(0,0,0,0.35), 0 8px 14px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.12);
+          }
           @media (max-width: 768px) {
-            .dice-btn { padding: 9px 12px; font-size: 12px; border-radius: 12px; }
+            .dice-controls { position: sticky; bottom: calc(64px + env(safe-area-inset-bottom, 0px)); z-index: 5; gap: 10px; }
+            .dice-btn { padding: 22px 14px; font-size: 17px; border-radius: 20px; min-height: 64px; }
+            .dice-roll-btn { flex: 1.15 1 0; }
           }
           .confetti-overlay { position:fixed; inset:0; pointer-events:none; overflow:hidden; z-index:9999; }
           .confetti-piece { position:absolute; background:white; opacity:0.95; border-radius: 3px; animation: confetti-up 1200ms cubic-bezier(.2,.9,.2,1) forwards; }
