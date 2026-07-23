@@ -1,16 +1,17 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useTheme } from '../context/ThemeContext'
 
 export default function Dice() {
   const { theme } = useTheme()
   const isClassic = theme === 'light' || theme === 'classic'
+  const boardRef = useRef(null)
   const [rolling, setRolling] = useState(false)
   const [result, setResult] = useState(null)
   const [displayValue, setDisplayValue] = useState(1)
   const [showConfetti, setShowConfetti] = useState(false)
   const [showRain, setShowRain] = useState(false)
   const [sink, setSink] = useState(false)
-  const [d20Transform, setD20Transform] = useState('translate(0%, -140%) rotate(0deg)')
+  const [d20Transform, setD20Transform] = useState('translate(0px, -400px) rotate(0deg)')
   const [d20Transition, setD20Transition] = useState('transform 0ms')
 
   useEffect(() => {
@@ -32,22 +33,29 @@ export default function Dice() {
     setShowConfetti(false)
     setSink(false)
 
+    // Measure the actual tray so the throw distance is always relative to
+    // real pixel dimensions — using % transforms was relative to the die's
+    // own tiny size (58px), which is why it barely moved before.
+    const rect = boardRef.current?.getBoundingClientRect()
+    const dieSize = 58
+    const maxX = rect ? (rect.width - dieSize) / 2 - 6 : 300
+    const maxY = rect ? (rect.height - dieSize) / 2 - 6 : 200
+
     // reset d20 position to outside tray (top center)
     setD20Transition('transform 0ms')
-    setD20Transform('translate(0%, -140%) rotate(0deg)')
+    setD20Transform(`translate(0px, ${-(maxY + 220)}px) rotate(0deg)`)
 
     // Pick a random direction and slam all the way to a wall/corner every time.
     const angle = Math.random() * Math.PI * 2
-    const edge = 92 // percent — always reaches the tray wall
-    const tx = Math.round(Math.cos(angle) * edge * 10) / 10
-    const ty = Math.round(Math.sin(angle) * edge * 10) / 10
+    const tx = Math.round(Math.cos(angle) * maxX)
+    const ty = Math.round(Math.sin(angle) * maxY)
     const rot = Math.floor(Math.random() * 1080) + 360
     const duration = Math.floor(Math.random() * 500) + 550 // fast, forceful throw
 
     // animate from outside straight into the wall with a forceful throw
     setTimeout(() => {
       setD20Transition(`transform ${duration}ms cubic-bezier(.35,.8,.2,1)`)
-      setD20Transform(`translate(${tx}%, ${ty}%) rotate(${rot}deg)`)
+      setD20Transform(`translate(${tx}px, ${ty}px) rotate(${rot}deg)`)
     }, 50)
 
     // flicker display while throwing
@@ -68,16 +76,16 @@ export default function Dice() {
       setRolling(false)
 
       // Smack into the wall — sharp overshoot then rebound, then settle near the wall.
-      const overshootTx = Math.round((tx * 1.08) * 10) / 10
-      const overshootTy = Math.round((ty * 1.08) * 10) / 10
+      const overshootTx = Math.round(tx * 1.08)
+      const overshootTy = Math.round(ty * 1.08)
       setD20Transition('transform 90ms cubic-bezier(.5,0,.9,.4)')
-      setD20Transform(`translate(${overshootTx}%, ${overshootTy}%) rotate(${rot + 40}deg)`)
+      setD20Transform(`translate(${overshootTx}px, ${overshootTy}px) rotate(${rot + 40}deg)`)
 
       setTimeout(() => {
-        const settleTx = Math.round((tx * 0.86) * 10) / 10
-        const settleTy = Math.round((ty * 0.86) * 10) / 10
+        const settleTx = Math.round(tx * 0.86)
+        const settleTy = Math.round(ty * 0.86)
         setD20Transition('transform 260ms cubic-bezier(.34,1.56,.64,1)')
-        setD20Transform(`translate(${settleTx}%, ${settleTy}%) rotate(${rot}deg)`)
+        setD20Transform(`translate(${settleTx}px, ${settleTy}px) rotate(${rot}deg)`)
       }, 90)
     }, duration + 180)
   }
@@ -96,12 +104,10 @@ export default function Dice() {
           .dice-controls { display:flex; justify-content:stretch; align-items:stretch; gap:20px; width:100%; max-width:1280px; margin:0 auto; }
           .dice-btn { border:none; border-radius:22px; padding:32px 24px; font-family: 'Cinzel, serif'; font-size:26px; font-weight:700; line-height:1; transition: transform .08s ease, filter .12s ease, opacity .12s ease, box-shadow .08s ease; white-space: nowrap; flex:1 1 0; text-align:center; }
           .dice-roll-btn {
-            color: #2a1a00;
-            box-shadow: 0 5px 0 #8a5a00, 0 8px 14px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.55);
+            box-shadow: 0 5px 0 rgba(0,0,0,0.35), 0 8px 14px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.35);
           }
           .dice-roll-btn:disabled { opacity: .75; cursor: default; }
           .dice-result-btn {
-            background: linear-gradient(180deg, rgba(255,255,255,0.08), var(--surface) 55%, rgba(0,0,0,0.15));
             color: var(--text); border: 1px solid var(--border); cursor: default; overflow: hidden; text-overflow: ellipsis;
             box-shadow: 0 5px 0 rgba(0,0,0,0.35), 0 8px 14px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.12);
           }
@@ -120,7 +126,7 @@ export default function Dice() {
           @keyframes sink { 0%{ transform: translateY(0) scale(1) } 100%{ transform: translateY(14px) scale(0.94) } }
         `}</style>
 
-        <div className="board-shell">
+        <div className="board-shell" ref={boardRef}>
           <div className="d20-spot">
             <div className={`d20 ${rolling ? 'rolling' : ''}`} style={{ transform: d20Transform, transition: d20Transition }}>
               <svg viewBox="0 0 100 100" style={{ display: 'block' }}>
@@ -133,7 +139,7 @@ export default function Dice() {
                     <path d="M0,-42 L20,35" />
                     <path d="M0,-42 L-20,35" />
                   </g>
-                  <text x="0" y="8" textAnchor="middle" fontFamily="Cinzel, serif" fontSize="28" fill={isClassic ? '#111111' : '#ffffff'} stroke={isClassic ? '#ffffff' : '#000000'} strokeWidth="1.1" paintOrder="stroke">{rolling ? '' : (result || '?')}</text>
+                  <text x="0" y="8" textAnchor="middle" fontFamily="Cinzel, serif" fontSize="28" fontWeight="700" fill={isClassic ? '#111111' : '#ffffff'} stroke={isClassic ? '#ffffff' : '#000000'} strokeWidth="3" paintOrder="stroke">{rolling ? '' : (result || '?')}</text>
                 </g>
               </svg>
             </div>
@@ -165,12 +171,16 @@ export default function Dice() {
 
       <div className="dice-controls">
         <button className={`dice-btn dice-result-btn ${sink ? 'result-sink' : ''}`} disabled style={{
+          background: isClassic ? '#f2f2f2' : 'var(--surface)',
           color: isClassic ? '#111111' : 'var(--text)',
           textShadow: isClassic ? '0 0 1px #fff, 0 0 2px #fff' : 'none',
         }}>
           Result: {result || displayValue}
         </button>
-        <button className="dice-btn dice-roll-btn" onClick={roll} disabled={rolling}>Roll d20</button>
+        <button className="dice-btn dice-roll-btn" onClick={roll} disabled={rolling} style={{
+          background: isClassic ? '#111111' : 'var(--gold)',
+          color: isClassic ? '#ffffff' : '#2a1a00',
+        }}>Roll d20</button>
       </div>
     </div>
   )
