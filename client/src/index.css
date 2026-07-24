@@ -67,7 +67,7 @@ input, textarea, select { font-family: inherit; }
 .stat-grid-6 { display: grid; grid-template-columns: repeat(6, 1fr); gap: 10px; }
 
 /* book viewport helper for storyboard */
-.book-viewport { width: 100%; max-width: 880px; aspect-ratio: 2 / 1.25; max-height: calc(100vh - 200px); position: relative; min-width: 0; }
+.book-viewport { width: min(98%, 1400px); aspect-ratio: 2 / 1.1; max-height: calc(100vh - 140px); position: relative; min-width: 0; }
 
 /* journal defaults (overridden on mobile) */
 .journal-layout { display: flex; height: 100%; overflow: hidden; }

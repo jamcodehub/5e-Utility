@@ -127,8 +127,8 @@ export default function Shell({ children }) {
     setJoinCode(''); setJoining(false); setJoinError(''); setShowCampaigns(false)
   }
 
-  const canCreate = isDM && (isPremium || campaigns.length === 0)
   const realCampaigns = campaigns.filter(c => !c.isPersonal)
+  const canCreate = isDM && (isPremium || realCampaigns.length === 0)
   const canJoin = !isDM && (isPremium || realCampaigns.length === 0)
 
   const navLinkStyle = (isActive) => ({
@@ -165,7 +165,7 @@ export default function Shell({ children }) {
         {/* Campaign dropdown on mobile */}
         {showCampaigns && (
           <div style={{ background: 'var(--surface)', borderBottom: '1px solid var(--border)', padding: '10px 16px', flexShrink: 0 }}>
-            {campaigns.map(c => (
+            {campaigns.filter(c => !c.isPersonal).map(c => (
               <button key={c._id} onClick={() => { setActive(c); setShowCampaigns(false) }} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '8px 10px', borderRadius: 6, border: 'none', background: activeCampaign?._id === c._id ? 'var(--gold-bg)' : 'transparent', color: activeCampaign?._id === c._id ? 'var(--gold)' : 'var(--text-2)', fontSize: 13, cursor: 'pointer', marginBottom: 2 }}>{c.name}</button>
             ))}
             {isDM && activeCampaign?.joinCode && (
@@ -192,7 +192,7 @@ export default function Shell({ children }) {
             ) : (
               <div style={{ marginTop: 4 }}>
                 {isDM ? (
-                  campaigns.length === 0 ? (
+                  realCampaigns.length === 0 ? (
                     <div>
                       <div style={{ fontSize: 11, color: 'var(--text-3)', padding: '4px 4px 6px', lineHeight: 1.5 }}>You're a Dungeon Master — create your first campaign.</div>
                       {canCreate
@@ -205,7 +205,7 @@ export default function Shell({ children }) {
                       : <button onClick={() => { navigate('/premium'); setShowCampaigns(false) }} style={{ fontSize: 12, color: 'var(--gold)', background: 'none', border: 'none', cursor: 'pointer', padding: '6px 4px' }}>✦ Upgrade for more</button>
                   )
                 ) : (
-                  campaigns.length === 0 ? (
+                  realCampaigns.length === 0 ? (
                     <div>
                       <div style={{ fontSize: 11, color: 'var(--text-3)', padding: '4px 4px 6px', lineHeight: 1.5 }}>Ask your DM for a join code to enter their campaign.</div>
                       {canJoin
@@ -291,7 +291,7 @@ export default function Shell({ children }) {
 
         <div style={{ padding: '12px 14px', borderBottom: '1px solid var(--border)' }}>
           <div style={{ fontSize: 11, color: 'var(--text-3)', marginBottom: 6, fontWeight: 500, letterSpacing: '0.05em', textTransform: 'uppercase' }}>Campaign</div>
-          {campaigns.map(c => (
+          {campaigns.filter(c => !c.isPersonal).map(c => (
             <button key={c._id} onClick={() => setActive(c)} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '7px 10px', borderRadius: 8, border: 'none', background: activeCampaign?._id === c._id ? 'var(--gold-bg)' : 'transparent', color: activeCampaign?._id === c._id ? 'var(--gold)' : 'var(--text-2)', fontSize: 13, fontWeight: activeCampaign?._id === c._id ? 500 : 400, cursor: 'pointer', marginBottom: 2, borderLeft: activeCampaign?._id === c._id ? '2px solid var(--gold)' : '2px solid transparent' }}>{c.name}</button>
           ))}
           {isDM && activeCampaign?.joinCode && (
@@ -318,7 +318,7 @@ export default function Shell({ children }) {
           ) : (
             <div style={{ marginTop: 4 }}>
               {isDM ? (
-                campaigns.length === 0 ? (
+                realCampaigns.length === 0 ? (
                   <div style={{ marginBottom: 6 }}>
                     <div style={{ fontSize: 11, color: 'var(--text-3)', marginBottom: 6, lineHeight: 1.5 }}>You're a Dungeon Master — create your first campaign to get started.</div>
                     {canCreate
@@ -331,7 +331,7 @@ export default function Shell({ children }) {
                     : <button onClick={() => navigate('/premium')} style={{ display: 'flex', alignItems: 'center', gap: 6, width: '100%', padding: '6px 10px', borderRadius: 8, border: 'none', background: 'var(--gold-bg)', color: 'var(--gold)', fontSize: 12, cursor: 'pointer', borderLeft: '2px solid var(--gold-border)' }}>✦ Upgrade for more</button>
                 )
               ) : (
-                campaigns.length === 0 ? (
+                realCampaigns.length === 0 ? (
                   <div style={{ marginBottom: 6 }}>
                     <div style={{ fontSize: 11, color: 'var(--text-3)', marginBottom: 6, lineHeight: 1.5 }}>Ask your DM for a join code to enter their campaign.</div>
                     {canJoin

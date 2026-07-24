@@ -98,12 +98,12 @@ function BookSpread({ card, index }) {
         <div style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: 24, background: 'linear-gradient(to left, rgba(60,40,20,0.18), transparent)', pointerEvents: 'none' }} />
       </div>
       {/* Right — text with book-like margins */}
-      <div style={{ flex: 1, background: 'linear-gradient(180deg, #f7efde, #f0e4cd)', padding: '48px 48px', display: 'flex', flexDirection: 'column', position: 'relative', backgroundImage: 'radial-gradient(circle at 12% 20%, rgba(125,89,53,0.08), transparent 26%), radial-gradient(circle at 82% 74%, rgba(125,89,53,0.06), transparent 24%), repeating-linear-gradient(transparent, transparent 27px, rgba(0,0,0,0.032) 28px)', backgroundPosition: '0 0, 0 0, 0 48px' }}>
-        <div style={{ position: 'absolute', top: 14, right: 18, fontFamily: 'Cinzel, serif', fontSize: 10, color: 'var(--text-3)', letterSpacing: '0.1em' }}>{index * 2 + 2}</div>
-        <h2 style={{ fontFamily: 'Cinzel, serif', fontSize: 20, color: '#3f2b1f', marginBottom: 24, lineHeight: 1.4, position: 'relative', zIndex: 1 }}>{card.title}</h2>
-        <p style={{ fontFamily: 'Georgia, serif', fontSize: 14, color: '#5b4431', lineHeight: 1.95, position: 'relative', zIndex: 1, flex: 1, overflow: 'auto' }}>{card.description}</p>
+      <div style={{ flex: 1, background: 'linear-gradient(180deg, #f7efde, #ede1c8)', padding: '32px 40px 28px 36px', display: 'flex', flexDirection: 'column', position: 'relative', backgroundImage: 'radial-gradient(circle at 12% 20%, rgba(125,89,53,0.08), transparent 26%), radial-gradient(circle at 82% 74%, rgba(125,89,53,0.06), transparent 24%), repeating-linear-gradient(transparent, transparent 27px, rgba(0,0,0,0.032) 28px)', backgroundPosition: '0 0, 0 0, 0 32px' }}>
+        <div style={{ position: 'absolute', top: 14, right: 18, fontFamily: 'Cinzel, serif', fontSize: 10, color: '#9a8060', letterSpacing: '0.1em' }}>{index * 2 + 2}</div>
+        <h2 style={{ fontFamily: 'Cinzel, serif', fontSize: 18, color: '#3f2b1f', marginBottom: 16, lineHeight: 1.4, position: 'relative', zIndex: 1 }}>{card.title}</h2>
+        <p style={{ fontFamily: 'Georgia, serif', fontSize: 13.5, color: '#5b4431', lineHeight: 1.95, position: 'relative', zIndex: 1, flex: 1, overflow: 'auto' }}>{card.description}</p>
         {card.createdAt && (
-          <div style={{ fontSize: 10, color: '#7c624a', fontFamily: 'Cinzel, serif', letterSpacing: '0.06em', marginTop: 28, position: 'relative', zIndex: 1 }}>
+          <div style={{ fontSize: 10, color: '#7c624a', fontFamily: 'Cinzel, serif', letterSpacing: '0.06em', marginTop: 20, textAlign: 'right', position: 'relative', zIndex: 1 }}>
             {new Date(card.createdAt).toLocaleDateString('en-AU', { day: 'numeric', month: 'long', year: 'numeric' })}
           </div>
         )}
@@ -172,15 +172,15 @@ export default function Storyboard() {
   const generate = async () => {
     if (!prompt.trim() || !activeCampaign) return
     setGenerating(true)
-    // compute left-page dimensions from book viewport (half width)
+    // The left page is exactly half the book's rendered width and the full
+    // book height — measure from the real DOM so the generated image
+    // perfectly matches what's displayed in the book spread.
     const rect = bookRef.current?.getBoundingClientRect()
-    let w = 1200, h = 900
+    let w = 800, h = 900
     if (rect) {
-      const leftW = Math.max(360, Math.round(rect.width / 2))
-      const pageH = Math.max(360, Math.round(rect.height))
-      // upscale for HD / retina
-      w = leftW * 2
-      h = pageH * 2
+      // left page = half the total book width; multiply by 2 for retina sharpness
+      w = Math.max(400, Math.round((rect.width / 2) * 2))
+      h = Math.max(400, Math.round(rect.height * 2))
     }
     // include saved character appearance prompt for consistency, if present
     let finalPrompt = prompt
@@ -235,9 +235,9 @@ export default function Storyboard() {
   const currentCard = cards[currentPage]
 
   return (
-    <div style={{ height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden', background: 'var(--bg)', color: 'var(--text)' }}>
+    <div style={{ height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden', background: '#100d08', color: 'var(--text)' }}>
       {/* Top bar */}
-      <div style={{ padding: '10px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'var(--surface)', borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
+      <div style={{ padding: '8px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#1a1208', borderBottom: '1px solid #3a2a14', flexShrink: 0 }}>
         <div style={{ fontFamily: 'Cinzel, serif', fontSize: 12, color: 'var(--text-3)' }}>
           {onCover ? activeCampaign.name : `Scene ${currentPage + 1} / ${cards.length}`}
         </div>
@@ -253,7 +253,7 @@ export default function Storyboard() {
 
       {/* Form */}
       {showForm && (
-        <div style={{ padding: '12px 20px', background: 'var(--surface2)', borderBottom: '1px solid var(--border)', display: 'flex', gap: 10, alignItems: 'flex-end', flexShrink: 0 }}>
+        <div style={{ padding: '10px 20px', background: '#1e1610', borderBottom: '1px solid #3a2a14', display: 'flex', gap: 10, alignItems: 'flex-end', flexShrink: 0 }}>
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 8 }}>
             <input className="input" placeholder="Scene title" value={title} onChange={e => setTitle(e.target.value)} style={{ background: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--text)' }} />
             <textarea className="input" rows={2} placeholder="Describe this scene — who was there, what happened, what it looked like..." value={prompt} onChange={e => setPrompt(e.target.value)} style={{ resize: 'none', background: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--text)' }} />
@@ -265,7 +265,7 @@ export default function Storyboard() {
       )}
 
       {/* Book viewport */}
-      <div ref={scrollRef} style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px', position: 'relative', overflow: 'hidden' }}>
+      <div ref={scrollRef} style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '8px 48px', position: 'relative', overflow: 'hidden', background: 'radial-gradient(ellipse at center, #1e1508 0%, #100d08 70%)' }}>
         <div ref={bookRef} className="book-viewport" style={{ boxShadow: '0 24px 80px rgba(0,0,0,0.7), 0 0 0 1px rgba(200,160,96,0.15)', borderRadius: 3 }}>
           {!onCover && (
             <div style={{ position: 'absolute', left: '50%', top: 0, bottom: 0, width: 3, background: 'linear-gradient(to right, #2a1810, #4a3020, #2a1810)', zIndex: 10, transform: 'translateX(-50%)', boxShadow: '0 0 10px rgba(0,0,0,0.5)' }} />
@@ -310,7 +310,7 @@ export default function Storyboard() {
       </div>
 
       {/* Dots */}
-      <div style={{ padding: '6px 0 10px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5, background: '#1a1208', flexShrink: 0 }}>
+      <div style={{ padding: '6px 0 10px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5, background: '#100d08', flexShrink: 0 }}>
         <div onClick={() => setCurrentPage(-1)} style={{ width: 5, height: 5, borderRadius: '50%', background: onCover ? '#c8a060' : '#4a3020', cursor: 'pointer', transition: 'background .2s' }} />
         {cards.map((_, i) => (
           <div key={i} onClick={() => setCurrentPage(i)} style={{ width: 5, height: 5, borderRadius: '50%', background: i === currentPage ? '#c8a060' : '#4a3020', cursor: 'pointer', transition: 'background .2s' }} />

@@ -124,6 +124,7 @@ export default function LevelBuilder() {
           /* Force landscape on both A4 and A3 — the browser will scale to fit
              whichever paper the user picks in the print dialog. */
           @page { size: auto landscape; margin: 6mm; }
+          html, body { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; color-adjust: exact !important; }
           body * { visibility: hidden; }
           #level-print, #level-print * { visibility: visible; }
           /* Fill the full printable area edge-to-edge */
@@ -133,8 +134,17 @@ export default function LevelBuilder() {
             display: grid;
             grid-template-columns: repeat(${GRID_W}, 1fr);
             box-sizing: border-box;
+            background: #fff;
           }
-          #level-print > div { border: 0.4pt solid rgba(0,0,0,0.18); }
+          /* Chrome/Edge/Firefox suppress background-color on print by default
+             unless "Background graphics" is checked — force it so tiles
+             always render instead of appearing as an empty grid. */
+          #level-print > div {
+            border: 0.4pt solid rgba(0,0,0,0.18);
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+            color-adjust: exact !important;
+          }
         }
         .lb-cell { aspect-ratio: 1; border: 1px solid rgba(0,0,0,0.12); cursor: pointer; touch-action: none; }
         .lb-map-card { transition: transform .1s ease, box-shadow .1s ease, border-color .1s ease; }

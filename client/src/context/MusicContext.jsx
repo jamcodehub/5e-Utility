@@ -171,12 +171,14 @@ const FADE_MS = 170 // must be >= the hard-stop delay in startMood's cleanup (16
 export function MusicProvider({ children }) {
   const ctxRef = useRef(null)
   const masterRef = useRef(null)
-  const stopRef = useRef(null)
+  const stopRef = useRef(null)          // cleanup fn for the currently-playing (or fading-in) mood
+  const currentRef = useRef(null)       // ref mirror of `current` — always accurate, never stale
   const genRef = useRef(0)
-  const pendingStartRef = useRef(null)   // timeout id for a scheduled start
-  const lastStopTimeRef = useRef(0)      // wall-clock ms when the last stop was triggered
-  const [current, setCurrent] = useState(null)
+  const pendingStartRef = useRef(null)  // timeout id for a scheduled (delayed) start
+  const [current, setCurrentState] = useState(null)
   const [volume, setVolume] = useState(0.5)
+
+  const setCurrent = (v) => { currentRef.current = v; setCurrentState(v) }
 
   useEffect(() => () => {
     clearTimeout(pendingStartRef.current)
@@ -196,66 +198,60 @@ export function MusicProvider({ children }) {
     return ctxRef.current
   }
 
-  const play = (moodId) => {
-    const ctx = ensureCtx()
-    if (ctx.state === 'suspended') ctx.resume()
-
-    // Always cancel any pending delayed start first so stale starts never fire
+  // Immediately and fully tears down whatever is currently playing/pending.
+  // Always call this before starting anything new — guarantees there is
+  // never more than one live audio graph, no matter how fast the user clicks.
+  const hardStopNow = () => {
     if (pendingStartRef.current !== null) {
       clearTimeout(pendingStartRef.current)
       pendingStartRef.current = null
     }
+    if (stopRef.current) {
+      stopRef.current()
+      stopRef.current = null
+    }
+  }
 
-    // Bump generation so any remaining stale setTimeout callbacks bail out
+  const play = (moodId) => {
+    const ctx = ensureCtx()
+    if (ctx.state === 'suspended') ctx.resume()
+
+    // Bump generation so any in-flight delayed start (from a previous call)
+    // is guaranteed to no-op even if its setTimeout somehow already fired.
     genRef.current++
     const myGen = genRef.current
 
-    // Toggle off if tapping the currently playing mood
-    if (current === moodId) {
-      stopRef.current?.(); stopRef.current = null
-      lastStopTimeRef.current = Date.now()
+    // Toggle off — tapping the mood that's already playing/queued.
+    if (currentRef.current === moodId) {
+      hardStopNow()
       setCurrent(null)
       return
     }
 
-    // Fade out whatever is currently playing
-    const previousStop = stopRef.current
-    stopRef.current = null
+    // Was something actually playing/queued? If so we need a short fade
+    // gap before starting the new mood so they never audibly overlap.
+    const wasPlaying = !!stopRef.current
+    hardStopNow()
     setCurrent(moodId)
 
-    if (previousStop) {
-      previousStop()
-      lastStopTimeRef.current = Date.now()
-    }
-
-    // How long until any current fade-out finishes?
-    // If we just called previousStop, that's FADE_MS from now.
-    // If a previous switch already started a fade and we got here before it
-    // finished, calculate the remaining wait from lastStopTimeRef.
-    const elapsed = Date.now() - lastStopTimeRef.current
-    const delay = Math.max(0, FADE_MS - elapsed)
-
     const startNew = () => {
-      if (genRef.current !== myGen) return
+      if (genRef.current !== myGen) return // a newer switch happened meanwhile
       stopRef.current = startMood(ctx, masterRef.current, moodId)
     }
 
-    if (delay > 0) {
+    if (wasPlaying) {
       pendingStartRef.current = setTimeout(() => {
         pendingStartRef.current = null
         startNew()
-      }, delay)
+      }, FADE_MS)
     } else {
       startNew()
     }
   }
 
   const stop = () => {
-    clearTimeout(pendingStartRef.current)
-    pendingStartRef.current = null
     genRef.current++
-    stopRef.current?.(); stopRef.current = null
-    lastStopTimeRef.current = Date.now()
+    hardStopNow()
     setCurrent(null)
   }
 

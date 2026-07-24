@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { api } from '../context/AuthContext'
+import { useAuth } from '../context/AuthContext'
 import { useCampaign } from '../context/CampaignContext'
 import { useToast } from '../hooks/useToast'
 
@@ -50,6 +51,8 @@ function ItemForm({ form, setForm }) {
 
 export default function Inventory() {
   const { activeCampaign } = useCampaign()
+  const { user } = useAuth()
+  const isDM = user?.role === 'dm'
   const { toast, ToastContainer } = useToast()
   const [inv, setInv] = useState(DEFAULT_INV)
   const [loaded, setLoaded] = useState(false)
@@ -122,29 +125,31 @@ export default function Inventory() {
         </div>
       </div>
 
-      {/* ── Currency ── */}
-      <div className="card" style={{ padding: '16px 20px', marginBottom: 20 }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
-          <div style={{ fontFamily: 'Cinzel, serif', fontSize: 14, fontWeight: 600, color: 'var(--gold)' }}>My Currency</div>
-          <button className="btn btn-ghost btn-sm" onClick={() => { setCurrencyDraft({ ...inv.currency }); setEditingCurrency(true) }}>Edit all</button>
-        </div>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
-          {CURRENCY.map(c => (
-            <div key={c.key} style={{ flex: '1 1 100px', minWidth: 88, background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 12, padding: '12px 14px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
-                <span style={{ width: 10, height: 10, borderRadius: '50%', background: c.color, flexShrink: 0, border: '1px solid rgba(0,0,0,0.15)' }} />
-                <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text)' }}>{c.label}</span>
+      {/* ── Currency ── (players only — DMs manage the world, not personal gold) */}
+      {!isDM && (
+        <div className="card" style={{ padding: '16px 20px', marginBottom: 20 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+            <div style={{ fontFamily: 'Cinzel, serif', fontSize: 14, fontWeight: 600, color: 'var(--gold)' }}>My Currency</div>
+            <button className="btn btn-ghost btn-sm" onClick={() => { setCurrencyDraft({ ...inv.currency }); setEditingCurrency(true) }}>Edit all</button>
+          </div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
+            {CURRENCY.map(c => (
+              <div key={c.key} style={{ flex: '1 1 100px', minWidth: 88, background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 12, padding: '12px 14px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
+                  <span style={{ width: 10, height: 10, borderRadius: '50%', background: c.color, flexShrink: 0, border: '1px solid rgba(0,0,0,0.15)' }} />
+                  <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text)' }}>{c.label}</span>
+                </div>
+                {c.sub && <div style={{ fontSize: 10, color: 'var(--text-3)', marginBottom: 6, paddingLeft: 16 }}>{c.sub}</div>}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, paddingLeft: 16 }}>
+                  <button onClick={() => adjustCurrency(c.key, -1)} style={{ width: 20, height: 20, borderRadius: 4, border: '1px solid var(--border)', background: 'transparent', color: 'var(--text-2)', fontSize: 13, fontWeight: 700, cursor: 'pointer', lineHeight: 1, padding: 0 }}>−</button>
+                  <span style={{ fontFamily: 'Cinzel, serif', fontSize: 18, fontWeight: 700, color: c.key === 'gp' ? 'var(--gold)' : 'var(--text)', minWidth: 32, textAlign: 'center' }}>{(inv.currency[c.key] || 0).toLocaleString()}</span>
+                  <button onClick={() => adjustCurrency(c.key, 1)} style={{ width: 20, height: 20, borderRadius: 4, border: '1px solid var(--border)', background: 'transparent', color: 'var(--text-2)', fontSize: 13, fontWeight: 700, cursor: 'pointer', lineHeight: 1, padding: 0 }}>+</button>
+                </div>
               </div>
-              {c.sub && <div style={{ fontSize: 10, color: 'var(--text-3)', marginBottom: 6, paddingLeft: 16 }}>{c.sub}</div>}
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6, paddingLeft: 16 }}>
-                <button onClick={() => adjustCurrency(c.key, -1)} style={{ width: 20, height: 20, borderRadius: 4, border: '1px solid var(--border)', background: 'transparent', color: 'var(--text-2)', fontSize: 13, fontWeight: 700, cursor: 'pointer', lineHeight: 1, padding: 0 }}>−</button>
-                <span style={{ fontFamily: 'Cinzel, serif', fontSize: 18, fontWeight: 700, color: c.key === 'gp' ? 'var(--gold)' : 'var(--text)', minWidth: 32, textAlign: 'center' }}>{(inv.currency[c.key] || 0).toLocaleString()}</span>
-                <button onClick={() => adjustCurrency(c.key, 1)} style={{ width: 20, height: 20, borderRadius: 4, border: '1px solid var(--border)', background: 'transparent', color: 'var(--text-2)', fontSize: 13, fontWeight: 700, cursor: 'pointer', lineHeight: 1, padding: 0 }}>+</button>
-              </div>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* ── Items ── */}
       <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
