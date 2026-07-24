@@ -124,7 +124,12 @@ function startMood(ctx, master, mood) {
     addOsc(jitter(69, 3), 'triangle', 0.07)
     addNoise(0.02, 400)
     const fireNoise = addNoise(0, 700, 'lowpass')
+    // `cancelled` flag — set to true the instant cleanup runs so that any
+    // in-flight flicker/drip timeout that fires during the 160ms fade-out
+    // window cannot call cancelScheduledValues and resurrect the gain.
+    let cancelled = false
     const flicker = () => {
+      if (cancelled) return
       const t = ctx.currentTime
       const v = 0.02 + Math.random() * 0.035
       fireNoise.gain.cancelScheduledValues(t)
@@ -132,8 +137,14 @@ function startMood(ctx, master, mood) {
       intervals.push(setTimeout(flicker, 90 + Math.random() * 160))
     }
     flicker()
-    const scheduleDrip = () => { drip(ctx, master, 0.03 + Math.random() * 0.02); intervals.push(setTimeout(scheduleDrip, 2200 + Math.random() * 3800)) }
+    const scheduleDrip = () => {
+      if (cancelled) return
+      drip(ctx, master, 0.03 + Math.random() * 0.02)
+      intervals.push(setTimeout(scheduleDrip, 2200 + Math.random() * 3800))
+    }
     intervals.push(setTimeout(scheduleDrip, 1500))
+    // Attach the cancelled setter so the cleanup closure can flip it
+    intervals._cancelDungeon = () => { cancelled = true }
   } else if (mood === 'dramatic') {
     // Softer, more subtle medieval/vampiric drone — lower volumes across the
     // board and a gentler bell so it sits in the background instead of
@@ -154,6 +165,7 @@ function startMood(ctx, master, mood) {
   }
 
   return () => {
+    if (intervals._cancelDungeon) intervals._cancelDungeon()
     intervals.forEach(id => { clearInterval(id); clearTimeout(id) })
     // Hard-stop quickly (short ramp, then stop) rather than a long crossfade
     // — a slow fade let the outgoing and incoming moods audibly overlap.
