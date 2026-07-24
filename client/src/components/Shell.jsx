@@ -128,6 +128,8 @@ export default function Shell({ children }) {
   }
 
   const canCreate = isDM && (isPremium || campaigns.length === 0)
+  const realCampaigns = campaigns.filter(c => !c.isPersonal)
+  const canJoin = !isDM && (isPremium || realCampaigns.length === 0)
 
   const navLinkStyle = (isActive) => ({
     display: 'flex', flexDirection: 'row',
@@ -188,11 +190,34 @@ export default function Shell({ children }) {
                 </div>
               </form>
             ) : (
-              <div style={{ display: 'flex', gap: 6, marginTop: 4 }}>
-                {isDM && (canCreate
-                  ? <button onClick={() => setCreating(true)} style={{ fontSize: 12, color: 'var(--text-3)', background: 'none', border: 'none', cursor: 'pointer', padding: '6px 4px' }}>+ New campaign</button>
-                  : <button onClick={() => { navigate('/premium'); setShowCampaigns(false) }} style={{ fontSize: 12, color: 'var(--gold)', background: 'none', border: 'none', cursor: 'pointer', padding: '6px 4px' }}>✦ Upgrade for more</button>)}
-                <button onClick={() => setJoining(true)} style={{ fontSize: 12, color: 'var(--text-3)', background: 'none', border: 'none', cursor: 'pointer', padding: '6px 4px' }}>+ Join campaign</button>
+              <div style={{ marginTop: 4 }}>
+                {isDM ? (
+                  campaigns.length === 0 ? (
+                    <div>
+                      <div style={{ fontSize: 11, color: 'var(--text-3)', padding: '4px 4px 6px', lineHeight: 1.5 }}>You're a Dungeon Master — create your first campaign.</div>
+                      {canCreate
+                        ? <button onClick={() => setCreating(true)} style={{ fontSize: 12, color: 'var(--gold)', background: 'var(--gold-bg)', border: '1px solid var(--gold-border)', borderRadius: 8, cursor: 'pointer', padding: '7px 12px', fontWeight: 600, width: '100%' }}>✦ Create Campaign</button>
+                        : <button onClick={() => { navigate('/premium'); setShowCampaigns(false) }} style={{ fontSize: 12, color: 'var(--gold)', background: 'none', border: 'none', cursor: 'pointer', padding: '6px 4px' }}>✦ Upgrade for more</button>}
+                    </div>
+                  ) : (
+                    canCreate
+                      ? <button onClick={() => setCreating(true)} style={{ fontSize: 12, color: 'var(--text-3)', background: 'none', border: 'none', cursor: 'pointer', padding: '6px 4px' }}>+ New Campaign</button>
+                      : <button onClick={() => { navigate('/premium'); setShowCampaigns(false) }} style={{ fontSize: 12, color: 'var(--gold)', background: 'none', border: 'none', cursor: 'pointer', padding: '6px 4px' }}>✦ Upgrade for more</button>
+                  )
+                ) : (
+                  campaigns.length === 0 ? (
+                    <div>
+                      <div style={{ fontSize: 11, color: 'var(--text-3)', padding: '4px 4px 6px', lineHeight: 1.5 }}>Ask your DM for a join code to enter their campaign.</div>
+                      {canJoin
+                        ? <button onClick={() => setJoining(true)} style={{ fontSize: 12, color: 'var(--text-2)', background: 'transparent', border: '1px solid var(--border)', borderRadius: 8, cursor: 'pointer', padding: '7px 12px', fontWeight: 600, width: '100%' }}>⚔ Join a Campaign</button>
+                        : <button onClick={() => { navigate('/premium'); setShowCampaigns(false) }} style={{ fontSize: 12, color: 'var(--gold)', background: 'var(--gold-bg)', border: '1px solid var(--gold-border)', borderRadius: 8, cursor: 'pointer', padding: '7px 12px', fontWeight: 600, width: '100%' }}>✦ Upgrade for more</button>}
+                    </div>
+                  ) : (
+                    canJoin
+                      ? <button onClick={() => setJoining(true)} style={{ fontSize: 12, color: 'var(--text-3)', background: 'none', border: 'none', cursor: 'pointer', padding: '6px 4px' }}>+ Join Campaign</button>
+                      : <button onClick={() => { navigate('/premium'); setShowCampaigns(false) }} style={{ fontSize: 12, color: 'var(--gold)', background: 'none', border: 'none', cursor: 'pointer', padding: '6px 4px' }}>✦ Upgrade for more</button>
+                  )
+                )}
               </div>
             )}
           </div>
@@ -291,11 +316,34 @@ export default function Shell({ children }) {
               </div>
             </form>
           ) : (
-            <div style={{ display: 'flex', gap: 4, marginTop: 4 }}>
-              {isDM && (canCreate
-                ? <button onClick={() => setCreating(true)} style={{ display: 'flex', alignItems: 'center', gap: 6, flex: 1, padding: '6px 10px', borderRadius: 8, border: 'none', background: 'transparent', color: 'var(--text-3)', fontSize: 12, cursor: 'pointer' }}>+ New</button>
-                : <button onClick={() => navigate('/premium')} style={{ display: 'flex', alignItems: 'center', gap: 6, flex: 1, padding: '6px 10px', borderRadius: 8, border: 'none', background: 'var(--gold-bg)', color: 'var(--gold)', fontSize: 12, cursor: 'pointer', borderLeft: '2px solid var(--gold-border)' }}>✦ Upgrade</button>)}
-              <button onClick={() => setJoining(true)} style={{ display: 'flex', alignItems: 'center', gap: 6, flex: 1, padding: '6px 10px', borderRadius: 8, border: 'none', background: 'transparent', color: 'var(--text-3)', fontSize: 12, cursor: 'pointer' }}>+ Join</button>
+            <div style={{ marginTop: 4 }}>
+              {isDM ? (
+                campaigns.length === 0 ? (
+                  <div style={{ marginBottom: 6 }}>
+                    <div style={{ fontSize: 11, color: 'var(--text-3)', marginBottom: 6, lineHeight: 1.5 }}>You're a Dungeon Master — create your first campaign to get started.</div>
+                    {canCreate
+                      ? <button onClick={() => setCreating(true)} style={{ display: 'flex', alignItems: 'center', gap: 6, width: '100%', padding: '7px 10px', borderRadius: 8, border: '1px solid var(--gold-border)', background: 'var(--gold-bg)', color: 'var(--gold)', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>✦ Create Campaign</button>
+                      : <button onClick={() => navigate('/premium')} style={{ display: 'flex', alignItems: 'center', gap: 6, width: '100%', padding: '7px 10px', borderRadius: 8, border: 'none', background: 'var(--gold-bg)', color: 'var(--gold)', fontSize: 12, cursor: 'pointer', borderLeft: '2px solid var(--gold-border)' }}>✦ Upgrade for more</button>}
+                  </div>
+                ) : (
+                  canCreate
+                    ? <button onClick={() => setCreating(true)} style={{ display: 'flex', alignItems: 'center', gap: 6, width: '100%', padding: '6px 10px', borderRadius: 8, border: 'none', background: 'transparent', color: 'var(--text-3)', fontSize: 12, cursor: 'pointer' }}>+ New Campaign</button>
+                    : <button onClick={() => navigate('/premium')} style={{ display: 'flex', alignItems: 'center', gap: 6, width: '100%', padding: '6px 10px', borderRadius: 8, border: 'none', background: 'var(--gold-bg)', color: 'var(--gold)', fontSize: 12, cursor: 'pointer', borderLeft: '2px solid var(--gold-border)' }}>✦ Upgrade for more</button>
+                )
+              ) : (
+                campaigns.length === 0 ? (
+                  <div style={{ marginBottom: 6 }}>
+                    <div style={{ fontSize: 11, color: 'var(--text-3)', marginBottom: 6, lineHeight: 1.5 }}>Ask your DM for a join code to enter their campaign.</div>
+                    {canJoin
+                      ? <button onClick={() => setJoining(true)} style={{ display: 'flex', alignItems: 'center', gap: 6, width: '100%', padding: '7px 10px', borderRadius: 8, border: '1px solid var(--border)', background: 'transparent', color: 'var(--text-2)', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>⚔ Join a Campaign</button>
+                      : <button onClick={() => navigate('/premium')} style={{ display: 'flex', alignItems: 'center', gap: 6, width: '100%', padding: '7px 10px', borderRadius: 8, border: 'none', background: 'var(--gold-bg)', color: 'var(--gold)', fontSize: 12, cursor: 'pointer', borderLeft: '2px solid var(--gold-border)' }}>✦ Upgrade for more</button>}
+                  </div>
+                ) : (
+                  canJoin
+                    ? <button onClick={() => setJoining(true)} style={{ display: 'flex', alignItems: 'center', gap: 6, width: '100%', padding: '6px 10px', borderRadius: 8, border: 'none', background: 'transparent', color: 'var(--text-3)', fontSize: 12, cursor: 'pointer' }}>+ Join Campaign</button>
+                    : <button onClick={() => navigate('/premium')} style={{ display: 'flex', alignItems: 'center', gap: 6, width: '100%', padding: '6px 10px', borderRadius: 8, border: 'none', background: 'var(--gold-bg)', color: 'var(--gold)', fontSize: 12, cursor: 'pointer', borderLeft: '2px solid var(--gold-border)' }}>✦ Upgrade for more</button>
+                )
+              )}
             </div>
           )}
         </div>

@@ -74,19 +74,6 @@ export default function Dice() {
       if (finalValue === 20) setShowConfetti(true)
       if (finalValue === 1) { setSink(true); setShowRain(true) }
       setRolling(false)
-
-      // Smack into the wall — sharp overshoot then rebound, then settle near the wall.
-      const overshootTx = Math.round(tx * 1.08)
-      const overshootTy = Math.round(ty * 1.08)
-      setD20Transition('transform 90ms cubic-bezier(.5,0,.9,.4)')
-      setD20Transform(`translate(${overshootTx}px, ${overshootTy}px) rotate(${rot + 40}deg)`)
-
-      setTimeout(() => {
-        const settleTx = Math.round(tx * 0.86)
-        const settleTy = Math.round(ty * 0.86)
-        setD20Transition('transform 260ms cubic-bezier(.34,1.56,.64,1)')
-        setD20Transform(`translate(${settleTx}px, ${settleTy}px) rotate(${rot}deg)`)
-      }, 90)
     }, duration + 180)
   }
 

@@ -79,6 +79,27 @@ const LevelPlanSchema = new Schema({
   content:  { type: String, default: '' },
 }, { timestamps: true })
 
+const InventorySchema = new Schema({
+  campaign: { type: Schema.Types.ObjectId, ref: 'Campaign', required: true },
+  owner:    { type: Schema.Types.ObjectId, ref: 'User', required: true },
+  currency: {
+    pp: { type: Number, default: 0 },
+    gp: { type: Number, default: 0 },
+    ep: { type: Number, default: 0 },
+    sp: { type: Number, default: 0 },
+    cp: { type: Number, default: 0 },
+  },
+  items: [{
+    id:       { type: String },
+    name:     { type: String, required: true },
+    qty:      { type: Number, default: 1 },
+    weight:   { type: Number },
+    value:    { type: String },
+    notes:    { type: String },
+    equipped: { type: Boolean, default: false },
+  }],
+}, { timestamps: true })
+
 export const User       = model('User', UserSchema)
 export const Campaign   = model('Campaign', CampaignSchema)
 export const Journal    = model('Journal', JournalSchema)
@@ -86,3 +107,4 @@ export const Lore       = model('Lore', LoreSchema)
 export const StoryCard  = model('StoryCard', StoryCardSchema)
 export const Character  = model('Character', CharacterSchema)
 export const LevelPlan  = model('LevelPlan', LevelPlanSchema)
+export const Inventory  = model('Inventory', InventorySchema)

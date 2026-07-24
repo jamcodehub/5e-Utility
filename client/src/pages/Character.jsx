@@ -35,6 +35,7 @@ export default function Character() {
   const [char, setChar]     = useState(null)
   const [form, setForm]     = useState(DEFAULT)
   const [editing, setEditing] = useState(false)
+  const [skillsDirty, setSkillsDirty] = useState(false)
   const [avatarPreview, setAvatarPreview] = useState('')
   const [loaded, setLoaded] = useState(false)
 
@@ -44,6 +45,7 @@ export default function Character() {
     if (data) { setChar(data); setForm(data); setAvatarPreview(data.avatarUrl || '') }
     else { setChar(null); setForm(DEFAULT); setAvatarPreview('') }
     setLoaded(true)
+    setSkillsDirty(false)
   }, [activeCampaign])
 
   useEffect(() => { if (!activeCampaign) return; setLoaded(false); load() }, [activeCampaign, load])
@@ -62,14 +64,17 @@ export default function Character() {
   const save = async () => {
     try {
       const updated = await api(`/campaigns/${activeCampaign._id}/character`, { method: 'PUT', body: form })
-      setChar(updated); setForm(updated); setEditing(false); toast('Character saved')
+      setChar(updated); setForm(updated); setEditing(false); setSkillsDirty(false); toast('Character saved')
     } catch (e) { toast(e.message || 'Save failed') }
   }
 
-  const toggleProf = (name) => setForm(p => {
+  const toggleProf = (name) => {
+    setSkillsDirty(true)
+    setForm(p => {
     const profs = p.proficiencies || []
     return { ...p, proficiencies: profs.includes(name) ? profs.filter(s => s !== name) : [...profs, name] }
   })
+  }
 
   // Quick HP adjust — heal (+) or take damage (-), clamped to [0, max].
   // Updates the number instantly (no waiting on the network), then saves in
@@ -200,7 +205,7 @@ export default function Character() {
         <div className="card" style={{ padding: 0, overflow: 'hidden', maxWidth: 640 }}>
           <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <span style={{ fontSize: 11, color: 'var(--text-2)' }}>Click dot to toggle proficiency</span>
-            <button className="btn btn-primary btn-sm" onClick={save}>Save</button>
+            {skillsDirty && <button className="btn btn-primary btn-sm" onClick={save}>Save</button>}
           </div>
           {SKILLS.map((s, i) => {
             const statVal = F.stats?.[s.stat] ?? 10

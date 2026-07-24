@@ -89,15 +89,13 @@ function CandidateImage({ url, index, alt }) {
 function BookSpread({ card, index }) {
   return (
     <div style={{ position: 'absolute', inset: 0, display: 'flex', minWidth: 0 }}>
-      {/* Left — image with responsive cropping */}
-      <div style={{ flex: 1, background: 'linear-gradient(180deg, #f6eddc, #efe3cc)', borderRight: '2px solid #b39b74', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', position: 'relative', boxShadow: 'inset -10px 0 20px rgba(86,61,34,0.08)', padding: '4%' }}>
-        <div style={{ position: 'absolute', top: 14, left: 18, fontFamily: 'Cinzel, serif', fontSize: 10, color: 'var(--text-3)', letterSpacing: '0.1em', zIndex: 1 }}>SCENE {index + 1}</div>
+      {/* Left — image covering the full page, no padding, no title overlay */}
+      <div style={{ flex: 1, background: '#1a1208', borderRight: '2px solid #b39b74', overflow: 'hidden', position: 'relative' }}>
         {card.imageUrl
-          ? <img src={card.imageUrl} alt={card.title} style={{ width: '100%', height: '100%', minWidth: '100%', minHeight: '100%', objectFit: 'cover', objectPosition: 'center', display: 'block', borderRadius: 8 }} onError={e => { e.target.style.display = 'none' }} />
-          : <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, color: 'var(--text-3)' }}><div style={{ fontSize: 40, opacity: 0.3 }}>✦</div><div style={{ fontSize: 11, fontFamily: 'Cinzel, serif' }}>Generating...</div></div>
+          ? <img src={card.imageUrl} alt={card.title} style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center', display: 'block' }} onError={e => { e.target.style.display = 'none' }} />
+          : <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 10, color: '#8a7060' }}><div style={{ fontSize: 40, opacity: 0.3 }}>✦</div><div style={{ fontSize: 11, fontFamily: 'Cinzel, serif' }}>Generating...</div></div>
         }
-        <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', background: 'radial-gradient(circle at 18% 16%, rgba(128,94,59,0.10), transparent 30%), radial-gradient(circle at 84% 78%, rgba(128,94,59,0.08), transparent 28%)' }} />
-        <div style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: 24, background: 'linear-gradient(to left, rgba(60,40,20,0.10), transparent)', pointerEvents: 'none' }} />
+        <div style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: 24, background: 'linear-gradient(to left, rgba(60,40,20,0.18), transparent)', pointerEvents: 'none' }} />
       </div>
       {/* Right — text with book-like margins */}
       <div style={{ flex: 1, background: 'linear-gradient(180deg, #f7efde, #f0e4cd)', padding: '48px 48px', display: 'flex', flexDirection: 'column', position: 'relative', backgroundImage: 'radial-gradient(circle at 12% 20%, rgba(125,89,53,0.08), transparent 26%), radial-gradient(circle at 82% 74%, rgba(125,89,53,0.06), transparent 24%), repeating-linear-gradient(transparent, transparent 27px, rgba(0,0,0,0.032) 28px)', backgroundPosition: '0 0, 0 0, 0 48px' }}>

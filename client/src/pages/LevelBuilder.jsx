@@ -106,7 +106,13 @@ export default function LevelBuilder() {
     let parsedGrid = null
     try { const parsed = JSON.parse(content); if (Array.isArray(parsed)) parsedGrid = parsed } catch { /* legacy */ }
     setPrintTarget(parsedGrid || blankGrid())
-    setTimeout(() => { window.print(); setPrintTarget(null) }, 50)
+    // Wait a full frame for React to render the print target, THEN open the
+    // dialog. Clean up only after the dialog closes via the afterprint event.
+    setTimeout(() => {
+      const cleanup = () => { setPrintTarget(null); window.removeEventListener('afterprint', cleanup) }
+      window.addEventListener('afterprint', cleanup)
+      window.print()
+    }, 120)
   }
 
   if (!activeCampaign) return <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-3)' }}>Select a campaign.</div>
@@ -115,9 +121,20 @@ export default function LevelBuilder() {
     <div className="page-content">
       <style>{`
         @media print {
+          /* Force landscape on both A4 and A3 — the browser will scale to fit
+             whichever paper the user picks in the print dialog. */
+          @page { size: auto landscape; margin: 6mm; }
           body * { visibility: hidden; }
           #level-print, #level-print * { visibility: visible; }
-          #level-print { position: fixed; inset: 0; }
+          /* Fill the full printable area edge-to-edge */
+          #level-print {
+            position: fixed; inset: 0;
+            width: 100vw; height: 100vh;
+            display: grid;
+            grid-template-columns: repeat(${GRID_W}, 1fr);
+            box-sizing: border-box;
+          }
+          #level-print > div { border: 0.4pt solid rgba(0,0,0,0.18); }
         }
         .lb-cell { aspect-ratio: 1; border: 1px solid rgba(0,0,0,0.12); cursor: pointer; touch-action: none; }
         .lb-map-card { transition: transform .1s ease, box-shadow .1s ease, border-color .1s ease; }
@@ -195,7 +212,7 @@ export default function LevelBuilder() {
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 8 }}>
                 <span style={{ color: activePlanId === p._id ? 'var(--gold)' : 'var(--text)', fontFamily: 'Cinzel, serif', fontSize: 13 }}>{p.title}</span>
                 <div style={{ display: 'flex', gap: 4 }}>
-                  <button onClick={(e) => { e.stopPropagation(); printMap(p.content) }} title="Print this map" style={{ background: 'none', border: 'none', color: 'var(--text-3)', cursor: 'pointer', fontSize: 13 }}>🖰</button>
+                  <button onClick={(e) => { e.stopPropagation(); printMap(p.content) }} title="Print this map" style={{ background: 'none', border: 'none', color: 'var(--text-3)', cursor: 'pointer', fontSize: 13 }}>�</button>
                   <button onClick={(e) => { e.stopPropagation(); remove(p._id) }} style={{ background: 'none', border: 'none', color: 'var(--text-3)', cursor: 'pointer', fontSize: 13 }}>✕</button>
                 </div>
               </div>
@@ -206,9 +223,9 @@ export default function LevelBuilder() {
       </div>
 
       {printTarget && (
-        <div id="level-print" style={{ display: 'grid', gridTemplateColumns: `repeat(${GRID_W}, 1fr)`, position: 'fixed', top: 0, left: 0, width: '100vw', background: '#fff' }}>
+        <div id="level-print">
           {printTarget.map((row, r) => row.map((cellId, c) => (
-            <div key={`${r}-${c}`} style={{ aspectRatio: 1, background: tileColor(cellId), border: '1px solid rgba(0,0,0,0.12)' }} />
+            <div key={`${r}-${c}`} style={{ background: tileColor(cellId) }} />
           )))}
         </div>
       )}

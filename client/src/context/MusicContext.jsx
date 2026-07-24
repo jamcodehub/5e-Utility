@@ -166,15 +166,23 @@ function startMood(ctx, master, mood) {
 const MusicContext = createContext(null)
 export const useMusic = () => useContext(MusicContext)
 
+const FADE_MS = 170 // must be >= the hard-stop delay in startMood's cleanup (160ms)
+
 export function MusicProvider({ children }) {
   const ctxRef = useRef(null)
   const masterRef = useRef(null)
   const stopRef = useRef(null)
   const genRef = useRef(0)
+  const pendingStartRef = useRef(null)   // timeout id for a scheduled start
+  const lastStopTimeRef = useRef(0)      // wall-clock ms when the last stop was triggered
   const [current, setCurrent] = useState(null)
   const [volume, setVolume] = useState(0.5)
 
-  useEffect(() => () => { stopRef.current?.(); ctxRef.current?.close() }, [])
+  useEffect(() => () => {
+    clearTimeout(pendingStartRef.current)
+    stopRef.current?.()
+    ctxRef.current?.close()
+  }, [])
 
   const ensureCtx = () => {
     if (!ctxRef.current) {
@@ -191,29 +199,65 @@ export function MusicProvider({ children }) {
   const play = (moodId) => {
     const ctx = ensureCtx()
     if (ctx.state === 'suspended') ctx.resume()
-    const myGen = ++genRef.current
+
+    // Always cancel any pending delayed start first so stale starts never fire
+    if (pendingStartRef.current !== null) {
+      clearTimeout(pendingStartRef.current)
+      pendingStartRef.current = null
+    }
+
+    // Bump generation so any remaining stale setTimeout callbacks bail out
+    genRef.current++
+    const myGen = genRef.current
+
+    // Toggle off if tapping the currently playing mood
     if (current === moodId) {
       stopRef.current?.(); stopRef.current = null
+      lastStopTimeRef.current = Date.now()
       setCurrent(null)
       return
     }
+
+    // Fade out whatever is currently playing
     const previousStop = stopRef.current
     stopRef.current = null
     setCurrent(moodId)
+
     if (previousStop) {
-      // Wait for the outgoing mood to fully silence before starting the next
-      // one, so the two never audibly overlap.
       previousStop()
-      setTimeout(() => {
-        if (genRef.current !== myGen) return // a newer switch happened meanwhile
-        stopRef.current = startMood(ctx, masterRef.current, moodId)
-      }, 170)
-    } else {
+      lastStopTimeRef.current = Date.now()
+    }
+
+    // How long until any current fade-out finishes?
+    // If we just called previousStop, that's FADE_MS from now.
+    // If a previous switch already started a fade and we got here before it
+    // finished, calculate the remaining wait from lastStopTimeRef.
+    const elapsed = Date.now() - lastStopTimeRef.current
+    const delay = Math.max(0, FADE_MS - elapsed)
+
+    const startNew = () => {
+      if (genRef.current !== myGen) return
       stopRef.current = startMood(ctx, masterRef.current, moodId)
+    }
+
+    if (delay > 0) {
+      pendingStartRef.current = setTimeout(() => {
+        pendingStartRef.current = null
+        startNew()
+      }, delay)
+    } else {
+      startNew()
     }
   }
 
-  const stop = () => { genRef.current++; stopRef.current?.(); stopRef.current = null; setCurrent(null) }
+  const stop = () => {
+    clearTimeout(pendingStartRef.current)
+    pendingStartRef.current = null
+    genRef.current++
+    stopRef.current?.(); stopRef.current = null
+    lastStopTimeRef.current = Date.now()
+    setCurrent(null)
+  }
 
   const setVol = (v) => {
     setVolume(v)
