@@ -27,13 +27,17 @@ function BookSpread({ card, index, onEdit }) {
         <div style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: 24, background: 'linear-gradient(to left, rgba(60,40,20,0.18), transparent)', pointerEvents: 'none' }} />
       </div>
       {/* Right — text */}
-      <div style={{ flex: 1, background: 'linear-gradient(180deg, #f7efde, #ede1c8)', padding: '32px 40px 28px 36px', display: 'flex', flexDirection: 'column', position: 'relative', backgroundImage: 'radial-gradient(circle at 12% 20%, rgba(125,89,53,0.08), transparent 26%), radial-gradient(circle at 82% 74%, rgba(125,89,53,0.06), transparent 24%), repeating-linear-gradient(transparent, transparent 27px, rgba(0,0,0,0.032) 28px)', backgroundPosition: '0 0, 0 0, 0 32px' }}>
+      <div style={{ flex: 1, background: 'linear-gradient(180deg, #f7efde, #ede1c8)', padding: '32px 44px 28px 40px', display: 'flex', flexDirection: 'column', position: 'relative', backgroundImage: 'radial-gradient(circle at 12% 20%, rgba(125,89,53,0.08), transparent 26%), radial-gradient(circle at 82% 74%, rgba(125,89,53,0.06), transparent 24%), repeating-linear-gradient(transparent, transparent 27px, rgba(0,0,0,0.032) 28px)', backgroundPosition: '0 0, 0 0, 0 32px' }}>
+        {/* Page number */}
         <div style={{ position: 'absolute', top: 14, right: 18, fontFamily: 'Cinzel, serif', fontSize: 10, color: '#9a8060', letterSpacing: '0.1em' }}>{index * 2 + 2}</div>
-        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 16, gap: 8 }}>
-          <h2 style={{ fontFamily: 'Cinzel, serif', fontSize: 18, color: '#3f2b1f', lineHeight: 1.4, position: 'relative', zIndex: 1, margin: 0 }}>{card.title}</h2>
-          <button onClick={onEdit} title="Edit scene" style={{ flexShrink: 0, background: 'rgba(92,66,37,0.12)', border: '1px solid rgba(92,66,37,0.25)', color: '#6b4a2a', borderRadius: 6, padding: '3px 7px', fontSize: 11, cursor: 'pointer', fontFamily: 'Cinzel, serif' }}>Edit</button>
+        {/* Edit button — floating top-right below page number */}
+        <button onClick={onEdit} title="Edit scene" style={{ position: 'absolute', top: 32, right: 18, background: 'rgba(92,66,37,0.12)', border: '1px solid rgba(92,66,37,0.25)', color: '#6b4a2a', borderRadius: 6, padding: '3px 9px', fontSize: 11, cursor: 'pointer', fontFamily: 'Cinzel, serif', zIndex: 2 }}>Edit</button>
+        {/* Centered title */}
+        <h2 style={{ fontFamily: 'Cinzel, serif', fontSize: 17, color: '#3f2b1f', lineHeight: 1.4, margin: '0 0 20px 0', textAlign: 'center', position: 'relative', zIndex: 1, paddingRight: 44 }}>{card.title}</h2>
+        {/* Description — constrained column centered on the page */}
+        <div style={{ flex: 1, overflow: 'auto', display: 'flex', justifyContent: 'center' }}>
+          <p style={{ fontFamily: 'Georgia, serif', fontSize: 13.5, color: '#5b4431', lineHeight: 2, margin: 0, maxWidth: 320, width: '100%', textAlign: 'justify', hyphens: 'auto', position: 'relative', zIndex: 1 }}>{card.description}</p>
         </div>
-        <p style={{ fontFamily: 'Georgia, serif', fontSize: 13.5, color: '#5b4431', lineHeight: 1.95, position: 'relative', zIndex: 1, flex: 1, overflow: 'auto' }}>{card.description}</p>
         {card.createdAt && (
           <div style={{ fontSize: 10, color: '#7c624a', fontFamily: 'Cinzel, serif', letterSpacing: '0.06em', marginTop: 20, textAlign: 'right', position: 'relative', zIndex: 1 }}>
             {new Date(card.createdAt).toLocaleDateString('en-AU', { day: 'numeric', month: 'long', year: 'numeric' })}

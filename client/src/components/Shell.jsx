@@ -113,7 +113,6 @@ export default function Shell({ children }) {
   const [showSettings, setShowSettings] = useState(false)
   const [joinPending, setJoinPending] = useState(false) // player waiting for DM approval
   const [pendingMembers, setPendingMembers] = useState([]) // DM: list of pending requests
-  const [showPending, setShowPending] = useState(false)
 
   // DM: load pending join requests whenever active campaign changes
   useEffect(() => {
@@ -191,7 +190,19 @@ export default function Shell({ children }) {
               <button key={c._id} onClick={() => { setActive(c); setShowCampaigns(false) }} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '8px 10px', borderRadius: 6, border: 'none', background: activeCampaign?._id === c._id ? 'var(--gold-bg)' : 'transparent', color: activeCampaign?._id === c._id ? 'var(--gold)' : 'var(--text-2)', fontSize: 13, cursor: 'pointer', marginBottom: 2 }}>{c.name}</button>
             ))}
             {isDM && activeCampaign?.joinCode && (
-              <div style={{ fontSize: 11, color: 'var(--text-3)', padding: '4px 10px 8px' }}>Join code: <span style={{ color: 'var(--gold)', fontWeight: 600 }}>{activeCampaign.joinCode}</span></div>
+              <div style={{ padding: '4px 10px 6px' }}>
+                <div style={{ fontSize: 11, color: 'var(--text-3)', marginBottom: pendingMembers.length > 0 ? 6 : 0 }}>Join code: <span style={{ color: 'var(--gold)', fontWeight: 600 }}>{activeCampaign.joinCode}</span></div>
+                {pendingMembers.map(m => (
+                  <div key={m._id} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 0', borderTop: '1px solid var(--border)' }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 12, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.username}</div>
+                      <div style={{ fontSize: 10, color: 'var(--text-3)' }}>wants to join</div>
+                    </div>
+                    <button onClick={() => approveMember(m._id)} title="Approve" style={{ width: 26, height: 26, borderRadius: 6, border: 'none', background: '#1d6a3a', color: '#fff', fontSize: 13, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>✓</button>
+                    <button onClick={() => rejectMember(m._id)} title="Reject" style={{ width: 26, height: 26, borderRadius: 6, border: 'none', background: '#7a2020', color: '#fff', fontSize: 13, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>✕</button>
+                  </div>
+                ))}
+              </div>
             )}
             {creating ? (
               <form onSubmit={handleCreate} style={{ marginTop: 6 }}>
@@ -211,6 +222,15 @@ export default function Shell({ children }) {
                   <button type="button" className="btn btn-ghost btn-sm" onClick={() => { setJoining(false); setJoinError('') }}>✕</button>
                 </div>
               </form>
+            ) : joinPending ? (
+              <div style={{ marginTop: 6, padding: '8px 10px', background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ fontSize: 16 }}>⏳</span>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 12, fontWeight: 500 }}>Joining pending…</div>
+                  <div style={{ fontSize: 10, color: 'var(--text-3)', lineHeight: 1.4 }}>Waiting for the DM to approve your request.</div>
+                </div>
+                <button onClick={() => setJoinPending(false)} style={{ background: 'none', border: 'none', color: 'var(--text-3)', cursor: 'pointer', fontSize: 14, padding: 2 }}>✕</button>
+              </div>
             ) : (
               <div style={{ marginTop: 4 }}>
                 {isDM ? (
@@ -316,11 +336,18 @@ export default function Shell({ children }) {
             <button key={c._id} onClick={() => setActive(c)} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '7px 10px', borderRadius: 8, border: 'none', background: activeCampaign?._id === c._id ? 'var(--gold-bg)' : 'transparent', color: activeCampaign?._id === c._id ? 'var(--gold)' : 'var(--text-2)', fontSize: 13, fontWeight: activeCampaign?._id === c._id ? 500 : 400, cursor: 'pointer', marginBottom: 2, borderLeft: activeCampaign?._id === c._id ? '2px solid var(--gold)' : '2px solid transparent' }}>{c.name}</button>
           ))}
           {isDM && activeCampaign?.joinCode && (
-            <div style={{ fontSize: 11, color: 'var(--text-3)', padding: '2px 10px 6px', display: 'flex', alignItems: 'center', gap: 6 }}>
-              <span>Join code: <span style={{ color: 'var(--gold)', fontWeight: 600 }}>{activeCampaign.joinCode}</span></span>
-              {pendingMembers.length > 0 && (
-                <button onClick={() => setShowPending(true)} style={{ background: '#c0392b', border: 'none', color: '#fff', borderRadius: 10, fontSize: 10, padding: '1px 6px', cursor: 'pointer', fontWeight: 700 }}>{pendingMembers.length} pending</button>
-              )}
+            <div style={{ padding: '2px 10px 6px' }}>
+              <div style={{ fontSize: 11, color: 'var(--text-3)', marginBottom: pendingMembers.length > 0 ? 6 : 0 }}>Join code: <span style={{ color: 'var(--gold)', fontWeight: 600 }}>{activeCampaign.joinCode}</span></div>
+              {pendingMembers.map(m => (
+                <div key={m._id} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 0', borderTop: '1px solid var(--border)' }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 12, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.username}</div>
+                    <div style={{ fontSize: 10, color: 'var(--text-3)' }}>wants to join</div>
+                  </div>
+                  <button onClick={() => approveMember(m._id)} title="Approve" style={{ width: 28, height: 28, borderRadius: 6, border: 'none', background: '#1d6a3a', color: '#fff', fontSize: 14, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>✓</button>
+                  <button onClick={() => rejectMember(m._id)} title="Reject" style={{ width: 28, height: 28, borderRadius: 6, border: 'none', background: '#7a2020', color: '#fff', fontSize: 14, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>✕</button>
+                </div>
+              ))}
             </div>
           )}
           {creating ? (
@@ -341,6 +368,15 @@ export default function Shell({ children }) {
                 <button type="button" className="btn btn-ghost btn-sm" onClick={() => { setJoining(false); setJoinError('') }}>✕</button>
               </div>
             </form>
+          ) : joinPending ? (
+            <div style={{ marginTop: 4, padding: '8px 10px', background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 8 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                <span style={{ fontSize: 14 }}>⏳</span>
+                <div style={{ fontSize: 12, fontWeight: 500 }}>Joining pending…</div>
+                <button onClick={() => setJoinPending(false)} style={{ marginLeft: 'auto', background: 'none', border: 'none', color: 'var(--text-3)', cursor: 'pointer', fontSize: 13, padding: 0 }}>✕</button>
+              </div>
+              <div style={{ fontSize: 11, color: 'var(--text-3)', lineHeight: 1.5 }}>Waiting for the DM to approve your request.</div>
+            </div>
           ) : (
             <div style={{ marginTop: 4 }}>
               {isDM ? (
@@ -400,40 +436,7 @@ export default function Shell({ children }) {
       <main style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>{children}</main>
       {showSettings && <SettingsModal onClose={() => setShowSettings(false)} />}
 
-      {/* Player: waiting for DM approval */}
-      {joinPending && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <div className="card" style={{ padding: '28px 32px', maxWidth: 380, textAlign: 'center' }}>
-            <div style={{ fontSize: 28, marginBottom: 12 }}>⏳</div>
-            <div style={{ fontFamily: 'Cinzel, serif', fontSize: 16, fontWeight: 600, marginBottom: 8 }}>Request Sent</div>
-            <div style={{ fontSize: 13, color: 'var(--text-2)', lineHeight: 1.6, marginBottom: 20 }}>Your request to join has been sent to the Dungeon Master. You'll gain access once they approve it.</div>
-            <button className="btn btn-ghost" onClick={() => setJoinPending(false)}>OK</button>
-          </div>
-        </div>
-      )}
 
-      {/* DM: approve / reject pending members */}
-      {showPending && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={() => setShowPending(false)}>
-          <div className="card" style={{ padding: '24px 28px', minWidth: 340, maxWidth: 440 }} onClick={e => e.stopPropagation()}>
-            <div style={{ fontFamily: 'Cinzel, serif', fontSize: 15, fontWeight: 600, marginBottom: 16 }}>Pending Join Requests</div>
-            {pendingMembers.length === 0
-              ? <div style={{ fontSize: 13, color: 'var(--text-3)' }}>No pending requests.</div>
-              : pendingMembers.map(m => (
-                <div key={m._id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0', borderBottom: '1px solid var(--border)' }}>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: 13, fontWeight: 500 }}>{m.username}</div>
-                    <div style={{ fontSize: 11, color: 'var(--text-3)' }}>{m.email}</div>
-                  </div>
-                  <button className="btn btn-primary btn-sm" onClick={() => approveMember(m._id)}>Approve</button>
-                  <button className="btn btn-ghost btn-sm" onClick={() => rejectMember(m._id)}>Reject</button>
-                </div>
-              ))
-            }
-            <button className="btn btn-ghost" style={{ marginTop: 16, width: '100%', justifyContent: 'center' }} onClick={() => setShowPending(false)}>Close</button>
-          </div>
-        </div>
-      )}
     </div>
   )
 }
