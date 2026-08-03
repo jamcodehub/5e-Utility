@@ -2,7 +2,7 @@ import { NavLink, useNavigate } from 'react-router-dom'
 import { useAuth, api } from '../context/AuthContext'
 import { useCampaign } from '../context/CampaignContext'
 import { useMusic, MOODS } from '../context/MusicContext'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import SettingsModal from './SettingsModal'
 
 function MusicMiniPlayer({ bottomOffset }) {
@@ -110,6 +110,18 @@ export default function Shell({ children }) {
   const [joinCode, setJoinCode] = useState('')
   const [joinError, setJoinError] = useState('')
   const [showCampaigns, setShowCampaigns] = useState(false)
+  const campaignDropdownTimer = useRef(null)
+
+  const openCampaigns = () => {
+    setShowCampaigns(true)
+    clearTimeout(campaignDropdownTimer.current)
+    campaignDropdownTimer.current = setTimeout(() => setShowCampaigns(false), 5000)
+  }
+  const closeCampaigns = () => { clearTimeout(campaignDropdownTimer.current); setShowCampaigns(false) }
+  const resetDropdownTimer = () => {
+    clearTimeout(campaignDropdownTimer.current)
+    campaignDropdownTimer.current = setTimeout(() => setShowCampaigns(false), 5000)
+  }
   const [showSettings, setShowSettings] = useState(false)
   const [joinPending, setJoinPending] = useState(false) // player waiting for DM approval
   const [pendingMembers, setPendingMembers] = useState([]) // DM: list of pending requests
@@ -175,7 +187,7 @@ export default function Shell({ children }) {
         <div style={{ background: 'var(--surface)', borderBottom: '1px solid var(--border)', padding: '10px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
           <div style={{ fontFamily: 'Cinzel, serif', fontSize: 16, fontWeight: 600, color: 'var(--gold)' }}>Lore &amp; Ledger</div>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-            <button onClick={() => setShowCampaigns(s => !s)} style={{ background: 'var(--gold-bg)', border: '1px solid var(--gold-border)', color: 'var(--gold)', padding: '8px 12px', borderRadius: 10, fontSize: 11, cursor: 'pointer', fontFamily: 'Cinzel, serif', maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            <button onClick={() => showCampaigns ? closeCampaigns() : openCampaigns()} style={{ background: 'var(--gold-bg)', border: '1px solid var(--gold-border)', color: 'var(--gold)', padding: '8px 12px', borderRadius: 10, fontSize: 11, cursor: 'pointer', fontFamily: 'Cinzel, serif', maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
               {activeCampaign?.name || 'Campaign'} ▾
             </button>
             {!isPremium && <button onClick={() => navigate('/premium')} style={{ background: 'none', border: 'none', color: 'var(--gold)', fontSize: 18, padding: 8, borderRadius: 10, cursor: 'pointer' }}>✦</button>}
@@ -185,9 +197,9 @@ export default function Shell({ children }) {
 
         {/* Campaign dropdown on mobile */}
         {showCampaigns && (
-          <div style={{ background: 'var(--surface)', borderBottom: '1px solid var(--border)', padding: '10px 16px', flexShrink: 0 }}>
+          <div style={{ background: 'var(--surface)', borderBottom: '1px solid var(--border)', padding: '10px 16px', flexShrink: 0 }} onMouseMove={resetDropdownTimer} onTouchStart={resetDropdownTimer}>
             {campaigns.filter(c => !c.isPersonal).map(c => (
-              <button key={c._id} onClick={() => { setActive(c); setShowCampaigns(false) }} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '8px 10px', borderRadius: 6, border: 'none', background: activeCampaign?._id === c._id ? 'var(--gold-bg)' : 'transparent', color: activeCampaign?._id === c._id ? 'var(--gold)' : 'var(--text-2)', fontSize: 13, cursor: 'pointer', marginBottom: 2 }}>{c.name}</button>
+              <button key={c._id} onClick={() => { setActive(c); closeCampaigns() }} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '8px 10px', borderRadius: 6, border: 'none', background: activeCampaign?._id === c._id ? 'var(--gold-bg)' : 'transparent', color: activeCampaign?._id === c._id ? 'var(--gold)' : 'var(--text-2)', fontSize: 13, cursor: 'pointer', marginBottom: 2 }}>{c.name}</button>
             ))}
             {isDM && activeCampaign?.joinCode && (
               <div style={{ padding: '4px 10px 6px' }}>
@@ -239,12 +251,12 @@ export default function Shell({ children }) {
                       <div style={{ fontSize: 11, color: 'var(--text-3)', padding: '4px 4px 6px', lineHeight: 1.5 }}>You're a Dungeon Master — create your first campaign.</div>
                       {canCreate
                         ? <button onClick={() => setCreating(true)} style={{ fontSize: 12, color: 'var(--gold)', background: 'var(--gold-bg)', border: '1px solid var(--gold-border)', borderRadius: 8, cursor: 'pointer', padding: '7px 12px', fontWeight: 600, width: '100%' }}>✦ Create Campaign</button>
-                        : <button onClick={() => { navigate('/premium'); setShowCampaigns(false) }} style={{ fontSize: 12, color: 'var(--gold)', background: 'none', border: 'none', cursor: 'pointer', padding: '6px 4px' }}>✦ Upgrade for more</button>}
+                        : <button onClick={() => { navigate('/premium'); closeCampaigns() }} style={{ fontSize: 12, color: 'var(--gold)', background: 'none', border: 'none', cursor: 'pointer', padding: '6px 4px' }}>✦ Upgrade for more</button>}
                     </div>
                   ) : (
                     canCreate
                       ? <button onClick={() => setCreating(true)} style={{ fontSize: 12, color: 'var(--text-3)', background: 'none', border: 'none', cursor: 'pointer', padding: '6px 4px' }}>+ New Campaign</button>
-                      : <button onClick={() => { navigate('/premium'); setShowCampaigns(false) }} style={{ fontSize: 12, color: 'var(--gold)', background: 'none', border: 'none', cursor: 'pointer', padding: '6px 4px' }}>✦ Upgrade for more</button>
+                      : <button onClick={() => { navigate('/premium'); closeCampaigns() }} style={{ fontSize: 12, color: 'var(--gold)', background: 'none', border: 'none', cursor: 'pointer', padding: '6px 4px' }}>✦ Upgrade for more</button>
                   )
                 ) : (
                   realCampaigns.length === 0 ? (
@@ -252,12 +264,12 @@ export default function Shell({ children }) {
                       <div style={{ fontSize: 11, color: 'var(--text-3)', padding: '4px 4px 6px', lineHeight: 1.5 }}>Ask your DM for a join code to enter their campaign.</div>
                       {canJoin
                         ? <button onClick={() => setJoining(true)} style={{ fontSize: 12, color: 'var(--text-2)', background: 'transparent', border: '1px solid var(--border)', borderRadius: 8, cursor: 'pointer', padding: '7px 12px', fontWeight: 600, width: '100%' }}>⚔ Join a Campaign</button>
-                        : <button onClick={() => { navigate('/premium'); setShowCampaigns(false) }} style={{ fontSize: 12, color: 'var(--gold)', background: 'var(--gold-bg)', border: '1px solid var(--gold-border)', borderRadius: 8, cursor: 'pointer', padding: '7px 12px', fontWeight: 600, width: '100%' }}>✦ Upgrade for more</button>}
+                        : <button onClick={() => { navigate('/premium'); closeCampaigns() }} style={{ fontSize: 12, color: 'var(--gold)', background: 'var(--gold-bg)', border: '1px solid var(--gold-border)', borderRadius: 8, cursor: 'pointer', padding: '7px 12px', fontWeight: 600, width: '100%' }}>✦ Upgrade for more</button>}
                     </div>
                   ) : (
                     canJoin
                       ? <button onClick={() => setJoining(true)} style={{ fontSize: 12, color: 'var(--text-3)', background: 'none', border: 'none', cursor: 'pointer', padding: '6px 4px' }}>+ Join Campaign</button>
-                      : <button onClick={() => { navigate('/premium'); setShowCampaigns(false) }} style={{ fontSize: 12, color: 'var(--gold)', background: 'none', border: 'none', cursor: 'pointer', padding: '6px 4px' }}>✦ Upgrade for more</button>
+                      : <button onClick={() => { navigate('/premium'); closeCampaigns() }} style={{ fontSize: 12, color: 'var(--gold)', background: 'none', border: 'none', cursor: 'pointer', padding: '6px 4px' }}>✦ Upgrade for more</button>
                   )
                 )}
               </div>
