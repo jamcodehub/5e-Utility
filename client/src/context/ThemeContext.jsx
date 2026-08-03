@@ -243,7 +243,6 @@ export const THEMES = {
     }
   },
 }
-}
 
 export function ThemeProvider({ children }) {
   const [theme, setTheme] = useState(() => localStorage.getItem('ll_theme') || 'light')
