@@ -1,10 +1,11 @@
 import { Router } from 'express'
 import { LevelPlan, Campaign, User } from '../models/index.js'
-import { auth } from './campaigns.js'
+import { auth, isMember } from './campaigns.js'
 
 const router = Router()
 
 router.get('/:campaignId', auth, async (req, res) => {
+  if (!await isMember(req.params.campaignId, req.userId)) return res.status(403).json({ error: 'Not a campaign member' })
   res.json(await LevelPlan.find({ campaign: req.params.campaignId }).sort({ createdAt: 1 }))
 })
 

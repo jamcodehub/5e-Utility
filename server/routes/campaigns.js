@@ -43,7 +43,16 @@ router.post('/', auth, async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }) }
 })
 
-// Players (or anyone) join a campaign using the DM's share code.
+// ─── Shared membership helper ─────────────────────────────────────────────
+// Used by all campaign-scoped routes to gate data access.
+export const isMember = async (campaignId, userId) => {
+  const c = await Campaign.findById(campaignId).select('owner members')
+  if (!c) return false
+  const uid = String(userId)
+  return String(c.owner) === uid || c.members.some(m => String(m) === uid)
+}
+
+// Players join via code — DM approval required before they see any data.
 router.post('/join', auth, async (req, res) => {
   try {
     const { code } = req.body
@@ -51,21 +60,58 @@ router.post('/join', auth, async (req, res) => {
     const campaign = await Campaign.findOne({ joinCode: code.trim().toUpperCase() })
     if (!campaign) return res.status(404).json({ error: 'Invalid join code' })
 
+    const uid = String(req.userId)
+    // Already a member
+    if (String(campaign.owner) === uid || campaign.members.some(m => String(m) === uid))
+      return res.json({ pending: false, campaign })
+    // Already pending
+    if (campaign.pendingMembers.some(m => String(m) === uid))
+      return res.json({ pending: true })
+
     const user = await User.findById(req.userId)
     if (user.role === 'player' && !user.isPremium) {
       const already = await Campaign.countDocuments({ members: req.userId })
-      const owned = String(campaign.owner) === String(req.userId)
-      if (!owned && already >= 1) {
-        return res.status(403).json({ error: 'Free players can join 1 campaign. Upgrade to Premium for unlimited campaigns.' })
-      }
+      if (already >= 1) return res.status(403).json({ error: 'Free players can join 1 campaign. Upgrade to Premium for unlimited campaigns.' })
     }
 
-    if (String(campaign.owner) !== String(req.userId) && !campaign.members.some(m => String(m) === String(req.userId))) {
-      campaign.members.push(req.userId)
-      await campaign.save()
-    }
-    res.json(campaign)
-  } catch (e) { res.status(500).json({ error: e.message }) }
+    campaign.pendingMembers.push(req.userId)
+    await campaign.save()
+    res.json({ pending: true })
+  } catch { res.status(500).json({ error: 'Failed to submit join request' }) }
+})
+
+// DM: list pending join requests for a campaign
+router.get('/:id/pending', auth, async (req, res) => {
+  try {
+    const campaign = await Campaign.findOne({ _id: req.params.id, owner: req.userId })
+      .populate('pendingMembers', 'username email')
+    if (!campaign) return res.status(403).json({ error: 'Not authorised' })
+    res.json(campaign.pendingMembers)
+  } catch { res.status(500).json({ error: 'Failed to load requests' }) }
+})
+
+// DM: approve a pending member
+router.post('/:id/approve/:userId', auth, async (req, res) => {
+  try {
+    const campaign = await Campaign.findOne({ _id: req.params.id, owner: req.userId })
+    if (!campaign) return res.status(403).json({ error: 'Not authorised' })
+    campaign.pendingMembers = campaign.pendingMembers.filter(m => String(m) !== req.params.userId)
+    if (!campaign.members.some(m => String(m) === req.params.userId))
+      campaign.members.push(req.params.userId)
+    await campaign.save()
+    res.json({ ok: true })
+  } catch { res.status(500).json({ error: 'Failed to approve' }) }
+})
+
+// DM: reject / remove a pending member
+router.delete('/:id/pending/:userId', auth, async (req, res) => {
+  try {
+    const campaign = await Campaign.findOne({ _id: req.params.id, owner: req.userId })
+    if (!campaign) return res.status(403).json({ error: 'Not authorised' })
+    campaign.pendingMembers = campaign.pendingMembers.filter(m => String(m) !== req.params.userId)
+    await campaign.save()
+    res.json({ ok: true })
+  } catch { res.status(500).json({ error: 'Failed to reject' }) }
 })
 
 router.put('/:id', auth, async (req, res) => {

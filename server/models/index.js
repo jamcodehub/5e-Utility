@@ -23,9 +23,10 @@ const CampaignSchema = new Schema({
   description: String,
   setting:     String,
   coverImage:  String,
-  joinCode:    { type: String, unique: true, sparse: true, index: true },
-  members:     [{ type: Schema.Types.ObjectId, ref: 'User' }],
-  isPersonal:  { type: Boolean, default: false },
+  joinCode:        { type: String, unique: true, sparse: true, index: true },
+  members:         [{ type: Schema.Types.ObjectId, ref: 'User' }],
+  pendingMembers:  [{ type: Schema.Types.ObjectId, ref: 'User' }],
+  isPersonal:      { type: Boolean, default: false },
 }, { timestamps: true })
 
 const JournalSchema = new Schema({

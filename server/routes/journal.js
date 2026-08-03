@@ -1,11 +1,12 @@
 import { Router } from 'express'
 import { Journal } from '../models/index.js'
-import { auth } from './campaigns.js'
+import { auth, isMember } from './campaigns.js'
 import { User } from '../models/index.js'
 
 const router = Router()
 
 router.get('/:campaignId', auth, async (req, res) => {
+  if (!await isMember(req.params.campaignId, req.userId)) return res.status(403).json({ error: 'Not a campaign member' })
   const entries = await Journal.find({ campaign: req.params.campaignId })
     .populate('author', 'username').sort({ day: 1 })
   res.json(entries)

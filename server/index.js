@@ -2,6 +2,8 @@ import express from 'express'
 import mongoose from 'mongoose'
 import cors from 'cors'
 import dotenv from 'dotenv'
+import helmet from 'helmet'
+import { rateLimit } from 'express-rate-limit'
 import authRoutes from './routes/auth.js'
 import campaignRoutes from './routes/campaigns.js'
 import journalRoutes from './routes/journal.js'
@@ -17,13 +19,18 @@ dotenv.config()
 
 const app = express()
 
+app.use(helmet())
+
+// Tight rate limits on auth endpoints — brute-force protection
+const authLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 20, standardHeaders: true, legacyHeaders: false, message: { error: 'Too many attempts, please try again later.' } })
+
 // Raw body needed for Stripe webhook signature verification
 app.use('/api/payments/webhook', express.raw({ type: 'application/json', verify: (req, res, buf) => { req.rawBody = buf } }))
 
 app.use(cors({ origin: process.env.CLIENT_URL || 'http://localhost:5173' }))
 app.use(express.json())
 
-app.use('/api/auth',      authRoutes)
+app.use('/api/auth',      authLimiter, authRoutes)
 app.use('/api/campaigns', campaignRoutes)
 app.use('/api/journal',   journalRoutes)
 app.use('/api/lore',      loreRoutes)

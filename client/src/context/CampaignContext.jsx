@@ -42,10 +42,12 @@ export function CampaignProvider({ children }) {
     if (activeCampaign?._id === id) setActive(campaigns.find(x => x._id !== id) || null)
   }
 
-  // Returns null on success, error string on failure
+  // Returns null on success, 'pending' if awaiting DM approval, error string on failure
   const joinCampaign = async (code) => {
     try {
-      const c = await api('/campaigns/join', { method: 'POST', body: { code } })
+      const res = await api('/campaigns/join', { method: 'POST', body: { code } })
+      if (res.pending) return 'pending'
+      const c = res.campaign || res
       setCampaigns(p => p.some(x => x._id === c._id) ? p.map(x => x._id === c._id ? c : x) : [c, ...p])
       setActive(c)
       return null
