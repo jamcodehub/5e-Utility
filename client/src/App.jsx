@@ -20,6 +20,7 @@ const IdeaGenerator = lazy(() => import('./pages/IdeaGenerator'))
 const RulesReference = lazy(() => import('./pages/RulesReference'))
 const MusicPlayer   = lazy(() => import('./pages/MusicPlayer'))
 const LevelBuilder  = lazy(() => import('./pages/LevelBuilder'))
+const RoleplayAssistant = lazy(() => import('./pages/RoleplayAssistant'))
 
 // Kick off all remaining chunk downloads in idle time after Journal renders.
 // Uses requestIdleCallback so it never competes with the first paint.
@@ -35,6 +36,7 @@ const prefetchAll = () => {
     () => import('./pages/RulesReference'),
     () => import('./pages/MusicPlayer'),
     () => import('./pages/LevelBuilder'),
+    () => import('./pages/RoleplayAssistant'),
   ]
   const schedule = window.requestIdleCallback || ((cb) => setTimeout(cb, 200))
   let i = 0
@@ -79,6 +81,7 @@ function Guard() {
               <Route path="/rules"      element={<RulesReference />} />
               <Route path="/music"      element={<MusicPlayer />} />
               <Route path="/levels"     element={<LevelBuilder />} />
+              <Route path="/roleplay"   element={<RoleplayAssistant />} />
               <Route path="*"           element={<Navigate to="/journal" replace />} />
             </Routes>
           </Suspense>

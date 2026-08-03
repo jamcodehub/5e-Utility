@@ -57,6 +57,8 @@ function drip(ctx, dest, gainVal = 0.06) {
   gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.22)
   osc.connect(gain).connect(dest)
   osc.start(); osc.stop(t + 0.25)
+  // Return the gain node so callers can silence it immediately on cleanup
+  return gain
 }
 
 // Builds and starts the audio graph for a mood; returns a stop() cleanup fn.
@@ -139,7 +141,9 @@ function startMood(ctx, master, mood) {
     flicker()
     const scheduleDrip = () => {
       if (cancelled) return
-      drip(ctx, master, 0.03 + Math.random() * 0.02)
+      const dripGain = drip(ctx, master, 0.03 + Math.random() * 0.02)
+      // Track the drip's gain node so cleanup can mute any in-flight drip instantly
+      nodes.push(dripGain)
       intervals.push(setTimeout(scheduleDrip, 2200 + Math.random() * 3800))
     }
     intervals.push(setTimeout(scheduleDrip, 1500))

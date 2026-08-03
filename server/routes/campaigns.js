@@ -81,6 +81,21 @@ router.delete('/:id', auth, async (req, res) => {
   res.json({ ok: true })
 })
 
+// Roleplay assistant session gate — free first session, premium for more
+router.post('/:id/roleplay-session', auth, async (req, res) => {
+  try {
+    const user = await User.findById(req.userId)
+    let char = await Character.findOne({ campaign: req.params.id, owner: req.userId })
+    if (!char) return res.status(404).json({ error: 'Create a character first before using the Roleplay Assistant.' })
+    if (!user.isPremium && (char.roleplaySessionCount || 0) >= 1) {
+      return res.status(403).json({ error: 'Your first session plan is free. Upgrade to Premium for unlimited roleplay sessions.' })
+    }
+    char.roleplaySessionCount = (char.roleplaySessionCount || 0) + 1
+    await char.save()
+    res.json({ ok: true, sessionCount: char.roleplaySessionCount })
+  } catch (e) { res.status(500).json({ error: e.message }) }
+})
+
 // Character within a campaign
 router.get('/:id/character', auth, async (req, res) => {
   const char = await Character.findOne({ campaign: req.params.id, owner: req.userId })

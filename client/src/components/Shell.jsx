@@ -66,6 +66,7 @@ const NAV_PLAYER = [
   { to: '/character',  label: 'Character' },
   { to: '/inventory',  label: 'Inventory' },
   { to: '/dice',       label: 'Dice' },
+  { to: '/roleplay',   label: 'Roleplay' },
 ]
 
 const NAV_DM = [

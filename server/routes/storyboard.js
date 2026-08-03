@@ -21,6 +21,13 @@ router.post('/:campaignId', auth, async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }) }
 })
 
+router.put('/:id', auth, async (req, res) => {
+  try {
+    const card = await StoryCard.findByIdAndUpdate(req.params.id, { $set: req.body }, { new: true })
+    res.json(card)
+  } catch (e) { res.status(500).json({ error: e.message }) }
+})
+
 router.delete('/:id', auth, async (req, res) => {
   await StoryCard.findByIdAndDelete(req.params.id)
   res.json({ ok: true })

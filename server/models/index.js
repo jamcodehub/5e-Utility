@@ -70,6 +70,7 @@ const CharacterSchema = new Schema({
   // Array of skill names that are proficient e.g. ['Athletics', 'Investigation']
   proficiencies: [{ type: String }],
   notes:        String,
+  roleplaySessionCount: { type: Number, default: 0 },
 }, { timestamps: true })
 
 const LevelPlanSchema = new Schema({
