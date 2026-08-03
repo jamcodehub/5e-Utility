@@ -13,7 +13,7 @@ export const api = async (path, opts = {}) => {
     body: opts.body ? JSON.stringify(opts.body) : undefined,
   })
   let data
-  try { data = await res.json() } catch { data = {} }
+  try { data = await res.json() } catch (_e) { data = {} }
   if (!res.ok) {
     const err = new Error(data.error || `Request failed (${res.status})`)
     err.status = res.status

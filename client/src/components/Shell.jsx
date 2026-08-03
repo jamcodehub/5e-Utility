@@ -73,7 +73,6 @@ const NAV_DM = [
   { to: '/journal',    label: 'Journal' },
   { to: '/storyboard', label: 'Storyboard' },
   { to: '/lore',       label: 'Lore' },
-  { to: '/character',  label: 'Character' },
   { to: '/inventory',  label: 'Inventory' },
   { to: '/dice',       label: 'Dice' },
   { to: '/ideas',      label: 'Ideas' },
@@ -298,7 +297,6 @@ export default function Shell({ children }) {
           </div>
         )}
         {showSettings && <SettingsModal onClose={() => setShowSettings(false)} />}
-        {isDM && <MusicMiniPlayer bottomOffset="calc(84px + env(safe-area-inset-bottom, 12px))" />}
       </div>
     )
   }
@@ -401,7 +399,6 @@ export default function Shell({ children }) {
 
       <main style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>{children}</main>
       {showSettings && <SettingsModal onClose={() => setShowSettings(false)} />}
-      {isDM && <MusicMiniPlayer bottomOffset="20px" />}
 
       {/* Player: waiting for DM approval */}
       {joinPending && (

@@ -16,6 +16,9 @@ cloudinary.config({
 // leaves the server.
 router.post('/sign', auth, (req, res) => {
   try {
+    if (!process.env.CLOUDINARY_API_SECRET || !process.env.CLOUDINARY_API_KEY || !process.env.CLOUDINARY_CLOUD_NAME) {
+      return res.status(500).json({ error: 'Cloudinary env vars not configured on server' })
+    }
     const { folder = 'lore-ledger' } = req.body
     const timestamp = Math.round(Date.now() / 1000)
     const params = { timestamp, folder }

@@ -303,6 +303,7 @@ export default function RoleplayAssistant() {
   const [ctx, setCtx]                 = useState(emptyCtx())
   const [dmGuide, setDmGuide]         = useState({})
   const [checklist, setChecklist]     = useState(null)
+  const [checklistLevel, setChecklistLevel] = useState(null)   // level when last generated
   const [sessionCount, setSessionCount] = useState(0)
   const [loading, setLoading]         = useState(false)
   const [checked, setChecked]         = useState({})
@@ -370,6 +371,7 @@ export default function RoleplayAssistant() {
         body: { background: ctx.background, personality: ctx.personality, goals: ctx.goals, lore: ctx.lore },
       }).catch(() => {})
       setChecklist(buildChecklist(ctx, dmGuide))
+      setChecklistLevel(Number(ctx.level) || null)
       setChecked({})
       setStep('checklist')
     } catch (err) {
@@ -378,7 +380,7 @@ export default function RoleplayAssistant() {
     setLoading(false)
   }
 
-  const reset  = () => { setStep('context'); setChecklist(null); setChecked({}) }
+  const reset  = () => { setStep('context'); setChecklist(null); setChecked({}); setChecklistLevel(null) }
   const toggle = (key) => setChecked(p => ({ ...p, [key]: !p[key] }))
 
   if (!activeCampaign) {
@@ -553,6 +555,18 @@ export default function RoleplayAssistant() {
           <button className="btn btn-ghost btn-sm" onClick={() => { setChecklist(buildChecklist(ctx, dmGuide)); setChecked({}) }}>↺ Regenerate</button>
         </div>
       </div>
+
+      {/* Level-up banner — premium only */}
+      {isPremium && checklistLevel !== null && Number(ctx.level) > checklistLevel && (
+        <div style={{ padding: '10px 14px', marginBottom: 12, maxWidth: 700, background: 'linear-gradient(90deg, var(--gold-bg), rgba(154,124,58,0.08))', border: '2px solid var(--gold-border)', borderRadius: 8, fontSize: 12, color: 'var(--text)', lineHeight: 1.6, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+          <div><span style={{ color: 'var(--gold)', fontWeight: 700 }}>✦ You've reached Level {ctx.level}!</span> Your session plan can be refreshed to reflect your new abilities and hooks.</div>
+          <button
+            className="btn btn-primary btn-sm"
+            style={{ flexShrink: 0 }}
+            onClick={() => { setChecklist(buildChecklist(ctx, dmGuide)); setChecklistLevel(Number(ctx.level)); setChecked({}) }}
+          >Regenerate for Lvl {ctx.level}</button>
+        </div>
+      )}
 
       {/* Pro tip */}
       <div style={{ padding: '10px 14px', marginBottom: 16, maxWidth: 700, background: 'var(--gold-bg)', border: '1px solid var(--gold-border)', borderRadius: 8, fontSize: 12, color: 'var(--text-2)', lineHeight: 1.6 }}>
