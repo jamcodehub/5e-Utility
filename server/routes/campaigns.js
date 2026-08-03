@@ -203,7 +203,8 @@ router.patch('/:id/character/depth', auth, async (req, res) => {
   } catch { res.status(500).json({ error: 'Failed to save depth' }) }
 })
 
-export default router
+// ─── Campaign Guide (DM writes, all members can read) ───────────────────────
+router.get('/:id/guide', auth, async (req, res) => {
   try {
     if (!await isMember(req.params.id, req.userId)) return res.status(403).json({ error: 'Not authorised' })
     const guide = await CampaignGuide.findOne({ campaign: req.params.id }) || {}

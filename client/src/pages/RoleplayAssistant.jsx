@@ -45,15 +45,15 @@ function buildChecklist(ctx, dmGuide = {}) {
   const lastSess = (ctx.lastSession || '').trim()
   const profBonus = ctx.profBonus ?? 2
 
-  // DM-provided data takes priority over player-entered fallbacks
   const dmLastSess   = (dmGuide.lastSession || '').trim()
   const dmSetting    = (dmGuide.currentArc || dmGuide.story || '').trim()
   const activeQuests = (dmGuide.quests || []).filter(q => q.status === 'active' && q.title)
-  const relevantNpcs = (dmGuide.npcs   || []).filter(n => n.name)
+  const allNpcs      = (dmGuide.npcs || []).filter(n => n.name)
 
   const classHook = Object.entries(CLASS_HOOKS).find(([k]) => cls.includes(k))?.[1]
   const raceHook  = Object.entries(RACE_HOOKS).find(([k]) => race.includes(k))?.[1]
 
+  // ── Background flags ────────────────────────────────────────────────────────
   const hasTragedy  = /lost|death|killed|died|orphan|grief|tragedy|revenge/.test(bg)
   const hasSecret   = /secret|hiding|disguise|hidden|past/.test(bg)
   const hasShy      = /shy|quiet|anxious|nervous|introverted|awkward/.test(bg)
@@ -62,7 +62,34 @@ function buildChecklist(ctx, dmGuide = {}) {
   const hasCriminal = /criminal|thief|outlaw|exile|prison|assassin/.test(bg)
   const hasFaith    = /faith|god|goddess|deity|temple|divine|prayer|worship/.test(bg)
   const hasLoss     = /lost|abandoned|left behind|betrayed|alone/.test(bg)
+  const hasMystery  = /mystery|unknown|searching|find|looking|seeking/.test(bg)
 
+  // ── NPCs split by whether they have a personal relation for this character ──
+  // The DM may have typed the player's character name into characterRelation,
+  // or written a personal hook in it. Either way it's more specific than a
+  // generic description. We surface those as direct "seek out" action items.
+  const npcWithRelation    = allNpcs.filter(n => n.characterRelation && n.characterRelation.trim())
+  const npcWithoutRelation = allNpcs.filter(n => !n.characterRelation || !n.characterRelation.trim())
+
+  // ── Quest items ─────────────────────────────────────────────────────────────
+  // Quests with a characterRelation are personal hooks; those without are party tasks.
+  const personalQuests = activeQuests.filter(q => q.characterRelation && q.characterRelation.trim())
+  const partyQuests    = activeQuests.filter(q => !q.characterRelation || !q.characterRelation.trim())
+
+  // ── Backstory-triggered NPC hooks ───────────────────────────────────────────
+  // If the DM has an NPC whose description matches a background flag, surface it
+  // as a personal enquiry rather than a generic "engage an NPC" item.
+  const faithNpc    = allNpcs.find(n => /temple|priest|cleric|shrine|deity|divine|god|faith/.test((n.description || '').toLowerCase()))
+  const criminalNpc = allNpcs.find(n => /guild|fence|underworld|thief|outlaw|crime|shadow/.test((n.description || '').toLowerCase()))
+  const nobleNpc    = allNpcs.find(n => /lord|duke|court|noble|knight|herald|baron/.test((n.description || '').toLowerCase()))
+  const mysteryNpc  = allNpcs.find(n => /scholar|sage|wizard|archivist|historian|librarian|lore/.test((n.description || '').toLowerCase()))
+
+  // ── Shared-quest party interaction ──────────────────────────────────────────
+  // If there are quests, the party likely has shared context worth comparing.
+  // Pick the quest most likely to involve multiple characters.
+  const partyQuestHook = activeQuests.find(q => q.description && q.description.trim()) || activeQuests[0]
+
+  // ── Personality / continuity beats ──────────────────────────────────────────
   const personalityBeat = hasTragedy
     ? `When the group rests, let a quiet grief surface — not melodramatically, just a moment of stillness others might notice.`
     : hasSecret
@@ -90,9 +117,28 @@ function buildChecklist(ctx, dmGuide = {}) {
     ? `Last session: ${effectiveSess.charAt(0).toUpperCase() + effectiveSess.slice(1)}. Carry something forward — reference it in dialogue, let ${name}'s reaction still be present today.`
     : `Identify one unresolved thread from a previous session and find a way to acknowledge it — even if only internally.`
 
+  // ── Backstory enquiry item — derived from background + available NPCs ───────
+  const backstoryEnquiry = (() => {
+    if (hasFaith && faithNpc)
+      return { title: `Seek out ${faithNpc.name}`, desc: `Your faith is part of who ${name} is. ${faithNpc.name} ${faithNpc.characterRelation ? `— ${faithNpc.characterRelation}` : 'may offer spiritual counsel, prophecy, or knowledge connected to your path'}. Approach them as a believer, not just an information source.`, goal: 'Let your beliefs drive an interaction, not just your goals.' }
+    if (hasCriminal && criminalNpc)
+      return { title: `Reach out to ${criminalNpc.name}`, desc: `${name}'s past opens doors the party can't see. ${criminalNpc.name} ${criminalNpc.characterRelation ? `— ${criminalNpc.characterRelation}` : 'operates in circles your background gives you access to'}. Use that — carefully.`, goal: "Your history is a tool. Use it before it uses you." }
+    if (hasNoble && nobleNpc)
+      return { title: `Navigate ${nobleNpc.name}`, desc: `Your noble instincts tell you exactly how much power ${nobleNpc.name} holds in this room. ${nobleNpc.characterRelation ? nobleNpc.characterRelation : 'Play the courtly game — what do they want, and what can you trade?'}`, goal: 'Politics is just combat with words.' }
+    if ((hasMystery || hasTragedy || hasSecret) && mysteryNpc)
+      return { title: `Enquire of ${mysteryNpc.name}`, desc: `There are answers ${name} has been searching for. ${mysteryNpc.name} ${mysteryNpc.characterRelation ? `— ${mysteryNpc.characterRelation}` : 'deals in knowledge — if anyone can shed light on your past, it may be them'}. Find a moment to ask.`, goal: "Some questions are more dangerous than their answers." }
+    if (hasFaith)
+      return { title: 'Find a moment of private devotion', desc: `A prayer, a touched symbol, a quiet word to your god. ${name}'s faith doesn't need a temple — it just needs a moment. Let the session see it.`, goal: 'Faith shown in small actions is more powerful than grand proclamations.' }
+    if (hasCriminal)
+      return { title: 'Tap your old network', desc: `${name} knows people the party doesn't. A contact, a favour owed, a back-channel. Find one moment this session to use that shadow-world access for the group's benefit — or just to stay ahead.`, goal: 'Your past is a resource. Use it before it catches up with you.' }
+    if (ctx.lore && ctx.lore.trim() && allNpcs.length)
+      return { title: `Enquire of ${allNpcs[0].name} about your past`, desc: `${name}'s history: "${ctx.lore.slice(0, 100).trim()}${ctx.lore.length > 100 ? '…' : ''}". Ask ${allNpcs[0].name} whether they know anything about it — obliquely if needed. You might be surprised.`, goal: 'Backstory becomes story when it enters the world.' }
+    return null
+  })()
+
   return [
     {
-      phase: 'Phase 1: Pre-Session Mindset',
+      phase: 'Phase 1: Pre-Session Preparation',
       headerColor: '#7e22ce',
       headerBg: 'rgba(126,34,206,0.08)',
       items: [
@@ -119,41 +165,53 @@ function buildChecklist(ctx, dmGuide = {}) {
       ].filter(Boolean),
     },
     {
-      phase: 'Phase 2: Exploration & Environment',
+      phase: 'Phase 2: Leads & Investigation',
       headerColor: '#1d6a3a',
       headerBg: 'rgba(29,106,58,0.08)',
       items: [
+        // Personal NPC hooks (DM has written a specific relation for this character)
+        ...npcWithRelation.slice(0, 3).map(n => ({
+          title: `Seek out ${n.name}`,
+          desc: n.characterRelation.trim() + (n.description ? ` — ${n.description.slice(0, 80).trim()}` : ''),
+          goal: `${n.name} is relevant to your story specifically. Don't let this session pass without engaging them.`,
+        })),
+        // Personal quest hooks
+        ...personalQuests.slice(0, 2).map(q => ({
+          title: `Follow your thread: "${q.title}"`,
+          desc: q.characterRelation.trim() + (q.description ? ` Context: ${q.description.slice(0, 80).trim()}` : ''),
+          goal: 'Your personal stake in this quest is what makes it matter. Make that visible.',
+        })),
+        // Party quests (no personal relation — still needs engagement)
+        ...partyQuests.slice(0, 1).map(q => ({
+          title: `Advance the party's quest: "${q.title}"`,
+          desc: q.description
+            ? `${q.description.slice(0, 120).trim()} — Ask questions, gather information, push the thread forward as ${name}.`
+            : `Ask a local — a tavern keeper, a merchant, a guard — what they know about the people or places involved in "${q.title}". Background characters often know more than they let on.`,
+          goal: 'Quest progress should feel like character action, not task completion.',
+        })),
+        // Generic NPCs (description only, no personal relation)
+        npcWithRelation.length === 0 && npcWithoutRelation.length > 0 ? {
+          title: `Engage ${npcWithoutRelation[0].name}`,
+          desc: npcWithoutRelation[0].description
+            ? `${npcWithoutRelation[0].description.slice(0, 120).trim()} — Go beyond transaction. Ask them something real.`
+            : `The DM has placed ${npcWithoutRelation[0].name} in this world for a reason. Treat them like a person, not a quest marker.`,
+          goal: 'Build a world that feels inhabited.',
+        } : null,
+        // Fall back to generic if no DM data at all
+        allNpcs.length === 0 && activeQuests.length === 0 ? {
+          title: "React to the world, don't just navigate it",
+          desc: `Comment on smells, architecture, weather, sounds. ${(dmSetting || ctx.campaignContext || '').trim() ? `Current arc: "${(dmSetting || ctx.campaignContext).trim()}". ` : ''}Let the setting land on ${name}.`,
+          goal: 'Immersion for everyone at the table.',
+        } : null,
         classHook ? {
-          title: `${ctx.characterClass || 'Class'} roleplay hook`,
+          title: `${ctx.characterClass || 'Class'} exploration hook`,
           desc: classHook.explore,
           goal: 'Make your class identity visible outside of combat.',
-        } : null,
-        {
-          title: "React to the world, don't just navigate it",
-          desc: 'Comment on smells, architecture, weather, sounds. Let the setting land on your character.',
-          goal: 'Immersion for everyone at the table.',
-        },
-        {
-          title: 'Engage one NPC beyond transaction',
-          desc: "Ask a shopkeeper about their day. Remember a guard's name. Treat one background character like a person.",
-          goal: 'Build a world that feels inhabited.',
-        },
-        (dmSetting || ctx.campaignContext || '').trim() ? {
-          title: 'Lean into the campaign setting',
-          desc: `Current arc: "${(dmSetting || ctx.campaignContext).trim()}". Let this world's specific flavour shape how ${name} perceives and speaks about what's around them.`,
-          goal: 'Your character exists inside this world, not just passing through it.',
-        } : null,
-        activeQuests.length ? {
-          title: `Active quest: "${activeQuests[0].title}"`,
-          desc: activeQuests[0].characterRelation
-            ? `Your DM has noted for your character: "${activeQuests[0].characterRelation}". Find a moment this session to move this thread forward, even subtly.`
-            : `The party is working on "${activeQuests[0].title}"${activeQuests[0].description ? ` — ${activeQuests[0].description.slice(0, 100).trim()}` : ''}. Engage with it as your character, not just as a task.`,
-          goal: 'Quest progress should feel like character action, not task completion.',
         } : null,
       ].filter(Boolean),
     },
     {
-      phase: 'Phase 3: Social & Character Depth',
+      phase: 'Phase 3: Social, Party & Personal Depth',
       headerColor: '#9a7c3a',
       headerBg: 'rgba(154,124,58,0.08)',
       items: [
@@ -167,23 +225,22 @@ function buildChecklist(ctx, dmGuide = {}) {
           desc: `You described ${name} as: "${ctx.personality.trim()}". Find one scene this session where that trait drives a choice — not as performance, but as inevitability.`,
           goal: 'Traits are only real when they cost something.',
         } : null,
+        // Backstory enquiry — faith, criminal, mystery, or generic lore hook
+        backstoryEnquiry,
+        // Party information sharing — prompted by shared quest context
+        partyQuestHook ? {
+          title: 'Compare notes with your party',
+          desc: `The party is all tangled in "${partyQuestHook.title}" — but each character has seen different angles. Before the session escalates, actively ask your allies what they already know. Someone may have a piece you're missing.`,
+          goal: 'Shared information changes strategy. Don\'t assume you\'re the only one with a stake in this.',
+        } : {
+          title: 'Share what your character knows',
+          desc: `${name} has their own read on events — share it with the party in character, not as a player. Your perspective may shift how the group moves next.`,
+          goal: 'Party chemistry is built through in-character communication, not just combat.',
+        },
         {
           title: `Proficiency bonus reminder (+${profBonus})`,
-          desc: `You add +${profBonus} to proficient skill checks. When ${name} does something they're trained in, let the confidence show in how they approach it — not just in the roll.`,
+          desc: `You add +${profBonus} to proficient skill checks. When ${name} does something they're trained in, let the confidence show — not just in the roll.`,
           goal: 'Use mechanics to fuel roleplay, not replace it.',
-        },
-        relevantNpcs.length ? {
-          title: `Key NPC${relevantNpcs.length > 1 ? 's' : ''} this session`,
-          desc: relevantNpcs.slice(0, 2).map(n =>
-            n.characterRelation
-              ? `${n.name}: ${n.characterRelation}`
-              : `${n.name}${n.description ? ` — ${n.description.slice(0, 80).trim()}` : ''}`
-          ).join(' · '),
-          goal: 'Relationships are the connective tissue of roleplay. Let your history with these characters show.',
-        } : null,
-        {
-          desc: `When a party member does something in-character or impressive, let ${name} react. Nod, comment, remember it aloud later.`,
-          goal: 'Party chemistry that feels earned, not performed.',
         },
       ].filter(Boolean),
     },
@@ -211,6 +268,14 @@ function buildChecklist(ctx, dmGuide = {}) {
           title: 'Let your lore surface under pressure',
           desc: `${name}'s history: "${ctx.lore.length > 120 ? ctx.lore.slice(0, 120).trim() + '…' : ctx.lore.trim()}". In moments of danger, old wounds, instincts, and memories rise — let them.`,
           goal: 'Crisis reveals character. Use it.',
+        } : null,
+        // If there's a personal quest, crises may directly relate to it
+        personalQuests.length ? {
+          title: `If things escalate around "${personalQuests[0].title}"…`,
+          desc: personalQuests[0].characterRelation
+            ? `The DM has flagged this is personal to ${name}: "${personalQuests[0].characterRelation}". If combat or crisis erupts in this context, don't just fight — let the stakes land emotionally.`
+            : `This quest has personal weight for ${name}. If it turns dangerous, play the fear or fury — not just the tactics.`,
+          goal: 'The best combat moments are emotionally charged, not just mechanically satisfying.',
         } : null,
       ].filter(Boolean),
     },
