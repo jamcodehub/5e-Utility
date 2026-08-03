@@ -1,6 +1,6 @@
 import express from 'express'
 import { v2 as cloudinary } from 'cloudinary'
-import auth from '../middleware/auth.js'
+import { auth } from './campaigns.js'
 
 const router = express.Router()
 
