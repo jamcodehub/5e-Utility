@@ -130,7 +130,9 @@ export default function Shell({ children }) {
   const rejectMember = async (userId) => {
     await api(`/campaigns/${activeCampaign._id}/pending/${userId}`, { method: 'DELETE' })
     setPendingMembers(p => p.filter(m => m._id !== userId))
-  } = async (e) => {
+  }
+
+  const handleCreate = async (e) => {
     e.preventDefault()
     if (!newName.trim()) return
     const err = await createCampaign({ name: newName.trim() })
