@@ -16,6 +16,7 @@ const DEFAULT = {
   hp: { current: 10, max: 10 }, ac: 10, profBonus: 2,
   stats: { str: 10, dex: 10, con: 10, int: 10, wis: 10, cha: 10 },
   proficiencies: [], avatarUrl: '',
+  background: '', personality: '', goals: '', lore: '',
 }
 
 export default function Character() {
@@ -167,9 +168,16 @@ export default function Character() {
         </div>
       </div>
 
+      {/* Onboarding banner for new players */}
+      {loaded && !form.name && (
+        <div style={{ padding: '12px 16px', marginBottom: 12, background: 'var(--gold-bg)', border: '1px solid var(--gold-border)', borderRadius: 10, fontSize: 13, color: 'var(--text)', lineHeight: 1.6 }}>
+          🎲 <strong>Welcome!</strong> Click <strong>Edit</strong> to set up your character. Your DM and the Roleplay Assistant both read this sheet — the more you fill in, the better your session plans become.
+        </div>
+      )}
+
       {/* Tabs */}
       <div style={{ display: 'flex', gap: 4, marginBottom: 16, flexWrap: 'wrap' }}>
-        {['stats', 'notes', 'dndbeyond'].map(t => (
+        {['stats', 'backstory', 'notes', 'dndbeyond'].map(t => (
           <button key={t} onClick={() => setTab(t)} className={`btn btn-sm ${tab === t ? 'btn-primary' : 'btn-ghost'}`}>
             {t === 'dndbeyond' ? 'D&D Beyond' : t.charAt(0).toUpperCase() + t.slice(1)}
           </button>
@@ -187,6 +195,23 @@ export default function Character() {
               }
             </div>
           ))}
+        </div>
+      )}
+
+      {tab === 'backstory' && (
+        <div className="card" style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 4, lineHeight: 1.6 }}>
+            Your DM can see this in their Campaign Guide. The Roleplay Assistant uses it to personalise your session plans.
+          </div>
+          {[['background', 'Background / Origin', "Where did you come from? What shaped you before the campaign?"], ['personality', 'Personality Traits', "How do you speak, carry yourself, treat others? Key quirks and mannerisms."], ['goals', 'Goals & Motivations', "What does your character want — short and long term?"], ['lore', 'Lore / Secrets / Backstory', "Secrets, fears, obligations, scars — anything that drives or haunts you."]].map(([field, label, ph]) => (
+            <div key={field}>
+              <label style={{ fontSize: 11, color: 'var(--text-3)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em', display: 'block', marginBottom: 4 }}>{label}</label>
+              <textarea className="input" rows={3} style={{ resize: 'vertical', fontSize: 13, lineHeight: 1.6 }}
+                placeholder={ph} value={F[field] || ''}
+                onChange={e => setForm(p => ({ ...p, [field]: e.target.value }))} />
+            </div>
+          ))}
+          <button className="btn btn-primary btn-sm" style={{ alignSelf: 'flex-start' }} onClick={save}>Save Backstory</button>
         </div>
       )}
 

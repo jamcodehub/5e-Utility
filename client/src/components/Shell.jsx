@@ -80,6 +80,7 @@ const NAV_DM = [
   { to: '/levels',     label: 'Levels' },
   { to: '/rules',      label: 'Rules' },
   { to: '/music',      label: 'Music' },
+  { to: '/campaign-guide', label: 'Campaign' },
 ]
 
 function useIsMobile() {

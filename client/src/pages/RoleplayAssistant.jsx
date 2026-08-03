@@ -37,13 +37,19 @@ const RACE_HOOKS = {
 
 // ─── Checklist builder ───────────────────────────────────────────────────────
 
-function buildChecklist(ctx) {
+function buildChecklist(ctx, dmGuide = {}) {
   const cls      = (ctx.characterClass || '').toLowerCase().replace(/\s+/g, '')
   const race     = (ctx.race || '').toLowerCase()
   const name     = ctx.name || 'Your character'
   const bg       = ((ctx.background || '') + ' ' + (ctx.personality || '') + ' ' + (ctx.lore || '')).toLowerCase()
   const lastSess = (ctx.lastSession || '').trim()
   const profBonus = ctx.profBonus ?? 2
+
+  // DM-provided data takes priority over player-entered fallbacks
+  const dmLastSess   = (dmGuide.lastSession || '').trim()
+  const dmSetting    = (dmGuide.currentArc || dmGuide.story || '').trim()
+  const activeQuests = (dmGuide.quests || []).filter(q => q.status === 'active' && q.title)
+  const relevantNpcs = (dmGuide.npcs   || []).filter(n => n.name)
 
   const classHook = Object.entries(CLASS_HOOKS).find(([k]) => cls.includes(k))?.[1]
   const raceHook  = Object.entries(RACE_HOOKS).find(([k]) => race.includes(k))?.[1]
@@ -79,8 +85,9 @@ function buildChecklist(ctx) {
     ? `Your driving goal is: "${ctx.goals.trim()}". Look for one moment this session — even small — to move toward it or be reminded of what it costs.`
     : `Before the session starts, remind yourself what ${name} wants right now. Let that want shape at least one decision.`
 
-  const continuityBeat = lastSess
-    ? `Last session: ${lastSess.charAt(0).toUpperCase() + lastSess.slice(1)}. Carry something forward — reference it in dialogue, let ${name}'s reaction still be present today.`
+  const effectiveSess = dmLastSess || lastSess
+  const continuityBeat = effectiveSess
+    ? `Last session: ${effectiveSess.charAt(0).toUpperCase() + effectiveSess.slice(1)}. Carry something forward — reference it in dialogue, let ${name}'s reaction still be present today.`
     : `Identify one unresolved thread from a previous session and find a way to acknowledge it — even if only internally.`
 
   return [
@@ -131,10 +138,17 @@ function buildChecklist(ctx) {
           desc: "Ask a shopkeeper about their day. Remember a guard's name. Treat one background character like a person.",
           goal: 'Build a world that feels inhabited.',
         },
-        ctx.campaignContext && ctx.campaignContext.trim() ? {
+        (dmSetting || ctx.campaignContext || '').trim() ? {
           title: 'Lean into the campaign setting',
-          desc: `The campaign is: "${ctx.campaignContext.trim()}". Let this world's specific flavour shape how ${name} perceives and speaks about what's around them.`,
+          desc: `Current arc: "${(dmSetting || ctx.campaignContext).trim()}". Let this world's specific flavour shape how ${name} perceives and speaks about what's around them.`,
           goal: 'Your character exists inside this world, not just passing through it.',
+        } : null,
+        activeQuests.length ? {
+          title: `Active quest: "${activeQuests[0].title}"`,
+          desc: activeQuests[0].characterRelation
+            ? `Your DM has noted for your character: "${activeQuests[0].characterRelation}". Find a moment this session to move this thread forward, even subtly.`
+            : `The party is working on "${activeQuests[0].title}"${activeQuests[0].description ? ` — ${activeQuests[0].description.slice(0, 100).trim()}` : ''}. Engage with it as your character, not just as a task.`,
+          goal: 'Quest progress should feel like character action, not task completion.',
         } : null,
       ].filter(Boolean),
     },
@@ -158,8 +172,16 @@ function buildChecklist(ctx) {
           desc: `You add +${profBonus} to proficient skill checks. When ${name} does something they're trained in, let the confidence show in how they approach it — not just in the roll.`,
           goal: 'Use mechanics to fuel roleplay, not replace it.',
         },
+        relevantNpcs.length ? {
+          title: `Key NPC${relevantNpcs.length > 1 ? 's' : ''} this session`,
+          desc: relevantNpcs.slice(0, 2).map(n =>
+            n.characterRelation
+              ? `${n.name}: ${n.characterRelation}`
+              : `${n.name}${n.description ? ` — ${n.description.slice(0, 80).trim()}` : ''}`
+          ).join(' · '),
+          goal: 'Relationships are the connective tissue of roleplay. Let your history with these characters show.',
+        } : null,
         {
-          title: "Acknowledge another character's moment",
           desc: `When a party member does something in-character or impressive, let ${name} react. Nod, comment, remember it aloud later.`,
           goal: 'Party chemistry that feels earned, not performed.',
         },
@@ -214,6 +236,7 @@ export default function RoleplayAssistant() {
   // step: 'context' | 'checklist'
   const [step, setStep]               = useState('context')
   const [ctx, setCtx]                 = useState(emptyCtx())
+  const [dmGuide, setDmGuide]         = useState({})
   const [checklist, setChecklist]     = useState(null)
   const [sessionCount, setSessionCount] = useState(0)
   const [loading, setLoading]         = useState(false)
@@ -228,7 +251,11 @@ export default function RoleplayAssistant() {
       if (saved) {
         try { setCtx(JSON.parse(saved)); setCharLoaded(true); } catch {}
       }
-      const char = await api(`/campaigns/${activeCampaign._id}/character`)
+      const [char, guide] = await Promise.all([
+        api(`/campaigns/${activeCampaign._id}/character`),
+        api(`/campaigns/${activeCampaign._id}/guide`).catch(() => ({})),
+      ])
+      if (guide) setDmGuide(guide)
       if (char) {
         setSessionCount(char.roleplaySessionCount || 0)
         if (!saved) {
@@ -239,7 +266,10 @@ export default function RoleplayAssistant() {
             characterClass: char.class || '',
             level: String(char.level || ''),
             profBonus: char.profBonus ?? 2,
-            background: char.notes || '',
+            background: char.background || char.notes || '',
+            personality: char.personality || '',
+            goals: char.goals || '',
+            lore: char.lore || '',
           }))
         }
         setCharLoaded(true)
@@ -269,7 +299,12 @@ export default function RoleplayAssistant() {
     try {
       const res = await api(`/campaigns/${activeCampaign._id}/roleplay-session`, { method: 'POST' })
       setSessionCount(res.sessionCount)
-      setChecklist(buildChecklist(ctx))
+      // Persist depth back to character so DM can see it in Campaign Guide
+      api(`/campaigns/${activeCampaign._id}/character/depth`, {
+        method: 'PATCH',
+        body: { background: ctx.background, personality: ctx.personality, goals: ctx.goals, lore: ctx.lore },
+      }).catch(() => {})
+      setChecklist(buildChecklist(ctx, dmGuide))
       setChecked({})
       setStep('checklist')
     } catch (err) {
@@ -292,129 +327,145 @@ export default function RoleplayAssistant() {
   // ── Step 1: Context form ────────────────────────────────────────────────────
   if (step === 'context') {
     return (
-      <div className="page-content">
-        <div className="page-header-row" style={{ marginBottom: 4 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden', padding: '20px 24px 0' }}>
+        {/* Header */}
+        <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 16, flexShrink: 0 }}>
           <div>
-            <h2 style={{ fontSize: 22, marginBottom: 4 }}>Roleplay Assistant</h2>
-            <p style={{ color: 'var(--text-2)', fontSize: 14, margin: 0 }}>
-              Tell the assistant about your character first — the more detail you give, the more personalised your session plan will be.
+            <h2 style={{ fontSize: 20, marginBottom: 2 }}>Roleplay Assistant</h2>
+            <p style={{ color: 'var(--text-2)', fontSize: 13, margin: 0 }}>
+              Fill in your character details — the more you add, the more personalised your session plan.
             </p>
           </div>
           {sessionCount > 0 && (
-            <div style={{ fontSize: 12, color: 'var(--text-3)', textAlign: 'right' }}>
+            <div style={{ fontSize: 12, color: 'var(--text-3)', textAlign: 'right', flexShrink: 0, marginLeft: 16 }}>
               {sessionCount} session{sessionCount !== 1 ? 's' : ''} run
-              {!isPremium && sessionCount >= 1 && (
-                <div style={{ color: '#c0392b', marginTop: 2 }}>Upgrade for more sessions</div>
-              )}
+              {!isPremium && <div style={{ color: '#c0392b', marginTop: 2 }}>Upgrade for more</div>}
             </div>
           )}
         </div>
 
-        {/* Premium gate warning */}
-        {!canGenerate && (
-          <div className="card" style={{ padding: '14px 18px', marginBottom: 16, borderLeft: '3px solid #c0392b', maxWidth: 620 }}>
-            <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 4, color: '#c0392b' }}>Premium required</div>
-            <div style={{ fontSize: 12, color: 'var(--text-2)', lineHeight: 1.6, marginBottom: 10 }}>
-              Your first session was free. Upgrade to Premium to generate unlimited session plans.
-            </div>
-            <button className="btn btn-gold" onClick={() => window.location.href = '/premium'}>✦ Upgrade to Premium</button>
-          </div>
-        )}
+        {/* Two-column body — fills remaining height */}
+        <div style={{ display: 'flex', gap: 16, flex: 1, overflow: 'hidden', paddingBottom: 20 }}>
 
-        <div style={{ maxWidth: 620, display: 'flex', flexDirection: 'column', gap: 14 }}>
+          {/* LEFT — scrollable form */}
+          <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 12, paddingRight: 4 }}>
 
-          {/* Character basics */}
-          <div className="card" style={{ padding: '18px 20px' }}>
-            <SectionLabel>Character Basics</SectionLabel>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-              <Field label="Character Name *" value={ctx.name} onChange={set('name')} placeholder="e.g. Caelindra" />
-              <Field label="Race" value={ctx.race} onChange={set('race')} placeholder="e.g. High Elf" />
-              <Field label="Class *" value={ctx.characterClass} onChange={set('characterClass')} placeholder="e.g. Wizard" />
-              <Field label="Level" value={ctx.level} onChange={set('level')} placeholder="e.g. 5" type="number" />
+            <div className="card" style={{ padding: '14px 16px', flexShrink: 0 }}>
+              <SectionLabel>Character Basics</SectionLabel>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                <Field label="Name *" value={ctx.name} onChange={set('name')} placeholder="e.g. Caelindra" />
+                <Field label="Race" value={ctx.race} onChange={set('race')} placeholder="e.g. High Elf" />
+                <Field label="Class *" value={ctx.characterClass} onChange={set('characterClass')} placeholder="e.g. Wizard" />
+                <Field label="Level" value={ctx.level} onChange={set('level')} placeholder="e.g. 5" type="number" />
+              </div>
             </div>
-          </div>
 
-          {/* Character depth */}
-          <div className="card" style={{ padding: '18px 20px' }}>
-            <SectionLabel>Character Depth</SectionLabel>
-            <div style={{ fontSize: 11, color: 'var(--text-3)', marginBottom: 14, lineHeight: 1.5 }}>
-              Copy from your character sheet, DnD Beyond, or write it freehand. The more you include, the more specific your plan becomes.
+            <div className="card" style={{ padding: '14px 16px', flexShrink: 0 }}>
+              <SectionLabel>Character Depth</SectionLabel>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <TextArea label="Background / Origin *" value={ctx.background} onChange={set('background')}
+                  placeholder={"Where did they come from? What shaped them?\ne.g. Raised in a thieves guild. Left after refusing to kill an innocent mark."} rows={2} />
+                <TextArea label="Personality Traits" value={ctx.personality} onChange={set('personality')}
+                  placeholder={"How do they speak, carry themselves, treat others?\ne.g. Speaks formally. Hates being touched. Laughs at wrong moments."} rows={2} />
+                <TextArea label="Goals & Motivations" value={ctx.goals} onChange={set('goals')}
+                  placeholder={"What do they want — short and long term?\ne.g. Prove they deserve their title. Find the brother who vanished."} rows={2} />
+                <TextArea label="Lore / Secrets / Backstory" value={ctx.lore} onChange={set('lore')}
+                  placeholder={"Secrets, fears, scars, obligations.\ne.g. Carries a debt to a demon lord. Terrified of fire — her village burned."} rows={2} />
+              </div>
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              <TextArea
-                label="Background / Origin *"
-                value={ctx.background}
-                onChange={set('background')}
-                placeholder={"Where did your character come from? What shaped them before the campaign began?\ne.g. 'Raised in a thieves guild after being abandoned as a child. Left after refusing to kill an innocent mark.'"}
-                rows={3}
-              />
-              <TextArea
-                label="Personality Traits"
-                value={ctx.personality}
-                onChange={set('personality')}
-                placeholder={"How do they speak, carry themselves, treat others? Key quirks or mannerisms.\ne.g. 'Speaks formally even in casual settings. Hates being touched. Laughs at the wrong moments when nervous.'"}
-                rows={2}
-              />
-              <TextArea
-                label="Goals & Motivations"
-                value={ctx.goals}
-                onChange={set('goals')}
-                placeholder={"What does your character want — short and long term?\ne.g. 'Prove they deserve their title. Find the brother who vanished during the war.'"}
-                rows={2}
-              />
-              <TextArea
-                label="Lore / Secrets / Backstory Detail"
-                value={ctx.lore}
-                onChange={set('lore')}
-                placeholder={"Secrets, relationships, fears, scars, obligations. Anything that drives or haunts them.\ne.g. 'Carries a debt to a demon lord she hasn't told the party about. Terrified of fire — her village burned.'"}
-                rows={3}
-              />
-            </div>
+
           </div>
 
-          {/* Campaign context */}
-          <div className="card" style={{ padding: '18px 20px' }}>
-            <SectionLabel>Campaign Context</SectionLabel>
-            <div style={{ fontSize: 11, color: 'var(--text-3)', marginBottom: 14, lineHeight: 1.5 }}>
-              Helps tailor suggestions to the world and current story arc. Update "Last Session" each week.
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              <TextArea
-                label="Campaign Description / Setting"
-                value={ctx.campaignContext}
-                onChange={set('campaignContext')}
-                placeholder={"What is this campaign about? The tone, setting, stakes.\ne.g. 'Political intrigue in a dying empire. The party is trying to prevent a succession war while being manipulated by multiple factions.'"}
-                rows={2}
-              />
-              <TextArea
-                label="What Happened Last Session?"
-                value={ctx.lastSession}
-                onChange={set('lastSession')}
-                placeholder={"A quick 2–3 sentence recap — creates continuity hooks in your plan.\ne.g. 'We infiltrated the Duke's masquerade ball. Valeria recognised my character and didn't give us away — we don't know why yet.'"}
-                rows={2}
-              />
-            </div>
-          </div>
+          {/* RIGHT — sticky generate panel */}
+          <div style={{ width: 240, flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 12 }}>
 
-          {/* Generate */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, paddingBottom: 32 }}>
-            {!contextReady && (
-              <div style={{ fontSize: 12, color: 'var(--text-3)' }}>Fill in Name, Class, and Background to continue.</div>
-            )}
-            <button
-              className="btn btn-primary"
-              style={{ opacity: (!contextReady || !canGenerate) ? 0.5 : 1, maxWidth: 280 }}
-              disabled={!contextReady || !canGenerate || loading}
-              onClick={generate}
-            >
-              {loading ? 'Building your plan…' : sessionCount === 0 ? '✦ Generate Session Plan  (Free)' : '✦ Generate Session Plan'}
-            </button>
-            {sessionCount === 0 && (
-              <div style={{ fontSize: 11, color: 'var(--text-3)' }}>First session is free · Subsequent sessions require Premium</div>
-            )}
-          </div>
+            {/* Generate card */}
+            <div className="card" style={{ padding: '18px 16px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <div style={{ fontFamily: 'Cinzel, serif', fontSize: 12, fontWeight: 600, color: 'var(--gold)', letterSpacing: '0.05em', textTransform: 'uppercase' }}>Ready to Play</div>
 
+              {/* Completion indicators */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {[
+                  { label: 'Name',        done: !!ctx.name.trim(),            req: true },
+                  { label: 'Class',       done: !!ctx.characterClass.trim(),  req: true },
+                  { label: 'Background',  done: !!ctx.background.trim(),      req: true },
+                  { label: 'Personality', done: !!ctx.personality.trim() },
+                  { label: 'Goals',       done: !!ctx.goals.trim() },
+                  { label: 'Lore',        done: !!ctx.lore.trim() },
+                ].map(({ label, done, req }) => (
+                  <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 12 }}>
+                    <div style={{ width: 14, height: 14, borderRadius: 3, flexShrink: 0, border: `2px solid ${done ? 'var(--gold)' : 'var(--border-strong)'}`, background: done ? 'var(--gold)' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      {done && <span style={{ fontSize: 9, color: 'var(--bg)', fontWeight: 700 }}>✓</span>}
+                    </div>
+                    <span style={{ color: done ? 'var(--text)' : 'var(--text-3)' }}>{label}</span>
+                    {req && <span style={{ fontSize: 9, color: '#c0392b' }}>*</span>}
+                  </div>
+                ))}
+                {/* DM guide status — separate row */}
+                {(() => {
+                  const hasGuide = !!(dmGuide.story || dmGuide.currentArc || dmGuide.lastSession || (dmGuide.npcs || []).length || (dmGuide.quests || []).length)
+                  return (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 12, marginTop: 2, paddingTop: 6, borderTop: '1px solid var(--border)' }}>
+                      <div style={{ width: 14, height: 14, borderRadius: 3, flexShrink: 0, border: `2px solid ${hasGuide ? 'var(--gold)' : 'var(--border-strong)'}`, background: hasGuide ? 'var(--gold)' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        {hasGuide && <span style={{ fontSize: 9, color: 'var(--bg)', fontWeight: 700 }}>✓</span>}
+                      </div>
+                      <span style={{ color: hasGuide ? 'var(--text)' : 'var(--text-3)' }}>DM Guide</span>
+                      {!hasGuide && <span style={{ fontSize: 10, color: 'var(--text-3)' }}>(optional)</span>}
+                    </div>
+                  )
+                })()}
+              </div>
+
+              <div style={{ borderTop: '1px solid var(--border)', paddingTop: 12 }}>
+                {canGenerate ? (
+                  <>
+                    <button
+                      className="btn btn-primary"
+                      style={{ width: '100%', justifyContent: 'center', opacity: !contextReady ? 0.45 : 1, fontSize: 13 }}
+                      disabled={!contextReady || loading}
+                      onClick={generate}
+                    >
+                      {loading ? 'Building…' : sessionCount === 0 ? '✦ Generate (Free)' : '✦ Generate Plan'}
+                    </button>
+                    {sessionCount === 0 && (
+                      <div style={{ fontSize: 10, color: 'var(--text-3)', marginTop: 6, textAlign: 'center', lineHeight: 1.4 }}>First session free · Premium for unlimited</div>
+                    )}
+                    {!contextReady && (
+                      <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 6, textAlign: 'center' }}>Fill in the required fields (*) first</div>
+                    )}
+                  </>
+                ) : (
+                  <>
+                    <button className="btn btn-gold" style={{ width: '100%', justifyContent: 'center' }} onClick={() => window.location.href = '/premium'}>✦ Upgrade to Premium</button>
+                    <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 6, textAlign: 'center', lineHeight: 1.4 }}>Your first session was free. Premium unlocks unlimited plans.</div>
+                  </>
+                )}
+              </div>
+            </div>
+
+            {/* DM context preview */}
+            {(() => {
+              const hasGuide = !!(dmGuide.story || dmGuide.currentArc || dmGuide.lastSession || (dmGuide.npcs || []).length || (dmGuide.quests || []).length)
+              if (!hasGuide) return (
+                <div style={{ padding: '12px 14px', background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 8, fontSize: 11, color: 'var(--text-3)', lineHeight: 1.6 }}>
+                  <strong style={{ color: 'var(--text-2)' }}>DM Guide not set up yet</strong><br />
+                  Ask your DM to fill in the Campaign Guide tab — it adds campaign context, last session recaps, NPC hooks, and quest ties to your plan automatically.
+                </div>
+              )
+              return (
+                <div style={{ padding: '12px 14px', background: 'var(--gold-bg)', border: '1px solid var(--gold-border)', borderRadius: 8, fontSize: 11, color: 'var(--text-2)', lineHeight: 1.7 }}>
+                  <div style={{ fontFamily: 'Cinzel, serif', fontSize: 10, fontWeight: 600, color: 'var(--gold)', letterSpacing: '0.05em', textTransform: 'uppercase', marginBottom: 8 }}>DM Context Active</div>
+                  {dmGuide.currentArc && <div style={{ marginBottom: 5 }}><strong style={{ color: 'var(--text)' }}>Arc:</strong> {dmGuide.currentArc.slice(0, 80)}{dmGuide.currentArc.length > 80 ? '…' : ''}</div>}
+                  {dmGuide.lastSession && <div style={{ marginBottom: 5 }}><strong style={{ color: 'var(--text)' }}>Last session:</strong> {dmGuide.lastSession.slice(0, 80)}{dmGuide.lastSession.length > 80 ? '…' : ''}</div>}
+                  {(dmGuide.npcs || []).filter(n => n.name).length > 0 && <div style={{ marginBottom: 5 }}><strong style={{ color: 'var(--text)' }}>NPCs:</strong> {(dmGuide.npcs || []).filter(n => n.name).map(n => n.name).join(', ')}</div>}
+                  {(dmGuide.quests || []).filter(q => q.status === 'active' && q.title).length > 0 && <div><strong style={{ color: 'var(--text)' }}>Active quests:</strong> {(dmGuide.quests || []).filter(q => q.status === 'active' && q.title).map(q => q.title).join(', ')}</div>}
+                </div>
+              )
+            })()}
+
+          </div>
         </div>
+
         <ToastContainer />
       </div>
     )
@@ -434,7 +485,7 @@ export default function RoleplayAssistant() {
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
           <button className="btn btn-ghost btn-sm" onClick={reset}>← Edit Context</button>
-          <button className="btn btn-ghost btn-sm" onClick={() => { setChecklist(buildChecklist(ctx)); setChecked({}) }}>↺ Regenerate</button>
+          <button className="btn btn-ghost btn-sm" onClick={() => { setChecklist(buildChecklist(ctx, dmGuide)); setChecked({}) }}>↺ Regenerate</button>
         </div>
       </div>
 

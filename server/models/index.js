@@ -71,6 +71,10 @@ const CharacterSchema = new Schema({
   // Array of skill names that are proficient e.g. ['Athletics', 'Investigation']
   proficiencies: [{ type: String }],
   notes:        String,
+  background:   { type: String, default: '' },
+  personality:  { type: String, default: '' },
+  goals:        { type: String, default: '' },
+  lore:         { type: String, default: '' },
   roleplaySessionCount: { type: Number, default: 0 },
 }, { timestamps: true })
 
@@ -102,11 +106,33 @@ const InventorySchema = new Schema({
   }],
 }, { timestamps: true })
 
+const CampaignGuideSchema = new Schema({
+  campaign:    { type: Schema.Types.ObjectId, ref: 'Campaign', required: true, unique: true },
+  story:       { type: String, default: '' },
+  currentArc:  { type: String, default: '' },
+  lastSession: { type: String, default: '' },
+  worldNotes:  { type: String, default: '' },
+  npcs: [{
+    id:                { type: String },
+    name:              { type: String, default: '' },
+    description:       { type: String, default: '' },
+    characterRelation: { type: String, default: '' },
+  }],
+  quests: [{
+    id:                { type: String },
+    title:             { type: String, default: '' },
+    description:       { type: String, default: '' },
+    status:            { type: String, enum: ['active', 'completed', 'failed'], default: 'active' },
+    characterRelation: { type: String, default: '' },
+  }],
+}, { timestamps: true })
+
 export const User       = model('User', UserSchema)
 export const Campaign   = model('Campaign', CampaignSchema)
 export const Journal    = model('Journal', JournalSchema)
 export const Lore       = model('Lore', LoreSchema)
 export const StoryCard  = model('StoryCard', StoryCardSchema)
 export const Character  = model('Character', CharacterSchema)
-export const LevelPlan  = model('LevelPlan', LevelPlanSchema)
-export const Inventory  = model('Inventory', InventorySchema)
+export const LevelPlan     = model('LevelPlan', LevelPlanSchema)
+export const Inventory     = model('Inventory', InventorySchema)
+export const CampaignGuide = model('CampaignGuide', CampaignGuideSchema)

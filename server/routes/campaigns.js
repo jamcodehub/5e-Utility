@@ -1,6 +1,6 @@
 import { Router } from 'express'
 import jwt from 'jsonwebtoken'
-import { Campaign, Character, User } from '../models/index.js'
+import { Campaign, Character, User, CampaignGuide } from '../models/index.js'
 
 const router = Router()
 
@@ -168,6 +168,60 @@ router.put('/:id/character', auth, async (req, res) => {
     )
     res.json(char)
   } catch (e) { res.status(500).json({ error: e.message }) }
+})
+
+// DM: get all members' characters for Campaign Guide reference
+router.get('/:id/members/characters', auth, async (req, res) => {
+  try {
+    const campaign = await Campaign.findOne({ _id: req.params.id, owner: req.userId })
+      .populate('members', 'username')
+    if (!campaign) return res.status(403).json({ error: 'DM only' })
+    const chars = await Character.find({
+      campaign: req.params.id,
+      owner: { $in: campaign.members.map(m => m._id) },
+    })
+    const result = campaign.members.map(m => ({
+      userId: m._id,
+      username: m.username,
+      character: chars.find(c => String(c.owner) === String(m._id)) || null,
+    }))
+    res.json(result)
+  } catch { res.status(500).json({ error: 'Failed to load members' }) }
+})
+
+// Player: persist depth fields without overwriting other character data
+router.patch('/:id/character/depth', auth, async (req, res) => {
+  try {
+    const { background, personality, goals, lore } = req.body
+    const char = await Character.findOneAndUpdate(
+      { campaign: req.params.id, owner: req.userId },
+      { $set: { background, personality, goals, lore } },
+      { new: true }
+    )
+    if (!char) return res.status(404).json({ error: 'Character not found' })
+    res.json(char)
+  } catch { res.status(500).json({ error: 'Failed to save depth' }) }
+})
+
+export default router
+  try {
+    if (!await isMember(req.params.id, req.userId)) return res.status(403).json({ error: 'Not authorised' })
+    const guide = await CampaignGuide.findOne({ campaign: req.params.id }) || {}
+    res.json(guide)
+  } catch { res.status(500).json({ error: 'Failed to load guide' }) }
+})
+
+router.put('/:id/guide', auth, async (req, res) => {
+  try {
+    const campaign = await Campaign.findOne({ _id: req.params.id, owner: req.userId })
+    if (!campaign) return res.status(403).json({ error: 'Only the DM can edit the campaign guide' })
+    const guide = await CampaignGuide.findOneAndUpdate(
+      { campaign: req.params.id },
+      { ...req.body, campaign: req.params.id },
+      { upsert: true, new: true }
+    )
+    res.json(guide)
+  } catch { res.status(500).json({ error: 'Failed to save guide' }) }
 })
 
 export default router

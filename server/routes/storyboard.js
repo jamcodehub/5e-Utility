@@ -42,8 +42,6 @@ router.delete('/:id', auth, async (req, res) => {
   } catch { res.status(500).json({ error: 'Failed to delete' }) }
 })
 
-export default router
-
 router.post('/:campaignId', auth, async (req, res) => {
   try {
     const campaign = await Campaign.findById(req.params.campaignId)

@@ -12,9 +12,10 @@ export const api = async (path, opts = {}) => {
     ...opts,
     body: opts.body ? JSON.stringify(opts.body) : undefined,
   })
-  const data = await res.json()
+  let data
+  try { data = await res.json() } catch { data = {} }
   if (!res.ok) {
-    const err = new Error(data.error || 'Request failed')
+    const err = new Error(data.error || `Request failed (${res.status})`)
     err.status = res.status
     err.payload = data
     throw err
