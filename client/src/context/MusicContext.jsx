@@ -7,7 +7,6 @@ export const MOODS = [
   { id: 'tavern',   label: 'Tavern',   desc: 'Warm, mellow drone' },
   { id: 'battle',   label: 'Battle',   desc: 'Tense pulsing low end' },
   { id: 'forest',   label: 'Forest',   desc: 'Soft pad + wind' },
-  { id: 'dungeon',  label: 'Dungeon',  desc: 'Dark rumble + drips' },
   { id: 'dramatic', label: 'Dramatic', desc: 'Rising ominous swell' },
 ]
 
@@ -169,7 +168,6 @@ function startMood(ctx, master, mood) {
   }
 
   return () => {
-    if (intervals._cancelDungeon) intervals._cancelDungeon()
     intervals.forEach(id => { clearInterval(id); clearTimeout(id) })
     // Hard-stop quickly (short ramp, then stop) rather than a long crossfade
     // — a slow fade let the outgoing and incoming moods audibly overlap.

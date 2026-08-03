@@ -237,8 +237,27 @@ export default function CampaignGuide() {
     setSaving(true)
     try {
       await api(`/campaigns/${activeCampaign._id}/guide`, { method: 'PUT', body: guide })
-      setDirty(false); toast('Campaign guide saved ✓')
-    } catch { toast('Failed to save — try again') }
+      setDirty(false)
+      // Sync named NPCs to Lore board (best-effort, no duplicates)
+      const namedNpcs = guide.npcs.filter(n => n.name.trim())
+      if (namedNpcs.length > 0) {
+        try {
+          const existingLore = await api(`/lore/${activeCampaign._id}`)
+          const existingNpcTitles = new Set(
+            (existingLore || []).filter(e => (e.tags || []).includes('npc')).map(e => e.title)
+          )
+          for (const npc of namedNpcs) {
+            if (!existingNpcTitles.has(npc.name.trim())) {
+              await api(`/lore/${activeCampaign._id}`, {
+                method: 'POST',
+                body: { title: npc.name.trim(), content: npc.description || '', tags: ['npc'] },
+              })
+            }
+          }
+        } catch (_e) { /* lore sync is best-effort */ }
+      }
+      toast('Campaign guide saved ✓')
+    } catch (_e) { toast('Failed to save — try again') }
     setSaving(false)
   }
 
@@ -272,6 +291,11 @@ export default function CampaignGuide() {
         : <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             {guide.npcs.map(n => <NpcCard key={n.id} npc={n} onChange={v => updNpc(n.id, v)} onRemove={() => rmNpc(n.id)} activePlayer={activePlayer} onInserted={clearPlayer} />)}
           </div>}
+      {guide.npcs.length > 0 && (
+        <button className="btn btn-primary btn-sm" onClick={save} disabled={saving} style={{ width: '100%', justifyContent: 'center', marginTop: 12, opacity: dirty ? 1 : 0.45 }}>
+          {saving ? 'Saving…' : dirty ? '✦ Save Guide & Sync to Lore' : 'Saved ✓'}
+        </button>
+      )}
     </div>
   )
 
@@ -286,6 +310,11 @@ export default function CampaignGuide() {
         : <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             {guide.quests.map(q => <QuestCard key={q.id} quest={q} onChange={v => updQuest(q.id, v)} onRemove={() => rmQuest(q.id)} activePlayer={activePlayer} onInserted={clearPlayer} />)}
           </div>}
+      {guide.quests.length > 0 && (
+        <button className="btn btn-primary btn-sm" onClick={save} disabled={saving} style={{ width: '100%', justifyContent: 'center', marginTop: 12, opacity: dirty ? 1 : 0.45 }}>
+          {saving ? 'Saving…' : dirty ? '✦ Save Guide' : 'Saved ✓'}
+        </button>
+      )}
     </div>
   )
 

@@ -1,10 +1,12 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useTheme, THEMES } from '../context/ThemeContext'
 import { api, useAuth } from '../context/AuthContext'
 
 export default function SettingsModal({ onClose }) {
   const { theme, setTheme } = useTheme()
-  const { logout, user, setTwoFactor } = useAuth()
+  const { logout, user, setTwoFactor, isPremium } = useAuth()
+  const navigate = useNavigate()
   const [feedbackType, setFeedbackType] = useState('general')
   const [feedbackMsg, setFeedbackMsg] = useState('')
   const [sending, setSending] = useState(false)
@@ -57,21 +59,27 @@ export default function SettingsModal({ onClose }) {
         <div style={{ marginBottom: 28 }}>
           <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-2)', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 12 }}>Theme</div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8 }}>
-            {Object.entries(THEMES).map(([key, t]) => (
-              <button type="button" key={key} onClick={() => setTheme(key)} style={{
-                padding: '10px 14px', borderRadius: 8, border: `2px solid ${theme === key ? 'var(--gold)' : 'var(--border)'}`,
-                background: theme === key ? 'var(--gold-bg)' : 'var(--surface2)',
-                color: theme === key ? 'var(--gold)' : 'var(--text-2)',
-                fontSize: 13, fontWeight: theme === key ? 600 : 400, cursor: 'pointer',
-                textAlign: 'left', transition: 'all .15s',
-                display: 'flex', alignItems: 'center', gap: 8,
-              }}>
-                <span style={{ fontSize: 16 }}>
-                  {key === 'light' ? '☀️' : key === 'dark' ? '🌙' : key === 'barbarian' ? '⚔️' : key === 'wizard' ? '🔮' : key === 'druid' ? '🌿' : key === 'paladin' ? '🛡️' : '🗡️'}
-                </span>
-                {t.label}
-              </button>
-            ))}
+            {Object.entries(THEMES).map(([key, t]) => {
+              const ICONS = { light: '☀️', dark: '🌙', barbarian: '⚔️', wizard: '🔮', druid: '🌿', paladin: '🛡️', rogue: '🗡️', bard: '🎵', cleric: '⚜️', fighter: '🪖', monk: '🥋', ranger: '🏹', sorcerer: '✨', warlock: '👁️', gunslinger: '🔫', artificer: '⚙️', bloodhunter: '🩸' }
+              const locked = t.premium && !isPremium
+              return (
+                <button type="button" key={key}
+                  onClick={() => locked ? (navigate('/premium'), onClose()) : setTheme(key)}
+                  style={{
+                    padding: '10px 14px', borderRadius: 8,
+                    border: `2px solid ${theme === key ? 'var(--gold)' : 'var(--border)'}`,
+                    background: theme === key ? 'var(--gold-bg)' : 'var(--surface2)',
+                    color: theme === key ? 'var(--gold)' : locked ? 'var(--text-3)' : 'var(--text-2)',
+                    fontSize: 13, fontWeight: theme === key ? 600 : 400, cursor: 'pointer',
+                    textAlign: 'left', transition: 'all .15s',
+                    display: 'flex', alignItems: 'center', gap: 8, opacity: locked ? 0.65 : 1,
+                  }}>
+                  <span style={{ fontSize: 15 }}>{ICONS[key] || '🎨'}</span>
+                  <span style={{ flex: 1 }}>{t.label}</span>
+                  {t.premium && <span style={{ fontSize: 10, color: locked ? 'var(--text-3)' : 'var(--gold)', fontWeight: 700 }}>{locked ? '🔒' : '✦'}</span>}
+                </button>
+              )
+            })}
           </div>
         </div>
 
