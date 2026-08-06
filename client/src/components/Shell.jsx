@@ -65,21 +65,21 @@ const NAV_PLAYER = [
   { to: '/lore',       label: 'Lore' },
   { to: '/character',  label: 'Character' },
   { to: '/inventory',  label: 'Inventory' },
-  { to: '/dice',       label: 'Dice' },
   { to: '/roleplay',   label: 'Roleplay' },
+  { to: '/dice',       label: 'Dice' },
 ]
 
 const NAV_DM = [
+  { to: '/campaign-guide', label: 'Campaign' },
   { to: '/journal',    label: 'Journal' },
   { to: '/storyboard', label: 'Storyboard' },
   { to: '/lore',       label: 'Lore' },
-  { to: '/inventory',  label: 'Inventory' },
-  { to: '/dice',       label: 'Dice' },
+  { to: '/inventory',  label: 'Shop/Items' },
   { to: '/ideas',      label: 'Ideas' },
   { to: '/levels',     label: 'Levels' },
   { to: '/rules',      label: 'Rules' },
   { to: '/music',      label: 'Music' },
-  { to: '/campaign-guide', label: 'Campaign' },
+  { to: '/dice',       label: 'Dice' },
 ]
 
 function useIsMobile() {
