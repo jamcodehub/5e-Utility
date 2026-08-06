@@ -71,7 +71,7 @@ function RelationNote() {
 }
 
 // ─── NpcCard ──────────────────────────────────────────────────────────────────
-function NpcCard({ npc, onChange, onRemove, activePlayer, onInserted }) {
+function NpcCard({ npc, onChange, onRemove, onSendToLore, sending, activePlayer, onInserted }) {
   const u = f => e => onChange({ ...npc, [f]: e.target.value })
   return (
     <div style={{ border: '1px solid var(--border)', borderRadius: 8, padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -89,12 +89,17 @@ function NpcCard({ npc, onChange, onRemove, activePlayer, onInserted }) {
           style={{ borderColor: 'var(--gold-border)', background: 'var(--gold-bg)' }} />
         <RelationNote />
       </div>
+      {npc.name.trim() && (
+        <button className="btn btn-primary btn-sm" onClick={() => onSendToLore(npc.id)} disabled={sending} style={{ width: '100%', justifyContent: 'center' }}>
+          {sending ? 'Sending…' : '✦ Send to Lore & Close'}
+        </button>
+      )}
     </div>
   )
 }
 
 // ─── QuestCard ────────────────────────────────────────────────────────────────
-function QuestCard({ quest, onChange, onRemove, activePlayer, onInserted }) {
+function QuestCard({ quest, onChange, onRemove, onSendToLore, sending, activePlayer, onInserted }) {
   const u = f => e => onChange({ ...quest, [f]: e.target.value })
   const SC = { active: '#1d6a3a', completed: '#9a7c3a', failed: '#b03030' }
   return (
@@ -118,6 +123,11 @@ function QuestCard({ quest, onChange, onRemove, activePlayer, onInserted }) {
           style={{ borderColor: 'var(--gold-border)', background: 'var(--gold-bg)' }} />
         <RelationNote />
       </div>
+      {quest.title.trim() && (
+        <button className="btn btn-primary btn-sm" onClick={() => onSendToLore(quest.id)} disabled={sending} style={{ width: '100%', justifyContent: 'center' }}>
+          {sending ? 'Sending…' : '✦ Send to Lore & Close'}
+        </button>
+      )}
     </div>
   )
 }
@@ -199,6 +209,7 @@ export default function CampaignGuide() {
   const [activePlayer, setActive] = useState(null)   // { userId, name } | null
   const [charModal, setCharModal] = useState(null)
   const [saving, setSaving]       = useState(false)
+  const [sendingId, setSendingId] = useState(null)
   const [dirty, setDirty]         = useState(false)
   const [mobileTab, setMobileTab] = useState('story')
   const [isMobile, setIsMobile]   = useState(window.innerWidth <= 768)
@@ -233,32 +244,64 @@ export default function CampaignGuide() {
   const updQuest = (id, v) => { setGuide(g => ({ ...g, quests: g.quests.map(q => q.id === id ? v : q) })); setDirty(true) }
   const rmQuest  = id      => { setGuide(g => ({ ...g, quests: g.quests.filter(q => q.id !== id) })); setDirty(true) }
 
-  const save = async () => {
+  const save = async (guideData = guide) => {
     setSaving(true)
     try {
-      await api(`/campaigns/${activeCampaign._id}/guide`, { method: 'PUT', body: guide })
+      await api(`/campaigns/${activeCampaign._id}/guide`, { method: 'PUT', body: guideData })
       setDirty(false)
-      // Sync named NPCs to Lore board (best-effort, no duplicates)
-      const namedNpcs = guide.npcs.filter(n => n.name.trim())
-      if (namedNpcs.length > 0) {
-        try {
-          const existingLore = await api(`/lore/${activeCampaign._id}`)
-          const existingNpcTitles = new Set(
-            (existingLore || []).filter(e => (e.tags || []).includes('npc')).map(e => e.title)
-          )
-          for (const npc of namedNpcs) {
-            if (!existingNpcTitles.has(npc.name.trim())) {
-              await api(`/lore/${activeCampaign._id}`, {
-                method: 'POST',
-                body: { title: npc.name.trim(), content: npc.description || '', tags: ['npc'] },
-              })
-            }
-          }
-        } catch (_e) { /* lore sync is best-effort */ }
-      }
       toast('Campaign guide saved ✓')
     } catch (_e) { toast('Failed to save — try again') }
     setSaving(false)
+  }
+
+  const sendNpcToLore = async (npcId) => {
+    const npc = guide.npcs.find(n => n.id === npcId)
+    if (!npc?.name.trim()) return
+    setSendingId(npcId)
+    try {
+      await api(`/lore/${activeCampaign._id}`, {
+        method: 'POST',
+        body: { title: npc.name.trim(), content: [npc.description, npc.characterRelation].filter(Boolean).join('\n\n'), tag: 'npc' },
+      })
+      const next = { ...guide, npcs: guide.npcs.filter(n => n.id !== npcId) }
+      setGuide(next)
+      await api(`/campaigns/${activeCampaign._id}/guide`, { method: 'PUT', body: next })
+      setDirty(false)
+      toast(`${npc.name} sent to Lore ✓`)
+    } catch { toast('Failed to send to Lore') }
+    setSendingId(null)
+  }
+
+  const sendQuestToLore = async (questId) => {
+    const quest = guide.quests.find(q => q.id === questId)
+    if (!quest?.title.trim()) return
+    setSendingId(questId)
+    try {
+      await api(`/lore/${activeCampaign._id}`, {
+        method: 'POST',
+        body: { title: quest.title.trim(), content: [quest.description, quest.characterRelation].filter(Boolean).join('\n\n'), tag: 'event' },
+      })
+      const next = { ...guide, quests: guide.quests.filter(q => q.id !== questId) }
+      setGuide(next)
+      await api(`/campaigns/${activeCampaign._id}/guide`, { method: 'PUT', body: next })
+      setDirty(false)
+      toast(`${quest.title} sent to Lore ✓`)
+    } catch { toast('Failed to send to Lore') }
+    setSendingId(null)
+  }
+
+  const adjustMemberHp = async (userId, delta) => {
+    const member = members.find(m => String(m.userId) === String(userId))
+    if (!member?.character) return
+    const cur = member.character.hp?.current ?? 0
+    const max = member.character.hp?.max ?? 0
+    const next = Math.max(0, Math.min(max || 999, cur + delta))
+    try {
+      const updated = await api(`/campaigns/${activeCampaign._id}/members/${userId}/hp`, {
+        method: 'PATCH', body: { current: next, max: max || next },
+      })
+      setMembers(p => p.map(m => String(m.userId) === String(userId) ? { ...m, character: updated } : m))
+    } catch { toast('Failed to update HP') }
   }
 
   if (!activeCampaign) return <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-3)' }}>Select a campaign.</div>
@@ -289,7 +332,7 @@ export default function CampaignGuide() {
       {guide.npcs.length === 0
         ? <div style={{ fontSize: 12, color: 'var(--text-3)', lineHeight: 1.8 }}>No NPCs yet. The <span style={{ color: 'var(--gold)' }}>Character Relation</span> field appears directly in each player's session plan.</div>
         : <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            {guide.npcs.map(n => <NpcCard key={n.id} npc={n} onChange={v => updNpc(n.id, v)} onRemove={() => rmNpc(n.id)} activePlayer={activePlayer} onInserted={clearPlayer} />)}
+            {guide.npcs.map(n => <NpcCard key={n.id} npc={n} onChange={v => updNpc(n.id, v)} onRemove={() => rmNpc(n.id)} onSendToLore={sendNpcToLore} sending={sendingId === n.id} activePlayer={activePlayer} onInserted={clearPlayer} />)}
           </div>}
       {guide.npcs.length > 0 && (
         <button className="btn btn-primary btn-sm" onClick={save} disabled={saving} style={{ width: '100%', justifyContent: 'center', marginTop: 12, opacity: dirty ? 1 : 0.45 }}>
@@ -308,7 +351,7 @@ export default function CampaignGuide() {
       {guide.quests.length === 0
         ? <div style={{ fontSize: 12, color: 'var(--text-3)', lineHeight: 1.8 }}>No quests yet. The <span style={{ color: 'var(--gold)' }}>Character Relation</span> field ties each quest to a specific character's motivation.</div>
         : <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            {guide.quests.map(q => <QuestCard key={q.id} quest={q} onChange={v => updQuest(q.id, v)} onRemove={() => rmQuest(q.id)} activePlayer={activePlayer} onInserted={clearPlayer} />)}
+            {guide.quests.map(q => <QuestCard key={q.id} quest={q} onChange={v => updQuest(q.id, v)} onRemove={() => rmQuest(q.id)} onSendToLore={sendQuestToLore} sending={sendingId === q.id} activePlayer={activePlayer} onInserted={clearPlayer} />)}
           </div>}
       {guide.quests.length > 0 && (
         <button className="btn btn-primary btn-sm" onClick={save} disabled={saving} style={{ width: '100%', justifyContent: 'center', marginTop: 12, opacity: dirty ? 1 : 0.45 }}>

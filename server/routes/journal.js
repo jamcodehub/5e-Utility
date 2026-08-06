@@ -7,7 +7,8 @@ const router = Router()
 
 router.get('/:campaignId', auth, async (req, res) => {
   if (!await isMember(req.params.campaignId, req.userId)) return res.status(403).json({ error: 'Not a campaign member' })
-  const entries = await Journal.find({ campaign: req.params.campaignId })
+  const entryType = req.query.type === 'session' ? 'session' : 'journal'
+  const entries = await Journal.find({ campaign: req.params.campaignId, entryType })
     .populate('author', 'username').sort({ day: 1 })
   res.json(entries)
 })
@@ -15,11 +16,12 @@ router.get('/:campaignId', auth, async (req, res) => {
 router.post('/:campaignId', auth, async (req, res) => {
   try {
     const user = await User.findById(req.userId)
+    const entryType = req.body.entryType === 'session' ? 'session' : 'journal'
     if (!user.isPremium) {
-      const count = await Journal.countDocuments({ campaign: req.params.campaignId, author: req.userId })
-      if (count >= 5) return res.status(403).json({ error: 'Free accounts are limited to 5 journal entries. Upgrade to Premium for unlimited entries.' })
+      const count = await Journal.countDocuments({ campaign: req.params.campaignId, author: req.userId, entryType })
+      if (count >= 5) return res.status(403).json({ error: 'Free accounts are limited to 5 entries. Upgrade to Premium for unlimited entries.' })
     }
-    const entry = await Journal.create({ ...req.body, campaign: req.params.campaignId, author: req.userId })
+    const entry = await Journal.create({ ...req.body, entryType, campaign: req.params.campaignId, author: req.userId })
     res.json(entry)
   } catch (e) { res.status(500).json({ error: e.message }) }
 })

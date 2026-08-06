@@ -123,8 +123,44 @@ router.put('/:id', auth, async (req, res) => {
 })
 
 router.delete('/:id', auth, async (req, res) => {
-  await Campaign.findOneAndDelete({ _id: req.params.id, owner: req.userId })
-  res.json({ ok: true })
+  try {
+    const user = await User.findById(req.userId)
+    if (!user?.isPremium) return res.status(403).json({ error: 'Deleting campaigns is a Premium feature.' })
+    const campaign = await Campaign.findOne({ _id: req.params.id, owner: req.userId })
+    if (!campaign) return res.status(403).json({ error: 'Not authorised' })
+    if (campaign.isPersonal) return res.status(400).json({ error: 'Cannot delete your personal journal space.' })
+    await Campaign.findOneAndDelete({ _id: req.params.id, owner: req.userId })
+    res.json({ ok: true })
+  } catch { res.status(500).json({ error: 'Failed to delete campaign' }) }
+})
+
+// Player: leave a campaign they joined
+router.post('/:id/leave', auth, async (req, res) => {
+  try {
+    const campaign = await Campaign.findById(req.params.id)
+    if (!campaign) return res.status(404).json({ error: 'Campaign not found' })
+    if (String(campaign.owner) === String(req.userId)) return res.status(400).json({ error: 'Campaign owners cannot leave — delete the campaign instead.' })
+    campaign.members = campaign.members.filter(m => String(m) !== String(req.userId))
+    campaign.pendingMembers = campaign.pendingMembers.filter(m => String(m) !== String(req.userId))
+    await campaign.save()
+    res.json({ ok: true })
+  } catch { res.status(500).json({ error: 'Failed to leave campaign' }) }
+})
+
+// DM: update a member's HP during combat
+router.patch('/:id/members/:userId/hp', auth, async (req, res) => {
+  try {
+    const campaign = await Campaign.findOne({ _id: req.params.id, owner: req.userId })
+    if (!campaign) return res.status(403).json({ error: 'DM only' })
+    const { current, max } = req.body
+    const char = await Character.findOneAndUpdate(
+      { campaign: req.params.id, owner: req.params.userId },
+      { $set: { 'hp.current': current, 'hp.max': max } },
+      { new: true }
+    )
+    if (!char) return res.status(404).json({ error: 'Character not found' })
+    res.json(char)
+  } catch { res.status(500).json({ error: 'Failed to update HP' }) }
 })
 
 // Roleplay assistant session gate — free first session, premium for more

@@ -30,11 +30,12 @@ const CampaignSchema = new Schema({
 }, { timestamps: true })
 
 const JournalSchema = new Schema({
-  campaign: { type: Schema.Types.ObjectId, ref: 'Campaign', required: true },
-  author:   { type: Schema.Types.ObjectId, ref: 'User', required: true },
-  day:      { type: Number, required: true },
-  title:    String,
-  content:  { type: String, default: '' },
+  campaign:  { type: Schema.Types.ObjectId, ref: 'Campaign', required: true },
+  author:    { type: Schema.Types.ObjectId, ref: 'User', required: true },
+  day:       { type: Number, required: true },
+  title:     String,
+  content:   { type: String, default: '' },
+  entryType: { type: String, enum: ['journal', 'session'], default: 'journal' },
 }, { timestamps: true })
 
 const LoreSchema = new Schema({

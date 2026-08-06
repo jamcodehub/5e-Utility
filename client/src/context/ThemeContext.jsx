@@ -119,7 +119,7 @@ export const THEMES = {
   cleric: {
     label: 'Cleric', premium: true,
     vars: {
-      '--bg': '#141210', '--surface': '#1e1c18', '--surface2': '#282620',
+      '--bg': '#ebebebff', '--surface': '#d4d4d4ff', '--surface2': '#c1c1c1ff',
       '--border': '#403808', '--border-strong': '#60560c',
       '--text': '#f8f0d8', '--text-2': '#b0a070', '--text-3': '#706040',
       '--gold': '#e8c840', '--gold-bg': '#1a1808', '--gold-border': '#504000',

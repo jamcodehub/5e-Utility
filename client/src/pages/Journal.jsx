@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import UpgradeModal from '../components/UpgradeModal'
 import { api } from '../context/AuthContext'
 import { useCampaign } from '../context/CampaignContext'
@@ -6,59 +6,96 @@ import { useToast } from '../hooks/useToast'
 
 const wordCount = s => s.trim().split(/\s+/).filter(Boolean).length
 
-export default function Journal() {
+export default function Journal({
+  entryType = 'journal',
+  entryLabel = 'Day',
+  pageTitle = 'Journal',
+  emptyHint = 'No entries yet.',
+  selectHint = 'No day selected. Start a new one with +',
+}) {
   const { activeCampaign } = useCampaign()
   const { toast, ToastContainer } = useToast()
   const [entries, setEntries] = useState([])
   const [activeId, setActiveId] = useState(null)
   const [content, setContent] = useState('')
-  const [saving, setSaving] = useState(false)
+  const [saveStatus, setSaveStatus] = useState('saved') // saved | saving | unsaved
+  const saveTimer = useRef(null)
+  const contentRef = useRef(content)
+  const activeIdRef = useRef(activeId)
+
+  contentRef.current = content
+  activeIdRef.current = activeId
 
   const active = entries.find(e => e._id === activeId)
+  const apiType = entryType === 'session' ? 'session' : 'journal'
 
   const load = useCallback(async () => {
     if (!activeCampaign) return
-    const data = await api(`/journal/${activeCampaign._id}`)
+    const data = await api(`/journal/${activeCampaign._id}?type=${apiType}`)
     setEntries(data)
-    if (data.length) { setActiveId(data[0]._id); setContent(data[0].content) }
-    else { setActiveId(null); setContent('') }
-  }, [activeCampaign])
+    if (data.length) { setActiveId(data[0]._id); setContent(data[0].content); setSaveStatus('saved') }
+    else { setActiveId(null); setContent(''); setSaveStatus('saved') }
+  }, [activeCampaign, apiType])
 
   useEffect(() => { load() }, [load])
 
-  const selectEntry = (e) => { setActiveId(e._id); setContent(e.content) }
-
-  const newDay = async () => {
-    if (!activeCampaign) return
-    const maxDay = entries.reduce((m, e) => Math.max(m, e.day), 0)
+  const persist = useCallback(async (id, text) => {
+    if (!id) return
+    setSaveStatus('saving')
     try {
-      const entry = await api(`/journal/${activeCampaign._id}`, {
-        method: 'POST', body: { day: maxDay + 1, title: `Day ${maxDay + 1}`, content: '' }
-      })
-      setEntries(p => [...p, entry])
-      setActiveId(entry._id); setContent('')
-    } catch (err) {
-      // If backend signals limit (403), show upgrade modal
-      if (err && (err.status === 403 || String(err.message || '').toLowerCase().includes('limited'))) {
-        setShowUpgrade(true)
-        return
-      }
-      console.error(err)
-      toast('Failed to create day')
+      const updated = await api(`/journal/${id}`, { method: 'PUT', body: { content: text } })
+      setEntries(p => p.map(e => e._id === id ? updated : e))
+      setSaveStatus('saved')
+    } catch {
+      setSaveStatus('unsaved')
+      toast('Auto-save failed')
     }
+  }, [toast])
+
+  useEffect(() => {
+    if (!activeId) return
+    setSaveStatus('unsaved')
+    clearTimeout(saveTimer.current)
+    saveTimer.current = setTimeout(() => persist(activeId, content), 800)
+    return () => clearTimeout(saveTimer.current)
+  }, [content, activeId, persist])
+
+  useEffect(() => () => {
+    clearTimeout(saveTimer.current)
+    if (activeIdRef.current && contentRef.current !== undefined) {
+      persist(activeIdRef.current, contentRef.current)
+    }
+  }, [persist])
+
+  const selectEntry = (e) => {
+    if (activeId && saveStatus === 'unsaved') persist(activeId, content)
+    setActiveId(e._id)
+    setContent(e.content)
+    setSaveStatus('saved')
   }
 
   const [showUpgrade, setShowUpgrade] = useState(false)
 
-  const save = async () => {
-    if (!activeId) return
-    setSaving(true)
+  const newEntry = async () => {
+    if (!activeCampaign) return
+    if (activeId && saveStatus === 'unsaved') await persist(activeId, content)
+    const maxDay = entries.reduce((m, e) => Math.max(m, e.day), 0)
     try {
-      const updated = await api(`/journal/${activeId}`, { method: 'PUT', body: { content } })
-      setEntries(p => p.map(e => e._id === activeId ? updated : e))
-      toast('Saved')
-    } catch { toast('Save failed') }
-    setSaving(false)
+      const entry = await api(`/journal/${activeCampaign._id}`, {
+        method: 'POST',
+        body: { day: maxDay + 1, title: `${entryLabel} ${maxDay + 1}`, content: '', entryType: apiType },
+      })
+      setEntries(p => [...p, entry])
+      setActiveId(entry._id)
+      setContent('')
+      setSaveStatus('saved')
+    } catch (err) {
+      if (err && (err.status === 403 || String(err.message || '').toLowerCase().includes('limited'))) {
+        setShowUpgrade(true)
+        return
+      }
+      toast(`Failed to create ${entryLabel.toLowerCase()}`)
+    }
   }
 
   if (!activeCampaign) return (
@@ -67,13 +104,14 @@ export default function Journal() {
     </div>
   )
 
+  const saveLabel = saveStatus === 'saving' ? 'Saving…' : saveStatus === 'unsaved' ? 'Unsaved' : 'Saved ✓'
+
   return (
     <div className="journal-layout" style={{ display: 'flex', height: '100%', overflow: 'hidden' }}>
-      {/* Day list */}
       <div className="journal-day-list" style={{ width: 180, flexShrink: 0, borderRight: '1px solid var(--border)', overflowY: 'auto', background: 'var(--surface)' }}>
         <div style={{ padding: '14px 14px 8px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Days</span>
-          <button className="btn btn-ghost btn-sm" onClick={newDay} style={{ padding: '3px 8px' }}>+</button>
+          <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{entryLabel}s</span>
+          <button className="btn btn-ghost btn-sm" onClick={newEntry} style={{ padding: '3px 8px' }}>+</button>
         </div>
         {entries.map(e => (
           <button key={e._id} onClick={() => selectEntry(e)} style={{
@@ -82,26 +120,23 @@ export default function Journal() {
             color: activeId === e._id ? 'var(--gold)' : 'var(--text-2)',
             fontSize: 13, cursor: 'pointer', borderLeft: `2px solid ${activeId === e._id ? 'var(--gold)' : 'transparent'}`,
           }}>
-            <div style={{ fontWeight: 500 }}>Day {e.day}</div>
+            <div style={{ fontWeight: 500 }}>{entryLabel} {e.day}</div>
             <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 2 }}>
               {wordCount(e.content || '')} words
             </div>
           </button>
         ))}
         {!entries.length && (
-          <div style={{ padding: '20px 14px', fontSize: 12, color: 'var(--text-3)' }}>No entries yet.</div>
+          <div style={{ padding: '20px 14px', fontSize: 12, color: 'var(--text-3)' }}>{emptyHint}</div>
         )}
       </div>
 
-      {/* Editor */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
         <div style={{ padding: '14px 24px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'var(--surface)' }}>
-          <h2 style={{ fontSize: 16 }}>{active ? `Day ${active.day}` : 'Select a day'}</h2>
+          <h2 style={{ fontSize: 16 }}>{active ? `${entryLabel} ${active.day}` : pageTitle}</h2>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ fontSize: 12, color: saveStatus === 'unsaved' ? 'var(--gold)' : 'var(--text-3)' }}>{saveLabel}</span>
             <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{wordCount(content)} words</span>
-            <button className="btn btn-primary btn-sm" onClick={save} disabled={saving || !activeId}>
-              {saving ? 'Saving...' : 'Save'}
-            </button>
           </div>
         </div>
         <div style={{ flex: 1, overflowY: 'auto', padding: '24px 32px' }}>
@@ -109,6 +144,7 @@ export default function Journal() {
             <textarea
               value={content}
               onChange={e => setContent(e.target.value)}
+              onBlur={() => { if (saveStatus === 'unsaved') persist(activeId, content) }}
               placeholder="Record what happened this session..."
               style={{
                 width: '100%', minHeight: '100%', border: 'none', outline: 'none', resize: 'none',
@@ -118,7 +154,7 @@ export default function Journal() {
             />
           ) : (
             <div style={{ textAlign: 'center', color: 'var(--text-3)', marginTop: 60, fontSize: 13 }}>
-              No day selected. Start a new one with +
+              {selectHint}
             </div>
           )}
         </div>
