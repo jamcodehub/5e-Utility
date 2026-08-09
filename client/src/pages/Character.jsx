@@ -1,30 +1,42 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { api } from '../context/AuthContext'
 import { useCampaign } from '../context/CampaignContext'
 import { useToast } from '../hooks/useToast'
+import { uploadToCloudinary } from '../utils/uploadToCloudinary'
+import { CloudinaryImage } from '@cloudinary/url-gen'
+import { quality, format } from '@cloudinary/url-gen/actions/delivery'
+import { auto as autoQuality } from '@cloudinary/url-gen/qualifiers/quality'
+import { auto as autoFormat } from '@cloudinary/url-gen/qualifiers/format'
+import { thumbnail } from '@cloudinary/url-gen/actions/resize'
+import { autoGravity } from '@cloudinary/url-gen/qualifiers/gravity'
+
+const CLOUD_NAME = 'crcbzpw6'
+
+function getOptimisedUrl(cloudinaryUrl, width = null) {
+  if (!cloudinaryUrl) return ''
+  const match = cloudinaryUrl.match(/\/upload\/(?:v\d+\/)?(.+?)(\.[^.]+)?$/)
+  if (!match) return cloudinaryUrl
+  const publicId = match[1]
+  let img = new CloudinaryImage(publicId, { cloudName: CLOUD_NAME })
+    .delivery(quality(autoQuality()))
+    .delivery(format(autoFormat()))
+  if (width) img = img.resize(thumbnail().width(width).height(width).gravity(autoGravity()))
+  return img.toURL()
+}
 
 const STAT_KEYS = ['str', 'dex', 'con', 'int', 'wis', 'cha']
 const STAT_LABELS = { str: 'STR', dex: 'DEX', con: 'CON', int: 'INT', wis: 'WIS', cha: 'CHA' }
 const mod = v => { const m = Math.floor((v - 10) / 2); return m >= 0 ? `+${m}` : `${m}` }
+const modNum = v => Math.floor((v - 10) / 2)
 
-const SKILLS = [
-  { name: 'Acrobatics', stat: 'dex' }, { name: 'Animal Handling', stat: 'wis' },
-  { name: 'Arcana', stat: 'int' },     { name: 'Athletics', stat: 'str' },
-  { name: 'Deception', stat: 'cha' },  { name: 'History', stat: 'int' },
-  { name: 'Insight', stat: 'wis' },    { name: 'Intimidation', stat: 'cha' },
-  { name: 'Investigation', stat: 'int' }, { name: 'Medicine', stat: 'wis' },
-  { name: 'Nature', stat: 'int' },     { name: 'Perception', stat: 'wis' },
-  { name: 'Performance', stat: 'cha' }, { name: 'Persuasion', stat: 'cha' },
-  { name: 'Religion', stat: 'int' },   { name: 'Sleight of Hand', stat: 'dex' },
-  { name: 'Stealth', stat: 'dex' },   { name: 'Survival', stat: 'wis' },
-]
-
-const DEFAULT_FORM = {
+const DEFAULT = {
   name: '', race: '', class: '', level: 1,
   dndBeyondUrl: '', notes: '',
+  appearancePrompt: '',
   hp: { current: 10, max: 10 }, ac: 10, profBonus: 2,
   stats: { str: 10, dex: 10, con: 10, int: 10, wis: 10, cha: 10 },
-  proficiencies: [],
+  proficiencies: [], avatarUrl: '',
+  background: '', personality: '', goals: '', lore: '',
 }
 
 export default function Character() {
@@ -32,49 +44,90 @@ export default function Character() {
   const { toast, ToastContainer } = useToast()
   const [tab, setTab]       = useState('stats')
   const [char, setChar]     = useState(null)
-  const [form, setForm]     = useState(DEFAULT_FORM)
+  const [form, setForm]     = useState(DEFAULT)
   const [editing, setEditing] = useState(false)
+  const [avatarPreview, setAvatarPreview] = useState('')
+  const [loaded, setLoaded] = useState(false)
 
   const load = useCallback(async () => {
     if (!activeCampaign) return
     const data = await api(`/campaigns/${activeCampaign._id}/character`)
-    if (data) { setChar(data); setForm(data) }
-    else setForm(DEFAULT_FORM)
+    if (data) { setChar(data); setForm(data); setAvatarPreview(data.avatarUrl || '') }
+    else { setChar(null); setForm(DEFAULT); setAvatarPreview('') }
+    setLoaded(true)
   }, [activeCampaign])
 
-  useEffect(() => { load() }, [load])
+  useEffect(() => { if (!activeCampaign) return; setLoaded(false); load() }, [activeCampaign, load])
+
+  const [avatarUploading, setAvatarUploading] = useState(false)
+
+  const handleAvatar = async (e) => {
+    const file = e.target.files[0]
+    if (!file) return
+    setAvatarUploading(true)
+    try {
+      const url = await uploadToCloudinary(file, 'lore-ledger/avatars')
+      setAvatarPreview(url)
+      setForm(p => ({ ...p, avatarUrl: url }))
+    } catch (err) {
+      toast(err.message || 'Avatar upload failed')
+    }
+    setAvatarUploading(false)
+  }
 
   const save = async () => {
     try {
       const updated = await api(`/campaigns/${activeCampaign._id}/character`, { method: 'PUT', body: form })
       setChar(updated); setForm(updated); setEditing(false); toast('Character saved')
-    } catch { toast('Save failed') }
+    } catch (e) { toast(e.message || 'Save failed') }
   }
 
-  const toggleProf = (skillName) => {
+  const hpSaveTimer = useRef(null)
+  const adjustHp = (delta) => {
     setForm(p => {
-      const profs = p.proficiencies || []
-      return {
-        ...p,
-        proficiencies: profs.includes(skillName) ? profs.filter(s => s !== skillName) : [...profs, skillName]
+      const max = p.hp?.max ?? 10
+      const current = p.hp?.current ?? 10
+      const next = Math.max(0, Math.min(max, current + delta))
+      const nextForm = { ...p, hp: { current: next, max } }
+      if (activeCampaign) {
+        clearTimeout(hpSaveTimer.current)
+        hpSaveTimer.current = setTimeout(async () => {
+          try {
+            const updated = await api(`/campaigns/${activeCampaign._id}/character`, { method: 'PUT', body: nextForm })
+            setChar(updated)
+          } catch { toast('Could not save HP change') }
+        }, 400)
       }
+      return nextForm
     })
   }
 
   const F = form
-  const profs = F.proficiencies || []
 
   if (!activeCampaign) return <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-3)' }}>Select a campaign.</div>
+  if (!loaded) return <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-3)' }}>Loading character...</div>
 
   return (
-    <div style={{ height: '100%', overflowY: 'auto', padding: 24 }}>
-      {/* Header */}
-      <div className="card" style={{ padding: '16px 20px', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 16 }}>
-        <div style={{ width: 52, height: 52, borderRadius: '50%', flexShrink: 0, background: 'var(--gold-bg)', border: '1px solid var(--gold-border)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22 }}>⚔️</div>
-        <div style={{ flex: 1 }}>
+    <div className="page-content">
+      {/* Header card */}
+      <div className="card" style={{ padding: '16px 20px', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
+        {/* Avatar */}
+        <div style={{ position: 'relative', flexShrink: 0 }}>
+          <div style={{ width: 56, height: 56, borderRadius: '50%', overflow: 'hidden', background: 'var(--gold-bg)', border: '2px solid var(--gold-border)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24 }}>
+            {avatarPreview ? <img src={getOptimisedUrl(avatarPreview, 112)} alt="avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : '𖥔'}
+          </div>
+          {editing && (
+            <label style={{ position: 'absolute', inset: 0, borderRadius: '50%', background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: avatarUploading ? 'wait' : 'pointer', fontSize: 11, color: '#fff', flexDirection: 'column', gap: 2 }}>
+              <span style={{ fontSize: 16 }}>{avatarUploading ? '⏳' : '📷'}</span>
+              {!avatarUploading && <input type="file" accept="image/*" onChange={handleAvatar} style={{ display: 'none' }} />}
+            </label>
+          )}
+        </div>
+
+        <div style={{ flex: 1, minWidth: 200 }}>
           {editing ? (
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-              <input className="input" placeholder="Name" value={F.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} style={{ width: 160 }} />
+              <input className="input" placeholder="Name" value={F.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} style={{ width: 150 }} />
               <input className="input" placeholder="Race" value={F.race} onChange={e => setForm(p => ({ ...p, race: e.target.value }))} style={{ width: 110 }} />
               <input className="input" placeholder="Class" value={F.class} onChange={e => setForm(p => ({ ...p, class: e.target.value }))} style={{ width: 110 }} />
               <input className="input" type="number" placeholder="Level" value={F.level} onChange={e => setForm(p => ({ ...p, level: +e.target.value }))} style={{ width: 65 }} />
@@ -87,28 +140,39 @@ export default function Character() {
           )}
         </div>
 
-        {/* HP / AC / Prof */}
-        <div style={{ display: 'flex', gap: 16 }}>
+        {/* Stats row */}
+        <div style={{ display: 'flex', gap: 14 }}>
           {[
-            { label: 'HP',   val: `${F.hp?.current ?? 10}/${F.hp?.max ?? 10}`, color: 'var(--green)' },
-            { label: 'AC',   val: F.ac ?? 10, color: 'var(--text)' },
-            { label: 'Prof', val: `+${F.profBonus ?? 2}`, color: 'var(--text)' },
-          ].map(({ label, val, color }) => (
-            <div key={label} style={{ textAlign: 'center', minWidth: 48 }}>
-              <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-3)', letterSpacing: '0.05em', textTransform: 'uppercase', marginBottom: 2 }}>{label}</div>
+            { label: 'HP',   color: 'var(--green)' },
+            { label: 'AC',   color: 'var(--text)'  },
+            { label: 'Prof', color: 'var(--text)'  },
+            { label: 'Init', color: 'var(--accent)' },
+          ].map(({ label, color }) => (
+            <div key={label} style={{ textAlign: 'center', minWidth: 44 }}>
+              <div style={{ fontSize: 9, fontWeight: 600, color: 'var(--text-3)', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 2 }}>{label}</div>
               {editing ? (
                 label === 'HP' ? (
-                  <div style={{ display: 'flex', gap: 3 }}>
-                    <input type="number" className="input" style={{ width: 44, padding: '4px 4px', fontSize: 12, textAlign: 'center' }} value={F.hp?.current ?? 10} onChange={e => setForm(p => ({ ...p, hp: { ...p.hp, current: +e.target.value } }))} />
-                    <input type="number" className="input" style={{ width: 44, padding: '4px 4px', fontSize: 12, textAlign: 'center' }} value={F.hp?.max ?? 10} onChange={e => setForm(p => ({ ...p, hp: { ...p.hp, max: +e.target.value } }))} />
+                  <div style={{ display: 'flex', gap: 2 }}>
+                    <input type="number" className="input" style={{ width: 42, padding: '4px', fontSize: 11, textAlign: 'center' }} value={F.hp?.current ?? 10} onChange={e => setForm(p => ({ ...p, hp: { ...p.hp, current: +e.target.value } }))} />
+                    <input type="number" className="input" style={{ width: 42, padding: '4px', fontSize: 11, textAlign: 'center' }} value={F.hp?.max ?? 10} onChange={e => setForm(p => ({ ...p, hp: { ...p.hp, max: +e.target.value } }))} />
                   </div>
-                ) : label === 'AC' ? (
-                  <input type="number" className="input" style={{ width: 56, padding: '4px', fontSize: 12, textAlign: 'center' }} value={F.ac ?? 10} onChange={e => setForm(p => ({ ...p, ac: +e.target.value }))} />
+                ) : label === 'Init' ? (
+                  <div style={{ fontFamily: 'Cinzel, serif', fontSize: 16, fontWeight: 600, color }}>{mod(F.stats?.dex ?? 10)}</div>
                 ) : (
-                  <input type="number" className="input" style={{ width: 56, padding: '4px', fontSize: 12, textAlign: 'center' }} value={F.profBonus ?? 2} onChange={e => setForm(p => ({ ...p, profBonus: +e.target.value }))} />
+                  <input type="number" className="input" style={{ width: 52, padding: '4px', fontSize: 11, textAlign: 'center' }}
+                    value={label === 'AC' ? F.ac ?? 10 : F.profBonus ?? 2}
+                    onChange={e => setForm(p => ({ ...p, [label === 'AC' ? 'ac' : 'profBonus']: +e.target.value }))} />
                 )
               ) : (
-                <div style={{ fontFamily: 'Cinzel, serif', fontSize: 20, fontWeight: 600, color }}>{val}</div>
+                <div style={{ fontFamily: 'Cinzel, serif', fontSize: 18, fontWeight: 600, color }}>
+                  {label === 'HP' ? `${F.hp?.current ?? 10}/${F.hp?.max ?? 10}` : label === 'AC' ? F.ac ?? 10 : label === 'Prof' ? `+${F.profBonus ?? 2}` : mod(F.stats?.dex ?? 10)}
+                </div>
+              )}
+              {label === 'HP' && !editing && (
+                <div style={{ display: 'flex', gap: 4, justifyContent: 'center', marginTop: 4 }}>
+                  <button onClick={() => adjustHp(1)} title="Heal" style={{ width: 20, height: 20, borderRadius: 5, border: '1px solid var(--green)', background: 'transparent', color: 'var(--green)', fontSize: 12, fontWeight: 700, cursor: 'pointer', lineHeight: 1, padding: 0 }}>+</button>
+                  <button onClick={() => adjustHp(-1)} title="Take damage" style={{ width: 20, height: 20, borderRadius: 5, border: '1px solid var(--red)', background: 'transparent', color: 'var(--red)', fontSize: 12, fontWeight: 700, cursor: 'pointer', lineHeight: 1, padding: 0 }}>−</button>
+                </div>
               )}
             </div>
           ))}
@@ -116,14 +180,21 @@ export default function Character() {
 
         <div style={{ display: 'flex', gap: 8 }}>
           {editing
-            ? <><button className="btn btn-primary btn-sm" onClick={save}>Save</button><button className="btn btn-ghost btn-sm" onClick={() => { setEditing(false); setForm(char || DEFAULT_FORM) }}>Cancel</button></>
+            ? <><button className="btn btn-primary btn-sm" onClick={save}>Save</button><button className="btn btn-ghost btn-sm" onClick={() => { setEditing(false); setForm(char || DEFAULT); setAvatarPreview(char?.avatarUrl || '') }}>Cancel</button></>
             : <button className="btn btn-ghost btn-sm" onClick={() => setEditing(true)}>Edit</button>}
         </div>
       </div>
 
+      {/* Onboarding banner for new players */}
+      {loaded && !form.name && (
+        <div style={{ padding: '12px 16px', marginBottom: 12, background: 'var(--gold-bg)', border: '1px solid var(--gold-border)', borderRadius: 10, fontSize: 13, color: 'var(--text)', lineHeight: 1.6 }}>
+          🎲 <strong>Welcome!</strong> Click <strong>Edit</strong> to set up your character. Your DM and the Roleplay Assistant both read this sheet — the more you fill in, the better your session plans become.
+        </div>
+      )}
+
       {/* Tabs */}
-      <div style={{ display: 'flex', gap: 4, marginBottom: 16 }}>
-        {['stats', 'skills', 'notes', 'dndbeyond'].map(t => (
+      <div style={{ display: 'flex', gap: 4, marginBottom: 16, flexWrap: 'wrap' }}>
+        {['stats', 'backstory', 'notes', 'dndbeyond'].map(t => (
           <button key={t} onClick={() => setTab(t)} className={`btn btn-sm ${tab === t ? 'btn-primary' : 'btn-ghost'}`}>
             {t === 'dndbeyond' ? 'D&D Beyond' : t.charAt(0).toUpperCase() + t.slice(1)}
           </button>
@@ -131,66 +202,41 @@ export default function Character() {
       </div>
 
       {tab === 'stats' && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 12 }}>
+        <div className="stat-grid-6">
           {STAT_KEYS.map(k => (
-            <div key={k} className="card" style={{ padding: '14px 8px', textAlign: 'center' }}>
-              <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-3)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 4 }}>{STAT_LABELS[k]}</div>
-              {editing ? (
-                <input type="number" className="input" style={{ textAlign: 'center', padding: '4px', fontSize: 16 }}
-                  value={F.stats?.[k] ?? 10} onChange={e => setForm(p => ({ ...p, stats: { ...p.stats, [k]: +e.target.value } }))} />
-              ) : (
-                <>
-                  <div style={{ fontFamily: 'Cinzel, serif', fontSize: 26, fontWeight: 600, color: 'var(--gold)' }}>{mod(F.stats?.[k] ?? 10)}</div>
-                  <div style={{ fontSize: 12, color: 'var(--text-2)', marginTop: 2 }}>{F.stats?.[k] ?? 10}</div>
-                </>
-              )}
+            <div key={k} className="card" style={{ padding: '12px 6px', textAlign: 'center' }}>
+              <div style={{ fontSize: 9, fontWeight: 600, color: 'var(--text-3)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 4 }}>{STAT_LABELS[k]}</div>
+              {editing
+                ? <input type="number" className="input" style={{ textAlign: 'center', padding: '4px', fontSize: 15 }} value={F.stats?.[k] ?? 10} onChange={e => setForm(p => ({ ...p, stats: { ...p.stats, [k]: +e.target.value } }))} />
+                : <><div style={{ fontFamily: 'Cinzel, serif', fontSize: 24, fontWeight: 600, color: 'var(--gold)' }}>{mod(F.stats?.[k] ?? 10)}</div><div style={{ fontSize: 11, color: 'var(--text-2)', marginTop: 1 }}>{F.stats?.[k] ?? 10}</div></>
+              }
             </div>
           ))}
         </div>
       )}
 
-      {tab === 'skills' && (
-        <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-          <div style={{ padding: '10px 16px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <span style={{ fontSize: 12, color: 'var(--text-2)' }}>Click the dot to toggle proficiency</span>
-            <button className="btn btn-primary btn-sm" onClick={save}>Save skills</button>
+      {tab === 'backstory' && (
+        <div className="card" style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 4, lineHeight: 1.6 }}>
+            Your DM can see this in their Campaign Guide. The Roleplay Assistant uses it to personalise your session plans.
           </div>
-          {SKILLS.map((s, i) => {
-            const statVal = F.stats?.[s.stat] ?? 10
-            const isProficient = profs.includes(s.name)
-            const bonus = Math.floor((statVal - 10) / 2) + (isProficient ? (F.profBonus ?? 2) : 0)
-            return (
-              <div key={s.name} style={{
-                display: 'flex', alignItems: 'center', gap: 12, padding: '10px 16px',
-                borderBottom: i < SKILLS.length - 1 ? '1px solid var(--border)' : 'none',
-                background: isProficient ? 'var(--gold-bg)' : 'transparent',
-                transition: 'background .1s',
-              }}>
-                {/* Proficiency dot — clickable */}
-                <button onClick={() => toggleProf(s.name)} title="Toggle proficiency" style={{
-                  width: 18, height: 18, borderRadius: '50%', flexShrink: 0, cursor: 'pointer',
-                  background: isProficient ? 'var(--gold)' : 'transparent',
-                  border: `2px solid ${isProficient ? 'var(--gold)' : 'var(--border-strong)'}`,
-                  transition: 'all .15s',
-                }} />
-                <div style={{ flex: 1, fontSize: 13, color: isProficient ? 'var(--text)' : 'var(--text-2)' }}>{s.name}</div>
-                <div style={{ fontSize: 11, color: 'var(--text-3)', width: 36, textAlign: 'right' }}>{STAT_LABELS[s.stat]}</div>
-                <div style={{ fontFamily: 'Cinzel, serif', width: 36, textAlign: 'right', color: bonus >= 0 ? 'var(--green)' : 'var(--red)', fontSize: 14, fontWeight: 600 }}>
-                  {bonus >= 0 ? `+${bonus}` : bonus}
-                </div>
-              </div>
-            )
-          })}
+          {[['background', 'Background / Origin', "Where did you come from? What shaped you before the campaign?"], ['personality', 'Personality Traits', "How do you speak, carry yourself, treat others? Key quirks and mannerisms."], ['goals', 'Goals & Motivations', "What does your character want — short and long term?"], ['lore', 'Lore / Secrets / Backstory', "Secrets, fears, obligations, scars — anything that drives or haunts you."]].map(([field, label, ph]) => (
+            <div key={field}>
+              <label style={{ fontSize: 11, color: 'var(--text-3)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em', display: 'block', marginBottom: 4 }}>{label}</label>
+              <textarea className="input" rows={3} style={{ resize: 'vertical', fontSize: 13, lineHeight: 1.6 }}
+                placeholder={ph} value={F[field] || ''}
+                onChange={e => setForm(p => ({ ...p, [field]: e.target.value }))} />
+            </div>
+          ))}
+          <button className="btn btn-primary btn-sm" style={{ alignSelf: 'flex-start' }} onClick={save}>Save Backstory</button>
         </div>
       )}
 
       {tab === 'notes' && (
         <div className="card" style={{ padding: 16 }}>
-          <textarea className="input" rows={14} style={{ resize: 'vertical', fontFamily: 'Georgia, serif', fontSize: 14, lineHeight: 1.7 }}
+          <textarea className="input" rows={editing ? 10 : 14} style={{ resize: 'vertical', fontFamily: 'Georgia, serif', fontSize: 14, lineHeight: 1.7 }}
             placeholder="Character notes, backstory, personality traits, bonds, flaws..."
-            value={F.notes || ''}
-            onChange={e => setForm(p => ({ ...p, notes: e.target.value }))}
-          />
+            value={F.notes || ''} onChange={e => setForm(p => ({ ...p, notes: e.target.value }))} />
           <button className="btn btn-primary btn-sm" style={{ marginTop: 10 }} onClick={save}>Save notes</button>
         </div>
       )}
@@ -199,13 +245,10 @@ export default function Character() {
         <div className="card" style={{ padding: 20 }}>
           <div style={{ fontSize: 13, color: 'var(--text-2)', marginBottom: 12 }}>Link your D&amp;D Beyond character sheet to embed it here.</div>
           <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
-            <input className="input" style={{ flex: 1 }} placeholder="https://www.dndbeyond.com/characters/..."
-              value={F.dndBeyondUrl || ''} onChange={e => setForm(p => ({ ...p, dndBeyondUrl: e.target.value }))} />
+            <input className="input" style={{ flex: 1 }} placeholder="https://www.dndbeyond.com/characters/..." value={F.dndBeyondUrl || ''} onChange={e => setForm(p => ({ ...p, dndBeyondUrl: e.target.value }))} />
             <button className="btn btn-primary" onClick={save}>Link</button>
           </div>
-          {F.dndBeyondUrl && (
-            <iframe src={F.dndBeyondUrl} title="D&D Beyond" style={{ width: '100%', height: 700, border: 'none', borderRadius: 8 }} sandbox="allow-scripts allow-same-origin" />
-          )}
+          {F.dndBeyondUrl && <iframe src={F.dndBeyondUrl} title="D&D Beyond" style={{ width: '100%', minHeight: 360, maxHeight: 560, border: 'none', borderRadius: 8 }} sandbox="allow-scripts allow-same-origin" />}
         </div>
       )}
       <ToastContainer />

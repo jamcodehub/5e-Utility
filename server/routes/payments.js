@@ -50,7 +50,7 @@ router.post('/portal', auth, async (req, res) => {
 })
 
 // Stripe webhook — must be raw body
-router.post('/webhook', express => express, async (req, res) => {
+router.post('/webhook', async (req, res) => {
   const sig = req.headers['stripe-signature']
   let event
   try {
