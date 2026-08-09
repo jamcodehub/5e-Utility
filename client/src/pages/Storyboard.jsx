@@ -3,6 +3,23 @@ import { api } from '../context/AuthContext'
 import { useCampaign } from '../context/CampaignContext'
 import { useToast } from '../hooks/useToast'
 import { uploadToCloudinary } from '../utils/uploadToCloudinary'
+import { CloudinaryImage } from '@cloudinary/url-gen'
+import { quality, format } from '@cloudinary/url-gen/actions/delivery'
+import { auto as autoQuality } from '@cloudinary/url-gen/qualifiers/quality'
+import { auto as autoFormat } from '@cloudinary/url-gen/qualifiers/format'
+
+const CLOUD_NAME = 'YOUR_CLOUD_NAME'
+
+function getOptimisedUrl(cloudinaryUrl) {
+  if (!cloudinaryUrl) return ''
+  const match = cloudinaryUrl.match(/\/upload\/(?:v\d+\/)?(.+?)(\.[^.]+)?$/)
+  if (!match) return cloudinaryUrl
+  const publicId = match[1]
+  return new CloudinaryImage(publicId, { cloudName: CLOUD_NAME })
+    .delivery(quality(autoQuality()))
+    .delivery(format(autoFormat()))
+    .toURL()
+}
 
 function Cover({ campaignName }) {
   return (
@@ -24,7 +41,7 @@ function BookSpread({ card, index, onEdit }) {
         {/* Top — image */}
         <div style={{ flex: '0 0 55%', background: 'var(--sb-bar)', borderBottom: '2px solid var(--sb-spine)', overflow: 'hidden', position: 'relative' }}>
           {card.imageUrl
-            ? <img src={card.imageUrl} alt={card.title} style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center top', display: 'block' }} onError={e => { e.target.style.display = 'none' }} />
+            ? <img src={getOptimisedUrl(card.imageUrl)} alt={card.title} style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center top', display: 'block' }} onError={e => { e.target.style.display = 'none' }} />
             : <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8, color: 'var(--sb-page-meta)' }}><div style={{ fontSize: 32, opacity: 0.3 }}>✦</div><div style={{ fontSize: 11, fontFamily: 'Cinzel, serif' }}>No image uploaded</div></div>
           }
           <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 32, background: 'linear-gradient(to top, rgba(0,0,0,0.35), transparent)', pointerEvents: 'none' }} />
@@ -52,7 +69,7 @@ function BookSpread({ card, index, onEdit }) {
       {/* Left — image full bleed */}
       <div style={{ flex: 1, background: 'var(--sb-bar)', borderRight: '2px solid var(--sb-spine)', overflow: 'hidden', position: 'relative' }}>
         {card.imageUrl
-          ? <img src={card.imageUrl} alt={card.title} style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center', display: 'block' }} onError={e => { e.target.style.display = 'none' }} />
+          ? <img src={getOptimisedUrl(card.imageUrl)} alt={card.title} style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center', display: 'block' }} onError={e => { e.target.style.display = 'none' }} />
           : <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 10, color: 'var(--sb-page-meta)' }}><div style={{ fontSize: 40, opacity: 0.3 }}>✦</div><div style={{ fontSize: 11, fontFamily: 'Cinzel, serif' }}>No image uploaded</div></div>
         }
         <div style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: 24, background: 'linear-gradient(to left, rgba(0,0,0,0.18), transparent)', pointerEvents: 'none' }} />
@@ -94,11 +111,11 @@ export default function Storyboard() {
   // Add scene form
   const [newTitle, setNewTitle] = useState('')
   const [newDesc, setNewDesc] = useState('')
-  const [newImage, setNewImage] = useState(null) // base64
+  const [newImage, setNewImage] = useState(null)
   const [saving, setSaving] = useState(false)
 
   // Edit modal
-  const [editCard, setEditCard] = useState(null) // card being edited
+  const [editCard, setEditCard] = useState(null)
   const [editSaving, setEditSaving] = useState(false)
 
   const load = useCallback(async () => {
@@ -307,4 +324,3 @@ export default function Storyboard() {
     </div>
   )
 }
-

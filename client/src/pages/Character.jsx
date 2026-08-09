@@ -3,6 +3,26 @@ import { api } from '../context/AuthContext'
 import { useCampaign } from '../context/CampaignContext'
 import { useToast } from '../hooks/useToast'
 import { uploadToCloudinary } from '../utils/uploadToCloudinary'
+import { CloudinaryImage } from '@cloudinary/url-gen'
+import { quality, format } from '@cloudinary/url-gen/actions/delivery'
+import { auto as autoQuality } from '@cloudinary/url-gen/qualifiers/quality'
+import { auto as autoFormat } from '@cloudinary/url-gen/qualifiers/format'
+import { thumbnail } from '@cloudinary/url-gen/actions/resize'
+import { autoGravity } from '@cloudinary/url-gen/qualifiers/gravity'
+
+const CLOUD_NAME = 'YOUR_CLOUD_NAME'
+
+function getOptimisedUrl(cloudinaryUrl, width = null) {
+  if (!cloudinaryUrl) return ''
+  const match = cloudinaryUrl.match(/\/upload\/(?:v\d+\/)?(.+?)(\.[^.]+)?$/)
+  if (!match) return cloudinaryUrl
+  const publicId = match[1]
+  let img = new CloudinaryImage(publicId, { cloudName: CLOUD_NAME })
+    .delivery(quality(autoQuality()))
+    .delivery(format(autoFormat()))
+  if (width) img = img.resize(thumbnail().width(width).height(width).gravity(autoGravity()))
+  return img.toURL()
+}
 
 const STAT_KEYS = ['str', 'dex', 'con', 'int', 'wis', 'cha']
 const STAT_LABELS = { str: 'STR', dex: 'DEX', con: 'CON', int: 'INT', wis: 'WIS', cha: 'CHA' }
@@ -62,9 +82,6 @@ export default function Character() {
     } catch (e) { toast(e.message || 'Save failed') }
   }
 
-  // Quick HP adjust — heal (+) or take damage (-), clamped to [0, max].
-  // Updates the number instantly (no waiting on the network), then saves in
-  // the background debounced so rapid clicking never feels laggy.
   const hpSaveTimer = useRef(null)
   const adjustHp = (delta) => {
     setForm(p => {
@@ -97,7 +114,7 @@ export default function Character() {
         {/* Avatar */}
         <div style={{ position: 'relative', flexShrink: 0 }}>
           <div style={{ width: 56, height: 56, borderRadius: '50%', overflow: 'hidden', background: 'var(--gold-bg)', border: '2px solid var(--gold-border)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24 }}>
-            {avatarPreview ? <img src={avatarPreview} alt="avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : '𖥔'}
+            {avatarPreview ? <img src={getOptimisedUrl(avatarPreview, 112)} alt="avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : '𖥔'}
           </div>
           {editing && (
             <label style={{ position: 'absolute', inset: 0, borderRadius: '50%', background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: avatarUploading ? 'wait' : 'pointer', fontSize: 11, color: '#fff', flexDirection: 'column', gap: 2 }}>

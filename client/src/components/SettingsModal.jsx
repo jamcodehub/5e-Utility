@@ -47,6 +47,8 @@ export default function SettingsModal({ onClose }) {
     }
   }
 
+  const currentThemeLabel = THEMES[theme]?.label || theme
+
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }} onClick={onClose}>
       <div className="card" style={{ width: '100%', maxWidth: 480, padding: 28, maxHeight: '90vh', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
@@ -56,31 +58,24 @@ export default function SettingsModal({ onClose }) {
         </div>
 
         {/* Theme */}
-        <div style={{ marginBottom: 28 }}>
-          <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-2)', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 12 }}>Theme</div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8 }}>
-            {Object.entries(THEMES).map(([key, t]) => {
-              const ICONS = { light: '☀️', dark: '🌙', barbarian: '⚔️', wizard: '🔮', druid: '🌿', paladin: '🛡️', rogue: '🗡️', bard: '🎵', cleric: '⚜️', fighter: '🪖', monk: '🥋', ranger: '🏹', sorcerer: '✨', warlock: '👁️', gunslinger: '🔫', artificer: '⚙️', bloodhunter: '🩸' }
-              const locked = t.premium && !isPremium
-              return (
-                <button type="button" key={key}
-                  onClick={() => locked ? (navigate('/premium'), onClose()) : setTheme(key)}
-                  style={{
-                    padding: '10px 14px', borderRadius: 8,
-                    border: `2px solid ${theme === key ? 'var(--gold)' : 'var(--border)'}`,
-                    background: theme === key ? 'var(--gold-bg)' : 'var(--surface2)',
-                    color: theme === key ? 'var(--gold)' : locked ? 'var(--text-3)' : 'var(--text-2)',
-                    fontSize: 13, fontWeight: theme === key ? 600 : 400, cursor: 'pointer',
-                    textAlign: 'left', transition: 'all .15s',
-                    display: 'flex', alignItems: 'center', gap: 8, opacity: locked ? 0.65 : 1,
-                  }}>
-                  <span style={{ fontSize: 15 }}>{ICONS[key] || '🎨'}</span>
-                  <span style={{ flex: 1 }}>{t.label}</span>
-                  {t.premium && <span style={{ fontSize: 10, color: locked ? 'var(--text-3)' : 'var(--gold)', fontWeight: 700 }}>{locked ? '🔒' : '✦'}</span>}
-                </button>
-              )
-            })}
-          </div>
+        <div style={{ marginBottom: 24 }}>
+          <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-2)', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 10 }}>Theme</div>
+          <select
+            value={theme}
+            onChange={e => {
+              const key = e.target.value
+              if (THEMES[key]?.premium && !isPremium) { navigate('/premium'); onClose(); return }
+              setTheme(key)
+            }}
+            className="input"
+            style={{ width: '100%', cursor: 'pointer' }}
+          >
+            {Object.entries(THEMES).map(([key, t]) => (
+              <option key={key} value={key}>
+                {t.label}{t.premium ? (isPremium ? ' (Pro)' : ' (Locked)') : ''}
+              </option>
+            ))}
+          </select>
         </div>
 
         <div style={{ height: 1, background: 'var(--border)', marginBottom: 24 }} />
@@ -103,7 +98,7 @@ export default function SettingsModal({ onClose }) {
             style={{ resize: 'none', marginBottom: 10 }} />
           {error && <div style={{ fontSize: 13, color: 'var(--red)', padding: '8px 0' }}>{error}</div>}
           {sent
-            ? <div style={{ fontSize: 13, color: 'var(--green)', padding: '8px 0' }}>✓ Thanks for your feedback!</div>
+            ? <div style={{ fontSize: 13, color: 'var(--green)', padding: '8px 0' }}>Thanks for your feedback!</div>
             : <button type="button" className="btn btn-primary" onClick={submitFeedback} disabled={sending || !feedbackMsg.trim()}>
                 {sending ? 'Sending...' : 'Send feedback'}
               </button>

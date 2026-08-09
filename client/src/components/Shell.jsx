@@ -4,6 +4,17 @@ import { useCampaign } from '../context/CampaignContext'
 import { useMusic, MOODS } from '../context/MusicContext'
 import { useState, useEffect, useRef } from 'react'
 import SettingsModal from './SettingsModal'
+import { CloudinaryImage } from '@cloudinary/url-gen'
+import { quality, format } from '@cloudinary/url-gen/actions/delivery'
+import { auto as autoQuality } from '@cloudinary/url-gen/qualifiers/quality'
+import { auto as autoFormat } from '@cloudinary/url-gen/qualifiers/format'
+
+const CLOUD_NAME = 'crcbzpw6'
+
+const logoUrl = new CloudinaryImage('5e_Utillity', { cloudName: CLOUD_NAME })
+  .delivery(quality(autoQuality()))
+  .delivery(format(autoFormat()))
+  .toURL()
 
 function MusicMiniPlayer({ bottomOffset }) {
   const { current, volume, play, stop, setVol } = useMusic()
@@ -123,10 +134,9 @@ export default function Shell({ children }) {
     campaignDropdownTimer.current = setTimeout(() => setShowCampaigns(false), 5000)
   }
   const [showSettings, setShowSettings] = useState(false)
-  const [joinPending, setJoinPending] = useState(false) // player waiting for DM approval
-  const [pendingMembers, setPendingMembers] = useState([]) // DM: list of pending requests
+  const [joinPending, setJoinPending] = useState(false)
+  const [pendingMembers, setPendingMembers] = useState([])
 
-  // DM: load pending join requests whenever active campaign changes
   useEffect(() => {
     if (!isDM || !activeCampaign) return
     api(`/campaigns/${activeCampaign._id}/pending`)
@@ -184,8 +194,13 @@ export default function Shell({ children }) {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden' }}>
         {/* Mobile top bar */}
-        <div style={{ background: 'var(--surface)', borderBottom: '1px solid var(--border)', padding: '10px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
-          <div style={{ fontFamily: 'Cinzel, serif', fontSize: 16, fontWeight: 600, color: 'var(--gold)' }}>Lore &amp; Ledger</div>
+        <div style={{ background: 'var(--surface)', borderBottom: '1px solid var(--border)', padding: '8px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
+          {/* Logo — centred absolutely so it doesn't push the action buttons */}
+          <div style={{ position: 'absolute', left: '50%', transform: 'translateX(-50%)', pointerEvents: 'none' }}>
+            <img src={logoUrl} alt="Lore & Ledger" style={{ height: 36, width: 'auto', objectFit: 'contain', display: 'block' }} />
+          </div>
+          {/* Spacer to keep right-side buttons from overlapping logo */}
+          <div style={{ width: 36 }} />
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
             <button onClick={() => showCampaigns ? closeCampaigns() : openCampaigns()} style={{ background: 'var(--gold-bg)', border: '1px solid var(--gold-border)', color: 'var(--gold)', padding: '8px 12px', borderRadius: 10, fontSize: 11, cursor: 'pointer', fontFamily: 'Cinzel, serif', maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
               {(activeCampaign && !activeCampaign.isPersonal) ? activeCampaign.name : 'Campaign'} ▾
@@ -337,9 +352,8 @@ export default function Shell({ children }) {
   return (
     <div style={{ display: 'flex', height: '100vh', overflow: 'hidden' }}>
       <aside style={{ width: 232, flexShrink: 0, background: 'var(--surface)', borderRight: '1px solid var(--border)', display: 'flex', flexDirection: 'column' }}>
-        <div style={{ padding: '20px 20px 16px', borderBottom: '1px solid var(--border)' }}>
-          <div style={{ fontFamily: 'Cinzel, serif', fontSize: 18, fontWeight: 600, color: 'var(--gold)' }}>Lore &amp; Ledger</div>
-          <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 2 }}>D&amp;D Companion</div>
+        <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <img src={logoUrl} alt="Lore & Ledger" style={{ width: '100%', maxWidth: 160, height: 'auto', objectFit: 'contain', display: 'block' }} />
         </div>
 
         <div style={{ padding: '12px 14px', borderBottom: '1px solid var(--border)' }}>
@@ -447,8 +461,6 @@ export default function Shell({ children }) {
 
       <main style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>{children}</main>
       {showSettings && <SettingsModal onClose={() => setShowSettings(false)} />}
-
-
     </div>
   )
 }
