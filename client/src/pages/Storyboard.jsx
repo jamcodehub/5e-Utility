@@ -8,7 +8,7 @@ import { quality, format } from '@cloudinary/url-gen/actions/delivery'
 import { auto as autoQuality } from '@cloudinary/url-gen/qualifiers/quality'
 import { auto as autoFormat } from '@cloudinary/url-gen/qualifiers/format'
 
-const CLOUD_NAME = 'YOUR_CLOUD_NAME'
+const CLOUD_NAME = 'crcbzpw6'
 
 function getOptimisedUrl(cloudinaryUrl) {
   if (!cloudinaryUrl) return ''

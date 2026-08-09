@@ -34,9 +34,9 @@ const sendOtp = async (user, code) => {
     return
   }
   await transport.sendMail({
-    from: process.env.SMTP_FROM || 'Lore & Ledger <no-reply@loreledger.app>',
+    from: process.env.SMTP_FROM || '5e Utility <no-reply@5eUtility.app>',
     to: user.email,
-    subject: 'Your Lore & Ledger verification code',
+    subject: 'Your 5e Utility verification code',
     text: `Your verification code is ${code}. It expires in 10 minutes.`,
   })
 }

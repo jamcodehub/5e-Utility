@@ -33,7 +33,7 @@ export const THEMES = {
     }
   },
   barbarian: {
-    label: 'Barbarian',
+    label: 'Barbarian', premium: true,
     vars: {
       '--bg': '#1a0e0e', '--surface': '#241212', '--surface2': '#2e1616',
       '--border': '#3e2020', '--border-strong': '#5a2e2e',
@@ -47,7 +47,7 @@ export const THEMES = {
     }
   },
   wizard: {
-    label: 'Wizard',
+    label: 'Wizard', premium: true,
     vars: {
       '--bg': '#080e1a', '--surface': '#0c1228', '--surface2': '#101832',
       '--border': '#141e50', '--border-strong': '#1c2a70',
@@ -61,7 +61,7 @@ export const THEMES = {
     }
   },
   druid: {
-    label: 'Druid',
+    label: 'Druid', premium: true,
     vars: {
       '--bg': '#0e140e', '--surface': '#121a12', '--surface2': '#162016',
       '--border': '#203020', '--border-strong': '#2e4a2e',
@@ -75,7 +75,7 @@ export const THEMES = {
     }
   },
   paladin: {
-    label: 'Paladin',
+    label: 'Paladin', premium: true,
     vars: {
       '--bg': '#14120e', '--surface': '#1c1a12', '--surface2': '#242016',
       '--border': '#3a3420', '--border-strong': '#5a5030',
@@ -89,7 +89,7 @@ export const THEMES = {
     }
   },
   rogue: {
-    label: 'Rogue',
+    label: 'Rogue', premium: true,
     vars: {
       '--bg': '#0e0e0e', '--surface': '#141414', '--surface2': '#1a1a1a',
       '--border': '#282828', '--border-strong': '#383838',
