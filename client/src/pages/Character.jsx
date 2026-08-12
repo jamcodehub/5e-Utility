@@ -14,9 +14,10 @@ const CLOUD_NAME = 'crcbzpw6'
 
 function getOptimisedUrl(cloudinaryUrl, width = null) {
   if (!cloudinaryUrl) return ''
-  const match = cloudinaryUrl.match(/\/upload\/(?:v\d+\/)?(.+?)(\.[^.]+)?$/)
-  if (!match) return cloudinaryUrl
-  const publicId = match[1]
+  // Strip everything up to /upload/ (and optional version), then strip extension
+  const afterUpload = cloudinaryUrl.replace(/^.*\/upload\/(?:v\d+\/)?/, '')
+  const publicId = afterUpload.replace(/\.[^.]+$/, '')
+  if (!publicId) return cloudinaryUrl
   let img = new CloudinaryImage(publicId, { cloudName: CLOUD_NAME })
     .delivery(quality(autoQuality()))
     .delivery(format(autoFormat()))
