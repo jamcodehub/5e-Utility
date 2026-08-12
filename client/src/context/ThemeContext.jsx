@@ -5,14 +5,14 @@ export const useTheme = () => useContext(ThemeContext)
 
 export const THEMES = {
   light: {
-    label: 'Default Light',
+    label: 'Light',
     vars: {
       '--bg': '#f5f4f1', '--surface': '#ffffff', '--surface2': '#f0ede8',
       '--border': '#e4e0d8', '--border-strong': '#ccc8bf',
       '--text': '#1a1917', '--text-2': '#6b6760', '--text-3': '#a8a49c',
       '--gold': '#9a7c3a', '--gold-bg': '#faf6ed', '--gold-border': '#e8d9a8',
       '--red': '#c0392b', '--green': '#2e7d52',
-      '--sb-outer': '#100d08', '--sb-bar': '#1a1208', '--sb-bar-border': '#3a2a14',
+      '--sb-outer': '#272523ff', '--sb-bar': '#221e1aff', '--sb-bar-border': '#574c3dff',
       '--sb-accent': '#c8a060', '--sb-spine': '#b39b74',
       '--sb-page-start': '#f7efde', '--sb-page-end': '#ede1c8',
       '--sb-page-title': '#3f2b1f', '--sb-page-body': '#5b4431', '--sb-page-meta': '#9a8060',

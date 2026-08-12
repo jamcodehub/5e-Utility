@@ -6,9 +6,6 @@ import { useToast } from '../hooks/useToast'
 const nanoid = () => Math.random().toString(36).slice(2, 9)
 const emptyGuide = () => ({ story: '', currentArc: '', lastSession: '', worldNotes: '', npcs: [], quests: [] })
 
-// ─── DropTextarea ─────────────────────────────────────────────────────────────
-// Desktop: drag a player avatar onto this → inserts their name at drop position.
-// Mobile:  tap an avatar to select it, then tap this field → inserts name at cursor.
 function DropTextarea({ value, onChange, activePlayer, onInserted, style = {}, rows = 2, placeholder }) {
   const [over, setOver] = useState(false)
   const ref = useRef(null)
@@ -32,11 +29,7 @@ function DropTextarea({ value, onChange, activePlayer, onInserted, style = {}, r
   return (
     <div style={{ position: 'relative' }}>
       <textarea
-        ref={ref}
-        className="input"
-        rows={rows}
-        value={value}
-        onChange={onChange}
+        ref={ref} className="input" rows={rows} value={value} onChange={onChange}
         placeholder={activePlayer ? `Tap to insert "${activePlayer.name}", or type…` : placeholder}
         onDragOver={e => { e.preventDefault(); setOver(true) }}
         onDragLeave={() => setOver(false)}
@@ -45,8 +38,7 @@ function DropTextarea({ value, onChange, activePlayer, onInserted, style = {}, r
         style={{
           width: '100%', resize: 'none', fontSize: 12, lineHeight: 1.55, boxSizing: 'border-box',
           outline: over ? '2px solid var(--gold)' : activePlayer ? '2px dashed rgba(154,124,58,0.45)' : undefined,
-          cursor: activePlayer ? 'cell' : undefined,
-          ...style,
+          cursor: activePlayer ? 'cell' : undefined, ...style,
         }}
       />
       {activePlayer && (
@@ -70,18 +62,19 @@ function RelationNote() {
   return <div style={{ fontSize: 10, color: 'var(--gold)', marginTop: 3 }}>↑ Character Relation — shown in each player's Roleplay Assistant</div>
 }
 
-// ─── NpcCard ──────────────────────────────────────────────────────────────────
-function NpcCard({ npc, onChange, onRemove, activePlayer, onInserted }) {
+// Per-card save button — no shared state, no cross-saves
+function NpcCard({ npc, onChange, onRemove, onSave, activePlayer, onInserted }) {
+  const [saving, setSaving] = useState(false)
   const u = f => e => onChange({ ...npc, [f]: e.target.value })
+  const handleSave = async () => { setSaving(true); await onSave(npc); setSaving(false) }
+
   return (
     <div style={{ border: '1px solid var(--border)', borderRadius: 8, padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 8 }}>
       <div style={{ display: 'flex', gap: 8 }}>
         <input className="input" value={npc.name} onChange={u('name')} placeholder="NPC name" style={{ flex: 1, fontSize: 13, fontWeight: 500 }} />
         <button onClick={onRemove} style={{ background: 'none', border: 'none', color: 'var(--text-3)', cursor: 'pointer', fontSize: 18, lineHeight: 1, padding: '0 2px', flexShrink: 0 }}>✕</button>
       </div>
-      <DropTextarea value={npc.description} onChange={u('description')} rows={2}
-        placeholder="Who are they? Role, personality, motives…"
-        activePlayer={activePlayer} onInserted={onInserted} />
+      <DropTextarea value={npc.description} onChange={u('description')} rows={2} placeholder="Who are they? Role, personality, motives…" activePlayer={activePlayer} onInserted={onInserted} />
       <div>
         <DropTextarea value={npc.characterRelation} onChange={u('characterRelation')} rows={2}
           placeholder="How do they personally connect to the characters? History, secrets, hooks, debts?"
@@ -89,14 +82,21 @@ function NpcCard({ npc, onChange, onRemove, activePlayer, onInserted }) {
           style={{ borderColor: 'var(--gold-border)', background: 'var(--gold-bg)' }} />
         <RelationNote />
       </div>
+      <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+        <button className="btn btn-primary btn-sm" onClick={handleSave} disabled={saving || !npc.name.trim()}>
+          {saving ? 'Saving…' : 'Save NPC'}
+        </button>
+      </div>
     </div>
   )
 }
 
-// ─── QuestCard ────────────────────────────────────────────────────────────────
-function QuestCard({ quest, onChange, onRemove, activePlayer, onInserted }) {
+function QuestCard({ quest, onChange, onRemove, onSave, activePlayer, onInserted }) {
+  const [saving, setSaving] = useState(false)
   const u = f => e => onChange({ ...quest, [f]: e.target.value })
   const SC = { active: '#1d6a3a', completed: '#9a7c3a', failed: '#b03030' }
+  const handleSave = async () => { setSaving(true); await onSave(quest); setSaving(false) }
+
   return (
     <div style={{ border: '1px solid var(--border)', borderRadius: 8, padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 8 }}>
       <div style={{ display: 'flex', gap: 8 }}>
@@ -108,9 +108,7 @@ function QuestCard({ quest, onChange, onRemove, activePlayer, onInserted }) {
         </select>
         <button onClick={onRemove} style={{ background: 'none', border: 'none', color: 'var(--text-3)', cursor: 'pointer', fontSize: 18, lineHeight: 1, padding: '0 2px', flexShrink: 0 }}>✕</button>
       </div>
-      <DropTextarea value={quest.description} onChange={u('description')} rows={2}
-        placeholder="What is this quest? Stakes, background, what needs to happen…"
-        activePlayer={activePlayer} onInserted={onInserted} />
+      <DropTextarea value={quest.description} onChange={u('description')} rows={2} placeholder="What is this quest? Stakes, background, what needs to happen…" activePlayer={activePlayer} onInserted={onInserted} />
       <div>
         <DropTextarea value={quest.characterRelation} onChange={u('characterRelation')} rows={2}
           placeholder="How does this connect to specific characters? Whose backstory does it touch, who has the most to lose?"
@@ -118,11 +116,15 @@ function QuestCard({ quest, onChange, onRemove, activePlayer, onInserted }) {
           style={{ borderColor: 'var(--gold-border)', background: 'var(--gold-bg)' }} />
         <RelationNote />
       </div>
+      <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+        <button className="btn btn-primary btn-sm" onClick={handleSave} disabled={saving || !quest.title.trim()}>
+          {saving ? 'Saving…' : 'Save Quest'}
+        </button>
+      </div>
     </div>
   )
 }
 
-// ─── Character Reference Modal ────────────────────────────────────────────────
 function CharModal({ player, onClose }) {
   const char = player.character
   const Row = ({ label, val }) => val ? (
@@ -135,7 +137,6 @@ function CharModal({ player, onClose }) {
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.65)', zIndex: 300, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }} onClick={onClose}>
       <div className="card" style={{ padding: '22px 24px', width: '100%', maxWidth: 460, maxHeight: '88vh', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
-
         <div style={{ display: 'flex', gap: 12, alignItems: 'center', marginBottom: 16, paddingBottom: 14, borderBottom: '1px solid var(--border)' }}>
           <div style={{ width: 48, height: 48, borderRadius: '50%', flexShrink: 0, overflow: 'hidden', background: 'var(--gold-bg)', border: '2px solid var(--gold-border)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             {char?.avatarUrl
@@ -149,7 +150,6 @@ function CharModal({ player, onClose }) {
           </div>
           <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--text-3)', cursor: 'pointer', fontSize: 22, padding: 4, lineHeight: 1, flexShrink: 0 }}>✕</button>
         </div>
-
         {!char ? (
           <div style={{ fontSize: 13, color: 'var(--text-3)', textAlign: 'center', padding: '16px 0' }}>This player hasn't created a character sheet yet.</div>
         ) : (
@@ -157,8 +157,7 @@ function CharModal({ player, onClose }) {
             {char.stats && Object.values(char.stats).some(Boolean) && (
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 5, marginBottom: 18 }}>
                 {['str', 'dex', 'con', 'int', 'wis', 'cha'].map(s => {
-                  const v = char.stats[s] || 10
-                  const m = Math.floor((v - 10) / 2)
+                  const v = char.stats[s] || 10; const m = Math.floor((v - 10) / 2)
                   return (
                     <div key={s} style={{ textAlign: 'center', padding: '5px 2px', border: '1px solid var(--border)', borderRadius: 6 }}>
                       <div style={{ fontSize: 9, color: 'var(--text-3)', textTransform: 'uppercase' }}>{s}</div>
@@ -169,14 +168,14 @@ function CharModal({ player, onClose }) {
                 })}
               </div>
             )}
-            <Row label="Background / Origin"  val={char.background} />
-            <Row label="Personality Traits"   val={char.personality} />
-            <Row label="Goals & Motivations"  val={char.goals} />
-            <Row label="Lore / Secrets"       val={char.lore} />
+            <Row label="Background / Origin" val={char.background} />
+            <Row label="Personality Traits"  val={char.personality} />
+            <Row label="Goals & Motivations" val={char.goals} />
+            <Row label="Lore / Secrets"      val={char.lore} />
             {char.notes && <Row label="Notes" val={char.notes} />}
             {!char.background && !char.personality && !char.goals && !char.lore && (
               <div style={{ fontSize: 12, color: 'var(--text-3)', lineHeight: 1.7, background: 'var(--surface2)', borderRadius: 8, padding: '10px 12px' }}>
-                No character depth filled in yet. Ask {player.username} to complete their <strong>Backstory</strong> tab on the Character sheet, or generate a Roleplay Assistant plan — both save this data.
+                No character depth filled in yet. Ask {player.username} to complete their <strong>Backstory</strong> tab on the Character sheet.
               </div>
             )}
           </>
@@ -187,7 +186,6 @@ function CharModal({ player, onClose }) {
   )
 }
 
-// ─── Main ─────────────────────────────────────────────────────────────────────
 export default function CampaignGuide() {
   const { activeCampaign } = useCampaign()
   const { user } = useAuth()
@@ -196,13 +194,15 @@ export default function CampaignGuide() {
 
   const [guide, setGuide]         = useState(emptyGuide())
   const [members, setMembers]     = useState([])
-  const [activePlayer, setActive] = useState(null)   // { userId, name } | null
+  const [activePlayer, setActive] = useState(null)
   const [charModal, setCharModal] = useState(null)
-  const [saving, setSaving]       = useState(false)
+  const [storySaving, setStorySaving] = useState(false)
   const [dirty, setDirty]         = useState(false)
   const [mobileTab, setMobileTab] = useState('story')
   const [isMobile, setIsMobile]   = useState(window.innerWidth <= 768)
   const didDrag = useRef(false)
+  const guideRef = useRef(guide)
+  useEffect(() => { guideRef.current = guide }, [guide])
 
   useEffect(() => {
     const fn = () => setIsMobile(window.innerWidth <= 768)
@@ -226,43 +226,51 @@ export default function CampaignGuide() {
   const upd = f => e => { setGuide(g => ({ ...g, [f]: e.target.value })); setDirty(true) }
   const clearPlayer = () => setActive(null)
 
-  const addNpc   = () => { setGuide(g => ({ ...g, npcs:   [...g.npcs,   { id: nanoid(), name: '', description: '', characterRelation: '' }] })); setDirty(true) }
-  const addQuest = () => { setGuide(g => ({ ...g, quests: [...g.quests, { id: nanoid(), title: '', description: '', status: 'active', characterRelation: '' }] })); setDirty(true) }
+  const addNpc   = () => setGuide(g => ({ ...g, npcs:   [...g.npcs,   { id: nanoid(), name: '', description: '', characterRelation: '' }] }))
+  const addQuest = () => setGuide(g => ({ ...g, quests: [...g.quests, { id: nanoid(), title: '', description: '', status: 'active', characterRelation: '' }] }))
   const updNpc   = (id, v) => { setGuide(g => ({ ...g, npcs:   g.npcs.map(n => n.id === id ? v : n) })); setDirty(true) }
-  const rmNpc    = id      => { setGuide(g => ({ ...g, npcs:   g.npcs.filter(n => n.id !== id) })); setDirty(true) }
+  const rmNpc    = id => setGuide(g => ({ ...g, npcs:   g.npcs.filter(n => n.id !== id) }))
   const updQuest = (id, v) => { setGuide(g => ({ ...g, quests: g.quests.map(q => q.id === id ? v : q) })); setDirty(true) }
-  const rmQuest  = id      => { setGuide(g => ({ ...g, quests: g.quests.filter(q => q.id !== id) })); setDirty(true) }
+  const rmQuest  = id => setGuide(g => ({ ...g, quests: g.quests.filter(q => q.id !== id) }))
 
-  const save = async () => {
-    setSaving(true)
+  // Story-only save (top-right button)
+  const saveStory = async () => {
+    setStorySaving(true)
     try {
-      await api(`/campaigns/${activeCampaign._id}/guide`, { method: 'PUT', body: guide })
+      await api(`/campaigns/${activeCampaign._id}/guide`, { method: 'PUT', body: guideRef.current })
       setDirty(false)
-      // Sync named NPCs to Lore board (best-effort, no duplicates)
-      const namedNpcs = guide.npcs.filter(n => n.name.trim())
-      if (namedNpcs.length > 0) {
+      toast('Guide saved')
+    } catch { toast('Failed to save') }
+    setStorySaving(false)
+  }
+
+  // Save one NPC — writes full guide to keep backend consistent, syncs only this NPC to lore
+  const saveNpc = async (npc) => {
+    try {
+      await api(`/campaigns/${activeCampaign._id}/guide`, { method: 'PUT', body: guideRef.current })
+      if (npc.name.trim()) {
         try {
-          const existingLore = await api(`/lore/${activeCampaign._id}`)
-          const existingNpcTitles = new Set(
-            (existingLore || []).filter(e => (e.tags || []).includes('npc')).map(e => e.title)
-          )
-          for (const npc of namedNpcs) {
-            if (!existingNpcTitles.has(npc.name.trim())) {
-              await api(`/lore/${activeCampaign._id}`, {
-                method: 'POST',
-                body: { title: npc.name.trim(), content: npc.description || '', tags: ['npc'] },
-              })
-            }
+          const existing = await api(`/lore/${activeCampaign._id}`)
+          const titles = new Set((existing || []).filter(e => (e.tags || []).includes('npc')).map(e => e.title))
+          if (!titles.has(npc.name.trim())) {
+            await api(`/lore/${activeCampaign._id}`, { method: 'POST', body: { title: npc.name.trim(), content: npc.description || '', tags: ['npc'] } })
           }
-        } catch (_e) { /* lore sync is best-effort */ }
+        } catch { /* best-effort */ }
       }
-      toast('Campaign guide saved ✓')
-    } catch (_e) { toast('Failed to save — try again') }
-    setSaving(false)
+      toast(`NPC "${npc.name}" saved`)
+    } catch { toast('Failed to save NPC') }
+  }
+
+  // Save one quest — writes full guide to keep backend consistent
+  const saveQuest = async (quest) => {
+    try {
+      await api(`/campaigns/${activeCampaign._id}/guide`, { method: 'PUT', body: guideRef.current })
+      toast(`Quest "${quest.title}" saved`)
+    } catch { toast('Failed to save quest') }
   }
 
   if (!activeCampaign) return <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-3)' }}>Select a campaign.</div>
-  if (!isDM) return <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-3)', flexDirection: 'column', gap: 8 }}><div style={{ fontSize: 28 }}>📖</div><div>Only Dungeon Masters can edit the Campaign Guide.</div></div>
+  if (!isDM) return <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-3)' }}>Only Dungeon Masters can edit the Campaign Guide.</div>
 
   const StorySection = (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -289,13 +297,8 @@ export default function CampaignGuide() {
       {guide.npcs.length === 0
         ? <div style={{ fontSize: 12, color: 'var(--text-3)', lineHeight: 1.8 }}>No NPCs yet. The <span style={{ color: 'var(--gold)' }}>Character Relation</span> field appears directly in each player's session plan.</div>
         : <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            {guide.npcs.map(n => <NpcCard key={n.id} npc={n} onChange={v => updNpc(n.id, v)} onRemove={() => rmNpc(n.id)} activePlayer={activePlayer} onInserted={clearPlayer} />)}
+            {guide.npcs.map(n => <NpcCard key={n.id} npc={n} onChange={v => updNpc(n.id, v)} onRemove={() => rmNpc(n.id)} onSave={saveNpc} activePlayer={activePlayer} onInserted={clearPlayer} />)}
           </div>}
-      {guide.npcs.length > 0 && (
-        <button className="btn btn-primary btn-sm" onClick={save} disabled={saving} style={{ width: '100%', justifyContent: 'center', marginTop: 12, opacity: dirty ? 1 : 0.45 }}>
-          {saving ? 'Saving…' : dirty ? '✦ Save Guide & Sync to Lore' : 'Saved ✓'}
-        </button>
-      )}
     </div>
   )
 
@@ -308,13 +311,8 @@ export default function CampaignGuide() {
       {guide.quests.length === 0
         ? <div style={{ fontSize: 12, color: 'var(--text-3)', lineHeight: 1.8 }}>No quests yet. The <span style={{ color: 'var(--gold)' }}>Character Relation</span> field ties each quest to a specific character's motivation.</div>
         : <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            {guide.quests.map(q => <QuestCard key={q.id} quest={q} onChange={v => updQuest(q.id, v)} onRemove={() => rmQuest(q.id)} activePlayer={activePlayer} onInserted={clearPlayer} />)}
+            {guide.quests.map(q => <QuestCard key={q.id} quest={q} onChange={v => updQuest(q.id, v)} onRemove={() => rmQuest(q.id)} onSave={saveQuest} activePlayer={activePlayer} onInserted={clearPlayer} />)}
           </div>}
-      {guide.quests.length > 0 && (
-        <button className="btn btn-primary btn-sm" onClick={save} disabled={saving} style={{ width: '100%', justifyContent: 'center', marginTop: 12, opacity: dirty ? 1 : 0.45 }}>
-          {saving ? 'Saving…' : dirty ? '✦ Save Guide' : 'Saved ✓'}
-        </button>
-      )}
     </div>
   )
 
@@ -331,38 +329,17 @@ export default function CampaignGuide() {
           <div key={uid} style={{ flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, position: 'relative', userSelect: 'none' }}>
             <div
               draggable
-              onDragStart={e => {
-                didDrag.current = true
-                setActive({ userId: uid, name })
-                e.dataTransfer.setData('text/plain', name)
-                e.dataTransfer.effectAllowed = 'copy'
-              }}
+              onDragStart={e => { didDrag.current = true; setActive({ userId: uid, name }); e.dataTransfer.setData('text/plain', name); e.dataTransfer.effectAllowed = 'copy' }}
               onDragEnd={() => { setActive(null); setTimeout(() => { didDrag.current = false }, 40) }}
-              onClick={() => {
-                if (didDrag.current) return
-                // Mobile: tap toggles selection for insert; Desktop: opens modal
-                if (isMobile) setActive(selected ? null : { userId: uid, name })
-                else setCharModal(p)
-              }}
-              style={{
-                width: 40, height: 40, borderRadius: '50%', overflow: 'hidden',
-                background: 'var(--gold-bg)', border: `2px solid ${selected ? 'var(--gold)' : 'var(--gold-border)'}`,
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                cursor: isMobile ? 'pointer' : 'grab',
-                boxShadow: selected ? '0 0 0 3px rgba(154,124,58,0.28)' : 'none',
-                transition: 'box-shadow .15s, border-color .15s',
-              }}
+              onClick={() => { if (didDrag.current) return; if (isMobile) setActive(selected ? null : { userId: uid, name }); else setCharModal(p) }}
+              style={{ width: 40, height: 40, borderRadius: '50%', overflow: 'hidden', background: 'var(--gold-bg)', border: `2px solid ${selected ? 'var(--gold)' : 'var(--gold-border)'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: isMobile ? 'pointer' : 'grab', boxShadow: selected ? '0 0 0 3px rgba(154,124,58,0.28)' : 'none', transition: 'box-shadow .15s, border-color .15s' }}
             >
               {p.character?.avatarUrl
                 ? <img src={p.character.avatarUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                 : <span style={{ fontFamily: 'Cinzel, serif', fontSize: 15, color: 'var(--gold)', fontWeight: 600 }}>{name[0]?.toUpperCase()}</span>}
             </div>
             <div style={{ fontSize: 9, color: selected ? 'var(--gold)' : 'var(--text-3)', fontWeight: selected ? 700 : 400, maxWidth: 44, textAlign: 'center', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{name}</div>
-            <button
-              onClick={e => { e.stopPropagation(); setCharModal(p) }}
-              title="View character sheet"
-              style={{ position: 'absolute', top: -2, right: -4, width: 15, height: 15, borderRadius: '50%', background: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--text-3)', fontSize: 9, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0, lineHeight: 1 }}
-            >ⓘ</button>
+            <button onClick={e => { e.stopPropagation(); setCharModal(p) }} title="View character sheet" style={{ position: 'absolute', top: -2, right: -4, width: 15, height: 15, borderRadius: '50%', background: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--text-3)', fontSize: 9, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0, lineHeight: 1 }}>ⓘ</button>
           </div>
         )
       })}
@@ -376,17 +353,15 @@ export default function CampaignGuide() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden', paddingTop: 16 }}>
-
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', padding: '0 24px', marginBottom: 10, flexShrink: 0, gap: 12 }}>
         <div>
           <h2 style={{ fontSize: 18, marginBottom: 3 }}>Campaign Guide</h2>
           <p style={{ color: 'var(--text-2)', fontSize: 12, margin: 0, lineHeight: 1.5 }}>
-            {isMobile ? "Players' Roleplay Assistant reads this automatically."
-              : "Players' Roleplay Assistant reads this automatically. Gold fields personalise each player's session plan."}
+            {isMobile ? "Players' Roleplay Assistant reads this automatically." : "Players' Roleplay Assistant reads this automatically. Gold fields personalise each player's session plan."}
           </p>
         </div>
-        <button className="btn btn-primary btn-sm" onClick={save} disabled={saving || !dirty} style={{ flexShrink: 0, opacity: dirty ? 1 : 0.4, whiteSpace: 'nowrap', marginTop: 2 }}>
-          {saving ? 'Saving…' : dirty ? '✦ Save' : 'Saved ✓'}
+        <button className="btn btn-primary btn-sm" onClick={saveStory} disabled={storySaving || !dirty} style={{ flexShrink: 0, opacity: dirty ? 1 : 0.4, whiteSpace: 'nowrap', marginTop: 2 }}>
+          {storySaving ? 'Saving…' : dirty ? 'Save Story' : 'Saved'}
         </button>
       </div>
 
