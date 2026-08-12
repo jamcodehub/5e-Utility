@@ -97,13 +97,13 @@ export default function Auth() {
       </div>
     )
   }
-
+//sigin in / register form
   return (
     <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg)', padding: 20 }}>
       <div className="card" style={{ width: '100%', maxWidth: 380, padding: 32 }}>
         <div style={{ marginBottom: 28, textAlign: 'center' }}>
           <div style={{ fontFamily: 'Cinzel, serif', fontSize: 24, fontWeight: 600, color: 'var(--gold)', marginBottom: 4 }}>
-            Lore &amp; Ledger
+            5e &amp; Utility
           </div>
           <div style={{ fontSize: 13, color: 'var(--text-2)' }}>Your D&amp;D campaign companion</div>
         </div>

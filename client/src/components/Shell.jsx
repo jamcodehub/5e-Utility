@@ -197,7 +197,7 @@ export default function Shell({ children }) {
         <div style={{ background: 'var(--surface)', borderBottom: '1px solid var(--border)', padding: '8px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
           {/* Logo — centred absolutely so it doesn't push the action buttons */}
           <div style={{ position: 'absolute', left: '50%', transform: 'translateX(-50%)', pointerEvents: 'none' }}>
-            <img src={logoUrl} alt="Lore & Ledger" style={{ height: 36, width: 'auto', objectFit: 'contain', display: 'block' }} />
+            <img src={logoUrl} alt="5e Utility" style={{ height: 36, width: 'auto', objectFit: 'contain', display: 'block' }} />
           </div>
           {/* Spacer to keep right-side buttons from overlapping logo */}
           <div style={{ width: 36 }} />
@@ -348,12 +348,12 @@ export default function Shell({ children }) {
     )
   }
 
-  // Desktop layout
+  // Desktop layout .
   return (
     <div style={{ display: 'flex', height: '100vh', overflow: 'hidden' }}>
       <aside style={{ width: 232, flexShrink: 0, background: 'var(--surface)', borderRight: '1px solid var(--border)', display: 'flex', flexDirection: 'column' }}>
         <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <img src={logoUrl} alt="Lore & Ledger" style={{ width: '100%', maxWidth: 160, height: 'auto', objectFit: 'contain', display: 'block' }} />
+          <img src={logoUrl} alt="5e Utility" style={{ width: '100%', maxWidth: 160, height: 'auto', objectFit: 'contain', display: 'block' }} />
         </div>
 
         <div style={{ padding: '12px 14px', borderBottom: '1px solid var(--border)' }}>
