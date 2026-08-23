@@ -12,7 +12,7 @@ export const THEMES = {
       '--text': '#1a1917', '--text-2': '#6b6760', '--text-3': '#a8a49c',
       '--gold': '#9a7c3a', '--gold-bg': '#faf6ed', '--gold-border': '#e8d9a8',
       '--red': '#c0392b', '--green': '#2e7d52',
-      '--sb-outer': '#ffffff', '--sb-bar': '#f5f4f1', '--sb-bar-border': '#625c51ff',
+      '--sb-outer': '#ffffff', '--sb-bar': '#f5f4f1', '--sb-bar-border': '#faf6ed',
       '--sb-accent': '#c8a060', '--sb-spine': '#b39b74',
       '--sb-page-start': '#f7efde', '--sb-page-end': '#ede1c8',
       '--sb-page-title': '#3f2b1f', '--sb-page-body': '#5b4431', '--sb-page-meta': '#9a8060',
