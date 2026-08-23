@@ -5,13 +5,13 @@ import { useCampaign } from '../context/CampaignContext'
 import { useToast } from '../hooks/useToast'
 
 const CLOUD_NAME = 'crcbzpw6'
-const UPLOAD_PRESET = 'lore_ledger_music' // create an unsigned preset in Cloudinary dashboard
+const UPLOAD_PRESET = '5e_utility_music' // create an unsigned preset in Cloudinary dashboard
 
 async function uploadAudioToCloudinary(file) {
   const fd = new FormData()
   fd.append('file', file)
   fd.append('upload_preset', UPLOAD_PRESET)
-  fd.append('folder', 'lore-ledger/music')
+  fd.append('folder', '5e-utility/music')
   fd.append('resource_type', 'video') // Cloudinary uses 'video' resource type for audio
 
   const res = await fetch(`https://api.cloudinary.com/v1_1/${CLOUD_NAME}/video/upload`, {
@@ -40,10 +40,25 @@ export default function MusicPlayer() {
   const audioRef = useRef(null)
   const fileInputRef = useRef(null)
 
+  // Session planner state
+  const [sessions, setSessions] = useState([])
+  const [newSessionName, setNewSessionName] = useState('')
+  const [expandedSessionId, setExpandedSessionId] = useState(null)
+  const [editingSessionId, setEditingSessionId] = useState(null)
+  const [editSessionName, setEditSessionName] = useState('')
+  const [cueTrackDraft, setCueTrackDraft] = useState('')
+  const [cueLabelDraft, setCueLabelDraft] = useState('')
+
   // Load playlist from backend
   useEffect(() => {
     if (!activeCampaign) return
     api(`/music/${activeCampaign._id}`).then(data => setPlaylist(data || [])).catch(() => {})
+  }, [activeCampaign?._id])
+
+  // Load planned sessions from backend
+  useEffect(() => {
+    if (!activeCampaign) return
+    api(`/sessions/${activeCampaign._id}`).then(data => setSessions(data || [])).catch(() => {})
   }, [activeCampaign?._id])
 
   // Audio element time tracking
@@ -136,6 +151,8 @@ export default function MusicPlayer() {
       await api(`/music/${track._id}`, { method: 'DELETE' })
       setPlaylist(p => p.filter(t => t._id !== track._id))
       if (activeTrack?.id === track._id) stopTrack()
+      // Drop it from any session cues too, so the UI stays in sync
+      setSessions(s => s.map(sess => ({ ...sess, cues: sess.cues.filter(c => c.track?._id !== track._id) })))
       toast('Track removed')
     } catch { toast('Could not remove track') }
   }
@@ -147,6 +164,71 @@ export default function MusicPlayer() {
       setPlaylist(p => p.map(t => t._id === updated._id ? updated : t))
       setEditingId(null)
     } catch { toast('Could not rename track') }
+  }
+
+  // ── Session planner handlers ──
+  const createSession = async () => {
+    if (!newSessionName.trim() || !activeCampaign) return
+    try {
+      const session = await api(`/sessions/${activeCampaign._id}`, { method: 'POST', body: { name: newSessionName.trim() } })
+      setSessions(s => [...s, { ...session, cues: [] }])
+      setNewSessionName('')
+      setExpandedSessionId(session._id)
+    } catch { toast('Could not create session') }
+  }
+
+  const saveSessionRename = async (session) => {
+    if (!editSessionName.trim()) return
+    try {
+      const updated = await api(`/sessions/${session._id}`, { method: 'PUT', body: { name: editSessionName.trim() } })
+      setSessions(s => s.map(x => x._id === updated._id ? { ...x, name: updated.name } : x))
+      setEditingSessionId(null)
+    } catch { toast('Could not rename session') }
+  }
+
+  const deleteSession = async (session) => {
+    if (!window.confirm(`Delete "${session.name}" and all its cues?`)) return
+    try {
+      await api(`/sessions/${session._id}`, { method: 'DELETE' })
+      setSessions(s => s.filter(x => x._id !== session._id))
+    } catch { toast('Could not delete session') }
+  }
+
+  const addCue = async (session) => {
+    if (!cueTrackDraft || !cueLabelDraft.trim()) return
+    try {
+      const updated = await api(`/sessions/${session._id}/cues`, {
+        method: 'POST',
+        body: { trackId: cueTrackDraft, label: cueLabelDraft.trim() },
+      })
+      setSessions(s => s.map(x => x._id === updated._id ? updated : x))
+      setCueTrackDraft('')
+      setCueLabelDraft('')
+    } catch { toast('Could not add cue') }
+  }
+
+  const deleteCue = async (session, cue) => {
+    try {
+      await api(`/sessions/${session._id}/cues/${cue._id}`, { method: 'DELETE' })
+      setSessions(s => s.map(x => x._id === session._id ? { ...x, cues: x.cues.filter(c => c._id !== cue._id) } : x))
+    } catch { toast('Could not remove cue') }
+  }
+
+  const moveCue = async (session, index, dir) => {
+    const newIndex = index + dir
+    if (newIndex < 0 || newIndex >= session.cues.length) return
+    const reordered = [...session.cues]
+    const [moved] = reordered.splice(index, 1)
+    reordered.splice(newIndex, 0, moved)
+    setSessions(s => s.map(x => x._id === session._id ? { ...x, cues: reordered } : x))
+    try {
+      await api(`/sessions/${session._id}/cues-reorder`, { method: 'PUT', body: { order: reordered.map(c => c._id) } })
+    } catch { toast('Could not reorder cues') }
+  }
+
+  const playCue = (cue) => {
+    if (!cue.track) return
+    playTrack({ _id: cue.track._id, id: cue.track._id, name: cue.track.name, url: cue.track.url })
   }
 
   const fmt = (s) => {
@@ -274,6 +356,161 @@ export default function MusicPlayer() {
               )
             })}
           </div>
+        )}
+      </div>
+
+      {/* ── Session Planner ── */}
+      <div className="card" style={{ padding: '16px 18px', marginBottom: 20 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+          <div style={{ fontFamily: 'Cinzel, serif', fontSize: 12, fontWeight: 600, color: 'var(--gold)', letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+            Session Planner
+          </div>
+        </div>
+
+        {!activeCampaign ? (
+          <div style={{ fontSize: 12, color: 'var(--text-3)', padding: '8px 0' }}>Select a campaign to plan sessions.</div>
+        ) : (
+          <>
+            <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
+              <input
+                className="input"
+                placeholder="New session name (e.g. Session 3)"
+                value={newSessionName}
+                onChange={e => setNewSessionName(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') createSession() }}
+                style={{ flex: 1, fontSize: 13 }}
+              />
+              <button onClick={createSession} disabled={!newSessionName.trim()} className="btn btn-ghost btn-sm">
+                + Add session
+              </button>
+            </div>
+
+            {sessions.length === 0 ? (
+              <div style={{ fontSize: 12, color: 'var(--text-3)', lineHeight: 1.7 }}>
+                No sessions planned yet. Create one, then queue up tracks with a note for when to play each — e.g. "Entering the forest".
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                {sessions.map(session => {
+                  const isOpen = expandedSessionId === session._id
+                  const isEditingName = editingSessionId === session._id
+                  return (
+                    <div key={session._id} style={{ border: '1px solid var(--border)', borderRadius: 8, overflow: 'hidden' }}>
+                      <div
+                        style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px', background: 'var(--surface2)', cursor: 'pointer' }}
+                        onClick={() => setExpandedSessionId(isOpen ? null : session._id)}
+                      >
+                        <span style={{ fontSize: 12, color: 'var(--text-3)', flexShrink: 0 }}>{isOpen ? '▾' : '▸'}</span>
+                        {isEditingName ? (
+                          <input
+                            autoFocus
+                            className="input"
+                            value={editSessionName}
+                            onClick={e => e.stopPropagation()}
+                            onChange={e => setEditSessionName(e.target.value)}
+                            onBlur={() => saveSessionRename(session)}
+                            onKeyDown={e => { if (e.key === 'Enter') saveSessionRename(session); if (e.key === 'Escape') setEditingSessionId(null) }}
+                            style={{ flex: 1, padding: '2px 6px', fontSize: 13 }}
+                          />
+                        ) : (
+                          <span
+                            style={{ flex: 1, fontSize: 14, fontWeight: 600, color: 'var(--text)' }}
+                            onDoubleClick={(e) => { e.stopPropagation(); setEditingSessionId(session._id); setEditSessionName(session.name) }}
+                            title="Double-click to rename"
+                          >
+                            {session.name}
+                          </span>
+                        )}
+                        <span style={{ fontSize: 11, color: 'var(--text-3)', flexShrink: 0 }}>
+                          {session.cues.length} cue{session.cues.length !== 1 ? 's' : ''}
+                        </span>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); setEditingSessionId(session._id); setEditSessionName(session.name) }}
+                          title="Rename"
+                          style={{ background: 'none', border: 'none', color: 'var(--text-3)', cursor: 'pointer', fontSize: 13, padding: '0 2px', flexShrink: 0 }}
+                        >✎</button>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); deleteSession(session) }}
+                          title="Delete session"
+                          style={{ background: 'none', border: 'none', color: 'var(--text-3)', cursor: 'pointer', fontSize: 16, padding: '0 2px', flexShrink: 0, lineHeight: 1 }}
+                        >✕</button>
+                      </div>
+
+                      {isOpen && (
+                        <div style={{ padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 6 }}>
+                          {session.cues.length === 0 && (
+                            <div style={{ fontSize: 12, color: 'var(--text-3)', padding: '4px 0' }}>No cues yet.</div>
+                          )}
+                          {session.cues.map((cue, i) => (
+                            <div key={cue._id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 8px', borderRadius: 6, background: 'var(--surface)', border: '1px solid var(--border)' }}>
+                              <span style={{ fontSize: 11, color: 'var(--text-3)', width: 18, flexShrink: 0 }}>{i + 1}.</span>
+                              <button
+                                onClick={() => playCue(cue)}
+                                disabled={!cue.track}
+                                title={cue.track ? 'Play' : 'Track removed'}
+                                style={{ flexShrink: 0, width: 24, height: 24, borderRadius: '50%', border: '1px solid var(--border)', background: 'transparent', color: 'var(--text-2)', cursor: cue.track ? 'pointer' : 'not-allowed', fontSize: 10, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                              >▶</button>
+                              <div style={{ flex: 1, minWidth: 0 }}>
+                                <div style={{ fontSize: 13, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{cue.label}</div>
+                                <div style={{ fontSize: 10, color: 'var(--text-3)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                  {cue.track?.name || 'Track removed'}
+                                </div>
+                              </div>
+                              <button
+                                onClick={() => moveCue(session, i, -1)}
+                                disabled={i === 0}
+                                style={{ background: 'none', border: 'none', color: 'var(--text-3)', cursor: i === 0 ? 'default' : 'pointer', fontSize: 12, padding: '0 2px', flexShrink: 0, opacity: i === 0 ? 0.3 : 1 }}
+                              >▲</button>
+                              <button
+                                onClick={() => moveCue(session, i, 1)}
+                                disabled={i === session.cues.length - 1}
+                                style={{ background: 'none', border: 'none', color: 'var(--text-3)', cursor: i === session.cues.length - 1 ? 'default' : 'pointer', fontSize: 12, padding: '0 2px', flexShrink: 0, opacity: i === session.cues.length - 1 ? 0.3 : 1 }}
+                              >▼</button>
+                              <button
+                                onClick={() => deleteCue(session, cue)}
+                                title="Remove cue"
+                                style={{ background: 'none', border: 'none', color: 'var(--text-3)', cursor: 'pointer', fontSize: 14, padding: '0 2px', flexShrink: 0, lineHeight: 1 }}
+                              >✕</button>
+                            </div>
+                          ))}
+
+                          <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
+                            <select
+                              className="input"
+                              value={cueTrackDraft}
+                              onChange={e => setCueTrackDraft(e.target.value)}
+                              style={{ fontSize: 12, flex: '0 0 40%' }}
+                            >
+                              <option value="">Choose track…</option>
+                              {playlist.map(t => (
+                                <option key={t._id} value={t._id}>{t.name}</option>
+                              ))}
+                            </select>
+                            <input
+                              className="input"
+                              placeholder='Note, e.g. "Entering the forest"'
+                              value={cueLabelDraft}
+                              onChange={e => setCueLabelDraft(e.target.value)}
+                              onKeyDown={e => { if (e.key === 'Enter') addCue(session) }}
+                              style={{ flex: 1, fontSize: 12 }}
+                            />
+                            <button
+                              onClick={() => addCue(session)}
+                              disabled={!cueTrackDraft || !cueLabelDraft.trim()}
+                              className="btn btn-ghost btn-sm"
+                            >+ Add</button>
+                          </div>
+                          {playlist.length === 0 && (
+                            <div style={{ fontSize: 11, color: 'var(--text-3)' }}>Upload tracks to your playlist above first.</div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </>
         )}
       </div>
 
