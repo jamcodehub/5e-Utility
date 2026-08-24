@@ -21,37 +21,6 @@ function getOptimisedUrl(cloudinaryUrl) {
     .toURL()
 }
 
-// ─── Page turn animation styles injected once ───────────────────────────────
-const PAGE_TURN_CSS = `
-@keyframes sbTurnForward {
-  0%   { transform: perspective(1200px) rotateY(0deg); opacity: 1; }
-  100% { transform: perspective(1200px) rotateY(-90deg); opacity: 0; }
-}
-@keyframes sbRevealForward {
-  0%   { transform: perspective(1200px) rotateY(90deg); opacity: 0; }
-  100% { transform: perspective(1200px) rotateY(0deg); opacity: 1; }
-}
-@keyframes sbTurnBack {
-  0%   { transform: perspective(1200px) rotateY(0deg); opacity: 1; }
-  100% { transform: perspective(1200px) rotateY(90deg); opacity: 0; }
-}
-@keyframes sbRevealBack {
-  0%   { transform: perspective(1200px) rotateY(-90deg); opacity: 0; }
-  100% { transform: perspective(1200px) rotateY(0deg); opacity: 1; }
-}
-.sb-page-exit-fwd  { animation: sbTurnForward 0.32s cubic-bezier(.4,0,.2,1) forwards; transform-origin: left center; }
-.sb-page-enter-fwd { animation: sbRevealForward 0.32s cubic-bezier(.4,0,.2,1) 0.18s forwards; transform-origin: left center; opacity: 0; }
-.sb-page-exit-bck  { animation: sbTurnBack 0.32s cubic-bezier(.4,0,.2,1) forwards; transform-origin: right center; }
-.sb-page-enter-bck { animation: sbRevealBack 0.32s cubic-bezier(.4,0,.2,1) 0.18s forwards; transform-origin: right center; opacity: 0; }
-`
-
-function injectStyles() {
-  if (document.getElementById('sb-page-turn-css')) return
-  const s = document.createElement('style')
-  s.id = 'sb-page-turn-css'
-  s.textContent = PAGE_TURN_CSS
-  document.head.appendChild(s)
-}
 
 // ─── Cover ──────────────────────────────────────────────────────────────────
 function Cover({ campaignName, isMobile }) {
@@ -178,8 +147,6 @@ export default function Storyboard() {
   const { toast, ToastContainer } = useToast()
   const [cards, setCards] = useState([])
   const [currentPage, setCurrentPage] = useState(-1)
-  const [animClass, setAnimClass] = useState({ exit: '', enter: '' })
-  const [isAnimating, setIsAnimating] = useState(false)
   const bookRef = useRef(null)
   const [showForm, setShowForm] = useState(false)
   const scrollRef = useRef(null)
@@ -188,7 +155,6 @@ export default function Storyboard() {
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 768)
 
   useEffect(() => {
-    injectStyles()
     const fn = () => setIsMobile(window.innerWidth <= 768)
     window.addEventListener('resize', fn)
     return () => window.removeEventListener('resize', fn)
@@ -208,28 +174,11 @@ export default function Storyboard() {
 
   useEffect(() => { load() }, [load])
 
-  // Animated page turn
   const goTo = useCallback((dir) => {
     const next = currentPage + dir
     if (next < -1 || next > cards.length - 1) return
-    if (isAnimating) return
-
-    if (isMobile) {
-      // Page-turn animation on mobile
-      setIsAnimating(true)
-      const fwd = dir > 0
-      setAnimClass({ exit: fwd ? 'sb-page-exit-fwd' : 'sb-page-exit-bck', enter: fwd ? 'sb-page-enter-fwd' : 'sb-page-enter-bck' })
-      setTimeout(() => {
-        setCurrentPage(next)
-        setTimeout(() => {
-          setAnimClass({ exit: '', enter: '' })
-          setIsAnimating(false)
-        }, 350)
-      }, 200)
-    } else {
-      setCurrentPage(next)
-    }
-  }, [currentPage, cards.length, isAnimating, isMobile])
+    setCurrentPage(next)
+  }, [currentPage, cards.length])
 
   // Desktop scroll
   useEffect(() => {
@@ -391,41 +340,29 @@ export default function Storyboard() {
 
           {/* Cover */}
           <div
-            className={onCover ? '' : (animClass.exit && currentPage === -1 ? animClass.exit : '')}
             style={{
               position: 'absolute', inset: 0,
               opacity: onCover ? 1 : 0,
               pointerEvents: onCover ? 'auto' : 'none',
-              transition: isMobile ? 'none' : 'opacity .35s',
+              transition: 'opacity .2s',
             }}
           >
             <Cover campaignName={activeCampaign?.name} isMobile={isMobile} />
           </div>
 
           {/* Scene pages */}
-          {cards.map((card, i) => {
-            const isActive = i === currentPage
-            const cls = isActive
-              ? (animClass.enter || '')
-              : (i === currentPage - 1 || i === currentPage + 1) && animClass.exit
-                ? '' : ''
-            // We show the exiting page with exit class, entering with enter class
-            const showExit = !isActive && animClass.exit && i === currentPage - (animClass.exit.includes('fwd') ? 0 : 0)
-            return (
-              <div
-                key={card._id}
-                className={isActive ? animClass.enter : ''}
-                style={{
-                  position: 'absolute', inset: 0,
-                  opacity: isActive ? 1 : 0,
-                  pointerEvents: isActive ? 'auto' : 'none',
-                  transition: isMobile ? 'none' : 'none',
-                }}
-              >
-                <BookSpread card={card} index={i} onEdit={() => setEditCard({ ...card })} isMobile={isMobile} />
-              </div>
-            )
-          })}
+          {cards.map((card, i) => (
+            <div
+              key={card._id}
+              style={{
+                position: 'absolute', inset: 0,
+                opacity: i === currentPage ? 1 : 0,
+                pointerEvents: i === currentPage ? 'auto' : 'none',
+              }}
+            >
+              <BookSpread card={card} index={i} onEdit={() => setEditCard({ ...card })} isMobile={isMobile} />
+            </div>
+          ))}
 
           {cards.length === 0 && !onCover && (
             <div style={{ position: 'absolute', inset: 0, background: 'var(--sb-page-start)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 12, color: 'var(--sb-page-meta)' }}>
@@ -450,9 +387,9 @@ export default function Storyboard() {
 
       {/* Dots */}
       <div style={{ padding: '6px 0 10px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5, background: 'var(--sb-outer)', flexShrink: 0 }}>
-        <div onClick={() => !isAnimating && setCurrentPage(-1)} style={{ width: 5, height: 5, borderRadius: '50%', background: onCover ? 'var(--sb-accent)' : 'var(--sb-bar-border)', cursor: 'pointer' }} />
+        <div onClick={() => setCurrentPage(-1)} style={{ width: 5, height: 5, borderRadius: '50%', background: onCover ? 'var(--sb-accent)' : 'var(--sb-bar-border)', cursor: 'pointer' }} />
         {cards.map((_, i) => (
-          <div key={i} onClick={() => !isAnimating && setCurrentPage(i)} style={{ width: 5, height: 5, borderRadius: '50%', background: i === currentPage ? 'var(--sb-accent)' : 'var(--sb-bar-border)', cursor: 'pointer' }} />
+          <div key={i} onClick={() => setCurrentPage(i)} style={{ width: 5, height: 5, borderRadius: '50%', background: i === currentPage ? 'var(--sb-accent)' : 'var(--sb-bar-border)', cursor: 'pointer' }} />
         ))}
       </div>
 
