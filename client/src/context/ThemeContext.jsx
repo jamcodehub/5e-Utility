@@ -16,6 +16,7 @@ export const THEMES = {
       '--sb-accent': '#c8a060', '--sb-spine': '#b39b74',
       '--sb-page-start': '#f7efde', '--sb-page-end': '#ede1c8',
       '--sb-page-title': '#3f2b1f', '--sb-page-body': '#5b4431', '--sb-page-meta': '#9a8060',
+      '--logo-filter': 'none',
     }
   },
   dark: {
@@ -30,6 +31,7 @@ export const THEMES = {
       '--sb-accent': '#c8a060', '--sb-spine': '#3e4860',
       '--sb-page-start': '#1a1c22', '--sb-page-end': '#141618',
       '--sb-page-title': '#d8e0f0', '--sb-page-body': '#a0a8b8', '--sb-page-meta': '#505870',
+      '--logo-filter': 'invert(1)',
     }
   },
   barbarian: {
@@ -44,6 +46,7 @@ export const THEMES = {
       '--sb-accent': '#e05030', '--sb-spine': '#6a2010',
       '--sb-page-start': '#1e1010', '--sb-page-end': '#180c0c',
       '--sb-page-title': '#f0d8d0', '--sb-page-body': '#c09080', '--sb-page-meta': '#806050',
+      '--logo-filter': 'invert(1)',
     }
   },
   wizard: {
@@ -58,6 +61,7 @@ export const THEMES = {
       '--sb-accent': '#3060d0', '--sb-spine': '#102470',
       '--sb-page-start': '#0c1020', '--sb-page-end': '#080c18',
       '--sb-page-title': '#b8d0f8', '--sb-page-body': '#6080c0', '--sb-page-meta': '#404878',
+      '--logo-filter': 'invert(1)',
     }
   },
   druid: {
@@ -72,6 +76,7 @@ export const THEMES = {
       '--sb-accent': '#60a040', '--sb-spine': '#204810',
       '--sb-page-start': '#101a10', '--sb-page-end': '#0c140c',
       '--sb-page-title': '#d0f0d0', '--sb-page-body': '#80b080', '--sb-page-meta': '#405840',
+      '--logo-filter': 'invert(1)',
     }
   },
   paladin: {
@@ -86,6 +91,7 @@ export const THEMES = {
       '--sb-accent': '#d4a820', '--sb-spine': '#6a5010',
       '--sb-page-start': '#1c1808', '--sb-page-end': '#141208',
       '--sb-page-title': '#f0ecc8', '--sb-page-body': '#c0b080', '--sb-page-meta': '#806830',
+      '--logo-filter': 'invert(1)',
     }
   },
   rogue: {
@@ -100,6 +106,7 @@ export const THEMES = {
       '--sb-accent': '#a09060', '--sb-spine': '#303030',
       '--sb-page-start': '#161616', '--sb-page-end': '#101010',
       '--sb-page-title': '#d0d0c0', '--sb-page-body': '#909080', '--sb-page-meta': '#505048',
+      '--logo-filter': 'invert(1)',
     }
   },
   bard: {
@@ -114,6 +121,7 @@ export const THEMES = {
       '--sb-accent': '#e060a0', '--sb-spine': '#7a2868',
       '--sb-page-start': '#1c1018', '--sb-page-end': '#160c14',
       '--sb-page-title': '#f0c0e8', '--sb-page-body': '#b080a0', '--sb-page-meta': '#704060',
+      '--logo-filter': 'invert(1)',
     }
   },
   cleric: {
@@ -128,6 +136,7 @@ export const THEMES = {
       '--sb-accent': '#e8c840', '--sb-spine': '#8a7020',
       '--sb-page-start': '#1e1c10', '--sb-page-end': '#181608',
       '--sb-page-title': '#f8f0c0', '--sb-page-body': '#c0a870', '--sb-page-meta': '#807040',
+      '--logo-filter': 'invert(1)',
     }
   },
   fighter: {
@@ -142,6 +151,7 @@ export const THEMES = {
       '--sb-accent': '#e07020', '--sb-spine': '#6a2c00',
       '--sb-page-start': '#1c1008', '--sb-page-end': '#160c00',
       '--sb-page-title': '#f0d8a0', '--sb-page-body': '#b07840', '--sb-page-meta': '#705020',
+      '--logo-filter': 'invert(1)',
     }
   },
   monk: {
@@ -156,6 +166,7 @@ export const THEMES = {
       '--sb-accent': '#20b0c0', '--sb-spine': '#0c4860',
       '--sb-page-start': '#0c1218', '--sb-page-end': '#080e14',
       '--sb-page-title': '#b0e8f8', '--sb-page-body': '#5090a8', '--sb-page-meta': '#2c5868',
+      '--logo-filter': 'invert(1)',
     }
   },
   ranger: {
@@ -170,6 +181,7 @@ export const THEMES = {
       '--sb-accent': '#70a060', '--sb-spine': '#304828',
       '--sb-page-start': '#101810', '--sb-page-end': '#0c1408',
       '--sb-page-title': '#c8e0c0', '--sb-page-body': '#6a9860', '--sb-page-meta': '#405838',
+      '--logo-filter': 'invert(1)',
     }
   },
   sorcerer: {
@@ -184,6 +196,7 @@ export const THEMES = {
       '--sb-accent': '#c03080', '--sb-spine': '#6a1050',
       '--sb-page-start': '#160c1e', '--sb-page-end': '#100818',
       '--sb-page-title': '#f0b8f0', '--sb-page-body': '#a858b8', '--sb-page-meta': '#702880',
+      '--logo-filter': 'invert(1)',
     }
   },
   warlock: {
@@ -198,6 +211,7 @@ export const THEMES = {
       '--sb-accent': '#9040e0', '--sb-spine': '#401880',
       '--sb-page-start': '#101020', '--sb-page-end': '#0c0c18',
       '--sb-page-title': '#d8c0f8', '--sb-page-body': '#8060c0', '--sb-page-meta': '#483880',
+      '--logo-filter': 'invert(1)',
     }
   },
   gunslinger: {
@@ -212,6 +226,7 @@ export const THEMES = {
       '--sb-accent': '#c8a060', '--sb-spine': '#7a5020',
       '--sb-page-start': '#221808', '--sb-page-end': '#1c140a',
       '--sb-page-title': '#f0dca0', '--sb-page-body': '#c09060', '--sb-page-meta': '#806040',
+      '--logo-filter': 'invert(1)',
     }
   },
   artificer: {
@@ -226,6 +241,7 @@ export const THEMES = {
       '--sb-accent': '#d4a030', '--sb-spine': '#806000',
       '--sb-page-start': '#1a1600', '--sb-page-end': '#141200',
       '--sb-page-title': '#f0e090', '--sb-page-body': '#b09040', '--sb-page-meta': '#706020',
+      '--logo-filter': 'invert(1)',
     }
   },
   bloodhunter: {
@@ -240,6 +256,7 @@ export const THEMES = {
       '--sb-accent': '#c02020', '--sb-spine': '#6a0c0c',
       '--sb-page-start': '#180808', '--sb-page-end': '#120606',
       '--sb-page-title': '#f0c0c0', '--sb-page-body': '#a05050', '--sb-page-meta': '#703030',
+      '--logo-filter': 'invert(1)',
     }
   },
 }

@@ -2,6 +2,7 @@ import { NavLink, useNavigate, useLocation } from 'react-router-dom'
 import { useAuth, api } from '../context/AuthContext'
 import { useCampaign } from '../context/CampaignContext'
 import { useMusic, MOODS } from '../context/MusicContext'
+import { useTheme, THEMES } from '../context/ThemeContext'
 import { useState, useEffect, useRef, useCallback } from 'react'
 import SettingsModal from './SettingsModal'
 import { CloudinaryImage } from '@cloudinary/url-gen'
@@ -294,7 +295,7 @@ export default function Shell({ children }) {
         {/* Mobile top bar */}
         <div style={{ background: 'var(--surface)', borderBottom: '1px solid var(--border)', padding: '8px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0, position: 'relative' }}>
           <div style={{ position: 'absolute', left: '50%', transform: 'translateX(-50%)', pointerEvents: 'none' }}>
-            <img src={logoUrl} alt="Lore & Ledger" style={{ height: 36, width: 'auto', objectFit: 'contain', display: 'block' }} />
+            <img src={logoUrl} alt="5e Utility" style={{ height: 36, width: 'auto', objectFit: 'contain', display: 'block', filter: 'var(--logo-filter, none)' }} />
           </div>
           <div style={{ width: 36 }} />
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
@@ -421,7 +422,7 @@ export default function Shell({ children }) {
     <div style={{ display: 'flex', height: '100vh', overflow: 'hidden' }}>
       <aside style={{ width: 232, flexShrink: 0, background: 'var(--surface)', borderRight: '1px solid var(--border)', display: 'flex', flexDirection: 'column' }}>
         <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <img src={logoUrl} alt="Lore & Ledger" style={{ width: '100%', maxWidth: 160, height: 'auto', objectFit: 'contain', display: 'block' }} />
+          <img src={logoUrl} alt="5e Utility" style={{ width: '100%', maxWidth: 160, height: 'auto', objectFit: 'contain', display: 'block', filter: 'var(--logo-filter, none)' }} />
         </div>
 
         <div style={{ padding: '12px 14px', borderBottom: '1px solid var(--border)' }}>
