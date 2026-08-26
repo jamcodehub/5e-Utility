@@ -98,13 +98,21 @@ export default function Auth() {
     )
   }
 
-  return (
+ return (
     <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg)', padding: 20 }}>
       <div className="card" style={{ width: '100%', maxWidth: 380, padding: 32 }}>
-        <div style={{ marginBottom: 28, textAlign: 'center' }}>
-          <div style={{ fontFamily: 'Cinzel, serif', fontSize: 24, fontWeight: 600, color: 'var(--gold)', marginBottom: 4 }}>
-            Lore &amp; Ledger
-          </div>
+        <div style={{ marginBottom: 28, textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+          <img 
+            src="https://res.cloudinary.com/crcbzpw6/image/upload/v1786529766/lore-ledger/storyboard/sdniavu2yeigjupqxgou.png" 
+            alt="5e Utility" 
+            style={{ 
+              height: 64, 
+              width: 'auto', 
+              objectFit: 'contain', 
+              marginBottom: 12,
+              filter: 'var(--logo-filter, none)'
+            }} 
+          />
           <div style={{ fontSize: 13, color: 'var(--text-2)' }}>Your D&amp;D campaign companion</div>
         </div>
 
