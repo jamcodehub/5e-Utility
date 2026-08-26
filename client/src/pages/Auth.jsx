@@ -98,22 +98,21 @@ export default function Auth() {
     )
   }
 
- return (
+return (
     <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg)', padding: 20 }}>
       <div className="card" style={{ width: '100%', maxWidth: 380, padding: 32 }}>
-        <div style={{ marginBottom: 28, textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+        <div style={{ marginBottom: 32, textAlign: 'center', display: 'flex', justifyContent: 'center' }}>
           <img 
             src="https://res.cloudinary.com/crcbzpw6/image/upload/v1786529766/lore-ledger/storyboard/sdniavu2yeigjupqxgou.png" 
             alt="5e Utility" 
             style={{ 
-              height: 64, 
+              height: 96, 
               width: 'auto', 
+              maxWidth: '80%', 
               objectFit: 'contain', 
-              marginBottom: 12,
-              filter: 'var(--logo-filter, none)'
+              filter: 'var(--logo-filter, none) drop-shadow(0 4px 12px rgba(0, 0, 0, 0.25))' 
             }} 
           />
-          <div style={{ fontSize: 13, color: 'var(--text-2)' }}>Your D&amp;D campaign companion</div>
         </div>
 
         {error && (
