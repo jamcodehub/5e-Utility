@@ -106,7 +106,7 @@ return (
             src="https://res.cloudinary.com/crcbzpw6/image/upload/v1786529766/lore-ledger/storyboard/sdniavu2yeigjupqxgou.png" 
             alt="5e Utility" 
             style={{ 
-              height: 96, 
+              height: '150px', 
               width: 'auto', 
               maxWidth: '80%', 
               objectFit: 'contain', 
