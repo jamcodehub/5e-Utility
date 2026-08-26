@@ -1,4 +1,4 @@
-import mongoose from 'mongoose' // mongoose 2
+import mongoose from 'mongoose'
 const { Schema, model } = mongoose
 
 const UserSchema = new Schema({
@@ -32,7 +32,8 @@ const CampaignSchema = new Schema({
 const JournalSchema = new Schema({
   campaign: { type: Schema.Types.ObjectId, ref: 'Campaign', required: true },
   author:   { type: Schema.Types.ObjectId, ref: 'User', required: true },
-  day:      { type: Number, required: true },
+  day:      { type: Number },     // players use this
+  session:  { type: Number },     // DMs use this
   title:    String,
   content:  { type: String, default: '' },
 }, { timestamps: true })

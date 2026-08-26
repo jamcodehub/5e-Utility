@@ -14,7 +14,7 @@ export default function Journal() {
 
   const noun       = isDM ? 'Session' : 'Day'
   const nounPlural = isDM ? 'Sessions' : 'Days'
-  const apiBase    = isDM ? 'session-planner' : 'journal'
+  const apiBase    = 'journal' // both DM and player use the same endpoint; field differs (session vs day)
   const placeholder = isDM
     ? 'Plan this session — encounters, NPCs, pacing, hooks, notes for the table…'
     : 'Record what happened this session…'
