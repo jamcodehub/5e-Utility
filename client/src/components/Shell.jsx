@@ -293,11 +293,9 @@ export default function Shell({ children }) {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden' }}>
         {/* Mobile top bar */}
-        <div style={{ background: 'var(--surface)', borderBottom: '1px solid var(--border)', padding: '8px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0, position: 'relative' }}>
-          <div style={{ position: 'absolute', left: '50%', transform: 'translateX(-50%)', pointerEvents: 'none' }}>
-            <img src={logoUrl} alt="5e Utility" style={{ height: 36, width: 'auto', objectFit: 'contain', display: 'block', marginRight: 'auto', filter: 'var(--logo-filter, none)' }} />
-          </div>
-          <div style={{ width: 36 }} />
+        <div style={{ background: 'var(--surface)', borderBottom: '1px solid var(--border)', padding: '8px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
+          <img src={logoUrl} alt="5e Utility" style={{ height: 32, width: 'auto', objectFit: 'contain', display: 'block', filter: 'var(--logo-filter, none)' }} />
+          
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
             <button onClick={() => showCampaigns ? closeCampaigns() : openCampaigns()} style={{ background: 'var(--gold-bg)', border: '1px solid var(--gold-border)', color: 'var(--gold)', padding: '8px 12px', borderRadius: 10, fontSize: 11, cursor: 'pointer', fontFamily: 'Cinzel, serif', maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
               {(activeCampaign && !activeCampaign.isPersonal) ? activeCampaign.name : 'Campaign'} ▾
