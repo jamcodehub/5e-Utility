@@ -68,7 +68,6 @@ const CharacterSchema = new Schema({
   hp:           { current: Number, max: Number },
   ac:           Number,
   profBonus:    Number,
-  // Array of skill names that are proficient e.g. ['Athletics', 'Investigation']
   proficiencies: [{ type: String }],
   notes:        String,
   background:   { type: String, default: '' },
@@ -127,12 +126,37 @@ const CampaignGuideSchema = new Schema({
   }],
 }, { timestamps: true })
 
-export const User       = model('User', UserSchema)
-export const Campaign   = model('Campaign', CampaignSchema)
-export const Journal    = model('Journal', JournalSchema)
-export const Lore       = model('Lore', LoreSchema)
-export const StoryCard  = model('StoryCard', StoryCardSchema)
-export const Character  = model('Character', CharacterSchema)
+// ── MusicTrack ───────────────────────────────────────────────────────────────
+const MusicTrackSchema = new Schema({
+  campaign:  { type: Schema.Types.ObjectId, ref: 'Campaign', required: true, index: true },
+  addedBy:   { type: Schema.Types.ObjectId, ref: 'User' },
+  name:      { type: String, required: true, trim: true },
+  url:       { type: String, required: true },
+  publicId:  { type: String, default: '' },
+  duration:  { type: Number, default: 0 },
+}, { timestamps: true })
+
+// ── MusicSession ─────────────────────────────────────────────────────────────
+const CueSchema = new Schema({
+  track: { type: Schema.Types.ObjectId, ref: 'MusicTrack' },
+  label: { type: String, required: true, trim: true },
+}, { _id: true })
+
+const MusicSessionSchema = new Schema({
+  campaign:  { type: Schema.Types.ObjectId, ref: 'Campaign', required: true, index: true },
+  createdBy: { type: Schema.Types.ObjectId, ref: 'User' },
+  name:      { type: String, required: true, trim: true },
+  cues:      { type: [CueSchema], default: [] },
+}, { timestamps: true })
+
+export const User          = model('User', UserSchema)
+export const Campaign      = model('Campaign', CampaignSchema)
+export const Journal       = model('Journal', JournalSchema)
+export const Lore          = model('Lore', LoreSchema)
+export const StoryCard     = model('StoryCard', StoryCardSchema)
+export const Character     = model('Character', CharacterSchema)
 export const LevelPlan     = model('LevelPlan', LevelPlanSchema)
 export const Inventory     = model('Inventory', InventorySchema)
 export const CampaignGuide = model('CampaignGuide', CampaignGuideSchema)
+export const MusicTrack    = model('MusicTrack', MusicTrackSchema)
+export const MusicSession  = model('MusicSession', MusicSessionSchema)
