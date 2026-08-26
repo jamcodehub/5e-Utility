@@ -14,19 +14,19 @@ import feedbackRoutes from './routes/feedback.js'
 import levelRoutes from './routes/levels.js'
 import inventoryRoutes from './routes/inventory.js'
 import uploadRoutes from './routes/upload.js'
+import musicRoutes from './routes/music.js'
+import sessionsRoutes from './routes/sessions.js'
 
 dotenv.config()
 
 const app = express()
+app.set('trust proxy', 1) // Required for Render — lets express-rate-limit read the real client IP
 
 app.use(helmet())
 
-// Tight rate limits on auth endpoints — brute-force protection
 const authLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 20, standardHeaders: true, legacyHeaders: false, message: { error: 'Too many attempts, please try again later.' } })
 
-// Raw body needed for Stripe webhook signature verification
 app.use('/api/payments/webhook', express.raw({ type: 'application/json', verify: (req, res, buf) => { req.rawBody = buf } }))
-
 app.use(cors({ origin: process.env.CLIENT_URL || 'http://localhost:5173' }))
 app.use(express.json())
 
@@ -39,7 +39,10 @@ app.use('/api/payments',  paymentRoutes)
 app.use('/api/feedback',  feedbackRoutes)
 app.use('/api/levels',    levelRoutes)
 app.use('/api/inventory', inventoryRoutes)
-app.use('/api/upload',   uploadRoutes)
+app.use('/api/upload',    uploadRoutes)
+app.use('/api/music',     musicRoutes)
+app.use('/api/sessions',  sessionsRoutes)
+
 mongoose.connect(process.env.MONGO_URI).then(() => {
   console.log('MongoDB connected')
   app.listen(process.env.PORT || 4000, () => console.log(`Server on :${process.env.PORT || 4000}`))
