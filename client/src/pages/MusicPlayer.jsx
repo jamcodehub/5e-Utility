@@ -11,15 +11,17 @@ async function uploadAudioToCloudinary(file) {
   const fd = new FormData()
   fd.append('file', file)
   fd.append('upload_preset', UPLOAD_PRESET)
-  fd.append('folder', '5e-utility/music')
-  fd.append('resource_type', 'video') // Cloudinary uses 'video' resource type for audio
+  // Do NOT append 'folder' — unsigned presets ignore client-supplied folder params.
+  // Set the folder inside the preset on the Cloudinary dashboard instead.
 
   const res = await fetch(`https://api.cloudinary.com/v1_1/${CLOUD_NAME}/video/upload`, {
     method: 'POST',
     body: fd,
   })
-  if (!res.ok) throw new Error('Upload failed')
   const data = await res.json()
+  if (!res.ok) {
+    throw new Error(data?.error?.message || `Upload failed (${res.status})`)
+  }
   return { url: data.secure_url, publicId: data.public_id, duration: data.duration }
 }
 
