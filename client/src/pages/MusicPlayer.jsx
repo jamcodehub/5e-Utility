@@ -32,6 +32,8 @@ export default function MusicPlayer() {
   const [uploadProgress, setUploadProgress] = useState(0)
   const [activeTrack, setActiveTrack] = useState(null)
   const [playing, setPlaying] = useState(false)
+  const [shuffleEnabled, setShuffleEnabled] = useState(false)
+  const [repeatMode, setRepeatMode] = useState('off') // 'off' | 'all' | 'one'
   const [trackTime, setTrackTime] = useState(0)
   const [trackDuration, setTrackDuration] = useState(0)
   const [selectedTrackId, setSelectedTrackId] = useState('')
@@ -66,7 +68,34 @@ export default function MusicPlayer() {
     if (!el) return
     const onTime = () => setTrackTime(el.currentTime)
     const onDur  = () => setTrackDuration(el.duration || 0)
-    const onEnd  = () => { setPlaying(false); setTrackTime(0) }
+    const onEnd  = () => {
+      const endedTrackId = activeTrack?._id
+
+      if (repeatMode === 'one' && audioRef.current) {
+        audioRef.current.currentTime = 0
+        audioRef.current.play().then(() => setPlaying(true)).catch(() => setPlaying(false))
+        return
+      }
+
+      if (shuffleEnabled && playlist.length > 1) {
+        const choices = playlist.filter(t => t._id !== endedTrackId)
+        const nextTrack = choices[Math.floor(Math.random() * choices.length)]
+        if (nextTrack) {
+          playTrack(nextTrack)
+          return
+        }
+      }
+
+      if (repeatMode === 'all' && playlist.length > 0) {
+        const currentIndex = playlist.findIndex(t => t._id === endedTrackId)
+        const nextTrack = playlist[(currentIndex + 1) % playlist.length] || playlist[0]
+        playTrack(nextTrack)
+        return
+      }
+
+      setPlaying(false)
+      setTrackTime(0)
+    }
     el.addEventListener('timeupdate', onTime)
     el.addEventListener('loadedmetadata', onDur)
     el.addEventListener('ended', onEnd)
@@ -75,7 +104,7 @@ export default function MusicPlayer() {
       el.removeEventListener('loadedmetadata', onDur)
       el.removeEventListener('ended', onEnd)
     }
-  }, [])
+  }, [activeTrack, playlist, repeatMode, shuffleEnabled])
 
   useEffect(() => {
     if (audioRef.current) audioRef.current.volume = volume
@@ -408,7 +437,7 @@ export default function MusicPlayer() {
               </select>
 
               {/* Play controls */}
-              <div style={{ display: 'flex', gap: 8 }}>
+              <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
                 <button
                   onClick={() => selectedTrack && playTrack({ ...selectedTrack, id: selectedTrack._id })}
                   disabled={!selectedTrackId}
@@ -417,6 +446,40 @@ export default function MusicPlayer() {
                 >
                   {isCustomPlaying && activeTrack?._id === selectedTrackId ? '⏸ Pause' : '▶ Play'}
                 </button>
+
+                <button
+                  onClick={() => setShuffleEnabled(v => !v)}
+                  disabled={playlist.length < 2}
+                  className="btn btn-ghost btn-sm"
+                  title={shuffleEnabled ? 'Shuffle on' : 'Shuffle off'}
+                  aria-label={shuffleEnabled ? 'Turn shuffle off' : 'Turn shuffle on'}
+                  style={{ width: 34, minWidth: 34, height: 34, padding: 0, justifyContent: 'center', color: shuffleEnabled ? 'var(--gold)' : 'var(--text-3)', borderColor: shuffleEnabled ? 'var(--gold-border)' : undefined, opacity: playlist.length < 2 ? 0.45 : 1 }}
+                >
+                  🔀
+                </button>
+
+                <button
+                  onClick={() => setRepeatMode(v => v === 'all' ? 'off' : 'all')}
+                  disabled={!selectedTrackId}
+                  className="btn btn-ghost btn-sm"
+                  title={repeatMode === 'all' ? 'Repeat all on' : 'Repeat all off'}
+                  aria-label={repeatMode === 'all' ? 'Turn repeat all off' : 'Turn repeat all on'}
+                  style={{ width: 34, minWidth: 34, height: 34, padding: 0, justifyContent: 'center', color: repeatMode === 'all' ? 'var(--gold)' : 'var(--text-3)', borderColor: repeatMode === 'all' ? 'var(--gold-border)' : undefined }}
+                >
+                  ↻
+                </button>
+
+                <button
+                  onClick={() => setRepeatMode(v => v === 'one' ? 'off' : 'one')}
+                  disabled={!selectedTrackId}
+                  className="btn btn-ghost btn-sm"
+                  title={repeatMode === 'one' ? 'Repeat 1 on' : 'Repeat 1 off'}
+                  aria-label={repeatMode === 'one' ? 'Turn repeat 1 off' : 'Turn repeat 1 on'}
+                  style={{ width: 34, minWidth: 34, height: 34, padding: 0, justifyContent: 'center', color: repeatMode === 'one' ? 'var(--gold)' : 'var(--text-3)', borderColor: repeatMode === 'one' ? 'var(--gold-border)' : undefined, fontSize: 11, fontWeight: 700 }}
+                >
+                  ↻1
+                </button>
+
                 {isCustomPlaying && (
                   <button onClick={stopTrack} className="btn btn-ghost btn-sm">■ Stop</button>
                 )}

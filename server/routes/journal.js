@@ -8,7 +8,7 @@ const router = Router()
 router.get('/:campaignId', auth, async (req, res) => {
   if (!await isMember(req.params.campaignId, req.userId)) return res.status(403).json({ error: 'Not a campaign member' })
   const entries = await Journal.find({ campaign: req.params.campaignId })
-    .populate('author', 'username').sort({ day: 1, session: 1, createdAt: 1 })
+    .populate('author', 'username').sort({ day: -1, session: -1, createdAt: -1 })
   res.json(entries)
 })
 

@@ -86,7 +86,7 @@ export default function Journal() {
           ? { session: nextNum, title: `Session ${nextNum}`, content: '' }
           : { day: nextNum, title: `Day ${nextNum}`, content: '' },
       })
-      setEntries(p => [...p, entry])
+      setEntries(p => [entry, ...p])
       setActiveId(entry._id)
       setContent('')
     } catch (err) {
