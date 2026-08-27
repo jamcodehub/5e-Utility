@@ -49,13 +49,18 @@ export default function Journal() {
     setContent(e.content)
   }
 
-  // Autosave — debounced 800ms after the user stops typing
+  // Autosave — debounced 800ms after the user stops typing.
+  // We do NOT replace the full entry from the server response because that
+  // would cause a re-render where `active` momentarily resolves to the stale
+  // server object and the textarea content flashes blank. Instead we only
+  // update the content field in place, keeping local state as source of truth.
   const autosave = useCallback(async (id, text) => {
     if (!id) return
     setSaving(true)
     try {
-      const updated = await api(`/${apiBase}/${id}`, { method: 'PUT', body: { content: text } })
-      setEntries(p => p.map(e => e._id === id ? updated : e))
+      await api(`/${apiBase}/${id}`, { method: 'PUT', body: { content: text } })
+      // Only update content in the sidebar list (word count), don't replace whole entry
+      setEntries(p => p.map(e => e._id === id ? { ...e, content: text } : e))
     } catch { /* silently ignore — next keystroke will retry */ }
     setSaving(false)
   }, [apiBase])
