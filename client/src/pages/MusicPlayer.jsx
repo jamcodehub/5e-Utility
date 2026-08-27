@@ -37,6 +37,7 @@ export default function MusicPlayer() {
   const [selectedTrackId, setSelectedTrackId] = useState('')
   const [editingId, setEditingId] = useState(null)
   const [editName, setEditName] = useState('')
+  const [isDragging, setIsDragging] = useState(false)
   const audioRef = useRef(null)
   const fileInputRef = useRef(null)
 
@@ -106,14 +107,12 @@ export default function MusicPlayer() {
     setTrackTime(+e.target.value)
   }
 
-  const handleUpload = async (e) => {
-    const files = Array.from(e.target.files)
+  const processFiles = async (files) => {
     if (!files.length || !activeCampaign) return
 
     // Free tier paywall — max 5 tracks
     if (!isPremium && playlist.length >= FREE_TRACK_LIMIT) {
       toast(`Free accounts are limited to ${FREE_TRACK_LIMIT} tracks. Upgrade to Premium for unlimited uploads.`)
-      e.target.value = ''
       return
     }
 
@@ -121,7 +120,6 @@ export default function MusicPlayer() {
     setUploadProgress(0)
     const uploaded = []
     for (let i = 0; i < files.length; i++) {
-      // Check limit again per file in case uploading multiple
       if (!isPremium && playlist.length + uploaded.length >= FREE_TRACK_LIMIT) {
         toast(`Reached the ${FREE_TRACK_LIMIT}-track limit. Upgrade to Premium for unlimited uploads.`)
         break
@@ -144,7 +142,47 @@ export default function MusicPlayer() {
     setUploadProgress(100)
     setUploading(false)
     if (uploaded.length) toast(`${uploaded.length} track${uploaded.length > 1 ? 's' : ''} added`)
+  }
+
+  const handleUpload = async (e) => {
+    const files = Array.from(e.target.files)
+    await processFiles(files)
     e.target.value = ''
+  }
+
+  // ── Drag and Drop Handlers ──
+  const handleDragEnter = (e) => {
+    e.preventDefault()
+    e.stopPropagation()
+    if (e.dataTransfer.types && Array.from(e.dataTransfer.types).includes('Files')) {
+      setIsDragging(true)
+    }
+  }
+
+  const handleDragOver = (e) => {
+    e.preventDefault()
+    e.stopPropagation()
+  }
+
+  const handleDragLeave = (e) => {
+    e.preventDefault()
+    e.stopPropagation()
+    if (e.currentTarget.contains(e.relatedTarget)) return
+    setIsDragging(false)
+  }
+
+  const handleDrop = async (e) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setIsDragging(false)
+    const files = Array.from(e.dataTransfer.files).filter(
+      f => f.type.startsWith('audio/') || f.name.match(/\.(mp3|wav|ogg|m4a|flac|aac)$/i)
+    )
+    if (files.length > 0) {
+      await processFiles(files)
+    } else if (e.dataTransfer.files.length > 0) {
+      toast('Please drop valid audio files (.mp3, .wav, .ogg, etc.)')
+    }
   }
 
   const deleteTrack = async (track) => {
@@ -244,8 +282,41 @@ export default function MusicPlayer() {
   const atTrackLimit = !isPremium && playlist.length >= FREE_TRACK_LIMIT
 
   return (
-    <div className="page-content">
+    <div 
+      className="page-content" 
+      style={{ position: 'relative' }}
+      onDragEnter={handleDragEnter}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+    >
       <audio ref={audioRef} style={{ display: 'none' }} />
+
+      {/* Drag & Drop Visual Overlay */}
+      {isDragging && (
+        <div style={{
+          position: 'absolute',
+          inset: 0,
+          background: 'rgba(0, 0, 0, 0.85)',
+          zIndex: 1000,
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          border: '2px dashed var(--gold)',
+          borderRadius: 12,
+          backdropFilter: 'blur(4px)',
+          pointerEvents: 'none'
+        }}>
+          <div style={{ fontSize: 48, marginBottom: 12 }}>🎵</div>
+          <div style={{ fontFamily: 'Cinzel, serif', fontSize: 22, fontWeight: 700, color: 'var(--gold)', letterSpacing: '0.05em' }}>
+            Upload to Tracks
+          </div>
+          <div style={{ fontSize: 13, color: 'var(--text-2)', marginTop: 6 }}>
+            Drop your audio files here to upload them
+          </div>
+        </div>
+      )}
 
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 24, gap: 12 }}>
@@ -312,7 +383,7 @@ export default function MusicPlayer() {
             <div style={{ fontSize: 12, color: 'var(--text-3)' }}>Select a campaign first.</div>
           ) : playlist.length === 0 ? (
             <div style={{ fontSize: 12, color: 'var(--text-3)', lineHeight: 1.7 }}>
-              No tracks yet — upload MP3, WAV, or OGG files using the button above.
+              No tracks yet — upload or drag & drop MP3, WAV, or OGG files.
             </div>
           ) : (
             <>
