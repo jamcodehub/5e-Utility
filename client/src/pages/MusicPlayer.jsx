@@ -33,7 +33,7 @@ export default function MusicPlayer() {
   const [activeTrack, setActiveTrack] = useState(null)
   const [playing, setPlaying] = useState(false)
   const [shuffleEnabled, setShuffleEnabled] = useState(false)
-  const [repeatMode, setRepeatMode] = useState('off') // 'off' | 'all' | 'one'
+  const [repeatMode, setRepeatMode] = useState('off') // 'off' | 'forever' | 'once'
   const [manageTracksOpen, setManageTracksOpen] = useState(false)
   const [trackTime, setTrackTime] = useState(0)
   const [trackDuration, setTrackDuration] = useState(0)
@@ -44,6 +44,7 @@ export default function MusicPlayer() {
   const dragCounter = useRef(0)
   const audioRef = useRef(null)
   const fileInputRef = useRef(null)
+  const repeatOnceUsedRef = useRef(false)
 
   // Session planner state
   const [sessions, setSessions] = useState([])
@@ -72,7 +73,17 @@ export default function MusicPlayer() {
     const onEnd  = () => {
       const endedTrackId = activeTrack?._id
 
-      if (repeatMode === 'one' && audioRef.current) {
+      // Repeat forever: replay the current track indefinitely.
+      if (repeatMode === 'forever' && audioRef.current) {
+        audioRef.current.currentTime = 0
+        audioRef.current.play().then(() => setPlaying(true)).catch(() => setPlaying(false))
+        return
+      }
+
+      // Repeat once: replay the current track exactly one additional time,
+      // then continue normally to the next track.
+      if (repeatMode === 'once' && !repeatOnceUsedRef.current && audioRef.current) {
+        repeatOnceUsedRef.current = true
         audioRef.current.currentTime = 0
         audioRef.current.play().then(() => setPlaying(true)).catch(() => setPlaying(false))
         return
@@ -87,7 +98,8 @@ export default function MusicPlayer() {
         }
       }
 
-      if (repeatMode === 'all' && playlist.length > 0) {
+      // A normal end after Repeat Once continues to the next track.
+      if (repeatMode === 'once' && playlist.length > 1) {
         const currentIndex = playlist.findIndex(t => t._id === endedTrackId)
         const nextTrack = playlist[(currentIndex + 1) % playlist.length] || playlist[0]
         playTrack(nextTrack)
@@ -112,6 +124,7 @@ export default function MusicPlayer() {
   }, [volume])
 
   const playTrack = (track) => {
+    repeatOnceUsedRef.current = false
     if (current) stop()
     const el = audioRef.current
     if (!el) return
@@ -441,29 +454,29 @@ export default function MusicPlayer() {
                   className="btn btn-ghost btn-sm"
                   title={shuffleEnabled ? 'Shuffle on' : 'Shuffle off'}
                   aria-label={shuffleEnabled ? 'Turn shuffle off' : 'Turn shuffle on'}
-                  style={{ width: 34, minWidth: 34, height: 34, padding: 0, justifyContent: 'center', color: shuffleEnabled ? 'var(--gold)' : 'var(--text-3)', borderColor: shuffleEnabled ? 'var(--gold-border)' : undefined, opacity: playlist.length < 2 ? 0.45 : 1 }}
+                  style={{ width: 34, minWidth: 34, height: 34, padding: 0, justifyContent: 'center', color: shuffleEnabled ? 'var(--gold)' : 'var(--text-3)', background: shuffleEnabled ? 'var(--gold-bg)' : 'transparent', borderColor: shuffleEnabled ? 'var(--gold)' : undefined, opacity: playlist.length < 2 ? 0.45 : 1 }}
                 >
-                  🔀
+                  ⤨
                 </button>
 
                 <button
-                  onClick={() => setRepeatMode(v => v === 'all' ? 'off' : 'all')}
+                  onClick={() => setRepeatMode(v => v === 'forever' ? 'off' : 'forever')}
                   disabled={!selectedTrackId}
                   className="btn btn-ghost btn-sm"
-                  title={repeatMode === 'all' ? 'Repeat all on' : 'Repeat all off'}
-                  aria-label={repeatMode === 'all' ? 'Turn repeat all off' : 'Turn repeat all on'}
-                  style={{ width: 34, minWidth: 34, height: 34, padding: 0, justifyContent: 'center', color: repeatMode === 'all' ? 'var(--gold)' : 'var(--text-3)', borderColor: repeatMode === 'all' ? 'var(--gold-border)' : undefined }}
+                  title={repeatMode === 'forever' ? 'Repeat forever on' : 'Repeat forever off'}
+                  aria-label={repeatMode === 'forever' ? 'Turn repeat forever off' : 'Turn repeat forever on'}
+                  style={{ width: 34, minWidth: 34, height: 34, padding: 0, justifyContent: 'center', color: repeatMode === 'forever' ? 'var(--gold)' : 'var(--text-3)', background: repeatMode === 'forever' ? 'var(--gold-bg)' : 'transparent', borderColor: repeatMode === 'forever' ? 'var(--gold)' : undefined }}
                 >
                   ↻
                 </button>
 
                 <button
-                  onClick={() => setRepeatMode(v => v === 'one' ? 'off' : 'one')}
+                  onClick={() => setRepeatMode(v => v === 'once' ? 'off' : 'once')}
                   disabled={!selectedTrackId}
                   className="btn btn-ghost btn-sm"
-                  title={repeatMode === 'one' ? 'Repeat 1 on' : 'Repeat 1 off'}
-                  aria-label={repeatMode === 'one' ? 'Turn repeat 1 off' : 'Turn repeat 1 on'}
-                  style={{ width: 34, minWidth: 34, height: 34, padding: 0, justifyContent: 'center', color: repeatMode === 'one' ? 'var(--gold)' : 'var(--text-3)', borderColor: repeatMode === 'one' ? 'var(--gold-border)' : undefined, fontSize: 11, fontWeight: 700 }}
+                  title={repeatMode === 'once' ? 'Repeat once on' : 'Repeat once off'}
+                  aria-label={repeatMode === 'once' ? 'Turn repeat once off' : 'Turn repeat once on'}
+                  style={{ width: 34, minWidth: 34, height: 34, padding: 0, justifyContent: 'center', color: repeatMode === 'once' ? 'var(--gold)' : 'var(--text-3)', background: repeatMode === 'once' ? 'var(--gold-bg)' : 'transparent', borderColor: repeatMode === 'once' ? 'var(--gold)' : undefined, fontSize: 11, fontWeight: 700 }}
                 >
                   ↻1
                 </button>
