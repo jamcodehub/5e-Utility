@@ -286,9 +286,6 @@ export default function Storyboard() {
           <button onClick={() => setShowForm(f => !f)} style={{ background: showForm ? 'var(--sb-accent)' : 'var(--sb-bar-border)', border: 'none', color: showForm ? 'var(--sb-outer)' : 'var(--sb-accent)', padding: '6px 14px', borderRadius: 6, fontFamily: 'Cinzel, serif', fontSize: 11, cursor: 'pointer', letterSpacing: '0.05em' }}>
             {showForm ? '✕ Close' : '+ Add Scene'}
           </button>
-          {!onCover && currentCard && (
-            <button onClick={() => { if (!window.confirm('Delete this scene?')) return; deleteCard(currentCard._id) }} style={{ background: 'transparent', border: '1px solid var(--sb-bar-border)', color: 'var(--sb-page-meta)', padding: '6px 10px', borderRadius: 6, fontSize: 12, cursor: 'pointer' }}>✕</button>
-          )}
         </div>
       </div>
 
@@ -300,7 +297,7 @@ export default function Storyboard() {
             <textarea className="input" rows={2} placeholder="Describe what happened in this scene..." value={newDesc} onChange={e => setNewDesc(e.target.value)} style={{ resize: 'none', background: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--text)' }} />
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <label style={{ cursor: imageUploading ? 'wait' : 'pointer', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 6, padding: '5px 10px', fontSize: 12, color: 'var(--text-2)', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                🖼 {imageUploading ? 'Uploading…' : newImage ? 'Image selected ✓' : 'Upload image'}
+                {imageUploading ? 'Uploading…' : newImage ? 'Image selected ✓' : 'Upload image'}
                 {!imageUploading && <input type="file" accept="image/*" style={{ display: 'none' }} onChange={handleImagePick} />}
               </label>
               {newImage && <button onClick={() => setNewImage(null)} style={{ background: 'none', border: 'none', color: 'var(--text-3)', cursor: 'pointer', fontSize: 12 }}>✕ Remove</button>}
@@ -398,25 +395,42 @@ export default function Storyboard() {
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }} onClick={() => setEditCard(null)}>
           <div style={{ width: '100%', maxWidth: 520, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, padding: 24 }} onClick={e => e.stopPropagation()}>
             <div style={{ fontFamily: 'Cinzel, serif', fontSize: 16, fontWeight: 600, color: 'var(--gold)', marginBottom: 16 }}>Edit Scene</div>
+            
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
               <input className="input" placeholder="Title" value={editCard.title} onChange={e => setEditCard(p => ({ ...p, title: e.target.value }))} />
               <textarea className="input" rows={4} placeholder="Description" value={editCard.description || ''} onChange={e => setEditCard(p => ({ ...p, description: e.target.value }))} style={{ resize: 'vertical' }} />
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <label style={{ cursor: editImgUploading ? 'wait' : 'pointer', background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 6, padding: '5px 10px', fontSize: 12, color: 'var(--text-2)', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                  🖼 {editImgUploading ? 'Uploading…' : 'Replace image'}
+                  {editImgUploading ? 'Uploading…' : 'Replace image'}
                   {!editImgUploading && <input type="file" accept="image/*" style={{ display: 'none' }} onChange={handleEditImagePick} />}
                 </label>
                 {editCard.imageUrl && <span style={{ fontSize: 11, color: 'var(--green)' }}>Image set ✓</span>}
               </div>
             </div>
-            <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
-              <button className="btn btn-primary" style={{ flex: 1, justifyContent: 'center' }} onClick={saveEdit} disabled={editSaving}>{editSaving ? 'Saving...' : 'Save'}</button>
+
+            {/* Modal Actions */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 20 }}>
+              <button 
+                type="button" 
+                className="btn btn-ghost" 
+                style={{ color: '#e53935', border: '1px solid rgba(229, 57, 53, 0.3)' }}
+                onClick={() => {
+                  if (!window.confirm('Delete this scene?')) return
+                  deleteCard(editCard._id)
+                  setEditCard(null)
+                }}
+              >
+                Delete Scene
+              </button>
+              
+              <div style={{ flex: 1 }} />
+              
               <button className="btn btn-ghost" onClick={() => setEditCard(null)}>Cancel</button>
+              <button className="btn btn-primary" onClick={saveEdit} disabled={editSaving}>{editSaving ? 'Saving...' : 'Save'}</button>
             </div>
           </div>
         </div>
       )}
-
       <ToastContainer />
     </div>
   )
