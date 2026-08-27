@@ -34,6 +34,7 @@ export default function MusicPlayer() {
   const [playing, setPlaying] = useState(false)
   const [shuffleEnabled, setShuffleEnabled] = useState(false)
   const [repeatMode, setRepeatMode] = useState('off') // 'off' | 'all' | 'one'
+  const [manageTracksOpen, setManageTracksOpen] = useState(false)
   const [trackTime, setTrackTime] = useState(0)
   const [trackDuration, setTrackDuration] = useState(0)
   const [selectedTrackId, setSelectedTrackId] = useState('')
@@ -358,7 +359,22 @@ export default function MusicPlayer() {
           <h2 style={{ fontSize: 22, marginBottom: 4 }}>Music</h2>
           <p style={{ color: 'var(--text-2)', fontSize: 14, margin: 0 }}>Ambient moods &amp; your own tracks</p>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
+          {/* Volume — kept beside the upload controls and follows the active theme accent */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ fontSize: 12, color: 'var(--text-3)', flexShrink: 0 }}>Volume</span>
+            <input
+              type="range"
+              min={0}
+              max={1}
+              step={0.05}
+              value={volume}
+              onChange={e => { setVol(+e.target.value); if (audioRef.current) audioRef.current.volume = +e.target.value }}
+              aria-label="Volume"
+              style={{ width: 120, accentColor: 'var(--gold)', cursor: 'pointer' }}
+            />
+          </div>
+
           {uploading && <span style={{ fontSize: 12, color: 'var(--text-3)' }}>Uploading {uploadProgress}%…</span>}
           {atTrackLimit ? (
             <span style={{ fontSize: 12, color: 'var(--gold)', background: 'var(--gold-bg)', border: '1px solid var(--gold-border)', borderRadius: 8, padding: '6px 12px' }}>
@@ -377,38 +393,10 @@ export default function MusicPlayer() {
         </div>
       </div>
 
-      {/* ── Two-column: Ambient Moods | Your Tracks ── */}
-      <div style={{ display: 'flex', gap: 16, marginBottom: 20, alignItems: 'flex-start', flexWrap: 'wrap' }}>
-
-        {/* Left — Ambient Moods */}
-        <div className="card" style={{ flex: 1, minWidth: 240, padding: '16px 18px' }}>
-          <div style={{ fontFamily: 'Cinzel, serif', fontSize: 12, fontWeight: 600, color: 'var(--gold)', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 12 }}>
-            Ambient Moods
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {MOODS.map(m => (
-              <button
-                key={m.id}
-                onClick={() => { if (isCustomPlaying) stopTrack(); play(m.id) }}
-                className="card"
-                style={{
-                  padding: '10px 14px', textAlign: 'left', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                  border: current === m.id ? '2px solid var(--gold)' : '1px solid var(--border)',
-                  cursor: 'pointer', background: current === m.id ? 'var(--gold-bg)' : 'var(--surface2)',
-                }}
-              >
-                <span>
-                  <span style={{ fontSize: 13, color: current === m.id ? 'var(--gold)' : 'var(--text)', display: 'block' }}>{m.label}</span>
-                  <span style={{ fontSize: 11, color: 'var(--text-3)' }}>{m.desc}</span>
-                </span>
-                <span style={{ fontSize: 11, color: 'var(--text-3)' }}>{current === m.id ? '⏸' : '▶'}</span>
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Right — Your Tracks (dropdown + player) */}
-        <div className="card" style={{ flex: 1, minWidth: 240, padding: '16px 18px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+      {/* ── Top row: Your Tracks | Session Planner ── */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 16, marginBottom: 20, alignItems: 'start' }}>
+        {/* Your Tracks */}
+        <div className="card" style={{ flex: 1, minWidth: 0, padding: '16px 18px', display: 'flex', flexDirection: 'column', gap: 12 }}>
           <div style={{ fontFamily: 'Cinzel, serif', fontSize: 12, fontWeight: 600, color: 'var(--gold)', letterSpacing: '0.06em', textTransform: 'uppercase' }}>
             Your Tracks {!isPremium && <span style={{ fontSize: 10, fontFamily: 'sans-serif', fontWeight: 400, color: 'var(--text-3)', textTransform: 'none' }}>({playlist.length}/{FREE_TRACK_LIMIT} free)</span>}
           </div>
@@ -496,45 +484,49 @@ export default function MusicPlayer() {
                 </div>
               )}
 
-              {/* Manage — compact scrollable list */}
+              {/* Manage tracks — collapsible + scrollable */}
               <div style={{ borderTop: '1px solid var(--border)', paddingTop: 10 }}>
-                <div style={{ fontSize: 11, color: 'var(--text-3)', marginBottom: 6, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Manage tracks</div>
-                <div style={{ maxHeight: 160, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 4 }}>
-                  {playlist.map(track => (
-                    <div key={track._id} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 6px', borderRadius: 6, background: 'var(--surface2)', border: '1px solid var(--border)' }}>
-                      <span style={{ flex: 1, fontSize: 12, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        {editingId === track._id ? (
-                          <input autoFocus className="input"
-                            value={editName}
-                            onChange={e => setEditName(e.target.value)}
-                            onBlur={() => saveRename(track)}
-                            onKeyDown={e => { if (e.key === 'Enter') saveRename(track); if (e.key === 'Escape') setEditingId(null) }}
-                            style={{ padding: '1px 4px', fontSize: 12, width: '100%' }}
-                          />
-                        ) : (
-                          <span onDoubleClick={() => { setEditingId(track._id); setEditName(track.name) }} title="Double-click to rename">{track.name}</span>
-                        )}
-                      </span>
-                      <button onClick={() => { setEditingId(track._id); setEditName(track.name) }} style={{ background: 'none', border: 'none', color: 'var(--text-3)', cursor: 'pointer', fontSize: 12, padding: '0 2px', flexShrink: 0 }}>✎</button>
-                      <button onClick={() => deleteTrack(track)} style={{ background: 'none', border: 'none', color: 'var(--text-3)', cursor: 'pointer', fontSize: 14, padding: '0 2px', flexShrink: 0, lineHeight: 1 }}>✕</button>
-                    </div>
-                  ))}
-                </div>
+                <button
+                  onClick={() => setManageTracksOpen(v => !v)}
+                  className="btn btn-ghost btn-sm"
+                  aria-expanded={manageTracksOpen}
+                  style={{ width: '100%', justifyContent: 'space-between', padding: '7px 10px', fontSize: 11, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.04em' }}
+                >
+                  <span>Manage tracks ({playlist.length})</span>
+                  <span style={{ fontSize: 12 }}>{manageTracksOpen ? '▾' : '▸'}</span>
+                </button>
+
+                {manageTracksOpen && (
+                  <div style={{ marginTop: 6, maxHeight: 140, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 4, paddingRight: 2 }}>
+                    {playlist.map(track => (
+                      <div key={track._id} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 6px', borderRadius: 6, background: 'var(--surface2)', border: '1px solid var(--border)' }}>
+                        <span style={{ flex: 1, fontSize: 12, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {editingId === track._id ? (
+                            <input autoFocus className="input"
+                              value={editName}
+                              onChange={e => setEditName(e.target.value)}
+                              onBlur={() => saveRename(track)}
+                              onKeyDown={e => { if (e.key === 'Enter') saveRename(track); if (e.key === 'Escape') setEditingId(null) }}
+                              style={{ padding: '1px 4px', fontSize: 12, width: '100%' }}
+                            />
+                          ) : (
+                            <span onDoubleClick={() => { setEditingId(track._id); setEditName(track.name) }} title="Double-click to rename">{track.name}</span>
+                          )}
+                        </span>
+                        <button onClick={() => { setEditingId(track._id); setEditName(track.name) }} style={{ background: 'none', border: 'none', color: 'var(--text-3)', cursor: 'pointer', fontSize: 12, padding: '0 2px', flexShrink: 0 }}>✎</button>
+                        <button onClick={() => deleteTrack(track)} style={{ background: 'none', border: 'none', color: 'var(--text-3)', cursor: 'pointer', fontSize: 14, padding: '0 2px', flexShrink: 0, lineHeight: 1 }}>✕</button>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </>
           )}
         </div>
       </div>
 
-      {/* Volume */}
-      <div style={{ maxWidth: 420, display: 'flex', alignItems: 'center', gap: 10, marginBottom: 24 }}>
-        <span style={{ fontSize: 12, color: 'var(--text-3)', flexShrink: 0 }}>Volume</span>
-        <input type="range" min={0} max={1} step={0.05} value={volume}
-          onChange={e => { setVol(+e.target.value); if (audioRef.current) audioRef.current.volume = +e.target.value }}
-          style={{ flex: 1 }} />
-      </div>
 
-      {/* ── Session Planner ── */}
+        {/* Session Planner */}
       <div className="card" style={{ padding: '16px 18px', marginBottom: 20 }}>
         <div style={{ fontFamily: 'Cinzel, serif', fontSize: 12, fontWeight: 600, color: 'var(--gold)', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 14 }}>
           Session Planner
@@ -623,6 +615,33 @@ export default function MusicPlayer() {
             )}
           </>
         )}
+      </div>
+
+      {/* ── Ambient Moods ── */}
+      <div className="card" style={{ padding: '16px 18px', marginBottom: 20 }}>
+        <div style={{ fontFamily: 'Cinzel, serif', fontSize: 12, fontWeight: 600, color: 'var(--gold)', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 12 }}>
+          Ambient Moods
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 8 }}>
+          {MOODS.map(m => (
+            <button
+              key={m.id}
+              onClick={() => { if (isCustomPlaying) stopTrack(); play(m.id) }}
+              className="card"
+              style={{
+                padding: '10px 14px', textAlign: 'left', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                border: current === m.id ? '2px solid var(--gold)' : '1px solid var(--border)',
+                cursor: 'pointer', background: current === m.id ? 'var(--gold-bg)' : 'var(--surface2)',
+              }}
+            >
+              <span>
+                <span style={{ fontSize: 13, color: current === m.id ? 'var(--gold)' : 'var(--text)', display: 'block' }}>{m.label}</span>
+                <span style={{ fontSize: 11, color: 'var(--text-3)' }}>{m.desc}</span>
+              </span>
+              <span style={{ fontSize: 11, color: 'var(--text-3)' }}>{current === m.id ? '⏸' : '▶'}</span>
+            </button>
+          ))}
+        </div>
       </div>
 
       <ToastContainer />
