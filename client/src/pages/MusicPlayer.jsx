@@ -38,6 +38,7 @@ export default function MusicPlayer() {
   const [editingId, setEditingId] = useState(null)
   const [editName, setEditName] = useState('')
   const [isDragging, setIsDragging] = useState(false)
+  const dragCounter = useRef(0)
   const audioRef = useRef(null)
   const fileInputRef = useRef(null)
 
@@ -154,6 +155,7 @@ export default function MusicPlayer() {
   const handleDragEnter = (e) => {
     e.preventDefault()
     e.stopPropagation()
+    dragCounter.current += 1
     if (e.dataTransfer.types && Array.from(e.dataTransfer.types).includes('Files')) {
       setIsDragging(true)
     }
@@ -167,13 +169,16 @@ export default function MusicPlayer() {
   const handleDragLeave = (e) => {
     e.preventDefault()
     e.stopPropagation()
-    if (e.currentTarget.contains(e.relatedTarget)) return
-    setIsDragging(false)
+    dragCounter.current -= 1
+    if (dragCounter.current === 0) {
+      setIsDragging(false)
+    }
   }
 
   const handleDrop = async (e) => {
     e.preventDefault()
     e.stopPropagation()
+    dragCounter.current = 0
     setIsDragging(false)
     const files = Array.from(e.dataTransfer.files).filter(
       f => f.type.startsWith('audio/') || f.name.match(/\.(mp3|wav|ogg|m4a|flac|aac)$/i)
