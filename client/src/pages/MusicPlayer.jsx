@@ -630,33 +630,6 @@ export default function MusicPlayer() {
         )}
       </div>
 
-      {/* ── Ambient Moods ── */}
-      <div className="card" style={{ padding: '16px 18px', marginBottom: 20 }}>
-        <div style={{ fontFamily: 'Cinzel, serif', fontSize: 12, fontWeight: 600, color: 'var(--gold)', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 12 }}>
-          Ambient Moods
-        </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 8 }}>
-          {MOODS.map(m => (
-            <button
-              key={m.id}
-              onClick={() => { if (isCustomPlaying) stopTrack(); play(m.id) }}
-              className="card"
-              style={{
-                padding: '10px 14px', textAlign: 'left', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                border: current === m.id ? '2px solid var(--gold)' : '1px solid var(--border)',
-                cursor: 'pointer', background: current === m.id ? 'var(--gold-bg)' : 'var(--surface2)',
-              }}
-            >
-              <span>
-                <span style={{ fontSize: 13, color: current === m.id ? 'var(--gold)' : 'var(--text)', display: 'block' }}>{m.label}</span>
-                <span style={{ fontSize: 11, color: 'var(--text-3)' }}>{m.desc}</span>
-              </span>
-              <span style={{ fontSize: 11, color: 'var(--text-3)' }}>{current === m.id ? '⏸' : '▶'}</span>
-            </button>
-          ))}
-        </div>
-      </div>
-
       <ToastContainer />
     </div>
   )
