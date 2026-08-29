@@ -41,7 +41,7 @@ const JournalSchema = new Schema({
 const LoreSchema = new Schema({
   campaign: { type: Schema.Types.ObjectId, ref: 'Campaign', required: true },
   title:    { type: String, required: true },
-  tag:      { type: String, enum: ['npc', 'location', 'item', 'faction', 'event'], default: 'npc' },
+  tag:      { type: String, enum: ['npc', 'location', 'item', 'faction', 'event', 'enemy', 'boss'], default: 'npc' },
   content:  String,
   imageUrl: String,
 }, { timestamps: true })
