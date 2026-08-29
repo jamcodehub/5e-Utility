@@ -25,6 +25,18 @@ router.put('/:id', auth, async (req, res) => {
   } catch { res.status(500).json({ error: 'Failed to update' }) }
 })
 
+// PATCH — lightweight HP update (used by HP Tracker and Level Builder)
+router.patch('/:id/hp', auth, async (req, res) => {
+  try {
+    const entry = await Lore.findById(req.params.id)
+    if (!entry) return res.status(404).json({ error: 'Not found' })
+    if (!await isMember(entry.campaign, req.userId)) return res.status(403).json({ error: 'Not authorised' })
+    entry.hp = Math.max(0, Math.min(req.body.hp ?? entry.hp, entry.maxHp ?? 9999))
+    await entry.save()
+    res.json(entry)
+  } catch { res.status(500).json({ error: 'Failed to update HP' }) }
+})
+
 router.delete('/:id', auth, async (req, res) => {
   try {
     const entry = await Lore.findById(req.params.id)
