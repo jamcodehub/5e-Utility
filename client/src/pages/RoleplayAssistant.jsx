@@ -30,8 +30,8 @@ const RACE_HOOKS = {
   tiefling:     "Anticipate suspicion from strangers; decide in the moment whether to address it or ignore it.",
   dragonborn:   "Your heritage commands a room — use that presence deliberately; not every door needs to be kicked.",
   gnome:        "Curiosity and tinkering are instincts, not affectations — let them surface at inconvenient moments.",
-  'half-elf':   "You read both worlds without fully belonging to either; show that tension in how you navigate groups.",
-  'half-orc':   "Your physicality speaks before you do — use that, or work against it, as the moment demands.",
+  halfelf:     "You read both worlds without fully belonging to either; show that tension in how you navigate groups.",
+  halforc:     "Your physicality speaks before you do — use that, or work against it, as the moment demands.",
   drow:         "Surface-world light, customs, and open skies are still subtly wrong to you — lean into that.",
 }
 

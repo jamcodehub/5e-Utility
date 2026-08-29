@@ -95,7 +95,7 @@ export default function Premium() {
       <div className="page-header-row" style={{ marginBottom: 24 }}>
         <div>
           <h2 style={{ fontSize: 22, marginBottom: 4 }}>Premium</h2>
-          <p style={{ color: 'var(--text-2)', fontSize: 14, margin: 0 }}>Unlock the full Lore &amp; Ledger experience for your campaigns.</p>
+          <p style={{ color: 'var(--text-2)', fontSize: 14, margin: 0 }}>Unlock the full &amp; Utility experience for your campaigns.</p>
         </div>
       </div>
 
