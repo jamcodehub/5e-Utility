@@ -44,6 +44,8 @@ const LoreSchema = new Schema({
   tag:      { type: String, enum: ['npc', 'location', 'item', 'faction', 'event', 'enemy', 'boss'], default: 'npc' },
   content:  String,
   imageUrl: String,
+  hp:       { type: Number, default: null },   // current HP (npc/enemy/boss)
+  maxHp:    { type: Number, default: null },   // max HP
 }, { timestamps: true })
 
 const StoryCardSchema = new Schema({
