@@ -10,7 +10,7 @@ import { auto as autoFormat } from '@cloudinary/url-gen/qualifiers/format'
 import { thumbnail } from '@cloudinary/url-gen/actions/resize'
 import { autoGravity } from '@cloudinary/url-gen/qualifiers/gravity'
 
-const CLOUD_NAME = 'crcbzpw6'
+const CLOUD_NAME = 'crcbzpw6' //cloud id
 
 function getOptimisedUrl(cloudinaryUrl, width = null) {
   if (!cloudinaryUrl) return ''
