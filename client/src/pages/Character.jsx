@@ -188,7 +188,7 @@ export default function Character() {
       {/* Onboarding banner for new players */}
       {loaded && !form.name && (
         <div style={{ padding: '12px 16px', marginBottom: 12, background: 'var(--gold-bg)', border: '1px solid var(--gold-border)', borderRadius: 10, fontSize: 13, color: 'var(--text)', lineHeight: 1.6 }}>
-          🎲 <strong>Welcome!</strong> Click <strong>Edit</strong> to set up your character. Your DM and the Roleplay Assistant both read this sheet — the more you fill in, the better your session plans become.
+          <strong>Welcome!</strong> Click <strong>Edit</strong> to set up your character. Your DM and the Roleplay Assistant both read this sheet — the more you fill in, the better your session plans become.
         </div>
       )}
 
