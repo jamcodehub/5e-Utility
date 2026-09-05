@@ -164,14 +164,14 @@ export default function SettingsModal({ onClose }) {
               <>
                 <button type="button" onClick={() => { setConfirmAction('delete'); setConfirmInput(''); setConfirmError('') }}
                   disabled={!isPremium}
-                  style={{ width: '100%', padding: '10px 14px', borderRadius: 10, border: '1px solid var(--red)', background: 'transparent', color: isPremium ? 'var(--red)' : 'var(--text-3)', fontWeight: 600, cursor: isPremium ? 'pointer' : 'not-allowed', opacity: isPremium ? 1 : 0.6 }}>
+                  style={{ padding: '6px 12px', borderRadius: 8, border: '1px solid var(--border)', background: 'transparent', color: isPremium ? 'var(--red)' : 'var(--text-3)', fontWeight: 500, fontSize: 12, cursor: isPremium ? 'pointer' : 'not-allowed', opacity: isPremium ? 1 : 0.6 }}>
                   Delete Campaign
                 </button>
                 {!isPremium && <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 6 }}>Deleting a campaign is a Premium feature. <button type="button" onClick={() => { navigate('/premium'); onClose() }} style={{ background: 'none', border: 'none', color: 'var(--gold)', cursor: 'pointer', fontSize: 11, padding: 0 }}>Upgrade →</button></div>}
               </>
             ) : (
               <button type="button" onClick={() => { setConfirmAction('leave'); setConfirmInput(''); setConfirmError('') }}
-                style={{ width: '100%', padding: '10px 14px', borderRadius: 10, border: '1px solid var(--red)', background: 'transparent', color: 'var(--red)', fontWeight: 600, cursor: 'pointer' }}>
+                style={{ padding: '6px 12px', borderRadius: 8, border: '1px solid var(--border)', background: 'transparent', color: 'var(--red)', fontWeight: 500, fontSize: 12, cursor: 'pointer' }}>
                 Leave Campaign
               </button>
             )}

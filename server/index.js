@@ -1,4 +1,5 @@
 import express from 'express'
+import { createServer } from 'http'
 import mongoose from 'mongoose'
 import cors from 'cors'
 import dotenv from 'dotenv'
@@ -16,6 +17,7 @@ import inventoryRoutes from './routes/inventory.js'
 import uploadRoutes from './routes/upload.js'
 import musicRoutes from './routes/music.js'
 import sessionsRoutes from './routes/sessions.js'
+import { attachRealtime } from './realtime.js'
 
 dotenv.config()
 
@@ -45,5 +47,7 @@ app.use('/api/sessions',  sessionsRoutes)
 
 mongoose.connect(process.env.MONGO_URI).then(() => {
   console.log('MongoDB connected')
-  app.listen(process.env.PORT || 4000, () => console.log(`Server on :${process.env.PORT || 4000}`))
+  const httpServer = createServer(app)
+  attachRealtime(httpServer)
+  httpServer.listen(process.env.PORT || 4000, () => console.log(`Server on :${process.env.PORT || 4000}`))
 }).catch(err => console.error(err))

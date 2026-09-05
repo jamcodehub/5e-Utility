@@ -174,6 +174,45 @@ function SwipeNav({ items, navLinkStyle }) {
   )
 }
 
+// ─── Persistent mini play/pause/skip bar ────────────────────────────────────
+// Small, always-visible strip (not hidden behind a toggle) showing whatever
+// is currently playing — an ambient mood or an uploaded track — with quick
+// prev/play-pause/next controls. Renders nothing when nothing is playing.
+function PersistentPlayerBar({ compact }) {
+  const { current, activeTrack, trackPlaying, playTrack, skipTrack, play, skipMood, queue } = useMusic()
+  if (!current && !activeTrack) return null
+
+  const isTrack = !!activeTrack
+  const label = isTrack ? (activeTrack.title || activeTrack.name || 'Track') : MOODS.find(m => m.id === current)?.label
+  const playing = isTrack ? trackPlaying : !!current
+  const canSkip = isTrack ? queue.length > 1 : true
+  const togglePlay = () => { if (isTrack) playTrack(activeTrack); else play(current) }
+  const skipPrev = () => { if (isTrack) skipTrack(-1); else skipMood(-1) }
+  const skipNext = () => { if (isTrack) skipTrack(1); else skipMood(1) }
+
+  return (
+    <div style={{
+      display: 'flex', alignItems: 'center', gap: 8,
+      padding: compact ? '6px 10px' : '8px 10px',
+      background: 'var(--surface2)', border: '1px solid var(--border)',
+      borderRadius: compact ? 999 : 10,
+      margin: compact ? 0 : '0 0 10px',
+    }}>
+      <span style={{ fontSize: 14, flexShrink: 0 }}>{isTrack ? '🎵' : '♪'}</span>
+      <span style={{ flex: 1, minWidth: 0, fontSize: 12, color: 'var(--text-2)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{label}</span>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 2, flexShrink: 0 }}>
+        {canSkip && (
+          <button onClick={skipPrev} title="Previous" style={{ width: 22, height: 22, border: 'none', background: 'none', color: 'var(--text-2)', cursor: 'pointer', fontSize: 13, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>⏮</button>
+        )}
+        <button onClick={togglePlay} title={playing ? 'Pause' : 'Play'} style={{ width: 24, height: 24, borderRadius: '50%', border: 'none', background: 'var(--gold)', color: '#2a1a00', cursor: 'pointer', fontSize: 11, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{playing ? '⏸' : '▶'}</button>
+        {canSkip && (
+          <button onClick={skipNext} title="Next" style={{ width: 22, height: 22, border: 'none', background: 'none', color: 'var(--text-2)', cursor: 'pointer', fontSize: 13, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>⏭</button>
+        )}
+      </div>
+    </div>
+  )
+}
+
 // ─── Music mini player ───────────────────────────────────────────────────────
 function MusicMiniPlayer({ bottomOffset }) {
   const { current, volume, play, stop, setVol } = useMusic()
@@ -212,6 +251,7 @@ const NAV_PLAYER = [
   { to: '/character',  label: 'Character' },
   { to: '/inventory',  label: 'Inventory' },
   { to: '/roleplay',   label: 'Roleplay' },
+  { to: '/levels',     label: 'Battle Map' },
   { to: '/dice',       label: 'Dice' },
 ]
 
@@ -421,6 +461,15 @@ export default function Shell({ children }) {
 
         <main style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column', paddingBottom: '72px' }}>{children}</main>
 
+        {/* Persistent mini play/pause/skip — sits just above the bottom nav */}
+        <div style={{
+          position: 'fixed', left: '50%', transform: 'translateX(-50%)',
+          bottom: 'calc(66px + env(safe-area-inset-bottom, 12px))',
+          width: 'min(96%, 560px)', zIndex: 39,
+        }}>
+          <PersistentPlayerBar compact />
+        </div>
+
         {/* Bottom nav — swipeable infinite carousel */}
         <nav style={{
           position: 'fixed',
@@ -544,6 +593,7 @@ export default function Shell({ children }) {
         </nav>
 
         <div style={{ padding: '12px 14px', borderTop: '1px solid var(--border)' }}>
+          <PersistentPlayerBar />
           {!isPremium && (
             <button onClick={() => navigate('/premium')} className="btn btn-gold" style={{ width: '100%', justifyContent: 'center', marginBottom: 10, fontSize: 12 }}>✦ Upgrade to Premium</button>
           )}

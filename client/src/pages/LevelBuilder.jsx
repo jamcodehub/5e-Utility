@@ -3,6 +3,7 @@ import { api } from '../context/AuthContext'
 import { useCampaign } from '../context/CampaignContext'
 import { useAuth } from '../context/AuthContext'
 import { useToast } from '../hooks/useToast'
+import { getSocket } from '../utils/socket'
 
 // A3 landscape ratio ≈ 420/297
 const GRID_W = 32
@@ -39,6 +40,33 @@ function MapThumb({ content }) {
 }
 
 // Token component — draggable circle showing avatar or initials
+// Small overlapping "peeking" avatars — a minimal presence indicator showing
+// who else is currently viewing this board live (collaborative Play mode).
+function PeekingViewers({ viewers }) {
+  if (!viewers.length) return null
+  return (
+    <div style={{ display: 'flex', alignItems: 'center' }} title={viewers.map(v => v.username).join(', ')}>
+      {viewers.slice(0, 5).map((v, i) => (
+        <div key={v.userId} style={{
+          width: 24, height: 24, borderRadius: '50%', overflow: 'hidden',
+          background: 'var(--gold-bg)', border: '2px solid var(--surface)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          marginLeft: i === 0 ? 0 : -8, boxShadow: '0 1px 3px rgba(0,0,0,0.25)',
+          flexShrink: 0, position: 'relative', zIndex: 5 - i,
+        }}>
+          {v.avatar
+            ? <img src={v.avatar} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+            : <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--gold)', fontFamily: 'Cinzel, serif' }}>{v.username?.[0]?.toUpperCase()}</span>
+          }
+        </div>
+      ))}
+      {viewers.length > 5 && (
+        <span style={{ marginLeft: 4, fontSize: 11, color: 'var(--text-3)' }}>+{viewers.length - 5}</span>
+      )}
+    </div>
+  )
+}
+
 function Token({ token, cellSize, onDragStart }) {
   const initials = token.name?.[0]?.toUpperCase() || '?'
   return (
@@ -70,7 +98,8 @@ function Token({ token, cellSize, onDragStart }) {
 
 export default function LevelBuilder() {
   const { activeCampaign } = useCampaign()
-  const { isPremium } = useAuth()
+  const { isPremium, user } = useAuth()
+  const isDm = user?.role === 'dm'
   const { toast, ToastContainer } = useToast()
 
   // ── Map gallery state ──
@@ -91,6 +120,8 @@ export default function LevelBuilder() {
   const [dragTokenId, setDragTokenId] = useState(null)
   const [cellSize, setCellSize] = useState(28)
   const gridRef = useRef(null)
+  const remoteUpdateRef = useRef(false)
+  const [viewers, setViewers] = useState([]) // who's currently looking at this board
 
   // ── Data loading ──
   const loadPlans = useCallback(async () => {
@@ -151,8 +182,39 @@ export default function LevelBuilder() {
     return () => obs.disconnect()
   }, [mode])
 
+  // ── Real-time collaborative board ──
+  // Join the room for this map while in Play mode so every DM/player looking
+  // at the same board sees token moves, adds, removes, and HP changes live.
+  useEffect(() => {
+    if (mode !== 'play' || !selectedPlanId) return
+    const socket = getSocket()
+    socket.emit('level:join', selectedPlanId)
+    const onTokens = (remoteTokens) => {
+      remoteUpdateRef.current = true
+      setTokens(Array.isArray(remoteTokens) ? remoteTokens : [])
+    }
+    const onPresence = (users) => setViewers(Array.isArray(users) ? users : [])
+    socket.on('level:tokens', onTokens)
+    socket.on('level:presence', onPresence)
+    return () => {
+      socket.off('level:tokens', onTokens)
+      socket.off('level:presence', onPresence)
+      socket.emit('level:leave', selectedPlanId)
+      setViewers([])
+    }
+  }, [mode, selectedPlanId])
+
+  // Broadcast + persist whenever the local token layout changes — but not
+  // when the change just arrived from someone else, to avoid an echo loop.
+  useEffect(() => {
+    if (mode !== 'play' || !selectedPlanId) return
+    if (remoteUpdateRef.current) { remoteUpdateRef.current = false; return }
+    getSocket().emit('level:tokens', { planId: selectedPlanId, tokens })
+  }, [tokens, mode, selectedPlanId])
+
   // ── Gallery actions ──
   const openEditor = (plan = null) => {
+    if (!isDm) return
     if (plan) {
       setEditPlanId(plan._id)
       setEditTitle(plan.title)
@@ -170,7 +232,7 @@ export default function LevelBuilder() {
     setSelectedPlanId(plan._id)
     try { const g = JSON.parse(plan.content); if (Array.isArray(g)) setGrid(g) }
     catch { setGrid(blankGrid()) }
-    setTokens([])
+    setTokens(Array.isArray(plan.tokens) ? plan.tokens : [])
     setMode('play')
   }
 
@@ -297,6 +359,7 @@ export default function LevelBuilder() {
       {/* Grid — fills remaining height */}
       <div style={{ flex: 1, overflow: 'auto', padding: 16, background: '#2a2a2a', display: 'flex', alignItems: 'flex-start', justifyContent: 'center' }}>
         <div
+          id="level-print"
           onMouseUp={() => setPainting(false)}
           onMouseLeave={() => setPainting(false)}
           style={{
@@ -333,8 +396,9 @@ export default function LevelBuilder() {
       {/* Play toolbar */}
       <div style={{ padding: '10px 16px', background: 'var(--surface)', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
         <span style={{ fontFamily: 'Cinzel, serif', fontSize: 14, fontWeight: 600, flex: 1 }}>{selectedPlan?.title}</span>
+        <PeekingViewers viewers={viewers} />
         <button className="btn btn-ghost btn-sm" onClick={() => { setTokens([]); setMode('gallery') }}>← Back</button>
-        <button className="btn btn-primary btn-sm" onClick={() => openEditor(selectedPlan)}>Edit Map</button>
+        {isDm && <button className="btn btn-primary btn-sm" onClick={() => openEditor(selectedPlan)}>Edit Map</button>}
       </div>
 
       <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
@@ -466,10 +530,12 @@ export default function LevelBuilder() {
         <div style={{ flex: 1 }}>
           <h2 style={{ fontSize: 20, marginBottom: 2 }}>Level Builder</h2>
           <p style={{ fontSize: 13, color: 'var(--text-2)', margin: 0 }}>
-            Draw tile maps, then enter play mode to position your party. {!isPremium && `(${plans.length}/5 free)`}
+            {isDm
+              ? <>Draw tile maps, then enter play mode to position your party. {!isPremium && `(${plans.length}/5 free)`}</>
+              : 'Open a map below to view and move your token — everyone sees moves live.'}
           </p>
         </div>
-        <button className="btn btn-primary" onClick={() => openEditor(null)}>+ Create New Map</button>
+        {isDm && <button className="btn btn-primary" onClick={() => openEditor(null)}>+ Create New Map</button>}
       </div>
 
       {/* Horizontal scroll gallery */}
@@ -501,12 +567,14 @@ export default function LevelBuilder() {
                 <MapThumb content={plan.content} />
                 <div style={{ padding: '10px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                   <span style={{ fontFamily: 'Cinzel, serif', fontSize: 13, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{plan.title}</span>
-                  <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
-                    <button onClick={e => { e.stopPropagation(); openEditor(plan) }} title="Edit tiles"
-                      style={{ background: 'none', border: 'none', color: 'var(--text-3)', cursor: 'pointer', fontSize: 13 }}>✎</button>
-                    <button onClick={e => deleteMap(plan._id, e)} title="Delete"
-                      style={{ background: 'none', border: 'none', color: 'var(--text-3)', cursor: 'pointer', fontSize: 13 }}>✕</button>
-                  </div>
+                  {isDm && (
+                    <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+                      <button onClick={e => { e.stopPropagation(); openEditor(plan) }} title="Edit tiles"
+                        style={{ background: 'none', border: 'none', color: 'var(--text-3)', cursor: 'pointer', fontSize: 13 }}>✎</button>
+                      <button onClick={e => deleteMap(plan._id, e)} title="Delete"
+                        style={{ background: 'none', border: 'none', color: 'var(--text-3)', cursor: 'pointer', fontSize: 13 }}>✕</button>
+                    </div>
+                  )}
                 </div>
               </div>
             ))}

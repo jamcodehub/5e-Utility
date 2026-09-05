@@ -334,6 +334,25 @@ export function MusicProvider({ children }) {
     setTrackTime(time)
   }
 
+  // Manual skip — used by the persistent mini-player controls. Wraps
+  // around the current queue in either direction.
+  const skipTrack = (dir) => {
+    if (!queue.length) return
+    const idx = queue.findIndex(t => t._id === activeTrackRef.current?._id)
+    const nextIdx = idx === -1 ? 0 : (idx + dir + queue.length) % queue.length
+    playTrack(queue[nextIdx])
+  }
+
+  // Toggle mood ambient tracks in a fixed cycle order (used by the
+  // persistent mini-player's "skip" control when no uploaded track queue
+  // is active — cycles Tavern → Battle → Forest → Dramatic → Tavern...).
+  const skipMood = (dir) => {
+    if (!currentRef.current) return
+    const idx = MOODS.findIndex(m => m.id === currentRef.current)
+    const nextIdx = (idx + dir + MOODS.length) % MOODS.length
+    play(MOODS[nextIdx].id)
+  }
+
   useEffect(() => {
     const el = trackAudioRef.current
     if (!el) return
@@ -386,7 +405,7 @@ export function MusicProvider({ children }) {
       current, volume, play, stop, setVol,
       activeTrack, trackPlaying, trackTime, trackDuration, trackDurationRef: trackDuration,
       shuffleEnabled, setShuffleEnabled, repeatMode, setRepeatMode,
-      queue, setQueue, playTrack, stopTrack, seekTrack,
+      queue, setQueue, playTrack, stopTrack, seekTrack, skipTrack, skipMood,
     }}>
       {children}
     </MusicContext.Provider>

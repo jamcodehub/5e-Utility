@@ -4,7 +4,7 @@ import { useCampaign } from '../context/CampaignContext'
 import { useToast } from '../hooks/useToast'
 import { uploadToCloudinary } from '../utils/uploadToCloudinary'
 import UpgradeModal from '../components/UpgradeModal'
-import { SkeletonPage } from '../components/Skeleton'
+import { SkeletonCharacterPage } from '../components/Skeleton'
 import { CloudinaryImage } from '@cloudinary/url-gen'
 import { quality, format } from '@cloudinary/url-gen/actions/delivery'
 import { auto as autoQuality } from '@cloudinary/url-gen/qualifiers/quality'
@@ -200,7 +200,7 @@ export default function Character() {
   const F = form
 
   if (!activeCampaign) return <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-3)' }}>Select a campaign.</div>
-  if (!loaded) return <SkeletonPage cards={6} />
+  if (!loaded) return <SkeletonCharacterPage />
 
   return (
     <div className="page-content">

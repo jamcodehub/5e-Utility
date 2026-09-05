@@ -276,13 +276,14 @@ router.delete('/:id/characters/:charId', auth, async (req, res) => {
   } catch { res.status(500).json({ error: 'Failed to delete character' }) }
 })
 
-// DM: get all members' characters for Campaign Guide reference — uses each
-// member's primary character.
+// Get all members' characters — used by Campaign Guide/HP Tracker (DM-only
+// pages, gated client-side) and the collaborative Level Builder board, which
+// any campaign member (DM or player) needs so party tokens are available.
 router.get('/:id/members/characters', auth, async (req, res) => {
   try {
-    const campaign = await Campaign.findOne({ _id: req.params.id, owner: req.userId })
-      .populate('members', 'username')
-    if (!campaign) return res.status(403).json({ error: 'DM only' })
+    if (!await isMember(req.params.id, req.userId)) return res.status(403).json({ error: 'Not a campaign member' })
+    const campaign = await Campaign.findById(req.params.id).populate('members', 'username')
+    if (!campaign) return res.status(404).json({ error: 'Not found' })
     const chars = await Character.find({
       campaign: req.params.id,
       owner: { $in: campaign.members.map(m => m._id) },

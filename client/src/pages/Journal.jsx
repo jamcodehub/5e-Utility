@@ -214,6 +214,14 @@ export default function Journal() {
                 </span>
               )
             ) : 'Select a day'}
+            {active && renamingId !== active._id && (
+              <button
+                type="button"
+                onClick={(ev) => startRename(ev, active)}
+                title="Rename"
+                style={{ background: 'none', border: 'none', color: 'var(--text-3)', cursor: 'pointer', fontSize: 13, padding: 2, lineHeight: 1 }}
+              >✎</button>
+            )}
           </h2>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{wordCount(content)} words</span>
