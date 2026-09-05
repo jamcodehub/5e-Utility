@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
-import { api } from '../context/AuthContext'
+import { Navigate } from 'react-router-dom'
+import { api, useAuth } from '../context/AuthContext'
 import { useCampaign } from '../context/CampaignContext'
 import { useToast } from '../hooks/useToast'
 
@@ -139,6 +140,7 @@ function CombatantCard({ c, onChange, onRemove }) {
 
 export default function HpTracker() {
   const { activeCampaign } = useCampaign()
+  const { user } = useAuth()
   const { toast, ToastContainer } = useToast()
 
   const [combatants, setCombatants] = useState([])
@@ -160,6 +162,8 @@ export default function HpTracker() {
         .filter(m => m.character)
         .map(m => ({
           id: `player-${m.userId}`,
+          userId: m.userId,
+          charId: m.character._id,
           name: m.character.name || m.username,
           avatar: m.character.avatarUrl || null,
           type: 'player',
@@ -181,7 +185,16 @@ export default function HpTracker() {
 
   useEffect(() => { load() }, [load])
 
-  const updateCombatant = (updated) => setCombatants(cs => cs.map(c => c.id === updated.id ? updated : c))
+  const updateCombatant = (updated) => {
+    setCombatants(cs => cs.map(c => c.id === updated.id ? updated : c))
+    // Persist HP back to the source record so it doesn't reset to default
+    // next time this page (or Character.jsx / the Levels tilemap) loads it.
+    if (updated.source === 'lore' && updated.loreId && updated.hp !== undefined) {
+      api(`/lore/${updated.loreId}/hp`, { method: 'PATCH', body: { hp: updated.hp } }).catch(() => {})
+    } else if (updated.source === 'party' && updated.userId && updated.hp !== undefined) {
+      api(`/campaigns/${activeCampaign._id}/characters/${updated.charId}`, { method: 'PUT', body: { hp: { current: updated.hp, max: updated.maxHp } } }).catch(() => {})
+    }
+  }
   const removeCombatant = (id) => setCombatants(cs => cs.filter(c => c.id !== id))
 
   const addFromLore = (loreEntry) => {
@@ -226,6 +239,10 @@ export default function HpTracker() {
 
   const aliveCount = combatants.filter(c => !c.maxHp || c.hp > 0).length
   const downCount  = combatants.filter(c => c.maxHp && c.hp === 0).length
+
+  // This page's data (party members' characters) comes from a DM-only
+  // endpoint, so non-DMs are redirected rather than shown a broken page.
+  if (user?.role !== 'dm') return <Navigate to="/journal" replace />
 
   if (!activeCampaign) return (
     <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-3)' }}>

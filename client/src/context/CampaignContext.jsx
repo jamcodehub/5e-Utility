@@ -51,8 +51,16 @@ export function CampaignProvider({ children }) {
     if (activeCampaign?._id === id) setActive(c)
   }
 
-  const deleteCampaign = async (id) => {
-    await api(`/campaigns/${id}`, { method: 'DELETE' })
+  // Both require the caller to have already confirmed the exact campaign
+  // name client-side; confirmName is also re-checked server-side.
+  const deleteCampaign = async (id, confirmName) => {
+    await api(`/campaigns/${id}`, { method: 'DELETE', body: { confirmName } })
+    setCampaigns(p => p.filter(x => x._id !== id))
+    if (activeCampaign?._id === id) setActive(campaigns.find(x => x._id !== id) || null)
+  }
+
+  const leaveCampaign = async (id, confirmName) => {
+    await api(`/campaigns/${id}/leave`, { method: 'POST', body: { confirmName } })
     setCampaigns(p => p.filter(x => x._id !== id))
     if (activeCampaign?._id === id) setActive(campaigns.find(x => x._id !== id) || null)
   }
@@ -72,7 +80,7 @@ export function CampaignProvider({ children }) {
   }
 
   return (
-    <CampaignContext.Provider value={{ campaigns, activeCampaign, setActive, createCampaign, updateCampaign, deleteCampaign, joinCampaign, reload: load }}>
+    <CampaignContext.Provider value={{ campaigns, activeCampaign, setActive, createCampaign, updateCampaign, deleteCampaign, leaveCampaign, joinCampaign, reload: load }}>
       {children}
     </CampaignContext.Provider>
   )

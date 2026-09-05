@@ -62,24 +62,38 @@ function SwipeNav({ items, navLinkStyle }) {
     })
   }, [items.length])
 
-  const onTouchStart = (e) => {
-    dragRef.current = { active: true, startX: e.touches[0].clientX, startOffset: offset }
-  }
-  const onTouchMove = (e) => {
-    if (!dragRef.current.active) return
-    const dx = e.touches[0].clientX - dragRef.current.startX
-    setOffset(dragRef.current.startOffset + dx)
-  }
-  const onTouchEnd = () => {
-    dragRef.current.active = false
-    // Snap to nearest item
-    const itemStep = ITEM_W + GAP
-    setOffset(prev => {
-      const snapped = Math.round(prev / itemStep) * itemStep
-      return snapped
-    })
-    setTimeout(recentre, 50)
-  }
+  // Native (non-passive) touch listeners so we can preventDefault() on
+  // touchmove — this stops the swipe from also scrolling/selecting the
+  // rest of the page, restricting it to horizontal left/right paging only.
+  useEffect(() => {
+    const el = containerRef.current
+    if (!el) return
+    const start = (e) => {
+      dragRef.current = { active: true, startX: e.touches[0].clientX, startOffset: offset }
+    }
+    const move = (e) => {
+      if (!dragRef.current.active) return
+      e.preventDefault()
+      const dx = e.touches[0].clientX - dragRef.current.startX
+      setOffset(dragRef.current.startOffset + dx)
+    }
+    const end = () => {
+      dragRef.current.active = false
+      const itemStep = ITEM_W + GAP
+      setOffset(prev => Math.round(prev / itemStep) * itemStep)
+      setTimeout(recentre, 50)
+    }
+    el.addEventListener('touchstart', start, { passive: true })
+    el.addEventListener('touchmove', move, { passive: false })
+    el.addEventListener('touchend', end, { passive: true })
+    el.addEventListener('touchcancel', end, { passive: true })
+    return () => {
+      el.removeEventListener('touchstart', start)
+      el.removeEventListener('touchmove', move)
+      el.removeEventListener('touchend', end)
+      el.removeEventListener('touchcancel', end)
+    }
+  }, [offset, recentre])
 
   // Mouse drag for desktop testing
   const onMouseDown = (e) => {
@@ -104,10 +118,17 @@ function SwipeNav({ items, navLinkStyle }) {
   return (
     <div
       ref={containerRef}
-      style={{ flex: 1, overflow: 'hidden', display: 'flex', alignItems: 'center', cursor: 'grab', userSelect: 'none' }}
-      onTouchStart={onTouchStart}
-      onTouchMove={onTouchMove}
-      onTouchEnd={onTouchEnd}
+      style={{
+        flex: 1,
+        overflow: 'hidden',
+        display: 'flex',
+        alignItems: 'center',
+        cursor: 'grab',
+        userSelect: 'none',
+        WebkitUserSelect: 'none',
+        WebkitTouchCallout: 'none',
+        touchAction: 'none',
+      }}
       onMouseDown={onMouseDown}
     >
       <div
@@ -118,6 +139,8 @@ function SwipeNav({ items, navLinkStyle }) {
           transform: `translateX(${offset}px)`,
           transition: dragRef.current?.active ? 'none' : 'transform 0.18s cubic-bezier(.4,0,.2,1)',
           willChange: 'transform',
+          userSelect: 'none',
+          WebkitUserSelect: 'none',
         }}
       >
         {tripled.map((item, idx) => {
@@ -136,9 +159,11 @@ function SwipeNav({ items, navLinkStyle }) {
                 overflow: 'hidden',
                 fontSize: fontSizeFor(item.label),
                 pointerEvents: dragRef.current?.active ? 'none' : 'auto',
+                userSelect: 'none',
+                WebkitUserSelect: 'none',
               })}
             >
-              <span style={{ overflow: 'hidden', display: 'block', width: '100%', textAlign: 'center' }}>
+              <span style={{ overflow: 'hidden', display: 'block', width: '100%', textAlign: 'center', userSelect: 'none', WebkitUserSelect: 'none' }}>
                 {item.label}
               </span>
             </NavLink>
@@ -198,6 +223,7 @@ const NAV_DM = [
   { to: '/inventory',  label: 'Shop/Items' },
   { to: '/ideas',      label: 'Ideas' },
   { to: '/levels',     label: 'Levels' },
+  { to: '/combat',     label: 'Combat' },
   { to: '/rules',      label: 'Rules' },
   { to: '/music',      label: 'Music' },
   { to: '/dice',       label: 'Dice' },

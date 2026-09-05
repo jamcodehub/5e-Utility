@@ -1,8 +1,19 @@
-@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600&family=Inter:wght@400;500;600&display=swap');
-
+/* Font is now loaded via a <link> tag in index.html (not @import) so it
+   downloads in parallel with other assets instead of blocking CSSOM. */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 html, body { overflow-x: hidden; }
+
+/* Skeleton shimmer loading placeholders (Skeleton.jsx) */
+@keyframes skeleton-shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+.skeleton-shimmer {
+  background: linear-gradient(90deg, var(--surface2) 25%, var(--border) 50%, var(--surface2) 75%);
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.4s ease-in-out infinite;
+}
 
 :root {
   --bg: #f5f4f1;

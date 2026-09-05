@@ -6,6 +6,7 @@ import { MusicProvider } from './context/MusicContext'
 import Shell from './components/Shell'
 import Auth from './pages/Auth'
 import Journal from './pages/Journal'
+import { SkeletonPage } from './components/Skeleton'
 import { lazy, Suspense, useEffect } from 'react'
 
 // Journal loads in the initial bundle (first page users land on).
@@ -23,6 +24,7 @@ const LevelBuilder  = lazy(() => import('./pages/LevelBuilder'))
 const RoleplayAssistant = lazy(() => import('./pages/RoleplayAssistant'))
 const CampaignGuide = lazy(() => import('./pages/CampaignGuide'))
 const SessionPlanner = lazy(() => import('./pages/SessionPlanner'))
+const HpTracker      = lazy(() => import('./pages/HPtracker'))
 
 // Kick off all remaining chunk downloads in idle time after Journal renders.
 // Uses requestIdleCallback so it never competes with the first paint.
@@ -41,6 +43,7 @@ const prefetchAll = () => {
     () => import('./pages/RoleplayAssistant'),
     () => import('./pages/CampaignGuide'),
     () => import('./pages/SessionPlanner'),
+    () => import('./pages/HPtracker'),
   ]
   const schedule = window.requestIdleCallback || ((cb) => setTimeout(cb, 200))
   let i = 0
@@ -54,7 +57,7 @@ const prefetchAll = () => {
   schedule(next)
 }
 
-const PageLoader = () => <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-3)', fontFamily: 'Cinzel, serif' }}>Loading...</div>
+const PageLoader = () => <SkeletonPage />
 
 function Guard() {
   const { user, loading } = useAuth()
@@ -65,7 +68,7 @@ function Guard() {
     if (user) prefetchAll()
   }, [!!user])
 
-  if (loading) return <div style={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-3)', fontFamily: 'Cinzel, serif' }}>Loading...</div>
+  if (loading) return <div style={{ height: '100vh', display: 'flex' }}><SkeletonPage cards={6} /></div>
   if (!user) return <Auth />
   // Players land on their Journal; DMs land on their Session Planner.
   const homePath = user.role === 'dm' ? '/session-planner' : '/journal'
@@ -90,6 +93,7 @@ function Guard() {
               <Route path="/levels"     element={<LevelBuilder />} />
               <Route path="/roleplay"   element={<RoleplayAssistant />} />
               <Route path="/campaign-guide" element={<CampaignGuide />} />
+              <Route path="/combat"     element={<HpTracker />} />
               <Route path="*"           element={<Navigate to={homePath} replace />} />
             </Routes>
           </Suspense>

@@ -7,7 +7,17 @@ const router = Router()
 
 router.get('/:campaignId', auth, async (req, res) => {
   if (!await isMember(req.params.campaignId, req.userId)) return res.status(403).json({ error: 'Not a campaign member' })
-  const entries = await Journal.find({ campaign: req.params.campaignId })
+  // Journal entries are personal per-author (each player's own Journal,
+  // the DM's own Session Planner) — never shared across users. Previously
+  // this had no author filter at all, so every player's "Day" entries and
+  // the DM's "Session" entries all bled together into one combined list
+  // for anyone viewing any campaign member's page. `kind` further separates
+  // day-entries (Journal.jsx) from session-entries (SessionPlanner.jsx) so
+  // legacy entries missing one field never show up in the wrong page.
+  const filter = { campaign: req.params.campaignId, author: req.userId }
+  if (req.query.kind === 'day') filter.day = { $exists: true, $ne: null }
+  else if (req.query.kind === 'session') filter.session = { $exists: true, $ne: null }
+  const entries = await Journal.find(filter)
     .populate('author', 'username').sort({ day: -1, session: -1, createdAt: -1 })
   res.json(entries)
 })

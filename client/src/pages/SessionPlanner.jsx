@@ -32,7 +32,7 @@ export default function SessionPlanner() {
 
   const load = useCallback(async () => {
     if (!activeCampaign) return
-    const data = await api(`/${apiBase}/${activeCampaign._id}`)
+    const data = await api(`/${apiBase}/${activeCampaign._id}?kind=session`)
     setEntries(data)
     if (data.length) { setActiveId(data[0]._id); setContent(data[0].content) }
     else { setActiveId(null); setContent('') }

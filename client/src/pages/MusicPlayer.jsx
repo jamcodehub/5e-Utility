@@ -368,7 +368,7 @@ export default function MusicPlayer() {
                   className="btn btn-primary btn-sm"
                   style={{ flex: 1, justifyContent: 'center' }}
                 >
-                  {isCustomPlaying && activeTrack?._id === selectedTrackId ? '⏸ Pause' : '▶ Play'}
+                  {isCustomPlaying && activeTrack?._id === selectedTrackId ? '⏸ Pause' : 'Play'}
                 </button>
 
                 <button

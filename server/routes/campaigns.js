@@ -51,17 +51,12 @@ export const isMember = async (campaignId, userId) => {
   const uid = String(userId)
   return String(c.owner) === uid || c.members.some(m => String(m) === uid)
 }
-// ─── Character dedup helper ─────────────────────────────────────────
-// A unique index on (campaign, owner) exists on CharacterSchema, but Mongo
-// silently refuses to *build* a unique index if duplicate documents already
-// exist in the collection (e.g. from a pre-fix race between rapid HP +/-
-// clicks and the initial character upsert). That means old duplicates can
-// still be present and the constraint never actually took effect for them.
-// This self-heals on every read/write: if more than one Character doc is
-// found for a campaign+owner pair, we merge the non-empty fields from all
-// of them into whichever has the most content, delete the rest, and return
-// the merged survivor. This also lets the unique index finally build
-// successfully once no duplicates remain.
+// ─── Character helpers ─────────────────────────────────────────────
+// Players may now have multiple character docs per campaign (2 free /
+// unlimited premium), distinguished by `isPrimary`. Back-compat single-
+// character consumers (Roleplay Assistant, the DM's members/characters
+// roster, the singular /:id/character routes) always resolve to whichever
+// one is marked primary.
 const fieldScore = (doc) => {
   const obj = doc.toObject ? doc.toObject() : doc
   let score = 0
@@ -72,28 +67,22 @@ const fieldScore = (doc) => {
   return score
 }
 
-const dedupeCharacter = async (campaignId, ownerId) => {
-  const docs = await Character.find({ campaign: campaignId, owner: ownerId }).sort({ updatedAt: -1 })
-  if (docs.length <= 1) return docs[0] || null
-
-  // Pick the most content-rich doc as the survivor, not just the newest.
-  const winner = docs.reduce((best, d) => fieldScore(d) > fieldScore(best) ? d : best, docs[0])
-  const losers = docs.filter(d => d._id.toString() !== winner._id.toString())
-
-  // Backfill any fields the winner is missing from the losers before deleting them.
-  for (const loser of losers) {
-    const lo = loser.toObject()
-    for (const key of ['name', 'race', 'class', 'level', 'notes', 'background', 'personality', 'goals', 'lore', 'avatarUrl', 'dndBeyondUrl', 'appearancePrompt']) {
-      if ((!winner[key] || !String(winner[key]).trim()) && lo[key]) winner[key] = lo[key]
-    }
-    if ((!winner.proficiencies || !winner.proficiencies.length) && (lo.proficiencies || []).length) {
-      winner.proficiencies = lo.proficiencies
-    }
-  }
+// Finds the primary character for a campaign+owner, promoting the most
+// content-rich existing character to primary if none is currently marked
+// (covers legacy accounts from before `isPrimary` existed). Never deletes
+// anything — unlike the old dedupeCharacter, additional characters are a
+// deliberate feature now, not an error condition to clean up.
+const ensurePrimary = async (campaignId, ownerId) => {
+  let primary = await Character.findOne({ campaign: campaignId, owner: ownerId, isPrimary: true })
+  if (primary) return primary
+  const candidates = await Character.find({ campaign: campaignId, owner: ownerId })
+  if (!candidates.length) return null
+  const winner = candidates.reduce((best, d) => fieldScore(d) > fieldScore(best) ? d : best, candidates[0])
+  winner.isPrimary = true
   await winner.save()
-  await Character.deleteMany({ _id: { $in: losers.map(l => l._id) } })
   return winner
 }
+
 // Players join via code — DM approval required before they see any data.
 router.post('/join', auth, async (req, res) => {
   try {
@@ -164,8 +153,38 @@ router.put('/:id', auth, async (req, res) => {
   res.json(campaign)
 })
 
+// Member (not owner) leaves a campaign — requires typing the exact,
+// case-sensitive campaign name as a confirmation safeguard against
+// accidental taps, enforced here as well as in the UI.
+router.post('/:id/leave', auth, async (req, res) => {
+  try {
+    const campaign = await Campaign.findById(req.params.id)
+    if (!campaign) return res.status(404).json({ error: 'Campaign not found' })
+    if (String(campaign.owner) === String(req.userId)) {
+      return res.status(400).json({ error: 'Campaign owners cannot leave — delete the campaign instead.' })
+    }
+    if (req.body?.confirmName !== campaign.name) {
+      return res.status(400).json({ error: 'Campaign name did not match.' })
+    }
+    campaign.members = campaign.members.filter(m => String(m) !== String(req.userId))
+    await campaign.save()
+    res.json({ ok: true })
+  } catch { res.status(500).json({ error: 'Failed to leave campaign' }) }
+})
+
+// Owner deletes a campaign — Premium-only, and requires typing the exact,
+// case-sensitive campaign name as a confirmation safeguard.
 router.delete('/:id', auth, async (req, res) => {
-  await Campaign.findOneAndDelete({ _id: req.params.id, owner: req.userId })
+  const campaign = await Campaign.findOne({ _id: req.params.id, owner: req.userId })
+  if (!campaign) return res.status(404).json({ error: 'Campaign not found' })
+  const user = await User.findById(req.userId)
+  if (!user.isPremium) {
+    return res.status(403).json({ error: 'Deleting a campaign is a Premium feature. Upgrade to Premium to delete campaigns.' })
+  }
+  if (req.body?.confirmName !== campaign.name) {
+    return res.status(400).json({ error: 'Campaign name did not match.' })
+  }
+  await campaign.deleteOne()
   res.json({ ok: true })
 })
 
@@ -173,7 +192,7 @@ router.delete('/:id', auth, async (req, res) => {
 router.post('/:id/roleplay-session', auth, async (req, res) => {
   try {
     const user = await User.findById(req.userId)
-    let char = await Character.findOne({ campaign: req.params.id, owner: req.userId })
+    let char = await ensurePrimary(req.params.id, req.userId)
     if (!char) return res.status(404).json({ error: 'Create a character first before using the Roleplay Assistant.' })
     if (!user.isPremium && (char.roleplaySessionCount || 0) >= 1) {
       return res.status(403).json({ error: 'Your first session plan is free. Upgrade to Premium for unlimited roleplay sessions.' })
@@ -184,41 +203,81 @@ router.post('/:id/roleplay-session', auth, async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }) }
 })
 
-// Character within a campaign
+// Character within a campaign — resolves to the player's PRIMARY character
+// for back-compat with consumers that only understand a single sheet
+// (Roleplay Assistant, DM's members roster, D&D Beyond link, etc).
 router.get('/:id/character', auth, async (req, res) => {
-  // Self-heals any duplicate character docs before returning (see
-  // dedupeCharacter above) so stale/blank duplicates can never shadow the
-  // real one with saved notes/backstory again.
-  const char = await dedupeCharacter(req.params.id, req.userId)
+  const char = await ensurePrimary(req.params.id, req.userId)
   res.json(char)
 })
 
 router.put('/:id/character', auth, async (req, res) => {
   try {
-    // Collapse any duplicate docs first so the upsert below always targets
-    // a single, correct document instead of ambiguously matching one of
-    // several duplicates (which could silently touch/revive a stale blank one).
-    const existing = await dedupeCharacter(req.params.id, req.userId)
-    if (!existing) {
-      const user = await User.findById(req.userId)
-      if (!user.isPremium) {
-        const count = await Character.countDocuments({ owner: req.userId })
-        const limit = user.role === 'dm' ? 20 : 1
-        if (count >= limit) {
-          return res.status(403).json({ error: `Free ${user.role === 'dm' ? 'DMs are limited to 20 characters' : 'players are limited to 1 character sheet'}. Upgrade for unlimited characters.` })
-        }
-      }
+    let primary = await ensurePrimary(req.params.id, req.userId)
+    if (primary) {
+      Object.assign(primary, req.body)
+      await primary.save()
+      return res.json(primary)
     }
-    const char = await Character.findOneAndUpdate(
-      { campaign: req.params.id, owner: req.userId },
-      { ...req.body, campaign: req.params.id, owner: req.userId },
-      { upsert: true, new: true }
-    )
+    // No characters at all yet for this campaign — creating the first one
+    // is always within the free 2-per-campaign limit.
+    const char = await Character.create({ ...req.body, campaign: req.params.id, owner: req.userId, isPrimary: true })
     res.json(char)
   } catch (e) { res.status(500).json({ error: e.message }) }
 })
 
-// DM: get all members' characters for Campaign Guide reference
+// ── Multi-character routes (2 free / unlimited premium per campaign) ──
+router.get('/:id/characters', auth, async (req, res) => {
+  try {
+    const chars = await Character.find({ campaign: req.params.id, owner: req.userId }).sort({ createdAt: 1 })
+    res.json(chars)
+  } catch { res.status(500).json({ error: 'Failed to load characters' }) }
+})
+
+router.post('/:id/characters', auth, async (req, res) => {
+  try {
+    const user = await User.findById(req.userId)
+    const count = await Character.countDocuments({ campaign: req.params.id, owner: req.userId })
+    if (!user.isPremium && count >= 2) {
+      return res.status(403).json({ error: 'Free accounts are limited to 2 characters per campaign. Upgrade to Premium for unlimited characters.' })
+    }
+    const char = await Character.create({ ...req.body, campaign: req.params.id, owner: req.userId, isPrimary: count === 0 })
+    res.json(char)
+  } catch (e) { res.status(500).json({ error: e.message }) }
+})
+
+router.put('/:id/characters/:charId', auth, async (req, res) => {
+  try {
+    // Normally only the character's owner may edit it, but the campaign DM
+    // is also allowed to update HP during combat (HP Tracker).
+    const campaign = await Campaign.findById(req.params.id)
+    const isDm = campaign && String(campaign.owner) === String(req.userId)
+    const filter = isDm
+      ? { _id: req.params.charId, campaign: req.params.id }
+      : { _id: req.params.charId, campaign: req.params.id, owner: req.userId }
+    // The DM may only touch HP (combat tracker); full edits remain owner-only.
+    const body = isDm ? { hp: req.body.hp } : req.body
+    const char = await Character.findOneAndUpdate(filter, body, { new: true })
+    if (!char) return res.status(404).json({ error: 'Character not found' })
+    res.json(char)
+  } catch (e) { res.status(500).json({ error: e.message }) }
+})
+
+router.delete('/:id/characters/:charId', auth, async (req, res) => {
+  try {
+    const char = await Character.findOneAndDelete({ _id: req.params.charId, campaign: req.params.id, owner: req.userId })
+    if (char?.isPrimary) {
+      // Promote another remaining character (if any) so there's always a
+      // primary for back-compat consumers.
+      const next = await Character.findOne({ campaign: req.params.id, owner: req.userId })
+      if (next) { next.isPrimary = true; await next.save() }
+    }
+    res.json({ ok: true })
+  } catch { res.status(500).json({ error: 'Failed to delete character' }) }
+})
+
+// DM: get all members' characters for Campaign Guide reference — uses each
+// member's primary character.
 router.get('/:id/members/characters', auth, async (req, res) => {
   try {
     const campaign = await Campaign.findOne({ _id: req.params.id, owner: req.userId })
@@ -228,26 +287,28 @@ router.get('/:id/members/characters', auth, async (req, res) => {
       campaign: req.params.id,
       owner: { $in: campaign.members.map(m => m._id) },
     })
-    const result = campaign.members.map(m => ({
-      userId: m._id,
-      username: m.username,
-      character: chars.find(c => String(c.owner) === String(m._id)) || null,
-    }))
+    const result = campaign.members.map(m => {
+      const owned = chars.filter(c => String(c.owner) === String(m._id))
+      const character = owned.find(c => c.isPrimary) || owned[0] || null
+      return { userId: m._id, username: m.username, character }
+    })
     res.json(result)
   } catch { res.status(500).json({ error: 'Failed to load members' }) }
 })
 
 // Player: persist depth fields without overwriting other character data
+// (targets the primary character).
 router.patch('/:id/character/depth', auth, async (req, res) => {
   try {
     const { background, personality, goals, lore } = req.body
-    const char = await Character.findOneAndUpdate(
-      { campaign: req.params.id, owner: req.userId },
-      { $set: { background, personality, goals, lore } },
-      { new: true }
-    )
-    if (!char) return res.status(404).json({ error: 'Character not found' })
-    res.json(char)
+    const primary = await ensurePrimary(req.params.id, req.userId)
+    if (!primary) return res.status(404).json({ error: 'Character not found' })
+    primary.background = background
+    primary.personality = personality
+    primary.goals = goals
+    primary.lore = lore
+    await primary.save()
+    res.json(primary)
   } catch { res.status(500).json({ error: 'Failed to save depth' }) }
 })
 

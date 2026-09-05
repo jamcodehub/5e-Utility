@@ -62,6 +62,11 @@ const StoryCardSchema = new Schema({
 const CharacterSchema = new Schema({
   campaign:     { type: Schema.Types.ObjectId, ref: 'Campaign', required: true },
   owner:        { type: Schema.Types.ObjectId, ref: 'User', required: true },
+  // Multiple characters per owner per campaign are now supported (2 free /
+  // unlimited premium). `isPrimary` marks the one shown by default and used
+  // by back-compat single-character consumers (Roleplay Assistant, the DM's
+  // members/characters roster, etc).
+  isPrimary:    { type: Boolean, default: false },
   avatarUrl:    { type: String },
   appearancePrompt: { type: String },
   name:         String,
@@ -82,12 +87,10 @@ const CharacterSchema = new Schema({
   roleplaySessionCount: { type: Number, default: 0 },
 }, { timestamps: true })
 
-// Prevent duplicate character docs for the same player in the same campaign —
-// without this, concurrent upserts (e.g. rapid HP +/- clicks before the sheet
-// exists yet) can race and create two documents, and whichever one GET
-// happens to return first may be the stale/blank one (making saved notes
-// appear to vanish on next login).
-CharacterSchema.index({ campaign: 1, owner: 1 }, { unique: true })
+// Non-unique index (kept for query performance) — players may now have
+// multiple character docs per campaign, distinguished by `isPrimary`/_id.
+CharacterSchema.index({ campaign: 1, owner: 1 })
+
 
 const LevelPlanSchema = new Schema({
   campaign: { type: Schema.Types.ObjectId, ref: 'Campaign', required: true },

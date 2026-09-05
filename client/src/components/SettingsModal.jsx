@@ -2,10 +2,12 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useTheme, THEMES } from '../context/ThemeContext'
 import { api, useAuth } from '../context/AuthContext'
+import { useCampaign } from '../context/CampaignContext'
 
 export default function SettingsModal({ onClose }) {
   const { theme, setTheme, lightMode, setLightMode } = useTheme()
   const { logout, user, setTwoFactor, isPremium } = useAuth()
+  const { activeCampaign, leaveCampaign, deleteCampaign } = useCampaign()
   const navigate = useNavigate()
   const [feedbackType, setFeedbackType] = useState('general')
   const [feedbackMsg, setFeedbackMsg] = useState('')
@@ -15,6 +17,31 @@ export default function SettingsModal({ onClose }) {
   const [phone, setPhone] = useState(user?.phone || '')
   const [twoFAWorking, setTwoFAWorking] = useState(false)
   const [twoFAError, setTwoFAError] = useState('')
+  const [confirmAction, setConfirmAction] = useState(null) // 'leave' | 'delete' | null
+  const [confirmInput, setConfirmInput] = useState('')
+  const [confirmError, setConfirmError] = useState('')
+  const [confirmWorking, setConfirmWorking] = useState(false)
+
+  const isOwner = activeCampaign && String(activeCampaign.owner) === String(user?._id || user?.id)
+
+  const runConfirmedAction = async () => {
+    if (!activeCampaign) return
+    setConfirmError('')
+    if (confirmInput !== activeCampaign.name) { setConfirmError('Name did not match — check capitalisation.'); return }
+    setConfirmWorking(true)
+    try {
+      if (confirmAction === 'leave') await leaveCampaign(activeCampaign._id, confirmInput)
+      else await deleteCampaign(activeCampaign._id, confirmInput)
+      setConfirmAction(null)
+      setConfirmInput('')
+      onClose()
+    } catch (err) {
+      setConfirmError(err?.message || 'Something went wrong.')
+    } finally {
+      setConfirmWorking(false)
+    }
+  }
+
 
   const toggleTwoFactor = async () => {
     setTwoFAError('')
@@ -79,7 +106,7 @@ export default function SettingsModal({ onClose }) {
           {theme !== 'light' && theme !== 'dark' && (
             <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 10, fontSize: 12, color: 'var(--text-2)', cursor: 'pointer' }}>
               <input type="checkbox" checked={lightMode} onChange={e => setLightMode(e.target.checked)} />
-              Lighter variant <span style={{ color: 'var(--text-3)' }}>(keeps the {THEMES[theme]?.label} accent color on light backgrounds)</span>
+              Lighter variant <span style={{ color: 'var(--text-3)' }}>(keeps the accent color on light backgrounds)</span>
             </label>
           )}
         </div>
@@ -129,6 +156,28 @@ export default function SettingsModal({ onClose }) {
           {twoFAError && <div style={{ fontSize: 12, color: 'var(--red)', marginTop: 8 }}>{twoFAError}</div>}
         </div>
 
+        {activeCampaign && !activeCampaign.isPersonal && (
+          <div style={{ marginTop: 24, paddingTop: 24, borderTop: '1px solid var(--border)' }}>
+            <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-2)', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 12 }}>This Campaign</div>
+            <div style={{ fontSize: 13, color: 'var(--text-2)', marginBottom: 10 }}>{activeCampaign.name}</div>
+            {isOwner ? (
+              <>
+                <button type="button" onClick={() => { setConfirmAction('delete'); setConfirmInput(''); setConfirmError('') }}
+                  disabled={!isPremium}
+                  style={{ width: '100%', padding: '10px 14px', borderRadius: 10, border: '1px solid var(--red)', background: 'transparent', color: isPremium ? 'var(--red)' : 'var(--text-3)', fontWeight: 600, cursor: isPremium ? 'pointer' : 'not-allowed', opacity: isPremium ? 1 : 0.6 }}>
+                  Delete Campaign
+                </button>
+                {!isPremium && <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 6 }}>Deleting a campaign is a Premium feature. <button type="button" onClick={() => { navigate('/premium'); onClose() }} style={{ background: 'none', border: 'none', color: 'var(--gold)', cursor: 'pointer', fontSize: 11, padding: 0 }}>Upgrade →</button></div>}
+              </>
+            ) : (
+              <button type="button" onClick={() => { setConfirmAction('leave'); setConfirmInput(''); setConfirmError('') }}
+                style={{ width: '100%', padding: '10px 14px', borderRadius: 10, border: '1px solid var(--red)', background: 'transparent', color: 'var(--red)', fontWeight: 600, cursor: 'pointer' }}>
+                Leave Campaign
+              </button>
+            )}
+          </div>
+        )}
+
         <div style={{ marginTop: 24, paddingTop: 24, borderTop: '1px solid var(--border)' }}>
           <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-2)', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 10 }}>Account</div>
           <button type="button" onClick={() => { logout(); onClose() }} style={{ width: '100%', padding: '10px 14px', borderRadius: 10, border: '1px solid var(--red)', background: 'transparent', color: 'var(--red)', fontWeight: 600, cursor: 'pointer' }}>
@@ -136,6 +185,45 @@ export default function SettingsModal({ onClose }) {
           </button>
         </div>
       </div>
+
+      {/* Type-to-confirm modal for Leave/Delete campaign — case-sensitive
+          exact name match required, to guard against accidental taps. */}
+      {confirmAction && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.65)', zIndex: 1100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }} onClick={() => setConfirmAction(null)}>
+          <div className="card" style={{ width: '100%', maxWidth: 380, padding: 22 }} onClick={e => e.stopPropagation()}>
+            <div style={{ fontFamily: 'Cinzel, serif', fontSize: 16, fontWeight: 600, color: 'var(--red)', marginBottom: 10 }}>
+              {confirmAction === 'delete' ? 'Delete Campaign' : 'Leave Campaign'}
+            </div>
+            <div style={{ fontSize: 13, color: 'var(--text-2)', marginBottom: 14, lineHeight: 1.6 }}>
+              {confirmAction === 'delete'
+                ? 'This permanently deletes the campaign and all its data for every member. This cannot be undone.'
+                : 'You will lose access to this campaign\u2019s data until you\u2019re invited back.'}
+              {' '}Type <strong style={{ color: 'var(--text)' }}>{activeCampaign?.name}</strong> exactly to confirm.
+            </div>
+            <input
+              autoFocus
+              className="input"
+              placeholder={activeCampaign?.name}
+              value={confirmInput}
+              onChange={e => setConfirmInput(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter') runConfirmedAction(); if (e.key === 'Escape') setConfirmAction(null) }}
+              style={{ marginBottom: 10 }}
+            />
+            {confirmError && <div style={{ fontSize: 12, color: 'var(--red)', marginBottom: 10 }}>{confirmError}</div>}
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button
+                className="btn btn-sm"
+                onClick={runConfirmedAction}
+                disabled={confirmWorking || confirmInput !== activeCampaign?.name}
+                style={{ background: 'var(--red)', color: '#fff', border: 'none', flex: 1 }}
+              >
+                {confirmWorking ? 'Working…' : confirmAction === 'delete' ? 'Delete Forever' : 'Leave Campaign'}
+              </button>
+              <button className="btn btn-ghost btn-sm" onClick={() => setConfirmAction(null)}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

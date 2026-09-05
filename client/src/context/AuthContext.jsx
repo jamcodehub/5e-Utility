@@ -30,7 +30,15 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     const token = localStorage.getItem('ll_token')
     if (!token) { setLoading(false); return }
-    api('/auth/me').then(u => { setUser(u); setLoading(false) }).catch(() => { localStorage.removeItem('ll_token'); setLoading(false) })
+    // Only clear the stored token on a genuine 401 (invalid/expired token).
+    // Previously ANY failure here — including a transient network blip or
+    // the API briefly waking from sleep on Render's free tier — wiped the
+    // token and logged the user out, which looked like "doesn't stay
+    // logged in" even though the token itself was still valid.
+    api('/auth/me').then(u => { setUser(u); setLoading(false) }).catch((err) => {
+      if (err?.status === 401) localStorage.removeItem('ll_token')
+      setLoading(false)
+    })
   }, [])
 
   const login = async (email, password) => {

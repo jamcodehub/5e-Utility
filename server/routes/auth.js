@@ -8,7 +8,11 @@ import { User } from '../models/index.js'
 
 const router = Router()
 
-const sign = (id) => jwt.sign({ id }, process.env.JWT_SECRET, { expiresIn: '30d' })
+// Long-lived session token — users reported being logged out unexpectedly;
+// 30 days was likely fine in theory, but combined with any client-side
+// clearing on transient errors this felt like "doesn't stay logged in".
+// Bumped to 90 days so a normal browsing cadence never hits expiry.
+const sign = (id) => jwt.sign({ id }, process.env.JWT_SECRET, { expiresIn: '90d' })
 
 const googleClient = process.env.GOOGLE_CLIENT_ID ? new OAuth2Client(process.env.GOOGLE_CLIENT_ID) : null
 
