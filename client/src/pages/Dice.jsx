@@ -78,7 +78,7 @@ export default function Dice() {
   }
 
   return (
-    <div className="page-content dice-page" style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0, height: '100%', gap: 14, padding: '14px' }}>
+    <div className="page-content dice-page" style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0, height: '100%', gap: 14, padding: '14px', overflowY: 'auto' }}>
       <div style={{ flex: 1, width: '100%', maxWidth: 1280, margin: '0 auto', position: 'relative' }}>
         <style>{`
           .board-shell { width: 100%; height: 100%; background: rgba(255,255,255,0.02); border: 2px solid rgba(255,255,255,0.07); border-radius: 32px; position: relative; overflow: hidden; display:flex; align-items:center; justify-content:center; box-shadow: inset 0 12px 34px rgba(0,0,0,0.28); }
@@ -99,7 +99,8 @@ export default function Dice() {
             box-shadow: 0 5px 0 rgba(0,0,0,0.35), 0 8px 14px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.12);
           }
           @media (max-width: 768px) {
-            .dice-controls { position: sticky; bottom: calc(64px + env(safe-area-inset-bottom, 0px)); z-index: 5; gap: 10px; }
+            .board-shell { min-height: 280px; }
+            .dice-controls { margin-bottom: calc(64px + env(safe-area-inset-bottom, 0px)); gap: 10px; }
             .dice-btn { padding: 22px 14px; font-size: 17px; border-radius: 20px; min-height: 64px; }
             .dice-roll-btn { flex: 1.15 1 0; }
           }

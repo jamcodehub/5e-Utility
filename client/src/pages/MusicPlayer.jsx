@@ -22,7 +22,12 @@ async function uploadAudioToCloudinary(file) {
 }
 
 export default function MusicPlayer() {
-  const { current, volume, play, stop, setVol } = useMusic()
+  const {
+    current, volume, play, stop, setVol,
+    activeTrack, trackPlaying, trackTime, trackDuration,
+    shuffleEnabled, setShuffleEnabled, repeatMode, setRepeatMode,
+    setQueue, playTrack, stopTrack, seekTrack,
+  } = useMusic()
   const { activeCampaign } = useCampaign()
   const { isPremium } = useAuth()
   const { toast, ToastContainer } = useToast()
@@ -30,21 +35,13 @@ export default function MusicPlayer() {
   const [playlist, setPlaylist] = useState([])
   const [uploading, setUploading] = useState(false)
   const [uploadProgress, setUploadProgress] = useState(0)
-  const [activeTrack, setActiveTrack] = useState(null)
-  const [playing, setPlaying] = useState(false)
-  const [shuffleEnabled, setShuffleEnabled] = useState(false)
-  const [repeatMode, setRepeatMode] = useState('off') // 'off' | 'forever' | 'once'
   const [manageTracksOpen, setManageTracksOpen] = useState(false)
-  const [trackTime, setTrackTime] = useState(0)
-  const [trackDuration, setTrackDuration] = useState(0)
   const [selectedTrackId, setSelectedTrackId] = useState('')
   const [editingId, setEditingId] = useState(null)
   const [editName, setEditName] = useState('')
   const [isDragging, setIsDragging] = useState(false)
   const dragCounter = useRef(0)
-  const audioRef = useRef(null)
   const fileInputRef = useRef(null)
-  const repeatOnceUsedRef = useRef(false)
 
   // Session planner state
   const [sessions, setSessions] = useState([])
@@ -60,95 +57,22 @@ export default function MusicPlayer() {
     api(`/music/${activeCampaign._id}`).then(data => setPlaylist(data || [])).catch(() => {})
   }, [activeCampaign?._id])
 
+  // Keep the shared playback context's queue (used for shuffle/next-track,
+  // and which survives navigating to other tabs) in sync with this
+  // campaign's playlist whenever it loads or changes.
+  useEffect(() => { setQueue(playlist) }, [playlist, setQueue])
+
   useEffect(() => {
     if (!activeCampaign) return
     api(`/sessions/${activeCampaign._id}`).then(data => setSessions(data || [])).catch(() => {})
   }, [activeCampaign?._id])
 
-  useEffect(() => {
-    const el = audioRef.current
-    if (!el) return
-    const onTime = () => setTrackTime(el.currentTime)
-    const onDur  = () => setTrackDuration(el.duration || 0)
-    const onEnd  = () => {
-      const endedTrackId = activeTrack?._id
-
-      // Repeat forever: replay the current track indefinitely.
-      if (repeatMode === 'forever' && audioRef.current) {
-        audioRef.current.currentTime = 0
-        audioRef.current.play().then(() => setPlaying(true)).catch(() => setPlaying(false))
-        return
-      }
-
-      // Repeat once: replay the current track exactly one additional time,
-      // then continue normally to the next track.
-      if (repeatMode === 'once' && !repeatOnceUsedRef.current && audioRef.current) {
-        repeatOnceUsedRef.current = true
-        audioRef.current.currentTime = 0
-        audioRef.current.play().then(() => setPlaying(true)).catch(() => setPlaying(false))
-        return
-      }
-
-      if (shuffleEnabled && playlist.length > 1) {
-        const choices = playlist.filter(t => t._id !== endedTrackId)
-        const nextTrack = choices[Math.floor(Math.random() * choices.length)]
-        if (nextTrack) {
-          playTrack(nextTrack)
-          return
-        }
-      }
-
-      // A normal end after Repeat Once continues to the next track.
-      if (repeatMode === 'once' && playlist.length > 1) {
-        const currentIndex = playlist.findIndex(t => t._id === endedTrackId)
-        const nextTrack = playlist[(currentIndex + 1) % playlist.length] || playlist[0]
-        playTrack(nextTrack)
-        return
-      }
-
-      setPlaying(false)
-      setTrackTime(0)
-    }
-    el.addEventListener('timeupdate', onTime)
-    el.addEventListener('loadedmetadata', onDur)
-    el.addEventListener('ended', onEnd)
-    return () => {
-      el.removeEventListener('timeupdate', onTime)
-      el.removeEventListener('loadedmetadata', onDur)
-      el.removeEventListener('ended', onEnd)
-    }
-  }, [activeTrack, playlist, repeatMode, shuffleEnabled])
-
-  useEffect(() => {
-    if (audioRef.current) audioRef.current.volume = volume
-  }, [volume])
-
-  const playTrack = (track) => {
-    repeatOnceUsedRef.current = false
-    if (current) stop()
-    const el = audioRef.current
-    if (!el) return
-    if (activeTrack?._id === track._id && playing) {
-      el.pause(); setPlaying(false); return
-    }
-    setActiveTrack(track)
-    el.src = track.url
-    el.volume = volume
-    el.play().then(() => setPlaying(true)).catch(() => toast('Could not play track'))
-  }
-
-  const stopTrack = () => {
-    const el = audioRef.current
-    if (!el) return
-    el.pause(); el.currentTime = 0
-    setPlaying(false); setActiveTrack(null)
+  const playTrackHandler = (track) => {
+    playTrack(track, playlist).catch(() => toast('Could not play track'))
   }
 
   const handleSeek = (e) => {
-    const el = audioRef.current
-    if (!el) return
-    el.currentTime = +e.target.value
-    setTrackTime(+e.target.value)
+    seekTrack(+e.target.value)
   }
 
   const processFiles = async (files) => {
@@ -315,7 +239,7 @@ export default function MusicPlayer() {
 
   const playCue = (cue) => {
     if (!cue.track) return
-    playTrack({ _id: cue.track._id, id: cue.track._id, name: cue.track.name, url: cue.track.url })
+    playTrackHandler({ _id: cue.track._id, id: cue.track._id, name: cue.track.name, url: cue.track.url })
   }
 
   const fmt = (s) => {
@@ -325,7 +249,7 @@ export default function MusicPlayer() {
     return `${m}:${sec.toString().padStart(2, '0')}`
   }
 
-  const isCustomPlaying = playing && !!activeTrack
+  const isCustomPlaying = trackPlaying && !!activeTrack
   const selectedTrack = playlist.find(t => t._id === selectedTrackId) || null
   const atTrackLimit = !isPremium && playlist.length >= FREE_TRACK_LIMIT
 
@@ -338,7 +262,6 @@ export default function MusicPlayer() {
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
     >
-      <audio ref={audioRef} style={{ display: 'none' }} />
 
       {/* Drag & Drop Visual Overlay */}
       {isDragging && (
@@ -382,7 +305,7 @@ export default function MusicPlayer() {
               max={1}
               step={0.05}
               value={volume}
-              onChange={e => { setVol(+e.target.value); if (audioRef.current) audioRef.current.volume = +e.target.value }}
+              onChange={e => setVol(+e.target.value)}
               aria-label="Volume"
               style={{ width: 120, accentColor: 'var(--gold)', cursor: 'pointer' }}
             />
@@ -440,7 +363,7 @@ export default function MusicPlayer() {
               {/* Play controls */}
               <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
                 <button
-                  onClick={() => selectedTrack && playTrack({ ...selectedTrack, id: selectedTrack._id })}
+                  onClick={() => selectedTrack && playTrackHandler(selectedTrack)}
                   disabled={!selectedTrackId}
                   className="btn btn-primary btn-sm"
                   style={{ flex: 1, justifyContent: 'center' }}
@@ -461,18 +384,18 @@ export default function MusicPlayer() {
 
                 <button
                   onClick={() => setRepeatMode(v => v === 'forever' ? 'off' : 'forever')}
-                  disabled={!selectedTrackId}
+                  disabled={!selectedTrackId && !activeTrack}
                   className="btn btn-ghost btn-sm"
                   title={repeatMode === 'forever' ? 'Repeat forever on' : 'Repeat forever off'}
                   aria-label={repeatMode === 'forever' ? 'Turn repeat forever off' : 'Turn repeat forever on'}
-                  style={{ width: 34, minWidth: 34, height: 34, padding: 0, justifyContent: 'center', color: repeatMode === 'forever' ? 'var(--gold)' : 'var(--text-3)', background: repeatMode === 'forever' ? 'var(--gold-bg)' : 'transparent', borderColor: repeatMode === 'forever' ? 'var(--gold)' : undefined }}
+                  style={{ width: 34, minWidth: 34, height: 34, padding: 0, justifyContent: 'center', color: repeatMode === 'forever' ? 'var(--gold)' : 'var(--text-3)', background: repeatMode === 'forever' ? 'var(--gold-bg)' : 'transparent', borderColor: repeatMode === 'forever' ? 'var(--gold)' : undefined, fontSize: 15 }}
                 >
-                  ↻
+                  ∞
                 </button>
 
                 <button
                   onClick={() => setRepeatMode(v => v === 'once' ? 'off' : 'once')}
-                  disabled={!selectedTrackId}
+                  disabled={!selectedTrackId && !activeTrack}
                   className="btn btn-ghost btn-sm"
                   title={repeatMode === 'once' ? 'Repeat once on' : 'Repeat once off'}
                   aria-label={repeatMode === 'once' ? 'Turn repeat once off' : 'Turn repeat once on'}
@@ -536,19 +459,17 @@ export default function MusicPlayer() {
             </>
           )}
         </div>
-      </div>
 
-
-        {/* Session Planner */}
-      <div className="card" style={{ padding: '16px 18px', marginBottom: 20 }}>
-        <div style={{ fontFamily: 'Cinzel, serif', fontSize: 12, fontWeight: 600, color: 'var(--gold)', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 14 }}>
+        {/* Session Planner — sits side-by-side with Your Tracks */}
+        <div className="card" style={{ padding: '16px 18px', minWidth: 0, display: 'flex', flexDirection: 'column', gap: 12, maxHeight: 480, overflow: 'hidden' }}>
+        <div style={{ fontFamily: 'Cinzel, serif', fontSize: 12, fontWeight: 600, color: 'var(--gold)', letterSpacing: '0.06em', textTransform: 'uppercase' }}>
           Session Planner
         </div>
         {!activeCampaign ? (
           <div style={{ fontSize: 12, color: 'var(--text-3)', padding: '8px 0' }}>Select a campaign to plan sessions.</div>
         ) : (
           <>
-            <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
+            <div style={{ display: 'flex', gap: 8 }}>
               <input className="input" placeholder="New session name (e.g. Session 3)"
                 value={newSessionName} onChange={e => setNewSessionName(e.target.value)}
                 onKeyDown={e => { if (e.key === 'Enter') createSession() }}
@@ -560,7 +481,7 @@ export default function MusicPlayer() {
                 No sessions planned yet. Create one, then queue up tracks with a note for when to play each.
               </div>
             ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10, overflowY: 'auto', paddingRight: 2 }}>
                 {sessions.map(session => {
                   const isOpen = expandedSessionId === session._id
                   const isEditingName = editingSessionId === session._id
@@ -628,6 +549,7 @@ export default function MusicPlayer() {
             )}
           </>
         )}
+        </div>
       </div>
 
       <ToastContainer />

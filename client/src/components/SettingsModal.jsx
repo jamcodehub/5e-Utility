@@ -4,7 +4,7 @@ import { useTheme, THEMES } from '../context/ThemeContext'
 import { api, useAuth } from '../context/AuthContext'
 
 export default function SettingsModal({ onClose }) {
-  const { theme, setTheme } = useTheme()
+  const { theme, setTheme, lightMode, setLightMode } = useTheme()
   const { logout, user, setTwoFactor, isPremium } = useAuth()
   const navigate = useNavigate()
   const [feedbackType, setFeedbackType] = useState('general')
@@ -76,6 +76,12 @@ export default function SettingsModal({ onClose }) {
               </option>
             ))}
           </select>
+          {theme !== 'light' && theme !== 'dark' && (
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 10, fontSize: 12, color: 'var(--text-2)', cursor: 'pointer' }}>
+              <input type="checkbox" checked={lightMode} onChange={e => setLightMode(e.target.checked)} />
+              Lighter variant <span style={{ color: 'var(--text-3)' }}>(keeps the {THEMES[theme]?.label} accent color on light backgrounds)</span>
+            </label>
+          )}
         </div>
 
         <div style={{ height: 1, background: 'var(--border)', marginBottom: 24 }} />

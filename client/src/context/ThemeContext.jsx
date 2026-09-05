@@ -263,13 +263,29 @@ export const THEMES = {
 
 export function ThemeProvider({ children }) {
   const [theme, setTheme] = useState(() => localStorage.getItem('ll_theme') || 'light')
+  // "Light mode" — applies a class theme's accent colours on top of light
+  // backgrounds instead of that theme's (often very dark) native palette.
+  // Lets premium users get a lighter variant of any class theme.
+  const [lightMode, setLightMode] = useState(() => localStorage.getItem('ll_light_mode') === '1')
 
   useEffect(() => {
-    const vars = THEMES[theme]?.vars || THEMES.light.vars
+    const base = THEMES[theme]?.vars || THEMES.light.vars
+    const isNeutral = theme === 'light' || theme === 'dark'
+    const vars = (lightMode && !isNeutral)
+      ? {
+          ...THEMES.light.vars,
+          '--gold': base['--gold'],
+          '--sb-accent': base['--gold'],
+          '--sb-spine': base['--gold'],
+          '--red': base['--red'],
+          '--green': base['--green'],
+        }
+      : base
     const root = document.documentElement
     Object.entries(vars).forEach(([k, v]) => root.style.setProperty(k, v))
     localStorage.setItem('ll_theme', theme)
-  }, [theme])
+    localStorage.setItem('ll_light_mode', lightMode ? '1' : '0')
+  }, [theme, lightMode])
 
-  return <ThemeContext.Provider value={{ theme, setTheme, themes: THEMES }}>{children}</ThemeContext.Provider>
+  return <ThemeContext.Provider value={{ theme, setTheme, themes: THEMES, lightMode, setLightMode }}>{children}</ThemeContext.Provider>
 }

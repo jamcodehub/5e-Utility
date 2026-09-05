@@ -29,8 +29,15 @@ function SwipeNav({ items, navLinkStyle }) {
   // copy so we can shift left or right and wrap infinitely.
   const COPIES = 3
   const tripled = [...items, ...items, ...items]
-  const ITEM_W = 80 // px per nav item
+  const ITEM_W = 88 // px per nav item
   const GAP = 4
+
+  // Auto-shrink font size for longer labels so nothing gets clipped/ellipsized.
+  const fontSizeFor = (label) => {
+    if (label.length <= 6) return 12
+    if (label.length <= 9) return 11
+    return 10
+  }
 
   const [offset, setOffset] = useState(0) // px offset of the track
   const dragRef = useRef({ active: false, startX: 0, startOffset: 0 })
@@ -127,11 +134,11 @@ function SwipeNav({ items, navLinkStyle }) {
                 justifyContent: 'center',
                 whiteSpace: 'nowrap',
                 overflow: 'hidden',
-                textOverflow: 'ellipsis',
+                fontSize: fontSizeFor(item.label),
                 pointerEvents: dragRef.current?.active ? 'none' : 'auto',
               })}
             >
-              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', display: 'block', width: '100%', textAlign: 'center' }}>
+              <span style={{ overflow: 'hidden', display: 'block', width: '100%', textAlign: 'center' }}>
                 {item.label}
               </span>
             </NavLink>
