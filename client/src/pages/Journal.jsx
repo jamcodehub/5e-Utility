@@ -188,7 +188,7 @@ export default function Journal() {
       {/* Editor */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
         <div style={{ padding: '14px 24px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'var(--surface)' }}>
-          <h2 style={{ fontSize: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
+          <h2 onClick={(ev) => { if (active && renamingId !== active._id) startRename(ev, active) }} style={{ fontSize: 16, display: 'flex', alignItems: 'center', gap: 8, cursor: 'text' }}>
             {active ? (
               renamingId === active._id ? (
                 <input
