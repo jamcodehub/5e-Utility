@@ -52,6 +52,7 @@ export default function Character() {
   const load = useCallback(async () => {
     if (!activeCampaign) return
     const data = await api(`/campaigns/${activeCampaign._id}/character`)
+    console.log('character data:', data)
     if (data) { setChar(data); setForm(data); setAvatarPreview(data.avatarUrl || '') }
     else { setChar(null); setForm(DEFAULT); setAvatarPreview('') }
     setLoaded(true)
