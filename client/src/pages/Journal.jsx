@@ -24,10 +24,13 @@ export default function Journal() {
   const [content, setContent] = useState('')
   const [saving, setSaving] = useState(false)
   const [showUpgrade, setShowUpgrade] = useState(false)
+  const [renamingId, setRenamingId] = useState(null)
+  const [titleDraft, setTitleDraft] = useState('')
   const saveTimer = useRef(null)
 
   const active = entries.find(e => e._id === activeId)
   const entryNum = e => e.session ?? e.day ?? '?'
+  const entryTitle = e => e.title || `${noun} ${entryNum(e)}`
 
   const load = useCallback(async () => {
     if (!activeCampaign) return
@@ -75,6 +78,23 @@ export default function Journal() {
   // Flush on unmount
   useEffect(() => () => { if (saveTimer.current) clearTimeout(saveTimer.current) }, [])
 
+  const startRename = (e, entry) => {
+    e.stopPropagation()
+    setRenamingId(entry._id)
+    setTitleDraft(entryTitle(entry))
+  }
+
+  const commitRename = async (id) => {
+    const title = titleDraft.trim()
+    setRenamingId(null)
+    if (!title) return
+    // Optimistic update so the sidebar/header reflect the new title instantly
+    setEntries(p => p.map(e => e._id === id ? { ...e, title } : e))
+    try {
+      await api(`/${apiBase}/${id}`, { method: 'PUT', body: { title } })
+    } catch { toast(`Failed to rename ${noun.toLowerCase()}`) }
+  }
+
   const newEntry = async () => {
     if (!activeCampaign) return
     const maxNum = entries.reduce((m, e) => Math.max(m, e.day ?? e.session ?? 0), 0)
@@ -113,19 +133,41 @@ export default function Journal() {
           <button className="btn btn-ghost btn-sm" onClick={newEntry} style={{ padding: '3px 8px' }}>+</button>
         </div>
         {entries.map(e => (
-          <button key={e._id} onClick={() => selectEntry(e)} style={{
-            display: 'block', width: '100%', textAlign: 'left', border: 'none',
-            padding: '9px 14px',
-            background: activeId === e._id ? 'var(--gold-bg)' : 'transparent',
-            color: activeId === e._id ? 'var(--gold)' : 'var(--text-2)',
-            fontSize: 13, cursor: 'pointer',
-            borderLeft: `2px solid ${activeId === e._id ? 'var(--gold)' : 'transparent'}`,
-          }}>
-            <div style={{ fontWeight: 500 }}>{noun} {entryNum(e)}</div>
+          <div key={e._id}
+            onClick={() => renamingId !== e._id && selectEntry(e)}
+            style={{
+              width: '100%', textAlign: 'left', border: 'none',
+              padding: '9px 14px',
+              background: activeId === e._id ? 'var(--gold-bg)' : 'transparent',
+              color: activeId === e._id ? 'var(--gold)' : 'var(--text-2)',
+              fontSize: 13, cursor: 'pointer',
+              borderLeft: `2px solid ${activeId === e._id ? 'var(--gold)' : 'transparent'}`,
+            }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6 }}>
+              {renamingId === e._id ? (
+                <input
+                  autoFocus
+                  className="input"
+                  value={titleDraft}
+                  onClick={ev => ev.stopPropagation()}
+                  onChange={ev => setTitleDraft(ev.target.value)}
+                  onBlur={() => commitRename(e._id)}
+                  onKeyDown={ev => {
+                    if (ev.key === 'Enter') { ev.preventDefault(); commitRename(e._id) }
+                    if (ev.key === 'Escape') setRenamingId(null)
+                  }}
+                  style={{ fontSize: 12, padding: '2px 6px', width: '100%' }}
+                />
+              ) : (
+                <>
+                  <span onClick={(ev) => startRename(ev, e)} title="Click to rename" style={{ fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', cursor: 'text' }}>{entryTitle(e)}</span>
+                </>
+              )}
+            </div>
             <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 2 }}>
               {wordCount(e.content || '')} words
             </div>
-          </button>
+          </div>
         ))}
         {!entries.length && (
           <div style={{ padding: '20px 14px', fontSize: 12, color: 'var(--text-3)' }}>No {nounPlural.toLowerCase()} yet.</div>
@@ -136,7 +178,26 @@ export default function Journal() {
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
         <div style={{ padding: '14px 24px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'var(--surface)' }}>
           <h2 style={{ fontSize: 16 }}>
-            {active ? `${noun} ${entryNum(active)}` : `Select a ${noun.toLowerCase()}`}
+            {active ? (
+              renamingId === active._id ? (
+                <input
+                  autoFocus
+                  className="input"
+                  value={titleDraft}
+                  onChange={ev => setTitleDraft(ev.target.value)}
+                  onBlur={() => commitRename(active._id)}
+                  onKeyDown={ev => {
+                    if (ev.key === 'Enter') { ev.preventDefault(); commitRename(active._id) }
+                    if (ev.key === 'Escape') setRenamingId(null)
+                  }}
+                  style={{ fontSize: 15, padding: '3px 8px' }}
+                />
+              ) : (
+                <span onClick={(ev) => startRename(ev, active)} title="Click to rename" style={{ cursor: 'text' }}>
+                  {entryTitle(active)}
+                </span>
+              )
+            ) : `Select a ${noun.toLowerCase()}`}
           </h2>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{wordCount(content)} words</span>

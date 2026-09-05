@@ -144,7 +144,10 @@ router.post('/:id/roleplay-session', auth, async (req, res) => {
 
 // Character within a campaign
 router.get('/:id/character', auth, async (req, res) => {
-  const char = await Character.findOne({ campaign: req.params.id, owner: req.userId })
+  // Sort by most recently updated in case legacy duplicate docs exist for
+  // this campaign/owner pair (pre-dating the unique index) — otherwise a
+  // stale/blank duplicate could be returned instead of the one with notes.
+  const char = await Character.findOne({ campaign: req.params.id, owner: req.userId }).sort({ updatedAt: -1 })
   res.json(char)
 })
 

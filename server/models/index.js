@@ -15,6 +15,8 @@ const UserSchema = new Schema({
   twoFactorEnabled:     { type: Boolean, default: false },
   twoFactorCode:        { type: String, default: '' },
   twoFactorCodeExpires: { type: Date },
+  resetPasswordToken:   { type: String, default: '' },
+  resetPasswordExpires: { type: Date },
 }, { timestamps: true })
 
 const CampaignSchema = new Schema({
@@ -79,6 +81,13 @@ const CharacterSchema = new Schema({
   lore:         { type: String, default: '' },
   roleplaySessionCount: { type: Number, default: 0 },
 }, { timestamps: true })
+
+// Prevent duplicate character docs for the same player in the same campaign —
+// without this, concurrent upserts (e.g. rapid HP +/- clicks before the sheet
+// exists yet) can race and create two documents, and whichever one GET
+// happens to return first may be the stale/blank one (making saved notes
+// appear to vanish on next login).
+CharacterSchema.index({ campaign: 1, owner: 1 }, { unique: true })
 
 const LevelPlanSchema = new Schema({
   campaign: { type: Schema.Types.ObjectId, ref: 'Campaign', required: true },

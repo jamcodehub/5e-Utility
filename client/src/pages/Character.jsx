@@ -103,6 +103,36 @@ export default function Character() {
     })
   }
 
+  // Autosave for free-text fields (notes + backstory tabs) — debounced 800ms
+  // after typing stops, so nothing is lost if the user navigates away or the
+  // browser closes without clicking Save.
+  const [autosaveStatus, setAutosaveStatus] = useState('') // '' | 'saving' | 'saved'
+  const textSaveTimer = useRef(null)
+  const scheduleTextAutosave = useCallback((nextForm) => {
+    if (!activeCampaign) return
+    clearTimeout(textSaveTimer.current)
+    setAutosaveStatus('saving')
+    textSaveTimer.current = setTimeout(async () => {
+      try {
+        const updated = await api(`/campaigns/${activeCampaign._id}/character`, { method: 'PUT', body: nextForm })
+        setChar(updated)
+        setAutosaveStatus('saved')
+      } catch { setAutosaveStatus(''); toast('Could not autosave') }
+    }, 800)
+  }, [activeCampaign])
+
+  const setTextField = (field) => (e) => {
+    const value = e.target.value
+    setForm(p => {
+      const next = { ...p, [field]: value }
+      scheduleTextAutosave(next)
+      return next
+    })
+  }
+
+  // Flush pending autosave on unmount
+  useEffect(() => () => { if (textSaveTimer.current) clearTimeout(textSaveTimer.current) }, [])
+
   const F = form
 
   if (!activeCampaign) return <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-3)' }}>Select a campaign.</div>
@@ -218,27 +248,33 @@ export default function Character() {
 
       {tab === 'backstory' && (
         <div className="card" style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
-          <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 4, lineHeight: 1.6 }}>
-            Your DM can see this in their Campaign Guide. The Roleplay Assistant uses it to personalise your session plans.
+          <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 4, lineHeight: 1.6, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span>Your DM can see this in their Campaign Guide. The Roleplay Assistant uses it to personalise your session plans.</span>
+            <span style={{ fontSize: 11, color: autosaveStatus === 'saving' ? 'var(--text-3)' : 'var(--green)', flexShrink: 0, marginLeft: 8 }}>
+              {autosaveStatus === 'saving' ? 'Saving…' : autosaveStatus === 'saved' ? 'Saved' : ''}
+            </span>
           </div>
           {[['background', 'Background / Origin', "Where did you come from? What shaped you before the campaign?"], ['personality', 'Personality Traits', "How do you speak, carry yourself, treat others? Key quirks and mannerisms."], ['goals', 'Goals & Motivations', "What does your character want — short and long term?"], ['lore', 'Lore / Secrets / Backstory', "Secrets, fears, obligations, scars — anything that drives or haunts you."]].map(([field, label, ph]) => (
             <div key={field}>
               <label style={{ fontSize: 11, color: 'var(--text-3)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em', display: 'block', marginBottom: 4 }}>{label}</label>
               <textarea className="input" rows={3} style={{ resize: 'vertical', fontSize: 13, lineHeight: 1.6 }}
                 placeholder={ph} value={F[field] || ''}
-                onChange={e => setForm(p => ({ ...p, [field]: e.target.value }))} />
+                onChange={setTextField(field)} />
             </div>
           ))}
-          <button className="btn btn-primary btn-sm" style={{ alignSelf: 'flex-start' }} onClick={save}>Save Backstory</button>
         </div>
       )}
 
       {tab === 'notes' && (
         <div className="card" style={{ padding: 16 }}>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 6 }}>
+            <span style={{ fontSize: 11, color: autosaveStatus === 'saving' ? 'var(--text-3)' : 'var(--green)' }}>
+              {autosaveStatus === 'saving' ? 'Saving…' : autosaveStatus === 'saved' ? 'Saved' : ''}
+            </span>
+          </div>
           <textarea className="input" rows={editing ? 10 : 14} style={{ resize: 'vertical', fontFamily: 'Georgia, serif', fontSize: 14, lineHeight: 1.7 }}
             placeholder="Character notes, backstory, personality traits, bonds, flaws..."
-            value={F.notes || ''} onChange={e => setForm(p => ({ ...p, notes: e.target.value }))} />
-          <button className="btn btn-primary btn-sm" style={{ marginTop: 10 }} onClick={save}>Save notes</button>
+            value={F.notes || ''} onChange={setTextField('notes')} />
         </div>
       )}
 
@@ -249,7 +285,7 @@ export default function Character() {
             <input className="input" style={{ flex: 1 }} placeholder="https://www.dndbeyond.com/characters/..." value={F.dndBeyondUrl || ''} onChange={e => setForm(p => ({ ...p, dndBeyondUrl: e.target.value }))} />
             <button className="btn btn-primary" onClick={save}>Link</button>
           </div>
-          {F.dndBeyondUrl && <iframe src={F.dndBeyondUrl} title="D&D Beyond" style={{ width: '100%', minHeight: 360, maxHeight: 560, border: 'none', borderRadius: 8 }} sandbox="allow-scripts allow-same-origin" />}
+          {F.dndBeyondUrl && <iframe src={F.dndBeyondUrl} title="D&D Beyond" style={{ width: '100%', height: 'calc(100vh - 260px)', minHeight: 500, border: 'none', borderRadius: 8 }} sandbox="allow-scripts allow-same-origin" />}
         </div>
       )}
       <ToastContainer />

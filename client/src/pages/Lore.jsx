@@ -90,7 +90,7 @@ export default function Lore() {
             </button>
           ))}
         </div>
-        <button className="btn btn-gold btn-sm" onClick={() => { setAdding(true); setEditing(null); setForm({ title: '', tag: 'npc', content: '', hp: '', maxHp: '' }) }}>+ Add entry</button>
+        <button className="btn btn-gold btn-sm" onClick={() => { setAdding(true); setEditing(null); setForm({ title: '', tag: filter !== 'all' ? filter : 'npc', content: '', hp: '', maxHp: '' }) }}>+ Add entry</button>
       </div>
 
       {adding && (
