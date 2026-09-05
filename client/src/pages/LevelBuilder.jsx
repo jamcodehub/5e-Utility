@@ -132,44 +132,55 @@ export default function LevelBuilder() {
 
   useEffect(() => { loadPlans() }, [loadPlans])
 
-  // Load party members + lore combatants for token pool
+  // Load party members + lore combatants for token pool.
+  // Both requests are fetched in parallel via Promise.allSettled and the
+  // pool is only committed to state once BOTH have resolved — previously
+  // this called setAvailableTokens() inside the lore .then() alone, so if
+  // the lore request finished before the (usually slower) members/characters
+  // request, party members would silently be dropped from the pool and
+  // players could never be dragged onto the map.
   useEffect(() => {
     if (!activeCampaign) return
-    const pool = []
+    let cancelled = false
 
-    // Party characters
-    api(`/campaigns/${activeCampaign._id}/members/characters`)
-      .then(members => {
-        ;(members || []).forEach(m => {
-          if (m.character) pool.push({
-            id: `char-${m.userId}`,
-            name: m.character.name || m.username,
-            avatar: m.character.avatarUrl || null,
-            color: '#6366f1',
-            hp: m.character.hp?.current ?? m.character.hp?.max ?? 10,
-            maxHp: m.character.hp?.max ?? 10,
-            type: 'player',
-          })
-        })
-      }).catch(() => {})
+    Promise.allSettled([
+      api(`/campaigns/${activeCampaign._id}/members/characters`),
+      api(`/lore/${activeCampaign._id}`),
+    ]).then(([membersRes, loreRes]) => {
+      if (cancelled) return
+      const pool = []
 
-    // Lore combatants (npc, enemy, boss)
-    api(`/lore/${activeCampaign._id}`)
-      .then(lore => {
-        ;(lore || []).filter(l => ['npc', 'enemy', 'boss'].includes(l.tag)).forEach(l => {
-          pool.push({
-            id: `lore-${l._id}`,
-            loreId: l._id,
-            name: l.title,
-            avatar: null,
-            color: l.tag === 'boss' ? '#f59e0b' : l.tag === 'enemy' ? '#ef4444' : '#10b981',
-            hp: l.hp ?? l.maxHp ?? 10,
-            maxHp: l.maxHp ?? 10,
-            type: l.tag,
-          })
+      const members = membersRes.status === 'fulfilled' ? membersRes.value : []
+      ;(members || []).forEach(m => {
+        if (m.character) pool.push({
+          id: `char-${m.userId}`,
+          name: m.character.name || m.username,
+          avatar: m.character.avatarUrl || null,
+          color: '#6366f1',
+          hp: m.character.hp?.current ?? m.character.hp?.max ?? 10,
+          maxHp: m.character.hp?.max ?? 10,
+          type: 'player',
         })
-        setAvailableTokens([...pool])
-      }).catch(() => { setAvailableTokens([...pool]) })
+      })
+
+      const lore = loreRes.status === 'fulfilled' ? loreRes.value : []
+      ;(lore || []).filter(l => ['npc', 'enemy', 'boss'].includes(l.tag)).forEach(l => {
+        pool.push({
+          id: `lore-${l._id}`,
+          loreId: l._id,
+          name: l.title,
+          avatar: null,
+          color: l.tag === 'boss' ? '#f59e0b' : l.tag === 'enemy' ? '#ef4444' : '#10b981',
+          hp: l.hp ?? l.maxHp ?? 10,
+          maxHp: l.maxHp ?? 10,
+          type: l.tag,
+        })
+      })
+
+      setAvailableTokens(pool)
+    })
+
+    return () => { cancelled = true }
   }, [activeCampaign?._id, mode])
 
   // Measure cell size from grid DOM
