@@ -51,7 +51,49 @@ export const isMember = async (campaignId, userId) => {
   const uid = String(userId)
   return String(c.owner) === uid || c.members.some(m => String(m) === uid)
 }
+// ─── Character dedup helper ─────────────────────────────────────────
+// A unique index on (campaign, owner) exists on CharacterSchema, but Mongo
+// silently refuses to *build* a unique index if duplicate documents already
+// exist in the collection (e.g. from a pre-fix race between rapid HP +/-
+// clicks and the initial character upsert). That means old duplicates can
+// still be present and the constraint never actually took effect for them.
+// This self-heals on every read/write: if more than one Character doc is
+// found for a campaign+owner pair, we merge the non-empty fields from all
+// of them into whichever has the most content, delete the rest, and return
+// the merged survivor. This also lets the unique index finally build
+// successfully once no duplicates remain.
+const fieldScore = (doc) => {
+  const obj = doc.toObject ? doc.toObject() : doc
+  let score = 0
+  for (const key of ['name', 'race', 'class', 'notes', 'background', 'personality', 'goals', 'lore', 'avatarUrl', 'dndBeyondUrl']) {
+    if (obj[key] && String(obj[key]).trim()) score += String(obj[key]).length
+  }
+  if ((obj.proficiencies || []).length) score += obj.proficiencies.length
+  return score
+}
 
+const dedupeCharacter = async (campaignId, ownerId) => {
+  const docs = await Character.find({ campaign: campaignId, owner: ownerId }).sort({ updatedAt: -1 })
+  if (docs.length <= 1) return docs[0] || null
+
+  // Pick the most content-rich doc as the survivor, not just the newest.
+  const winner = docs.reduce((best, d) => fieldScore(d) > fieldScore(best) ? d : best, docs[0])
+  const losers = docs.filter(d => d._id.toString() !== winner._id.toString())
+
+  // Backfill any fields the winner is missing from the losers before deleting them.
+  for (const loser of losers) {
+    const lo = loser.toObject()
+    for (const key of ['name', 'race', 'class', 'level', 'notes', 'background', 'personality', 'goals', 'lore', 'avatarUrl', 'dndBeyondUrl', 'appearancePrompt']) {
+      if ((!winner[key] || !String(winner[key]).trim()) && lo[key]) winner[key] = lo[key]
+    }
+    if ((!winner.proficiencies || !winner.proficiencies.length) && (lo.proficiencies || []).length) {
+      winner.proficiencies = lo.proficiencies
+    }
+  }
+  await winner.save()
+  await Character.deleteMany({ _id: { $in: losers.map(l => l._id) } })
+  return winner
+}
 // Players join via code — DM approval required before they see any data.
 router.post('/join', auth, async (req, res) => {
   try {
@@ -144,16 +186,19 @@ router.post('/:id/roleplay-session', auth, async (req, res) => {
 
 // Character within a campaign
 router.get('/:id/character', auth, async (req, res) => {
-  // Sort by most recently updated in case legacy duplicate docs exist for
-  // this campaign/owner pair (pre-dating the unique index) — otherwise a
-  // stale/blank duplicate could be returned instead of the one with notes.
-  const char = await Character.findOne({ campaign: req.params.id, owner: req.userId }).sort({ updatedAt: -1 })
+  // Self-heals any duplicate character docs before returning (see
+  // dedupeCharacter above) so stale/blank duplicates can never shadow the
+  // real one with saved notes/backstory again.
+  const char = await dedupeCharacter(req.params.id, req.userId)
   res.json(char)
 })
 
 router.put('/:id/character', auth, async (req, res) => {
   try {
-    const existing = await Character.findOne({ campaign: req.params.id, owner: req.userId })
+    // Collapse any duplicate docs first so the upsert below always targets
+    // a single, correct document instead of ambiguously matching one of
+    // several duplicates (which could silently touch/revive a stale blank one).
+    const existing = await dedupeCharacter(req.params.id, req.userId)
     if (!existing) {
       const user = await User.findById(req.userId)
       if (!user.isPremium) {

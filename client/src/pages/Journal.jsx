@@ -142,7 +142,7 @@ export default function Journal() {
         </div>
         {sorted.map(e => (
           <div key={e._id}
-            onClick={() => renamingId !== e._id && selectEntry(e)}
+            onClick={(ev) => { if (renamingId === e._id) return; selectEntry(e) }}
             style={{
               width: '100%', textAlign: 'left', border: 'none',
               padding: '9px 14px',
@@ -167,14 +167,12 @@ export default function Journal() {
                   style={{ fontSize: 12, padding: '2px 6px', width: '100%' }}
                 />
               ) : (
-                <>
-                  <span onClick={(ev) => startRename(ev, e)} title="Click to rename" style={{ fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', cursor: 'text', flex: 1 }}>{entryTitle(e)}</span>
-                  <button
-                    onClick={(ev) => startRename(ev, e)}
-                    title="Rename"
-                    style={{ background: 'none', border: 'none', color: 'inherit', opacity: 0.55, cursor: 'pointer', fontSize: 12, flexShrink: 0, padding: '2px 4px', lineHeight: 1 }}
-                  >✎</button>
-                </>
+                <span
+                  onMouseDown={(ev) => ev.stopPropagation()}
+                  onClick={(ev) => startRename(ev, e)}
+                  title="Click to rename"
+                  style={{ fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', cursor: 'text', flex: 1 }}
+                >{entryTitle(e)}</span>
               )}
             </div>
             <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 2 }}>
@@ -206,16 +204,14 @@ export default function Journal() {
                   style={{ fontSize: 15, padding: '3px 8px' }}
                 />
               ) : (
-                <>
-                  <span onClick={(ev) => startRename(ev, active)} title="Click to rename" style={{ cursor: 'text' }}>
-                    {entryTitle(active)}
-                  </span>
-                  <button
-                    onClick={(ev) => startRename(ev, active)}
-                    title="Rename"
-                    style={{ background: 'none', border: 'none', color: 'inherit', opacity: 0.5, cursor: 'pointer', fontSize: 13, padding: 0 }}
-                  >✎</button>
-                </>
+                <span
+                  onMouseDown={(ev) => ev.stopPropagation()}
+                  onClick={(ev) => startRename(ev, active)}
+                  title="Click to rename"
+                  style={{ cursor: 'text' }}
+                >
+                  {entryTitle(active)}
+                </span>
               )
             ) : 'Select a day'}
           </h2>

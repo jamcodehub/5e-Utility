@@ -174,15 +174,26 @@ export default function LevelBuilder() {
     setMode('play')
   }
 
+  // If the DM saves without naming the map, auto-assign the next free
+  // "Map N" name (Map1, Map2, ...) instead of blocking/prompting them.
+  const nextAutoMapName = () => {
+    let n = 1
+    const taken = new Set(plans.map(p => (p.title || '').trim().toLowerCase()))
+    while (taken.has(`map${n}`.toLowerCase())) n++
+    return `Map${n}`
+  }
+
   const saveMap = async () => {
-    if (!editTitle.trim() || !activeCampaign) return
+    if (!activeCampaign) return
+    const title = editTitle.trim() || nextAutoMapName()
     try {
-      const body = { title: editTitle, content: JSON.stringify(grid) }
+      const body = { title, content: JSON.stringify(grid) }
       const plan = editPlanId
         ? await api(`/levels/${editPlanId}`, { method: 'PUT', body })
         : await api(`/levels/${activeCampaign._id}`, { method: 'POST', body })
       setPlans(p => editPlanId ? p.map(x => x._id === plan._id ? plan : x) : [...p, plan])
       setEditPlanId(plan._id)
+      setEditTitle(title)
       toast('Map saved')
       setMode('gallery')
     } catch (e) { toast(e.message || 'Failed to save') }
@@ -221,11 +232,20 @@ export default function LevelBuilder() {
 
   const removeToken = (id) => setTokens(ts => ts.filter(t => t.id !== id))
 
+  // Adjusting HP on the map now persists back to the source Lore entry (for
+  // npc/enemy/boss tokens) via the existing PATCH /lore/:id/hp endpoint —
+  // previously this only updated local component state, so HP changes were
+  // lost on reload and lore combatants kept reverting to their default/10.
   const adjustTokenHp = (id, delta) => {
-    setTokens(ts => ts.map(t => t.id === id
-      ? { ...t, hp: Math.max(0, Math.min(t.maxHp, (t.hp || 0) + delta)) }
-      : t
-    ))
+    setTokens(ts => ts.map(t => {
+      if (t.id !== id) return t
+      const nextHp = Math.max(0, Math.min(t.maxHp, (t.hp || 0) + delta))
+      if (t.loreId) {
+        api(`/lore/${t.loreId}/hp`, { method: 'PATCH', body: { hp: nextHp } }).catch(() => {})
+        setAvailableTokens(ats => ats.map(a => a.id === t.id ? { ...a, hp: nextHp } : a))
+      }
+      return { ...t, hp: nextHp }
+    }))
   }
 
   // ── Render ──
@@ -270,7 +290,7 @@ export default function LevelBuilder() {
         <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
           <button className="btn btn-ghost btn-sm" onClick={() => setMode('gallery')}>✕ Cancel</button>
           <button className="btn btn-ghost btn-sm" onClick={() => window.print()}>Print</button>
-          <button className="btn btn-primary btn-sm" onClick={saveMap} disabled={!editTitle.trim()}>Save & Close</button>
+          <button className="btn btn-primary btn-sm" onClick={saveMap}>Save & Close</button>
         </div>
       </div>
 
