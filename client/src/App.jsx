@@ -22,6 +22,7 @@ const MusicPlayer   = lazy(() => import('./pages/MusicPlayer'))
 const LevelBuilder  = lazy(() => import('./pages/LevelBuilder'))
 const RoleplayAssistant = lazy(() => import('./pages/RoleplayAssistant'))
 const CampaignGuide = lazy(() => import('./pages/CampaignGuide'))
+const SessionPlanner = lazy(() => import('./pages/SessionPlanner'))
 
 // Kick off all remaining chunk downloads in idle time after Journal renders.
 // Uses requestIdleCallback so it never competes with the first paint.
@@ -39,6 +40,7 @@ const prefetchAll = () => {
     () => import('./pages/LevelBuilder'),
     () => import('./pages/RoleplayAssistant'),
     () => import('./pages/CampaignGuide'),
+    () => import('./pages/SessionPlanner'),
   ]
   const schedule = window.requestIdleCallback || ((cb) => setTimeout(cb, 200))
   let i = 0
@@ -65,14 +67,17 @@ function Guard() {
 
   if (loading) return <div style={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-3)', fontFamily: 'Cinzel, serif' }}>Loading...</div>
   if (!user) return <Auth />
+  // Players land on their Journal; DMs land on their Session Planner.
+  const homePath = user.role === 'dm' ? '/session-planner' : '/journal'
   return (
     <CampaignProvider>
       <MusicProvider>
         <Shell>
           <Suspense fallback={<PageLoader />}>
             <Routes>
-              <Route path="/"           element={<Navigate to="/journal" replace />} />
+              <Route path="/"           element={<Navigate to={homePath} replace />} />
               <Route path="/journal"    element={<Journal />} />
+              <Route path="/session-planner" element={<SessionPlanner />} />
               <Route path="/storyboard" element={<Storyboard />} />
               <Route path="/lore"       element={<Lore />} />
               <Route path="/character"  element={<Character />} />
@@ -85,7 +90,7 @@ function Guard() {
               <Route path="/levels"     element={<LevelBuilder />} />
               <Route path="/roleplay"   element={<RoleplayAssistant />} />
               <Route path="/campaign-guide" element={<CampaignGuide />} />
-              <Route path="*"           element={<Navigate to="/journal" replace />} />
+              <Route path="*"           element={<Navigate to={homePath} replace />} />
             </Routes>
           </Suspense>
         </Shell>

@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
+import { Navigate } from 'react-router-dom'
 import UpgradeModal from '../components/UpgradeModal'
 import { api, useAuth } from '../context/AuthContext'
 import { useCampaign } from '../context/CampaignContext'
@@ -6,18 +7,15 @@ import { useToast } from '../hooks/useToast'
 
 const wordCount = s => s.trim().split(/\s+/).filter(Boolean).length
 
+// Player-only journal — split out from the old shared Journal/Sessions page.
+// DMs now use SessionPlanner.jsx instead (see /session-planner route).
 export default function Journal() {
   const { activeCampaign } = useCampaign()
   const { user } = useAuth()
   const { toast, ToastContainer } = useToast()
-  const isDM = user?.role === 'dm'
 
-  const noun       = isDM ? 'Session' : 'Day'
-  const nounPlural = isDM ? 'Sessions' : 'Days'
-  const apiBase    = 'journal' // both DM and player use the same endpoint; field differs (session vs day)
-  const placeholder = isDM
-    ? 'Plan this session — encounters, NPCs, pacing, hooks, notes for the table…'
-    : 'Record what happened this session…'
+  const apiBase    = 'journal'
+  const placeholder = 'Record what happened this session…'
 
   const [entries, setEntries] = useState([])
   const [activeId, setActiveId] = useState(null)
@@ -29,8 +27,8 @@ export default function Journal() {
   const saveTimer = useRef(null)
 
   const active = entries.find(e => e._id === activeId)
-  const entryNum = e => e.session ?? e.day ?? '?'
-  const entryTitle = e => e.title || `${noun} ${entryNum(e)}`
+  const entryNum = e => e.day ?? '?'
+  const entryTitle = e => e.title || `Day ${entryNum(e)}`
 
   const load = useCallback(async () => {
     if (!activeCampaign) return
@@ -38,7 +36,7 @@ export default function Journal() {
     setEntries(data)
     if (data.length) { setActiveId(data[0]._id); setContent(data[0].content) }
     else { setActiveId(null); setContent('') }
-  }, [activeCampaign, apiBase])
+  }, [activeCampaign])
 
   useEffect(() => { load() }, [load])
 
@@ -66,7 +64,7 @@ export default function Journal() {
       setEntries(p => p.map(e => e._id === id ? { ...e, content: text } : e))
     } catch { /* silently ignore — next keystroke will retry */ }
     setSaving(false)
-  }, [apiBase])
+  }, [])
 
   const handleContentChange = (e) => {
     const text = e.target.value
@@ -75,8 +73,12 @@ export default function Journal() {
     saveTimer.current = setTimeout(() => autosave(activeId, text), 800)
   }
 
-  // Flush on unmount
-  useEffect(() => () => { if (saveTimer.current) clearTimeout(saveTimer.current) }, [])
+  // Flush on unmount / tab close so nothing typed just before navigating away is lost.
+  useEffect(() => {
+    const flush = () => { if (saveTimer.current) clearTimeout(saveTimer.current) }
+    window.addEventListener('beforeunload', flush)
+    return () => { flush(); window.removeEventListener('beforeunload', flush) }
+  }, [])
 
   const startRename = (e, entry) => {
     e.stopPropagation()
@@ -92,19 +94,17 @@ export default function Journal() {
     setEntries(p => p.map(e => e._id === id ? { ...e, title } : e))
     try {
       await api(`/${apiBase}/${id}`, { method: 'PUT', body: { title } })
-    } catch { toast(`Failed to rename ${noun.toLowerCase()}`) }
+    } catch { toast('Failed to rename day') }
   }
 
   const newEntry = async () => {
     if (!activeCampaign) return
-    const maxNum = entries.reduce((m, e) => Math.max(m, e.day ?? e.session ?? 0), 0)
+    const maxNum = entries.reduce((m, e) => Math.max(m, e.day ?? 0), 0)
     const nextNum = maxNum + 1
     try {
       const entry = await api(`/${apiBase}/${activeCampaign._id}`, {
         method: 'POST',
-        body: isDM
-          ? { session: nextNum, title: `Session ${nextNum}`, content: '' }
-          : { day: nextNum, title: `Day ${nextNum}`, content: '' },
+        body: { day: nextNum, title: `Day ${nextNum}`, content: '' },
       })
       setEntries(p => [entry, ...p])
       setActiveId(entry._id)
@@ -114,9 +114,13 @@ export default function Journal() {
         setShowUpgrade(true)
         return
       }
-      toast(`Failed to create ${noun.toLowerCase()}`)
+      toast('Failed to create day')
     }
   }
+
+  // DMs shouldn't land here — send them to their own Session Planner instead.
+  // (Placed after all hooks above to satisfy the Rules of Hooks.)
+  if (user?.role === 'dm') return <Navigate to="/session-planner" replace />
 
   if (!activeCampaign) return (
     <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-3)' }}>
@@ -124,15 +128,19 @@ export default function Journal() {
     </div>
   )
 
+  // Sort sidebar numerically by day number, descending (newest first) —
+  // independent of title text, so renaming a title never shuffles the list.
+  const sorted = [...entries].sort((a, b) => (b.day ?? 0) - (a.day ?? 0))
+
   return (
     <div className="journal-layout" style={{ display: 'flex', height: '100%', overflow: 'hidden' }}>
       {/* Sidebar list */}
       <div className="journal-day-list" style={{ width: 180, flexShrink: 0, borderRight: '1px solid var(--border)', overflowY: 'auto', background: 'var(--surface)' }}>
         <div style={{ padding: '14px 14px 8px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{nounPlural}</span>
+          <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Days</span>
           <button className="btn btn-ghost btn-sm" onClick={newEntry} style={{ padding: '3px 8px' }}>+</button>
         </div>
-        {entries.map(e => (
+        {sorted.map(e => (
           <div key={e._id}
             onClick={() => renamingId !== e._id && selectEntry(e)}
             style={{
@@ -160,7 +168,12 @@ export default function Journal() {
                 />
               ) : (
                 <>
-                  <span onClick={(ev) => startRename(ev, e)} title="Click to rename" style={{ fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', cursor: 'text' }}>{entryTitle(e)}</span>
+                  <span onClick={(ev) => startRename(ev, e)} title="Click to rename" style={{ fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', cursor: 'text', flex: 1 }}>{entryTitle(e)}</span>
+                  <button
+                    onClick={(ev) => startRename(ev, e)}
+                    title="Rename"
+                    style={{ background: 'none', border: 'none', color: 'inherit', opacity: 0.55, cursor: 'pointer', fontSize: 12, flexShrink: 0, padding: '2px 4px', lineHeight: 1 }}
+                  >✎</button>
                 </>
               )}
             </div>
@@ -170,14 +183,14 @@ export default function Journal() {
           </div>
         ))}
         {!entries.length && (
-          <div style={{ padding: '20px 14px', fontSize: 12, color: 'var(--text-3)' }}>No {nounPlural.toLowerCase()} yet.</div>
+          <div style={{ padding: '20px 14px', fontSize: 12, color: 'var(--text-3)' }}>No days yet.</div>
         )}
       </div>
 
       {/* Editor */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
         <div style={{ padding: '14px 24px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'var(--surface)' }}>
-          <h2 style={{ fontSize: 16 }}>
+          <h2 style={{ fontSize: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
             {active ? (
               renamingId === active._id ? (
                 <input
@@ -193,11 +206,18 @@ export default function Journal() {
                   style={{ fontSize: 15, padding: '3px 8px' }}
                 />
               ) : (
-                <span onClick={(ev) => startRename(ev, active)} title="Click to rename" style={{ cursor: 'text' }}>
-                  {entryTitle(active)}
-                </span>
+                <>
+                  <span onClick={(ev) => startRename(ev, active)} title="Click to rename" style={{ cursor: 'text' }}>
+                    {entryTitle(active)}
+                  </span>
+                  <button
+                    onClick={(ev) => startRename(ev, active)}
+                    title="Rename"
+                    style={{ background: 'none', border: 'none', color: 'inherit', opacity: 0.5, cursor: 'pointer', fontSize: 13, padding: 0 }}
+                  >✎</button>
+                </>
               )
-            ) : `Select a ${noun.toLowerCase()}`}
+            ) : 'Select a day'}
           </h2>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{wordCount(content)} words</span>
@@ -220,7 +240,7 @@ export default function Journal() {
             />
           ) : (
             <div style={{ textAlign: 'center', color: 'var(--text-3)', marginTop: 60, fontSize: 13 }}>
-              No {noun.toLowerCase()} selected. Start a new one with +
+              No day selected. Start a new one with +
             </div>
           )}
         </div>

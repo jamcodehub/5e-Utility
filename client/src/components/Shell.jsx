@@ -185,7 +185,7 @@ const NAV_PLAYER = [
 
 const NAV_DM = [
   { to: '/campaign-guide', label: 'Campaign' },
-  { to: '/journal',    label: 'Sessions' },
+  { to: '/session-planner', label: 'Sessions' },
   { to: '/storyboard', label: 'Storyboard' },
   { to: '/lore',       label: 'Lore' },
   { to: '/inventory',  label: 'Shop/Items' },
