@@ -1,8 +1,9 @@
-import { NavLink, useNavigate } from 'react-router-dom'
+import { NavLink, useNavigate, useLocation } from 'react-router-dom'
 import { useAuth, api } from '../context/AuthContext'
 import { useCampaign } from '../context/CampaignContext'
 import { useMusic, MOODS } from '../context/MusicContext'
-import { useState, useEffect, useRef } from 'react'
+import { useTheme, THEMES } from '../context/ThemeContext'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import SettingsModal from './SettingsModal'
 import { CloudinaryImage } from '@cloudinary/url-gen'
 import { quality, format } from '@cloudinary/url-gen/actions/delivery'
@@ -16,29 +17,143 @@ const logoUrl = new CloudinaryImage('5e_Utillity', { cloudName: CLOUD_NAME })
   .delivery(format(autoFormat()))
   .toURL()
 
+// ─── Infinite swipe carousel nav ────────────────────────────────────────────
+// All items sit side-by-side in a wide track. We maintain an offset and
+// duplicate items on each end so wrapping is seamless.
+function SwipeNav({ items, navLinkStyle }) {
+  const location = useLocation()
+  const trackRef = useRef(null)
+  const containerRef = useRef(null)
+
+  // We render items tripled: [items, items, items] and start in the middle
+  // copy so we can shift left or right and wrap infinitely.
+  const COPIES = 3
+  const tripled = [...items, ...items, ...items]
+  const ITEM_W = 80 // px per nav item
+  const GAP = 4
+
+  const [offset, setOffset] = useState(0) // px offset of the track
+  const dragRef = useRef({ active: false, startX: 0, startOffset: 0 })
+  const centerOffset = useRef(0)
+
+  // Initialise so the middle copy is visible
+  useEffect(() => {
+    const base = -(items.length * (ITEM_W + GAP))
+    centerOffset.current = base
+    setOffset(base)
+  }, [items.length])
+
+  // After settling, silently recentre if we've drifted too far
+  const recentre = useCallback(() => {
+    const base = centerOffset.current
+    const total = items.length * (ITEM_W + GAP)
+    setOffset(prev => {
+      let o = prev
+      if (o < base - total) o += total
+      if (o > base + total) o -= total
+      return o
+    })
+  }, [items.length])
+
+  const onTouchStart = (e) => {
+    dragRef.current = { active: true, startX: e.touches[0].clientX, startOffset: offset }
+  }
+  const onTouchMove = (e) => {
+    if (!dragRef.current.active) return
+    const dx = e.touches[0].clientX - dragRef.current.startX
+    setOffset(dragRef.current.startOffset + dx)
+  }
+  const onTouchEnd = () => {
+    dragRef.current.active = false
+    // Snap to nearest item
+    const itemStep = ITEM_W + GAP
+    setOffset(prev => {
+      const snapped = Math.round(prev / itemStep) * itemStep
+      return snapped
+    })
+    setTimeout(recentre, 50)
+  }
+
+  // Mouse drag for desktop testing
+  const onMouseDown = (e) => {
+    dragRef.current = { active: true, startX: e.clientX, startOffset: offset }
+    window.addEventListener('mousemove', onMouseMove)
+    window.addEventListener('mouseup', onMouseUp)
+  }
+  const onMouseMove = (e) => {
+    if (!dragRef.current.active) return
+    const dx = e.clientX - dragRef.current.startX
+    setOffset(dragRef.current.startOffset + dx)
+  }
+  const onMouseUp = () => {
+    dragRef.current.active = false
+    const itemStep = ITEM_W + GAP
+    setOffset(prev => Math.round(prev / itemStep) * itemStep)
+    setTimeout(recentre, 50)
+    window.removeEventListener('mousemove', onMouseMove)
+    window.removeEventListener('mouseup', onMouseUp)
+  }
+
+  return (
+    <div
+      ref={containerRef}
+      style={{ flex: 1, overflow: 'hidden', display: 'flex', alignItems: 'center', cursor: 'grab', userSelect: 'none' }}
+      onTouchStart={onTouchStart}
+      onTouchMove={onTouchMove}
+      onTouchEnd={onTouchEnd}
+      onMouseDown={onMouseDown}
+    >
+      <div
+        ref={trackRef}
+        style={{
+          display: 'flex',
+          gap: GAP,
+          transform: `translateX(${offset}px)`,
+          transition: dragRef.current?.active ? 'none' : 'transform 0.18s cubic-bezier(.4,0,.2,1)',
+          willChange: 'transform',
+        }}
+      >
+        {tripled.map((item, idx) => {
+          const isActive = location.pathname === item.to
+          return (
+            <NavLink
+              key={`${item.to}-${idx}`}
+              to={item.to}
+              draggable={false}
+              style={({ isActive: a }) => ({
+                ...navLinkStyle(a),
+                width: ITEM_W,
+                flexShrink: 0,
+                justifyContent: 'center',
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                pointerEvents: dragRef.current?.active ? 'none' : 'auto',
+              })}
+            >
+              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', display: 'block', width: '100%', textAlign: 'center' }}>
+                {item.label}
+              </span>
+            </NavLink>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+// ─── Music mini player ───────────────────────────────────────────────────────
 function MusicMiniPlayer({ bottomOffset }) {
   const { current, volume, play, stop, setVol } = useMusic()
   const [open, setOpen] = useState(false)
-  if (!current && !open) {
-    // Only show the floating launcher once something is worth multitasking with,
-    // but still allow opening it manually via a subtle always-present dot.
-  }
   return (
     <div style={{ position: 'fixed', right: 16, bottom: bottomOffset, zIndex: 60 }}>
       {open && (
-        <div style={{
-          marginBottom: 10, width: 220, background: 'var(--surface)', border: '1px solid var(--border)',
-          borderRadius: 12, padding: 12, boxShadow: '0 12px 32px rgba(0,0,0,0.35)',
-        }}>
+        <div style={{ marginBottom: 10, width: 220, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, padding: 12, boxShadow: '0 12px 32px rgba(0,0,0,0.35)' }}>
           <div style={{ fontSize: 11, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 8 }}>Ambient Music</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 10 }}>
             {MOODS.map(m => (
-              <button key={m.id} onClick={() => play(m.id)} style={{
-                display: 'flex', justifyContent: 'space-between', alignItems: 'center', textAlign: 'left',
-                padding: '6px 8px', borderRadius: 8, border: 'none', cursor: 'pointer', fontSize: 12,
-                background: current === m.id ? 'var(--gold-bg)' : 'transparent',
-                color: current === m.id ? 'var(--gold)' : 'var(--text-2)',
-              }}>
+              <button key={m.id} onClick={() => play(m.id)} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', textAlign: 'left', padding: '6px 8px', borderRadius: 8, border: 'none', cursor: 'pointer', fontSize: 12, background: current === m.id ? 'var(--gold-bg)' : 'transparent', color: current === m.id ? 'var(--gold)' : 'var(--text-2)' }}>
                 <span>{m.label}</span>
                 <span style={{ fontSize: 12, width: 16, textAlign: 'center' }}>{current === m.id ? '⏸' : '▶'}</span>
               </button>
@@ -48,22 +163,10 @@ function MusicMiniPlayer({ bottomOffset }) {
             <span style={{ fontSize: 11, color: 'var(--text-3)' }}>Vol</span>
             <input type="range" min={0} max={1} step={0.05} value={volume} onChange={e => setVol(+e.target.value)} style={{ flex: 1 }} />
           </div>
-          {current && (
-            <button onClick={stop} style={{ marginTop: 8, width: '100%', background: 'transparent', border: '1px solid var(--border)', color: 'var(--text-3)', borderRadius: 8, padding: '5px 0', fontSize: 11, cursor: 'pointer' }}>Stop</button>
-          )}
+          {current && <button onClick={stop} style={{ marginTop: 8, width: '100%', background: 'transparent', border: '1px solid var(--border)', color: 'var(--text-3)', borderRadius: 8, padding: '5px 0', fontSize: 11, cursor: 'pointer' }}>Stop</button>}
         </div>
       )}
-      <button
-        onClick={() => setOpen(o => !o)}
-        title="Music"
-        style={{
-          width: 48, height: 48, borderRadius: '50%', cursor: 'pointer',
-          background: current ? 'var(--gold)' : 'var(--surface)', color: current ? '#2a1a00' : 'var(--text-2)',
-          boxShadow: '0 8px 20px rgba(0,0,0,0.3)', fontSize: 18,
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          border: current ? 'none' : '1px solid var(--border)',
-        }}
-      >
+      <button onClick={() => setOpen(o => !o)} title="Music" style={{ width: 48, height: 48, borderRadius: '50%', cursor: 'pointer', background: current ? 'var(--gold)' : 'var(--surface)', color: current ? '#2a1a00' : 'var(--text-2)', boxShadow: '0 8px 20px rgba(0,0,0,0.3)', fontSize: 18, display: 'flex', alignItems: 'center', justifyContent: 'center', border: current ? 'none' : '1px solid var(--border)' }}>
         {current ? '♪' : '♫'}
       </button>
     </div>
@@ -82,7 +185,7 @@ const NAV_PLAYER = [
 
 const NAV_DM = [
   { to: '/campaign-guide', label: 'Campaign' },
-  { to: '/journal',    label: 'Journal' },
+  { to: '/journal',    label: 'Sessions' },
   { to: '/storyboard', label: 'Storyboard' },
   { to: '/lore',       label: 'Lore' },
   { to: '/inventory',  label: 'Shop/Items' },
@@ -110,10 +213,7 @@ export default function Shell({ children }) {
   const isMobile = useIsMobile()
   const isDM = user?.role === 'dm'
   const NAV = isDM ? NAV_DM : NAV_PLAYER
-  const NAV_PAGE_SIZE = 5
-  const navPages = []
-  for (let i = 0; i < NAV.length; i += NAV_PAGE_SIZE) navPages.push(NAV.slice(i, i + NAV_PAGE_SIZE))
-  const [navPage, setNavPage] = useState(0)
+
   const [creating, setCreating] = useState(false)
   const [newName, setNewName]   = useState('')
   const [error, setError]       = useState('')
@@ -133,15 +233,14 @@ export default function Shell({ children }) {
     clearTimeout(campaignDropdownTimer.current)
     campaignDropdownTimer.current = setTimeout(() => setShowCampaigns(false), 5000)
   }
+
   const [showSettings, setShowSettings] = useState(false)
   const [joinPending, setJoinPending] = useState(false)
   const [pendingMembers, setPendingMembers] = useState([])
 
   useEffect(() => {
     if (!isDM || !activeCampaign) return
-    api(`/campaigns/${activeCampaign._id}/pending`)
-      .then(setPendingMembers)
-      .catch(() => {})
+    api(`/campaigns/${activeCampaign._id}/pending`).then(setPendingMembers).catch(() => {})
   }, [isDM, activeCampaign?._id])
 
   const approveMember = async (userId) => {
@@ -178,7 +277,7 @@ export default function Shell({ children }) {
     display: 'flex', flexDirection: 'row',
     alignItems: 'center', justifyContent: isMobile ? 'center' : 'flex-start',
     gap: 8,
-    padding: isMobile ? '10px 14px' : '9px 12px',
+    padding: isMobile ? '10px 10px' : '9px 12px',
     borderRadius: isMobile ? 999 : 8,
     marginBottom: isMobile ? 0 : 2,
     fontSize: isMobile ? 12 : 13,
@@ -195,12 +294,8 @@ export default function Shell({ children }) {
       <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden' }}>
         {/* Mobile top bar */}
         <div style={{ background: 'var(--surface)', borderBottom: '1px solid var(--border)', padding: '8px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
-          {/* Logo — centred absolutely so it doesn't push the action buttons */}
-          <div style={{ position: 'absolute', left: '50%', transform: 'translateX(-50%)', pointerEvents: 'none' }}>
-            <img src={logoUrl} alt="Lore & Ledger" style={{ height: 36, width: 'auto', objectFit: 'contain', display: 'block' }} />
-          </div>
-          {/* Spacer to keep right-side buttons from overlapping logo */}
-          <div style={{ width: 36 }} />
+          <img src={logoUrl} alt="5e Utility" style={{ height: 32, width: 'auto', objectFit: 'contain', display: 'block', filter: 'var(--logo-filter, none)' }} />
+          
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
             <button onClick={() => showCampaigns ? closeCampaigns() : openCampaigns()} style={{ background: 'var(--gold-bg)', border: '1px solid var(--gold-border)', color: 'var(--gold)', padding: '8px 12px', borderRadius: 10, fontSize: 11, cursor: 'pointer', fontFamily: 'Cinzel, serif', maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
               {(activeCampaign && !activeCampaign.isPersonal) ? activeCampaign.name : 'Campaign'} ▾
@@ -210,7 +305,7 @@ export default function Shell({ children }) {
           </div>
         </div>
 
-        {/* Campaign dropdown on mobile */}
+        {/* Campaign dropdown */}
         {showCampaigns && (
           <div style={{ background: 'var(--surface)', borderBottom: '1px solid var(--border)', padding: '10px 16px', flexShrink: 0 }} onMouseMove={resetDropdownTimer} onTouchStart={resetDropdownTimer}>
             {campaigns.filter(c => !c.isPersonal).map(c => (
@@ -225,8 +320,8 @@ export default function Shell({ children }) {
                       <div style={{ fontSize: 12, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.username}</div>
                       <div style={{ fontSize: 10, color: 'var(--text-3)' }}>wants to join</div>
                     </div>
-                    <button onClick={() => approveMember(m._id)} title="Approve" style={{ width: 26, height: 26, borderRadius: 6, border: 'none', background: '#1d6a3a', color: '#fff', fontSize: 13, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>✓</button>
-                    <button onClick={() => rejectMember(m._id)} title="Reject" style={{ width: 26, height: 26, borderRadius: 6, border: 'none', background: '#7a2020', color: '#fff', fontSize: 13, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>✕</button>
+                    <button onClick={() => approveMember(m._id)} style={{ width: 26, height: 26, borderRadius: 6, border: 'none', background: '#1d6a3a', color: '#fff', fontSize: 13, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>✓</button>
+                    <button onClick={() => rejectMember(m._id)} style={{ width: 26, height: 26, borderRadius: 6, border: 'none', background: '#7a2020', color: '#fff', fontSize: 13, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>✕</button>
                   </div>
                 ))}
               </div>
@@ -251,7 +346,6 @@ export default function Shell({ children }) {
               </form>
             ) : joinPending ? (
               <div style={{ marginTop: 6, padding: '8px 10px', background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span style={{ fontSize: 16 }}>⏳</span>
                 <div style={{ flex: 1 }}>
                   <div style={{ fontSize: 12, fontWeight: 500 }}>Joining pending…</div>
                   <div style={{ fontSize: 10, color: 'var(--text-3)', lineHeight: 1.4 }}>Waiting for the DM to approve your request.</div>
@@ -278,7 +372,7 @@ export default function Shell({ children }) {
                     <div>
                       <div style={{ fontSize: 11, color: 'var(--text-3)', padding: '4px 4px 6px', lineHeight: 1.5 }}>Ask your DM for a join code to enter their campaign.</div>
                       {canJoin
-                        ? <button onClick={() => setJoining(true)} style={{ fontSize: 12, color: 'var(--text-2)', background: 'transparent', border: '1px solid var(--border)', borderRadius: 8, cursor: 'pointer', padding: '7px 12px', fontWeight: 600, width: '100%' }}>⚔ Join a Campaign</button>
+                        ? <button onClick={() => setJoining(true)} style={{ fontSize: 12, color: 'var(--text-2)', background: 'transparent', border: '1px solid var(--border)', borderRadius: 8, cursor: 'pointer', padding: '7px 12px', fontWeight: 600, width: '100%' }}>Join a Campaign</button>
                         : <button onClick={() => { navigate('/premium'); closeCampaigns() }} style={{ fontSize: 12, color: 'var(--gold)', background: 'var(--gold-bg)', border: '1px solid var(--gold-border)', borderRadius: 8, cursor: 'pointer', padding: '7px 12px', fontWeight: 600, width: '100%' }}>✦ Upgrade for more</button>}
                     </div>
                   ) : (
@@ -292,10 +386,9 @@ export default function Shell({ children }) {
           </div>
         )}
 
-        {/* Main content */}
-        <main style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column', paddingBottom: '96px' }}>{children}</main>
+        <main style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column', paddingBottom: '72px' }}>{children}</main>
 
-        {/* Bottom nav */}
+        {/* Bottom nav — swipeable infinite carousel */}
         <nav style={{
           position: 'fixed',
           left: '50%',
@@ -304,56 +397,30 @@ export default function Shell({ children }) {
           width: 'min(96%, 560px)',
           display: 'flex',
           alignItems: 'center',
-          gap: 4,
           background: 'rgba(255,255,255,0.12)',
           border: '1px solid rgba(255,255,255,0.14)',
           borderRadius: 999,
-          padding: '8px 8px',
+          padding: '6px 10px',
           boxShadow: '0 24px 60px rgba(0,0,0,0.08)',
           zIndex: 40,
           backdropFilter: 'blur(20px)',
           WebkitBackdropFilter: 'blur(20px)',
+          overflow: 'hidden',
         }}>
-          {navPages.length > 1 && (
-            <button
-              onClick={() => setNavPage(p => (p - 1 + navPages.length) % navPages.length)}
-              aria-label="Previous nav page"
-              style={{ flexShrink: 0, background: 'transparent', border: 'none', color: 'var(--text-2)', fontSize: 16, padding: '6px 4px', cursor: 'pointer' }}
-            >&lsaquo;</button>
-          )}
-          <div style={{ flex: 1, display: 'flex', justifyContent: 'space-between', gap: 4, minWidth: 0 }}>
-            {navPages[navPage].map(item => (
-              <NavLink key={item.to} to={item.to} style={({ isActive }) => navLinkStyle(isActive)}>
-                <span>{item.label}</span>
-              </NavLink>
-            ))}
-          </div>
-          {navPages.length > 1 && (
-            <button
-              onClick={() => setNavPage(p => (p + 1) % navPages.length)}
-              aria-label="Next nav page"
-              style={{ flexShrink: 0, background: 'transparent', border: 'none', color: 'var(--text-2)', fontSize: 16, padding: '6px 4px', cursor: 'pointer' }}
-            >&rsaquo;</button>
-          )}
+          <SwipeNav items={NAV} navLinkStyle={navLinkStyle} />
         </nav>
-        {navPages.length > 1 && (
-          <div style={{ position: 'fixed', left: '50%', transform: 'translateX(-50%)', bottom: 'calc(4px + env(safe-area-inset-bottom, 4px))', display: 'flex', gap: 4, zIndex: 40 }}>
-            {navPages.map((_, i) => (
-              <span key={i} style={{ width: 5, height: 5, borderRadius: '50%', background: i === navPage ? 'var(--gold)' : 'rgba(255,255,255,0.25)' }} />
-            ))}
-          </div>
-        )}
+
         {showSettings && <SettingsModal onClose={() => setShowSettings(false)} />}
       </div>
     )
   }
 
-  // Desktop layout
+  // Desktop layout — unchanged
   return (
     <div style={{ display: 'flex', height: '100vh', overflow: 'hidden' }}>
       <aside style={{ width: 232, flexShrink: 0, background: 'var(--surface)', borderRight: '1px solid var(--border)', display: 'flex', flexDirection: 'column' }}>
         <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <img src={logoUrl} alt="Lore & Ledger" style={{ width: '100%', maxWidth: 160, height: 'auto', objectFit: 'contain', display: 'block' }} />
+          <img src={logoUrl} alt="5e Utility" style={{ width: '100%', maxWidth: 160, height: 'auto', objectFit: 'contain', display: 'block', filter: 'var(--logo-filter, none)' }} />
         </div>
 
         <div style={{ padding: '12px 14px', borderBottom: '1px solid var(--border)' }}>
@@ -370,8 +437,8 @@ export default function Shell({ children }) {
                     <div style={{ fontSize: 12, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.username}</div>
                     <div style={{ fontSize: 10, color: 'var(--text-3)' }}>wants to join</div>
                   </div>
-                  <button onClick={() => approveMember(m._id)} title="Approve" style={{ width: 28, height: 28, borderRadius: 6, border: 'none', background: '#1d6a3a', color: '#fff', fontSize: 14, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>✓</button>
-                  <button onClick={() => rejectMember(m._id)} title="Reject" style={{ width: 28, height: 28, borderRadius: 6, border: 'none', background: '#7a2020', color: '#fff', fontSize: 14, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>✕</button>
+                  <button onClick={() => approveMember(m._id)} style={{ width: 28, height: 28, borderRadius: 6, border: 'none', background: '#1d6a3a', color: '#fff', fontSize: 14, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>✓</button>
+                  <button onClick={() => rejectMember(m._id)} style={{ width: 28, height: 28, borderRadius: 6, border: 'none', background: '#7a2020', color: '#fff', fontSize: 14, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>✕</button>
                 </div>
               ))}
             </div>
@@ -397,7 +464,6 @@ export default function Shell({ children }) {
           ) : joinPending ? (
             <div style={{ marginTop: 4, padding: '8px 10px', background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 8 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
-                <span style={{ fontSize: 14 }}>⏳</span>
                 <div style={{ fontSize: 12, fontWeight: 500 }}>Joining pending…</div>
                 <button onClick={() => setJoinPending(false)} style={{ marginLeft: 'auto', background: 'none', border: 'none', color: 'var(--text-3)', cursor: 'pointer', fontSize: 13, padding: 0 }}>✕</button>
               </div>

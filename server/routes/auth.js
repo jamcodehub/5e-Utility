@@ -1,6 +1,7 @@
 import { Router } from 'express'
 import bcrypt from 'bcryptjs'
 import jwt from 'jsonwebtoken'
+import crypto from 'crypto'
 import { OAuth2Client } from 'google-auth-library'
 import nodemailer from 'nodemailer'
 import { User } from '../models/index.js'
@@ -156,6 +157,61 @@ router.get('/me', authMiddleware, async (req, res) => {
     const user = await User.findById(req.userId).select('-password -twoFactorCode')
     res.json(user)
   } catch (e) { res.status(401).json({ error: 'Invalid token' }) }
+})
+
+// Request a password reset link. Always responds with a generic success
+// message (even if the email doesn't exist) to avoid leaking which emails
+// are registered.
+router.post('/forgot-password', async (req, res) => {
+  try {
+    const { email } = req.body
+    if (!email) return res.status(400).json({ error: 'Email required' })
+    const user = await User.findOne({ email: String(email).toLowerCase() })
+    if (user) {
+      const token = crypto.randomBytes(32).toString('hex')
+      user.resetPasswordToken = crypto.createHash('sha256').update(token).digest('hex')
+      user.resetPasswordExpires = new Date(Date.now() + 60 * 60 * 1000) // 1 hour
+      await user.save()
+
+      const origin = process.env.CLIENT_URL || req.headers.origin || ''
+      const resetUrl = `${origin}/reset-password?token=${token}&id=${user._id}`
+      const transport = getMailer()
+      if (!transport) {
+        console.log(`[Password Reset] Link for ${user.email}: ${resetUrl}`)
+      } else {
+        await transport.sendMail({
+          from: process.env.SMTP_FROM || '5e Utility <no-reply@5eUtility.app>',
+          to: user.email,
+          subject: 'Reset your 5e Utility password',
+          text: `We received a request to reset your password. Click the link below to choose a new one (expires in 1 hour):\n\n${resetUrl}\n\nIf you didn't request this, you can safely ignore this email.`,
+        })
+      }
+    }
+    res.json({ ok: true, message: 'If that email is registered, a reset link has been sent.' })
+  } catch (e) { res.status(500).json({ error: e.message }) }
+})
+
+// Complete the reset using the token emailed to the user.
+router.post('/reset-password', async (req, res) => {
+  try {
+    const { id, token, password } = req.body
+    if (!id || !token || !password) return res.status(400).json({ error: 'Missing required fields' })
+    if (password.length < 6) return res.status(400).json({ error: 'Password must be at least 6 characters' })
+
+    const hashedToken = crypto.createHash('sha256').update(token).digest('hex')
+    const user = await User.findOne({
+      _id: id,
+      resetPasswordToken: hashedToken,
+      resetPasswordExpires: { $gt: new Date() },
+    })
+    if (!user) return res.status(400).json({ error: 'Reset link is invalid or has expired' })
+
+    user.password = await bcrypt.hash(password, 12)
+    user.resetPasswordToken = ''
+    user.resetPasswordExpires = undefined
+    await user.save()
+    res.json({ token: sign(user._id), user: publicUser(user) })
+  } catch (e) { res.status(500).json({ error: e.message }) }
 })
 
 export default router

@@ -7,13 +7,28 @@ export const useCampaign = () => useContext(CampaignContext)
 export function CampaignProvider({ children }) {
   const { user } = useAuth()
   const [campaigns, setCampaigns]   = useState([])
-  const [activeCampaign, setActive] = useState(null)
+  const [activeCampaign, setActiveRaw] = useState(null)
+
+  const setActive = (c) => {
+    setActiveRaw(c)
+    if (c?._id) localStorage.setItem('activeCampaignId', c._id)
+    else localStorage.removeItem('activeCampaignId')
+  }
 
   const load = async () => {
     if (!user) return
     const data = await api('/campaigns')
     setCampaigns(data)
-    if (data.length && !activeCampaign) setActive(data[0])
+    if (data.length && !activeCampaign) {
+      // Restore the campaign the user was last viewing instead of always
+      // defaulting to the most-recently-updated one (data[0]) — otherwise
+      // background activity in another campaign (e.g. a DM edit) can bump
+      // that campaign to the top and silently switch users onto a
+      // different, empty character sheet on next login.
+      const lastId = localStorage.getItem('activeCampaignId')
+      const restored = lastId && data.find(c => c._id === lastId)
+      setActive(restored || data[0])
+    }
   }
 
   useEffect(() => { load() }, [user])

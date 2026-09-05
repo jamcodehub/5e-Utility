@@ -15,6 +15,8 @@ const UserSchema = new Schema({
   twoFactorEnabled:     { type: Boolean, default: false },
   twoFactorCode:        { type: String, default: '' },
   twoFactorCodeExpires: { type: Date },
+  resetPasswordToken:   { type: String, default: '' },
+  resetPasswordExpires: { type: Date },
 }, { timestamps: true })
 
 const CampaignSchema = new Schema({
@@ -32,7 +34,8 @@ const CampaignSchema = new Schema({
 const JournalSchema = new Schema({
   campaign: { type: Schema.Types.ObjectId, ref: 'Campaign', required: true },
   author:   { type: Schema.Types.ObjectId, ref: 'User', required: true },
-  day:      { type: Number, required: true },
+  day:      { type: Number },     // players use this
+  session:  { type: Number },     // DMs use this
   title:    String,
   content:  { type: String, default: '' },
 }, { timestamps: true })
@@ -40,9 +43,11 @@ const JournalSchema = new Schema({
 const LoreSchema = new Schema({
   campaign: { type: Schema.Types.ObjectId, ref: 'Campaign', required: true },
   title:    { type: String, required: true },
-  tag:      { type: String, enum: ['npc', 'location', 'item', 'faction', 'event'], default: 'npc' },
+  tag:      { type: String, enum: ['npc', 'location', 'item', 'faction', 'event', 'enemy', 'boss'], default: 'npc' },
   content:  String,
   imageUrl: String,
+  hp:       { type: Number, default: null },   // current HP (npc/enemy/boss)
+  maxHp:    { type: Number, default: null },   // max HP
 }, { timestamps: true })
 
 const StoryCardSchema = new Schema({
@@ -68,7 +73,6 @@ const CharacterSchema = new Schema({
   hp:           { current: Number, max: Number },
   ac:           Number,
   profBonus:    Number,
-  // Array of skill names that are proficient e.g. ['Athletics', 'Investigation']
   proficiencies: [{ type: String }],
   notes:        String,
   background:   { type: String, default: '' },
@@ -77,6 +81,13 @@ const CharacterSchema = new Schema({
   lore:         { type: String, default: '' },
   roleplaySessionCount: { type: Number, default: 0 },
 }, { timestamps: true })
+
+// Prevent duplicate character docs for the same player in the same campaign —
+// without this, concurrent upserts (e.g. rapid HP +/- clicks before the sheet
+// exists yet) can race and create two documents, and whichever one GET
+// happens to return first may be the stale/blank one (making saved notes
+// appear to vanish on next login).
+CharacterSchema.index({ campaign: 1, owner: 1 }, { unique: true })
 
 const LevelPlanSchema = new Schema({
   campaign: { type: Schema.Types.ObjectId, ref: 'Campaign', required: true },
@@ -127,12 +138,37 @@ const CampaignGuideSchema = new Schema({
   }],
 }, { timestamps: true })
 
-export const User       = model('User', UserSchema)
-export const Campaign   = model('Campaign', CampaignSchema)
-export const Journal    = model('Journal', JournalSchema)
-export const Lore       = model('Lore', LoreSchema)
-export const StoryCard  = model('StoryCard', StoryCardSchema)
-export const Character  = model('Character', CharacterSchema)
+// ── MusicTrack ───────────────────────────────────────────────────────────────
+const MusicTrackSchema = new Schema({
+  campaign:  { type: Schema.Types.ObjectId, ref: 'Campaign', required: true, index: true },
+  addedBy:   { type: Schema.Types.ObjectId, ref: 'User' },
+  name:      { type: String, required: true, trim: true },
+  url:       { type: String, required: true },
+  publicId:  { type: String, default: '' },
+  duration:  { type: Number, default: 0 },
+}, { timestamps: true })
+
+// ── MusicSession ─────────────────────────────────────────────────────────────
+const CueSchema = new Schema({
+  track: { type: Schema.Types.ObjectId, ref: 'MusicTrack' },
+  label: { type: String, required: true, trim: true },
+}, { _id: true })
+
+const MusicSessionSchema = new Schema({
+  campaign:  { type: Schema.Types.ObjectId, ref: 'Campaign', required: true, index: true },
+  createdBy: { type: Schema.Types.ObjectId, ref: 'User' },
+  name:      { type: String, required: true, trim: true },
+  cues:      { type: [CueSchema], default: [] },
+}, { timestamps: true })
+
+export const User          = model('User', UserSchema)
+export const Campaign      = model('Campaign', CampaignSchema)
+export const Journal       = model('Journal', JournalSchema)
+export const Lore          = model('Lore', LoreSchema)
+export const StoryCard     = model('StoryCard', StoryCardSchema)
+export const Character     = model('Character', CharacterSchema)
 export const LevelPlan     = model('LevelPlan', LevelPlanSchema)
 export const Inventory     = model('Inventory', InventorySchema)
 export const CampaignGuide = model('CampaignGuide', CampaignGuideSchema)
+export const MusicTrack    = model('MusicTrack', MusicTrackSchema)
+export const MusicSession  = model('MusicSession', MusicSessionSchema)
