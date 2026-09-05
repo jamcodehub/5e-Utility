@@ -106,7 +106,7 @@ export default function SettingsModal({ onClose }) {
           {theme !== 'light' && theme !== 'dark' && (
             <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 10, fontSize: 12, color: 'var(--text-2)', cursor: 'pointer' }}>
               <input type="checkbox" checked={lightMode} onChange={e => setLightMode(e.target.checked)} />
-              Lighter variant <span style={{ color: 'var(--text-3)' }}>(keeps the accent color on light backgrounds)</span>
+              Lighter variant <span style={{ color: 'var(--text-3)' }}></span>
             </label>
           )}
         </div>

@@ -67,6 +67,7 @@ export default function Auth() {
         const result = await login(form.email, form.password)
         if (result?.requires2FA) setTwoFA({ userId: result.userId })
       } else {
+        if (form.password.length < 8) throw new Error('Password must be at least 8 characters')
         await register(form.username, form.email, form.password, form.phone, form.role)
       }
     } catch (err) { setError(err.message) }
@@ -85,7 +86,7 @@ export default function Auth() {
   const submitReset = async (e) => {
     e.preventDefault(); setError(''); setLoading(true)
     try {
-      if (resetPw.password.length < 6) throw new Error('Password must be at least 6 characters')
+      if (resetPw.password.length < 8) throw new Error('Password must be at least 8 characters')
       if (resetPw.password !== resetPw.confirm) throw new Error('Passwords do not match')
       await resetPassword(resetParams.id, resetParams.token, resetPw.password)
       setResetDone(true)

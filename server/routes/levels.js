@@ -23,7 +23,15 @@ router.post('/:campaignId', auth, async (req, res) => {
 })
 
 router.put('/:id', auth, async (req, res) => {
-  const plan = await LevelPlan.findOneAndUpdate({ _id: req.params.id, owner: req.userId }, req.body, { new: true })
+  // Whitelist fields explicitly — previously the raw body was passed
+  // straight into findOneAndUpdate, which would let a client smuggle in
+  // `owner`/`campaign` and move the map into another campaign they don't
+  // have access to.
+  const updates = {}
+  if (typeof req.body.title === 'string') updates.title = req.body.title
+  if (typeof req.body.content === 'string') updates.content = req.body.content
+  if (req.body.tokens !== undefined) updates.tokens = req.body.tokens
+  const plan = await LevelPlan.findOneAndUpdate({ _id: req.params.id, owner: req.userId }, updates, { new: true })
   res.json(plan)
 })
 

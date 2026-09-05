@@ -6,7 +6,7 @@ import { MusicProvider } from './context/MusicContext'
 import Shell from './components/Shell'
 import Auth from './pages/Auth'
 import Journal from './pages/Journal'
-import { SkeletonPage } from './components/Skeleton'
+import { SkeletonPage, SkeletonShell } from './components/Skeleton'
 import { lazy, Suspense, useEffect } from 'react'
 
 // Journal loads in the initial bundle (first page users land on).
@@ -68,7 +68,7 @@ function Guard() {
     if (user) prefetchAll()
   }, [!!user])
 
-  if (loading) return <div style={{ height: '100vh', display: 'flex' }}><SkeletonPage cards={6} /></div>
+  if (loading) return <SkeletonShell cards={6} />
   if (!user) return <Auth />
   // Players land on their Journal; DMs land on their Session Planner.
   const homePath = user.role === 'dm' ? '/session-planner' : '/journal'

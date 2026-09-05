@@ -38,7 +38,15 @@ router.post('/:campaignId', auth, async (req, res) => {
 })
 
 router.put('/:id', auth, async (req, res) => {
-  const entry = await Journal.findOneAndUpdate({ _id: req.params.id, author: req.userId }, req.body, { new: true })
+  // Whitelist fields explicitly — passing the raw body straight into
+  // findOneAndUpdate would let a client smuggle in `author` or `campaign`
+  // and reassign the entry to someone else's account or another campaign.
+  const updates = {}
+  if (typeof req.body.title === 'string') updates.title = req.body.title
+  if (typeof req.body.content === 'string') updates.content = req.body.content
+  if (req.body.day !== undefined) updates.day = req.body.day
+  if (req.body.session !== undefined) updates.session = req.body.session
+  const entry = await Journal.findOneAndUpdate({ _id: req.params.id, author: req.userId }, updates, { new: true })
   res.json(entry)
 })
 

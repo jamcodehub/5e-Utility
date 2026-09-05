@@ -28,9 +28,20 @@ app.use(helmet())
 
 const authLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 20, standardHeaders: true, legacyHeaders: false, message: { error: 'Too many attempts, please try again later.' } })
 
+// General-purpose limiter for every other API route. Auth gets the much
+// stricter limiter above; this one just guards against scripted abuse/DoS
+// on the rest of the API (previously nothing outside /api/auth was limited
+// at all).
+const apiLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 600, standardHeaders: true, legacyHeaders: false, message: { error: 'Too many requests, please slow down.' } })
+
+// Feedback is intentionally open to logged-out visitors, which also makes
+// it the easiest unauthenticated spam target — keep it tight.
+const feedbackLimiter = rateLimit({ windowMs: 60 * 60 * 1000, max: 10, standardHeaders: true, legacyHeaders: false, message: { error: 'Too many submissions, please try again later.' } })
+
 app.use('/api/payments/webhook', express.raw({ type: 'application/json', verify: (req, res, buf) => { req.rawBody = buf } }))
 app.use(cors({ origin: process.env.CLIENT_URL || 'http://localhost:5173' }))
-app.use(express.json())
+app.use(express.json({ limit: '1mb' }))
+app.use('/api', apiLimiter)
 
 app.use('/api/auth',      authLimiter, authRoutes)
 app.use('/api/campaigns', campaignRoutes)
@@ -38,7 +49,7 @@ app.use('/api/journal',   journalRoutes)
 app.use('/api/lore',      loreRoutes)
 app.use('/api/storyboard', storyboardRoutes)
 app.use('/api/payments',  paymentRoutes)
-app.use('/api/feedback',  feedbackRoutes)
+app.use('/api/feedback',  feedbackLimiter, feedbackRoutes)
 app.use('/api/levels',    levelRoutes)
 app.use('/api/inventory', inventoryRoutes)
 app.use('/api/upload',    uploadRoutes)

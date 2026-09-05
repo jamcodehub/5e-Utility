@@ -1,5 +1,6 @@
 // Lightweight shimmer skeleton building blocks used while pages/data load.
 // Keeping this dependency-free (no extra libs) so it doesn't add to bundle size.
+import { useState, useEffect } from 'react'
 
 export function SkeletonBlock({ width = '100%', height = 14, radius = 6, style = {} }) {
   return (
@@ -114,3 +115,74 @@ export function SkeletonInventoryPage() {
 }
 
 export default SkeletonBlock
+
+// Mimics the actual app Shell (sidebar + main content) so the loading state
+// never looks like a different layout than the real app underneath it —
+// used for the initial auth-check screen, which renders before Shell.jsx's
+// real sidebar/nav exists. Matches Shell.jsx's own mobile breakpoint (768px)
+// so phones see a top-bar + bottom-pill skeleton instead of a desktop sidebar.
+export function SkeletonShell({ cards = 4 }) {
+  const [mobile, setMobile] = useState(typeof window !== 'undefined' && window.innerWidth <= 768)
+  useEffect(() => {
+    const fn = () => setMobile(window.innerWidth <= 768)
+    window.addEventListener('resize', fn)
+    return () => window.removeEventListener('resize', fn)
+  }, [])
+
+  if (mobile) {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden' }}>
+        {/* Top bar */}
+        <div style={{ background: 'var(--surface)', borderBottom: '1px solid var(--border)', padding: '8px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
+          <SkeletonBlock width={100} height={28} radius={6} />
+          <div style={{ display: 'flex', gap: 8 }}>
+            <SkeletonBlock width={80} height={32} radius={10} />
+            <SkeletonBlock width={32} height={32} radius={10} />
+          </div>
+        </div>
+
+        {/* Main content */}
+        <div style={{ flex: 1, padding: 20, display: 'flex', flexDirection: 'column', gap: 14, overflow: 'hidden' }}>
+          <SkeletonBlock width="60%" height={20} radius={6} />
+          {Array.from({ length: cards }).map((_, i) => (
+            <SkeletonCard key={i} lines={2} />
+          ))}
+        </div>
+
+        {/* Bottom pill nav */}
+        <div style={{
+          position: 'fixed', left: '50%', transform: 'translateX(-50%)',
+          bottom: 'calc(12px + env(safe-area-inset-bottom, 12px))',
+          width: 'min(96%, 560px)', height: 52,
+          borderRadius: 999, overflow: 'hidden',
+        }}>
+          <SkeletonBlock width="100%" height="100%" radius={999} />
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div style={{ display: 'flex', height: '100vh', overflow: 'hidden' }}>
+      {/* Sidebar — long vertical rectangle matching the real 232px nav column */}
+      <aside style={{ width: 232, flexShrink: 0, background: 'var(--surface)', borderRight: '1px solid var(--border)', display: 'flex', flexDirection: 'column', padding: '16px 14px' }}>
+        <SkeletonBlock width="70%" height={28} style={{ margin: '0 auto 24px' }} />
+        {Array.from({ length: 7 }).map((_, i) => (
+          <SkeletonBlock key={i} width="100%" height={34} radius={8} style={{ marginBottom: 8 }} />
+        ))}
+        <div style={{ flex: 1 }} />
+        <SkeletonBlock width="100%" height={48} radius={10} />
+      </aside>
+
+      {/* Main content area */}
+      <div style={{ flex: 1, padding: 24, display: 'flex', flexDirection: 'column', gap: 18, overflow: 'hidden' }}>
+        <SkeletonBlock width={220} height={22} radius={6} />
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 14 }}>
+          {Array.from({ length: cards }).map((_, i) => (
+            <SkeletonCard key={i} lines={2} avatar={i % 2 === 0} />
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
