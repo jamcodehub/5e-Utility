@@ -18,6 +18,7 @@ import uploadRoutes from './routes/upload.js'
 import musicRoutes from './routes/music.js'
 import sessionsRoutes from './routes/sessions.js'
 import { attachRealtime } from './realtime.js'
+import { Character } from './models/index.js'
 
 dotenv.config()
 
@@ -56,8 +57,26 @@ app.use('/api/upload',    uploadRoutes)
 app.use('/api/music',     musicRoutes)
 app.use('/api/sessions',  sessionsRoutes)
 
-mongoose.connect(process.env.MONGO_URI).then(() => {
+mongoose.connect(process.env.MONGO_URI).then(async () => {
   console.log('MongoDB connected')
+
+  // One-time self-heal: an older schema version had a UNIQUE index on
+  // { campaign: 1, owner: 1 } in the characters collection. Multi-character
+  // support (2 free / unlimited premium per campaign) needs that index to be
+  // non-unique — the current schema already declares it that way, but Mongo
+  // doesn't retroactively change an existing index's options, so the stale
+  // unique index kept throwing E11000 duplicate key errors whenever a player
+  // tried to create a 2nd character in the same campaign. Drop it if found;
+  // Mongoose will recreate the correct non-unique version automatically.
+  try {
+    const indexes = await Character.collection.indexes()
+    const stale = indexes.find(i => i.name === 'campaign_1_owner_1' && i.unique)
+    if (stale) {
+      await Character.collection.dropIndex('campaign_1_owner_1')
+      console.log('Dropped stale unique index campaign_1_owner_1 on characters collection')
+    }
+  } catch (e) { console.error('Index self-heal check failed:', e.message) }
+
   const httpServer = createServer(app)
   attachRealtime(httpServer)
   httpServer.listen(process.env.PORT || 4000, () => console.log(`Server on :${process.env.PORT || 4000}`))
