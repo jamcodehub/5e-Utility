@@ -2,7 +2,7 @@ import { NavLink, useNavigate, useLocation } from 'react-router-dom'
 import { useAuth, api } from '../context/AuthContext'
 import { useCampaign } from '../context/CampaignContext'
 import { useMusic, MOODS } from '../context/MusicContext'
-import { useTheme, THEMES } from '../context/ThemeContext'
+import { useTheme } from '../context/ThemeContext'
 import { useState, useEffect, useRef, useCallback } from 'react'
 import SettingsModal from './SettingsModal'
 import { CloudinaryImage } from '@cloudinary/url-gen'
@@ -20,7 +20,7 @@ const logoUrl = new CloudinaryImage('5e_Utillity', { cloudName: CLOUD_NAME })
 // ─── Infinite swipe carousel nav ────────────────────────────────────────────
 // All items sit side-by-side in a wide track. We maintain an offset and
 // duplicate items on each end so wrapping is seamless.
-function SwipeNav({ items, navLinkStyle }) {
+function SwipeNav({ items, navLinkStyle, darkMode }) {
   const location = useLocation()
   const trackRef = useRef(null)
   const containerRef = useRef(null)
@@ -164,7 +164,7 @@ function SwipeNav({ items, navLinkStyle }) {
               })}
             >
               <span style={{ overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4, width: '100%', whiteSpace: 'nowrap', userSelect: 'none', WebkitUserSelect: 'none' }}>
-                {item.iconUrl && <img src={item.iconUrl} alt="" aria-hidden="true" style={{ width: 16, height: 16, objectFit: 'contain', flexShrink: 0 }} />}
+                {item.iconUrl && <img src={item.iconUrl} alt="" aria-hidden="true" style={{ width: 16, height: 16, objectFit: 'contain', flexShrink: 0, filter: darkMode ? 'brightness(0) invert(1)' : 'none' }} />}
                 <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.label}</span>
               </span>
             </NavLink>
@@ -261,12 +261,12 @@ const NAV_DM = [
   { to: '/session-planner', label: 'Sessions',  iconUrl: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1791790758/01_fantasy_15_feather.png' },
   { to: '/storyboard', label: 'Storyboard',     iconUrl: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1791791388/book-solid-full.svg' },
   { to: '/lore',       label: 'Lore',           iconUrl: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1791791415/scroll-solid-full.svg' },
-  { to: '/inventory',  label: 'ShopItems',     iconUrl: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1791792290/coins-solid-full.svg' },
+  { to: '/inventory',  label: 'ShopItems',      iconUrl: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1791792290/coins-solid-full.svg' },
   { to: '/ideas',      label: 'Ideas',          iconUrl: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1791792794/lightbulb-solid-full.svg' },
-  { to: '/levels',     label: 'BattleMap',         iconUrl: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1791792887/map-solid-full.svg' },
+  { to: '/levels',     label: 'BattleMap',      iconUrl: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1791792887/map-solid-full.svg' },
   { to: '/combat',     label: 'Combat',         iconUrl: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1791791406/hand-fist-solid-full.svg' },
   { to: '/rules',      label: 'Rules',          iconUrl: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1791793208/gavel-solid-full.svg' },
-  { to: '/music',      label: 'Music',          iconUrl: '' },
+  { to: '/music',      label: 'Music',          iconUrl: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1791793410/mix-brands-solid-full.svg' },
   { to: '/dice',       label: 'Dice',           iconUrl: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1791790757/01_fantasy_01_d20_gem.png' },
 ]
 
@@ -283,9 +283,11 @@ function useIsMobile() {
 export default function Shell({ children }) {
   const { user, logout, isPremium } = useAuth()
   const { campaigns, activeCampaign, setActive, createCampaign, joinCampaign } = useCampaign()
+  const { theme, lightMode } = useTheme()
   const navigate = useNavigate()
   const isMobile = useIsMobile()
   const isDM = user?.role === 'dm'
+  const darkMode = theme !== 'light' && (!lightMode || theme === 'dark')
   const NAV = isDM ? NAV_DM : NAV_PLAYER
 
   const [creating, setCreating] = useState(false)
@@ -490,7 +492,7 @@ export default function Shell({ children }) {
           WebkitBackdropFilter: 'blur(20px)',
           overflow: 'hidden',
         }}>
-          <SwipeNav items={NAV} navLinkStyle={navLinkStyle} />
+          <SwipeNav items={NAV} navLinkStyle={navLinkStyle} darkMode={darkMode} />
         </nav>
 
         {showSettings && <SettingsModal onClose={() => setShowSettings(false)} />}
@@ -588,7 +590,7 @@ export default function Shell({ children }) {
         <nav style={{ padding: '10px', flex: 1, overflowY: 'auto' }}>
           {NAV.map(item => (
             <NavLink key={item.to} to={item.to} style={({ isActive }) => navLinkStyle(isActive)}>
-              {item.iconUrl && <img src={item.iconUrl} alt="" aria-hidden="true" style={{ width: 18, height: 18, objectFit: 'contain', flexShrink: 0 }} />}
+              {item.iconUrl && <img src={item.iconUrl} alt="" aria-hidden="true" style={{ width: 18, height: 18, objectFit: 'contain', flexShrink: 0, filter: darkMode ? 'brightness(0) invert(1)' : 'none' }} />}
               <span>{item.label}</span>
             </NavLink>
           ))}
