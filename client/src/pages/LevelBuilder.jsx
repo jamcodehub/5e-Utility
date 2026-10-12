@@ -67,12 +67,11 @@ function PeekingViewers({ viewers }) {
   )
 }
 
-function Token({ token, cellSize, onDragStart }) {
+function Token({ token, cellSize, onDragStart, dragging }) {
   const initials = token.name?.[0]?.toUpperCase() || '?'
   return (
     <div
-      draggable
-      onDragStart={e => { e.dataTransfer.setData('tokenId', token.id); onDragStart(token.id) }}
+      onPointerDown={e => onDragStart(e, token.id)}
       title={token.name}
       style={{
         position: 'absolute',
@@ -83,9 +82,11 @@ function Token({ token, cellSize, onDragStart }) {
         border: '2px solid rgba(255,255,255,0.8)',
         boxShadow: '0 2px 6px rgba(0,0,0,0.4)',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
-        cursor: 'grab',
+        cursor: dragging ? 'grabbing' : 'grab',
         zIndex: 10,
         userSelect: 'none',
+        touchAction: 'none',
+        transform: dragging ? 'scale(1.08)' : undefined,
       }}
     >
       {token.avatar
@@ -122,6 +123,39 @@ export default function LevelBuilder() {
   const gridRef = useRef(null)
   const remoteUpdateRef = useRef(false)
   const [viewers, setViewers] = useState([]) // who's currently looking at this board
+
+  const startTokenDrag = (e, tokenId) => {
+    e.preventDefault()
+    setDragTokenId(tokenId)
+  }
+
+  useEffect(() => {
+    if (mode !== 'play' || !selectedPlanId || !dragTokenId) return
+
+    const finishDrag = (e) => {
+      const cell = document.elementFromPoint(e.clientX, e.clientY)?.closest('[data-map-cell]')
+      if (cell) {
+        const row = Number(cell.dataset.row)
+        const col = Number(cell.dataset.col)
+        setTokens(current => {
+          if (current.some(token => token.id === dragTokenId)) {
+            return current.map(token => token.id === dragTokenId ? { ...token, row, col } : token)
+          }
+          const source = availableTokens.find(token => token.id === dragTokenId)
+          return source ? [...current, { ...source, row, col }] : current
+        })
+      }
+      setDragTokenId(null)
+    }
+    const cancelDrag = () => setDragTokenId(null)
+
+    window.addEventListener('pointerup', finishDrag)
+    window.addEventListener('pointercancel', cancelDrag)
+    return () => {
+      window.removeEventListener('pointerup', finishDrag)
+      window.removeEventListener('pointercancel', cancelDrag)
+    }
+  }, [availableTokens, dragTokenId, mode, selectedPlanId])
 
   // ── Data loading ──
   const loadPlans = useCallback(async () => {
@@ -284,25 +318,6 @@ export default function LevelBuilder() {
   // ── Paint ──
   const paint = (r, c) => setGrid(g => { const n = g.map(row => row.slice()); n[r][c] = tool; return n })
 
-  // ── Token drag onto grid ──
-  const dropOnCell = (e, r, c) => {
-    e.preventDefault()
-    const tokenId = e.dataTransfer.getData('tokenId')
-    if (!tokenId) return
-
-    // If token already on map, move it
-    if (tokens.find(t => t.id === tokenId)) {
-      setTokens(ts => ts.map(t => t.id === tokenId ? { ...t, row: r, col: c } : t))
-      return
-    }
-    // Otherwise place from pool
-    const src = availableTokens.find(t => t.id === tokenId)
-    if (!src) return
-    // Don't place same token twice
-    if (tokens.find(t => t.id === tokenId)) return
-    setTokens(ts => [...ts, { ...src, row: r, col: c }])
-  }
-
   const removeToken = (id) => setTokens(ts => ts.filter(t => t.id !== id))
 
   // Adjusting HP on the map now persists back to the source Lore entry (for
@@ -434,20 +449,22 @@ export default function LevelBuilder() {
               return (
                 <div
                   key={`${r}-${c}`}
+                  data-map-cell
+                  data-row={r}
+                  data-col={c}
                   style={{
                     aspectRatio: '1',
                     background: tileColor(cellId),
                     border: '0.5px solid rgba(0,0,0,0.08)',
                     position: 'relative',
                   }}
-                  onDragOver={e => e.preventDefault()}
-                  onDrop={e => dropOnCell(e, r, c)}
                 >
                   {token && (
                     <Token
                       token={token}
                       cellSize={cellSize}
-                      onDragStart={setDragTokenId}
+                      onDragStart={startTokenDrag}
+                      dragging={dragTokenId === token.id}
                     />
                   )}
                 </div>
@@ -467,7 +484,7 @@ export default function LevelBuilder() {
               <>
                 <div style={{ fontSize: 10, color: 'var(--text-3)', marginBottom: 4, marginTop: 4, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Party</div>
                 {availableTokens.filter(t => t.type === 'player').map(t => (
-                  <SidebarToken key={t.id} token={t} placed={!!tokens.find(x => x.id === t.id)} />
+                  <SidebarToken key={t.id} token={t} placed={!!tokens.find(x => x.id === t.id)} onDragStart={startTokenDrag} />
                 ))}
               </>
             )}
@@ -476,7 +493,7 @@ export default function LevelBuilder() {
               <>
                 <div style={{ fontSize: 10, color: 'var(--text-3)', marginBottom: 4, marginTop: 8, textTransform: 'uppercase', letterSpacing: '0.05em' }}>NPCs</div>
                 {availableTokens.filter(t => t.type === 'npc').map(t => (
-                  <SidebarToken key={t.id} token={t} placed={!!tokens.find(x => x.id === t.id)} />
+                  <SidebarToken key={t.id} token={t} placed={!!tokens.find(x => x.id === t.id)} onDragStart={startTokenDrag} />
                 ))}
               </>
             )}
@@ -485,7 +502,7 @@ export default function LevelBuilder() {
               <>
                 <div style={{ fontSize: 10, color: '#ef4444', marginBottom: 4, marginTop: 8, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Enemies</div>
                 {availableTokens.filter(t => t.type === 'enemy').map(t => (
-                  <SidebarToken key={t.id} token={t} placed={!!tokens.find(x => x.id === t.id)} />
+                  <SidebarToken key={t.id} token={t} placed={!!tokens.find(x => x.id === t.id)} onDragStart={startTokenDrag} />
                 ))}
               </>
             )}
@@ -494,7 +511,7 @@ export default function LevelBuilder() {
               <>
                 <div style={{ fontSize: 10, color: '#f59e0b', marginBottom: 4, marginTop: 8, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Bosses</div>
                 {availableTokens.filter(t => t.type === 'boss').map(t => (
-                  <SidebarToken key={t.id} token={t} placed={!!tokens.find(x => x.id === t.id)} />
+                  <SidebarToken key={t.id} token={t} placed={!!tokens.find(x => x.id === t.id)} onDragStart={startTokenDrag} />
                 ))}
               </>
             )}
@@ -599,11 +616,10 @@ export default function LevelBuilder() {
 }
 
 // Sidebar token pill — draggable from the panel onto the map
-function SidebarToken({ token, placed }) {
+function SidebarToken({ token, placed, onDragStart }) {
   return (
     <div
-      draggable={!placed}
-      onDragStart={e => { if (!placed) e.dataTransfer.setData('tokenId', token.id) }}
+      onPointerDown={e => { if (!placed) onDragStart(e, token.id) }}
       style={{
         display: 'flex', alignItems: 'center', gap: 8, padding: '5px 8px',
         borderRadius: 8, marginBottom: 4,
@@ -612,6 +628,7 @@ function SidebarToken({ token, placed }) {
         opacity: placed ? 0.45 : 1,
         cursor: placed ? 'default' : 'grab',
         userSelect: 'none',
+        touchAction: 'none',
       }}
     >
       <div style={{ width: 28, height: 28, borderRadius: '50%', background: token.color, border: '2px solid rgba(255,255,255,0.2)', flexShrink: 0, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>

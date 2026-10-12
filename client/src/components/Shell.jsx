@@ -163,8 +163,9 @@ function SwipeNav({ items, navLinkStyle }) {
                 WebkitUserSelect: 'none',
               })}
             >
-              <span style={{ overflow: 'hidden', display: 'block', width: '100%', textAlign: 'center', userSelect: 'none', WebkitUserSelect: 'none' }}>
-                {item.label}
+              <span style={{ overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4, width: '100%', whiteSpace: 'nowrap', userSelect: 'none', WebkitUserSelect: 'none' }}>
+                {item.iconUrl && <img src={item.iconUrl} alt="" aria-hidden="true" style={{ width: 16, height: 16, objectFit: 'contain', flexShrink: 0 }} />}
+                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.label}</span>
               </span>
             </NavLink>
           )
@@ -245,28 +246,28 @@ function MusicMiniPlayer({ bottomOffset }) {
 }
 
 const NAV_PLAYER = [
-  { to: '/journal',    label: 'Journal' },
-  { to: '/storyboard', label: 'Storyboard' },
-  { to: '/lore',       label: 'Lore' },
-  { to: '/character',  label: 'Character' },
-  { to: '/inventory',  label: 'Inventory' },
-  { to: '/roleplay',   label: 'Roleplay' },
-  { to: '/levels',     label: 'Battle Map' },
-  { to: '/dice',       label: 'Dice' },
+  { to: '/journal',    label: 'Journal',    iconUrl: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1791790758/01_fantasy_15_feather.png' },
+  { to: '/storyboard', label: 'Storyboard', iconUrl: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1791791388/book-solid-full.svg' },
+  { to: '/lore',       label: 'Lore',       iconUrl: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1791791415/scroll-solid-full.svg' },
+  { to: '/character',  label: 'Character',  iconUrl: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1791791397/circle-user-solid-full.svg' },
+  { to: '/inventory',  label: 'Inventory',  iconUrl: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1791791414/ring-solid-full.svg' },
+  { to: '/roleplay',   label: 'Roleplay',   iconUrl: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1791792735/comment-solid-full.svg' },
+  { to: '/levels',     label: 'Battle Map', iconUrl: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1791792887/map-solid-full.svg' },
+  { to: '/dice',       label: 'Dice',       iconUrl: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1791790757/01_fantasy_01_d20_gem.png' },
 ]
 
 const NAV_DM = [
-  { to: '/campaign-guide', label: 'Campaign' },
-  { to: '/session-planner', label: 'Sessions' },
-  { to: '/storyboard', label: 'Storyboard' },
-  { to: '/lore',       label: 'Lore' },
-  { to: '/inventory',  label: 'Shop/Items' },
-  { to: '/ideas',      label: 'Ideas' },
-  { to: '/levels',     label: 'Levels' },
-  { to: '/combat',     label: 'Combat' },
-  { to: '/rules',      label: 'Rules' },
-  { to: '/music',      label: 'Music' },
-  { to: '/dice',       label: 'Dice' },
+  { to: '/campaign-guide', label: 'Campaign',   iconUrl: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1791790757/01_fantasy_04_castle.png' },
+  { to: '/session-planner', label: 'Sessions',  iconUrl: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1791790758/01_fantasy_15_feather.png' },
+  { to: '/storyboard', label: 'Storyboard',     iconUrl: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1791791388/book-solid-full.svg' },
+  { to: '/lore',       label: 'Lore',           iconUrl: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1791791415/scroll-solid-full.svg' },
+  { to: '/inventory',  label: 'ShopItems',     iconUrl: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1791792290/coins-solid-full.svg' },
+  { to: '/ideas',      label: 'Ideas',          iconUrl: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1791792794/lightbulb-solid-full.svg' },
+  { to: '/levels',     label: 'BattleMap',         iconUrl: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1791792887/map-solid-full.svg' },
+  { to: '/combat',     label: 'Combat',         iconUrl: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1791791406/hand-fist-solid-full.svg' },
+  { to: '/rules',      label: 'Rules',          iconUrl: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1791793208/gavel-solid-full.svg' },
+  { to: '/music',      label: 'Music',          iconUrl: '' },
+  { to: '/dice',       label: 'Dice',           iconUrl: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1791790757/01_fantasy_01_d20_gem.png' },
 ]
 
 function useIsMobile() {
@@ -587,7 +588,8 @@ export default function Shell({ children }) {
         <nav style={{ padding: '10px', flex: 1, overflowY: 'auto' }}>
           {NAV.map(item => (
             <NavLink key={item.to} to={item.to} style={({ isActive }) => navLinkStyle(isActive)}>
-              {item.label}
+              {item.iconUrl && <img src={item.iconUrl} alt="" aria-hidden="true" style={{ width: 18, height: 18, objectFit: 'contain', flexShrink: 0 }} />}
+              <span>{item.label}</span>
             </NavLink>
           ))}
         </nav>

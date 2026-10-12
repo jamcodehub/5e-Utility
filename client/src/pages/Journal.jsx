@@ -195,6 +195,7 @@ export default function Journal() {
                   autoFocus
                   className="input"
                   value={titleDraft}
+                  onClick={ev => ev.stopPropagation()}
                   onChange={ev => setTitleDraft(ev.target.value)}
                   onBlur={() => commitRename(active._id)}
                   onKeyDown={ev => {
