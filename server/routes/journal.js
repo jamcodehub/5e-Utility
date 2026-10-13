@@ -27,7 +27,7 @@ router.post('/:campaignId', auth, async (req, res) => {
     const user = await User.findById(req.userId)
     if (!user.isPremium) {
       const count = await Journal.countDocuments({ campaign: req.params.campaignId, author: req.userId })
-      if (count >= 5) return res.status(403).json({ error: 'Free accounts are limited to 5 journal entries. Upgrade to Premium for unlimited entries.' })
+      if (count >= 15) return res.status(403).json({ error: 'Free accounts are limited to 15 journal/session planner entries. Upgrade to Premium for unlimited entries.' })
     }
     // Support both players (day field) and DMs (session field)
     const body = { ...req.body, campaign: req.params.campaignId, author: req.userId }
