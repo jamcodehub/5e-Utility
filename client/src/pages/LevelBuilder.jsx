@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
+import { createPortal } from 'react-dom'
 import { api } from '../context/AuthContext'
 import { useCampaign } from '../context/CampaignContext'
 import { useAuth } from '../context/AuthContext'
@@ -699,7 +700,6 @@ export default function LevelBuilder() {
 
   // ── Render ──
   const selectedPlan = plans.find(p => p._id === selectedPlanId)
-  const activeTools = editLayer === 'objects' ? OBJECT_TILES : TILES
   const torchLocations = useMemo(
     () => objectGrid.flatMap((row, r) => row.flatMap((id, c) => id === 'torch' ? [{ row: r, col: c }] : [])),
     [objectGrid],
@@ -711,11 +711,13 @@ export default function LevelBuilder() {
   const localPlayerToken = tokens.find(token => token.id === `char-${user?.id}`)
   const visibility = useMemo(() => {
     const visible = []
-    const dimVision = []
+    const torchlit = []
+    const darkvision = []
     const lightStrength = []
     for (let row = 0; row < GRID_H; row++) {
       visible[row] = []
-      dimVision[row] = []
+      torchlit[row] = []
+      darkvision[row] = []
       lightStrength[row] = []
       for (let col = 0; col < GRID_W; col++) {
         const lightDistances = sharedLightSources
@@ -724,16 +726,16 @@ export default function LevelBuilder() {
         const sharedLight = lightDistances.length > 0
         const hasDarkvision = Boolean(localPlayerToken?.darkvision
           && canSeeFrom(grid, doorStates, localPlayerToken, row, col, DARKVISION_RADIUS))
-        const onOwnToken = localPlayerToken?.row === row && localPlayerToken?.col === col
-        visible[row][col] = !darkMode || isDm || sharedLight || hasDarkvision || onOwnToken
-        dimVision[row][col] = darkMode && hasDarkvision && !sharedLight
+        visible[row][col] = !darkMode || sharedLight || hasDarkvision
+        torchlit[row][col] = !darkMode || sharedLight
+        darkvision[row][col] = darkMode && hasDarkvision && !sharedLight
         lightStrength[row][col] = sharedLight
           ? Math.max(...lightDistances.map(distance => distance <= 3 ? 1 : 1 - ((distance - 3) / 2) * 0.55))
           : 0
       }
     }
-    return { visible, dimVision, lightStrength }
-  }, [darkMode, doorStates, grid, isDm, localPlayerToken, sharedLightSources])
+    return { visible, torchlit, darkvision, lightStrength }
+  }, [darkMode, doorStates, grid, localPlayerToken, sharedLightSources])
 
   if (!activeCampaign && !campaignsLoading) return (
     <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-3)' }}>
@@ -751,6 +753,15 @@ export default function LevelBuilder() {
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
       <style>{`
         .lb-cell { aspect-ratio: 1; border: 0.5px solid rgba(0,0,0,0.1); cursor: crosshair; touch-action: none; }
+        .lb-tool-palettes { display: flex; align-items: stretch; gap: 8px; flex: 1; min-width: 0; }
+        .lb-tool-palette { min-width: 0; padding: 5px 7px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface2); }
+        .lb-tool-palette-title { margin-bottom: 4px; color: var(--text-3); font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; }
+        .lb-tool-palette-buttons { display: flex; gap: 4px; flex-wrap: wrap; }
+        @media (max-width: 700px) {
+          .lb-tool-palettes { flex: 1 1 100%; order: 3; }
+          .lb-tool-palette { flex: 1; }
+          .lb-tool-palette-buttons { max-height: 76px; overflow-y: auto; }
+        }
         @media print {
           @page { size: A3 landscape; margin: 4mm; }
           html, body { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
@@ -764,50 +775,50 @@ export default function LevelBuilder() {
       {/* Editor toolbar */}
       <div style={{ padding: '10px 16px', background: 'var(--surface)', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0, flexWrap: 'wrap' }}>
         <input className="input" placeholder="Map title" value={editTitle} onChange={e => setEditTitle(e.target.value)} style={{ width: 200 }} />
-        <div style={{ display: 'flex', gap: 4 }}>
+        <div className="lb-tool-palettes">
           {[
-            { id: 'ground', label: 'Ground Layer' },
-            { id: 'objects', label: 'Objects Layer' },
-          ].map(layer => (
-            <button key={layer.id} type="button" className="btn btn-sm" onClick={() => {
-              setEditLayer(layer.id)
-              setTool(layer.id === 'ground' ? 'wall' : 'torch')
-              setLinkMode(false)
-              setPendingStair(null)
-            }} style={{
-              border: editLayer === layer.id ? '2px solid var(--gold)' : '1px solid var(--border)',
-              background: editLayer === layer.id ? 'var(--gold-bg)' : 'var(--surface)',
-              color: 'var(--text)',
-            }} aria-pressed={editLayer === layer.id}>{layer.label}</button>
+            { layer: 'ground', title: 'Ground Tiles', tiles: TILES },
+            { layer: 'objects', title: 'Upper Layer Objects', tiles: OBJECT_TILES },
+          ].map(palette => (
+            <div key={palette.layer} className="lb-tool-palette" style={{
+              borderColor: editLayer === palette.layer && !linkMode ? 'var(--gold)' : 'var(--border)',
+              boxShadow: editLayer === palette.layer && !linkMode ? 'inset 0 0 0 1px var(--gold)' : undefined,
+            }}>
+              <div className="lb-tool-palette-title">{palette.title}</div>
+              <div className="lb-tool-palette-buttons">
+                {palette.tiles.map(tile => {
+                  const selected = editLayer === palette.layer && tool === tile.id && !linkMode
+                  return (
+                    <button key={tile.id} type="button" onClick={() => {
+                      setEditLayer(palette.layer)
+                      setTool(tile.id)
+                      setLinkMode(false)
+                      setPendingStair(null)
+                    }} className="btn btn-sm" aria-pressed={selected} style={{
+                      display: 'flex', alignItems: 'center', gap: 5,
+                      border: selected ? '2px solid var(--gold)' : '1px solid var(--border)',
+                      background: selected ? 'var(--gold-bg)' : 'var(--surface)', color: 'var(--text)',
+                    }}>
+                      {tile.marker
+                        ? <span style={{ color: tile.color || 'inherit', fontSize: tile.size || 13, lineHeight: 1 }}>{tile.marker}</span>
+                        : <span style={{ width: 12, height: 12, borderRadius: 2, background: tile.color === 'transparent' ? 'repeating-conic-gradient(#ccc 0% 25%, #fff 0% 50%) 50%/6px 6px' : tile.color, border: '1px solid rgba(0,0,0,0.2)', flexShrink: 0 }} />
+                      }
+                      {tile.label}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
           ))}
-          <button type="button" className="btn btn-sm" aria-pressed={linkMode} onClick={() => {
+        </div>
+        <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
+          <button type="button" className="btn btn-ghost btn-sm" aria-pressed={linkMode} onClick={() => {
             setEditLayer('ground')
             setTool('wall')
             setLinkMode(current => !current)
             setPendingStair(null)
             setPainting(false)
-          }} style={{
-            border: linkMode ? '2px solid var(--gold)' : '1px solid var(--border)',
-            background: linkMode ? 'var(--gold-bg)' : 'var(--surface)',
-            color: 'var(--text)',
           }}>🔗 Link stairs</button>
-        </div>
-        <div style={{ display: 'flex', gap: 4, flex: 1, flexWrap: 'wrap' }}>
-          {!linkMode && activeTools.map(t => (
-            <button key={t.id} type="button" onClick={() => setTool(t.id)} className="btn btn-sm" style={{
-              display: 'flex', alignItems: 'center', gap: 5,
-              border: tool === t.id ? '2px solid var(--gold)' : '1px solid var(--border)',
-              background: tool === t.id ? 'var(--gold-bg)' : 'var(--surface)', color: 'var(--text)',
-            }}>
-              {t.marker
-                ? <span style={{ color: t.color || 'inherit', fontSize: t.size || 13, lineHeight: 1 }}>{t.marker}</span>
-                : <span style={{ width: 12, height: 12, borderRadius: 2, background: t.color === 'transparent' ? 'repeating-conic-gradient(#ccc 0% 25%, #fff 0% 50%) 50%/6px 6px' : t.color, border: '1px solid rgba(0,0,0,0.2)', flexShrink: 0 }} />
-              }
-              {t.label}
-            </button>
-          ))}
-        </div>
-        <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
           <button className="btn btn-ghost btn-sm" onClick={() => setMode('gallery')}>✕ Cancel</button>
           <button className="btn btn-ghost btn-sm" onClick={() => window.print()}>Print</button>
           <button className="btn btn-primary btn-sm" onClick={saveMap}>Save & Close</button>
@@ -935,13 +946,14 @@ export default function LevelBuilder() {
               const token = tokens.find(t => t.row === r && t.col === c)
               const object = objectTile(objectGrid[r]?.[c])
               const visible = visibility.visible[r]?.[c]
+              const torchlit = visibility.torchlit[r]?.[c]
+              const darkvision = visibility.darkvision[r]?.[c]
               const doorOpen = Boolean(doorStates[r]?.[c])
               const isDoor = cellId === 'door'
               const isStair = cellId === 'stairs' || cellId === 'stairs-down'
               const cellBase = isDoor && doorOpen ? 'floor' : cellId
               const lightStrength = visibility.lightStrength[r]?.[c] || 0
               const dim = visibility.dimVision[r]?.[c]
-              const isOwnToken = token?.id === localPlayerToken?.id
               const groundTile = TILES.find(tile => tile.id === cellId)
               return (
                 <div
@@ -953,12 +965,14 @@ export default function LevelBuilder() {
                   title={visible && isDoor ? (doorOpen ? 'Click to close door' : 'Click to open door') : visible && isStair ? 'Click to use stairs' : undefined}
                   style={{
                     aspectRatio: '1',
-                    background: !visible && !isDm ? '#000' : tileColor(cellBase),
-                    border: `0.5px solid ${darkMode && !visible ? '#050505' : 'rgba(0,0,0,0.08)'}`,
+                    background: darkMode && !visible ? '#000' : tileColor(cellBase),
+                    border: `0.5px solid ${darkMode && !visible ? '#000' : 'rgba(0,0,0,0.08)'}`,
                     position: 'relative',
-                    filter: darkMode && visible
-                      ? dim ? 'brightness(0.22)' : lightStrength ? `brightness(${0.45 + lightStrength * 0.55})` : isDm ? 'brightness(0.18)' : undefined
-                      : undefined,
+                    filter: darkvision
+                      ? 'brightness(0.4)'
+                      : darkMode && torchlit && lightStrength
+                        ? `brightness(${0.45 + lightStrength * 0.55})`
+                        : undefined,
                     cursor: visible && (isDoor || isStair) ? 'pointer' : undefined,
                   }}
                 >
@@ -970,7 +984,7 @@ export default function LevelBuilder() {
                   {object && visible && (
                     <span aria-hidden="true" style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: object.color || 'inherit', fontSize: object.size ? Math.max(8, cellSize * (object.size / 16)) : Math.max(10, cellSize * 0.7), lineHeight: 1, textShadow: object.id === 'torch' ? '0 0 12px #ff8c00' : '0 1px 2px rgba(0,0,0,0.55)', pointerEvents: 'none' }}>{object.marker}</span>
                   )}
-                  {token && (visible || isOwnToken) && (
+                  {token && visible && (
                     <Token
                       token={token}
                       cellSize={cellSize}
@@ -1069,7 +1083,7 @@ export default function LevelBuilder() {
           )}
         </div>
       </div>
-      {dragPreviewToken && (
+      {dragPreviewToken && createPortal(
         <div
           ref={dragPreviewRef}
           aria-hidden="true"
@@ -1096,7 +1110,8 @@ export default function LevelBuilder() {
             ? <img src={dragPreviewToken.avatar} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
             : <span style={{ fontSize: Math.max(10, cellSize * 0.35), color: '#fff', fontWeight: 700, fontFamily: 'Cinzel, serif' }}>{dragPreviewToken.name?.[0]?.toUpperCase() || '?'}</span>
           }
-        </div>
+        </div>,
+        document.body,
       )}
     </div>
   )
