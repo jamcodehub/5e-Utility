@@ -146,7 +146,7 @@ function MapThumb({ content }) {
         return tile ? <text key={`ground-${r}-${c}`} x={c + 0.5} y={r + 0.78} textAnchor="middle" fontSize="0.8" fill="#fff">{tile.marker}</text> : null
       }))}
       <path
-        d={`M${Array.from({ length: GRID_W + 1 }, (_, x) => `M${x} 0V${GRID_H}`).join('')} ${Array.from({ length: GRID_H + 1 }, (_, y) => `M0 ${y}H${GRID_W}`).join('')}`}
+        d={[...Array.from({ length: GRID_W + 1 }, (_, x) => `M${x} 0V${GRID_H}`), ...Array.from({ length: GRID_H + 1 }, (_, y) => `M0 ${y}H${GRID_W}`)].join(' ')}
         fill="none"
         stroke="rgba(0,0,0,0.24)"
         strokeWidth="0.045"
@@ -953,7 +953,6 @@ export default function LevelBuilder() {
               const isStair = cellId === 'stairs' || cellId === 'stairs-down'
               const cellBase = isDoor && doorOpen ? 'floor' : cellId
               const lightStrength = visibility.lightStrength[r]?.[c] || 0
-              const dim = visibility.dimVision[r]?.[c]
               const groundTile = TILES.find(tile => tile.id === cellId)
               return (
                 <div
