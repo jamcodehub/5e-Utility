@@ -44,6 +44,8 @@ app.use(cors({ origin: process.env.CLIENT_URL || 'http://localhost:5173' }))
 app.use(express.json({ limit: '1mb' }))
 app.use('/api', apiLimiter)
 
+app.get('/api/health', (_req, res) => res.json({ status: 'ok' }))
+
 app.use('/api/auth',      authLimiter, authRoutes)
 app.use('/api/campaigns', campaignRoutes)
 app.use('/api/journal',   journalRoutes)

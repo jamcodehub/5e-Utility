@@ -3,7 +3,7 @@ import { useAuth, api } from '../context/AuthContext'
 import { useCampaign } from '../context/CampaignContext'
 import { useMusic, MOODS } from '../context/MusicContext'
 import { useTheme } from '../context/ThemeContext'
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import SettingsModal from './SettingsModal'
 import { CloudinaryImage } from '@cloudinary/url-gen'
 import { quality, format } from '@cloudinary/url-gen/actions/delivery'
@@ -18,134 +18,56 @@ const logoUrl = new CloudinaryImage('5e_Utillity', { cloudName: CLOUD_NAME })
   .toURL()
 
 // ─── Infinite swipe carousel nav ────────────────────────────────────────────
-// All items sit side-by-side in a wide track. We maintain an offset and
-// duplicate items on each end so wrapping is seamless.
 function SwipeNav({ items, navLinkStyle, darkMode }) {
   const location = useLocation()
-  const trackRef = useRef(null)
   const containerRef = useRef(null)
-
-  // We render items tripled: [items, items, items] and start in the middle
-  // copy so we can shift left or right and wrap infinitely.
-  const COPIES = 3
-  const tripled = [...items, ...items, ...items]
+  const COPIES = 5
+  const CENTER_COPY = 2
+  const tripled = Array.from({ length: COPIES }, () => items).flat()
   const ITEM_W = 88 // px per nav item
   const GAP = 4
-
-  // Auto-shrink font size for longer labels so nothing gets clipped/ellipsized.
   const fontSizeFor = (label) => {
     if (label.length <= 6) return 12
     if (label.length <= 9) return 11
     return 10
   }
 
-  const [offset, setOffset] = useState(0) // px offset of the track
-  const dragRef = useRef({ active: false, startX: 0, startOffset: 0 })
-  const centerOffset = useRef(0)
-
-  // Initialise so the middle copy is visible
-  useEffect(() => {
-    const base = -(items.length * (ITEM_W + GAP))
-    centerOffset.current = base
-    setOffset(base)
-  }, [items.length])
-
-  // After settling, silently recentre if we've drifted too far
-  const recentre = useCallback(() => {
-    const base = centerOffset.current
-    const total = items.length * (ITEM_W + GAP)
-    setOffset(prev => {
-      let o = prev
-      if (o < base - total) o += total
-      if (o > base + total) o -= total
-      return o
-    })
-  }, [items.length])
-
-  // Native (non-passive) touch listeners so we can preventDefault() on
-  // touchmove — this stops the swipe from also scrolling/selecting the
-  // rest of the page, restricting it to horizontal left/right paging only.
+  // Native horizontal scrolling supplies touch momentum and scroll snapping.
+  // Identical copies on either side make recentering visually seamless.
   useEffect(() => {
     const el = containerRef.current
     if (!el) return
-    const start = (e) => {
-      dragRef.current = { active: true, startX: e.touches[0].clientX, startOffset: offset }
-    }
-    const move = (e) => {
-      if (!dragRef.current.active) return
-      e.preventDefault()
-      const dx = e.touches[0].clientX - dragRef.current.startX
-      setOffset(dragRef.current.startOffset + dx)
-    }
-    const end = () => {
-      dragRef.current.active = false
-      const itemStep = ITEM_W + GAP
-      setOffset(prev => Math.round(prev / itemStep) * itemStep)
-      setTimeout(recentre, 50)
-    }
-    el.addEventListener('touchstart', start, { passive: true })
-    el.addEventListener('touchmove', move, { passive: false })
-    el.addEventListener('touchend', end, { passive: true })
-    el.addEventListener('touchcancel', end, { passive: true })
-    return () => {
-      el.removeEventListener('touchstart', start)
-      el.removeEventListener('touchmove', move)
-      el.removeEventListener('touchend', end)
-      el.removeEventListener('touchcancel', end)
-    }
-  }, [offset, recentre])
+    const segment = items.length * (ITEM_W + GAP)
+    const activeIndex = Math.max(0, items.findIndex(item => item.to === location.pathname))
+    el.scrollLeft = segment * CENTER_COPY + activeIndex * (ITEM_W + GAP) - (el.clientWidth - ITEM_W) / 2
 
-  // Mouse drag for desktop testing
-  const onMouseDown = (e) => {
-    dragRef.current = { active: true, startX: e.clientX, startOffset: offset }
-    window.addEventListener('mousemove', onMouseMove)
-    window.addEventListener('mouseup', onMouseUp)
-  }
-  const onMouseMove = (e) => {
-    if (!dragRef.current.active) return
-    const dx = e.clientX - dragRef.current.startX
-    setOffset(dragRef.current.startOffset + dx)
-  }
-  const onMouseUp = () => {
-    dragRef.current.active = false
-    const itemStep = ITEM_W + GAP
-    setOffset(prev => Math.round(prev / itemStep) * itemStep)
-    setTimeout(recentre, 50)
-    window.removeEventListener('mousemove', onMouseMove)
-    window.removeEventListener('mouseup', onMouseUp)
-  }
+    const recenter = () => {
+      if (el.scrollLeft < segment) el.scrollLeft += segment
+      else if (el.scrollLeft > segment * (COPIES - 2)) el.scrollLeft -= segment
+    }
+    el.addEventListener('scroll', recenter, { passive: true })
+    return () => el.removeEventListener('scroll', recenter)
+  }, [items, location.pathname])
 
   return (
     <div
       ref={containerRef}
+      className="pill-carousel-track"
       style={{
         flex: 1,
-        overflow: 'hidden',
+        overflowX: 'auto',
+        overflowY: 'hidden',
         display: 'flex',
         alignItems: 'center',
-        cursor: 'grab',
-        userSelect: 'none',
-        WebkitUserSelect: 'none',
-        WebkitTouchCallout: 'none',
-        touchAction: 'none',
+        touchAction: 'pan-x',
+        WebkitOverflowScrolling: 'touch',
+        scrollSnapType: 'x mandatory',
+        overscrollBehaviorX: 'contain',
+        scrollbarWidth: 'none',
       }}
-      onMouseDown={onMouseDown}
     >
-      <div
-        ref={trackRef}
-        style={{
-          display: 'flex',
-          gap: GAP,
-          transform: `translateX(${offset}px)`,
-          transition: dragRef.current?.active ? 'none' : 'transform 0.18s cubic-bezier(.4,0,.2,1)',
-          willChange: 'transform',
-          userSelect: 'none',
-          WebkitUserSelect: 'none',
-        }}
-      >
-        {tripled.map((item, idx) => {
-          const isActive = location.pathname === item.to
-          return (
+      {tripled.map((item, idx) => {
+        return (
             <NavLink
               key={`${item.to}-${idx}`}
               to={item.to}
@@ -153,14 +75,13 @@ function SwipeNav({ items, navLinkStyle, darkMode }) {
               style={({ isActive: a }) => ({
                 ...navLinkStyle(a),
                 width: ITEM_W,
+                marginRight: GAP,
                 flexShrink: 0,
+                scrollSnapAlign: 'center',
                 justifyContent: 'center',
                 whiteSpace: 'nowrap',
                 overflow: 'hidden',
                 fontSize: fontSizeFor(item.label),
-                pointerEvents: dragRef.current?.active ? 'none' : 'auto',
-                userSelect: 'none',
-                WebkitUserSelect: 'none',
               })}
             >
               <span style={{ overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4, width: '100%', whiteSpace: 'nowrap', userSelect: 'none', WebkitUserSelect: 'none' }}>
@@ -170,7 +91,6 @@ function SwipeNav({ items, navLinkStyle, darkMode }) {
             </NavLink>
           )
         })}
-      </div>
     </div>
   )
 }

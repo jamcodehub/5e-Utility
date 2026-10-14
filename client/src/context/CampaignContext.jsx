@@ -8,6 +8,8 @@ export function CampaignProvider({ children }) {
   const { user } = useAuth()
   const [campaigns, setCampaigns]   = useState([])
   const [activeCampaign, setActiveRaw] = useState(null)
+  const [campaignsLoading, setCampaignsLoading] = useState(true)
+  const [campaignsError, setCampaignsError] = useState('')
 
   const setActive = (c) => {
     setActiveRaw(c)
@@ -16,22 +18,31 @@ export function CampaignProvider({ children }) {
   }
 
   const load = async () => {
-    if (!user) return
-    const data = await api('/campaigns')
-    setCampaigns(data)
-    if (data.length && !activeCampaign) {
-      // Restore the campaign the user was last viewing instead of always
-      // defaulting to the most-recently-updated one (data[0]) — otherwise
-      // background activity in another campaign (e.g. a DM edit) can bump
-      // that campaign to the top and silently switch users onto a
-      // different, empty character sheet on next login.
-      const lastId = localStorage.getItem('activeCampaignId')
-      const restored = lastId && data.find(c => c._id === lastId)
-      setActive(restored || data[0])
+    if (!user) {
+      setCampaignsLoading(false)
+      return
+    }
+    setCampaignsLoading(true)
+    setCampaignsError('')
+    try {
+      const data = await api('/campaigns')
+      setCampaigns(data)
+      if (data.length && !activeCampaign) {
+        // Restore the campaign the user was last viewing instead of always
+        // defaulting to the most-recently-updated one — otherwise
+        // background activity in another campaign can silently switch them.
+        const lastId = localStorage.getItem('activeCampaignId')
+        const restored = lastId && data.find(c => c._id === lastId)
+        setActive(restored || data[0])
+      }
+    } catch (err) {
+      setCampaignsError(err.message || 'Failed to load campaigns')
+    } finally {
+      setCampaignsLoading(false)
     }
   }
 
-  useEffect(() => { load() }, [user])
+  useEffect(() => { load() }, [user?.id || user?._id])
 
   // Returns null on success, error string on failure
   const createCampaign = async (body) => {
@@ -80,7 +91,7 @@ export function CampaignProvider({ children }) {
   }
 
   return (
-    <CampaignContext.Provider value={{ campaigns, activeCampaign, setActive, createCampaign, updateCampaign, deleteCampaign, leaveCampaign, joinCampaign, reload: load }}>
+    <CampaignContext.Provider value={{ campaigns, activeCampaign, campaignsLoading, campaignsError, setActive, createCampaign, updateCampaign, deleteCampaign, leaveCampaign, joinCampaign, reload: load }}>
       {children}
     </CampaignContext.Provider>
   )

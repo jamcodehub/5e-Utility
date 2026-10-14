@@ -4,13 +4,14 @@ import UpgradeModal from '../components/UpgradeModal'
 import { api, useAuth } from '../context/AuthContext'
 import { useCampaign } from '../context/CampaignContext'
 import { useToast } from '../hooks/useToast'
+import { SkeletonTextLines } from '../components/Skeleton'
 
 const wordCount = s => s.trim().split(/\s+/).filter(Boolean).length
 
 // Player-only journal — split out from the old shared Journal/Sessions page.
 // DMs now use SessionPlanner.jsx instead (see /session-planner route).
 export default function Journal() {
-  const { activeCampaign } = useCampaign()
+  const { activeCampaign, campaignsLoading, campaignsError, reload: reloadCampaigns } = useCampaign()
   const { user } = useAuth()
   const { toast, ToastContainer } = useToast()
 
@@ -18,6 +19,9 @@ export default function Journal() {
   const placeholder = 'Record what happened this session…'
 
   const [entries, setEntries] = useState([])
+  const [entriesLoading, setEntriesLoading] = useState(true)
+  const [entriesError, setEntriesError] = useState('')
+  const [entriesReload, setEntriesReload] = useState(0)
   const [activeId, setActiveId] = useState(null)
   const [content, setContent] = useState('')
   const [saving, setSaving] = useState(false)
@@ -30,15 +34,34 @@ export default function Journal() {
   const entryNum = e => e.day ?? '?'
   const entryTitle = e => e.title || `Day ${entryNum(e)}`
 
-  const load = useCallback(async () => {
-    if (!activeCampaign) return
-    const data = await api(`/${apiBase}/${activeCampaign._id}?kind=day`)
-    setEntries(data)
-    if (data.length) { setActiveId(data[0]._id); setContent(data[0].content) }
-    else { setActiveId(null); setContent('') }
-  }, [activeCampaign])
-
-  useEffect(() => { load() }, [load])
+  useEffect(() => {
+    if (!activeCampaign) {
+      setEntries([])
+      setActiveId(null)
+      setContent('')
+      setEntriesLoading(false)
+      return
+    }
+    let cancelled = false
+    setEntries([])
+    setActiveId(null)
+    setContent('')
+    setEntriesLoading(true)
+    setEntriesError('')
+    api(`/${apiBase}/${activeCampaign._id}?kind=day`)
+      .then(data => {
+        if (cancelled) return
+        setEntries(data)
+        if (data.length) { setActiveId(data[0]._id); setContent(data[0].content) }
+      })
+      .catch(err => {
+        if (!cancelled) setEntriesError(err.message || 'Failed to load journal entries')
+      })
+      .finally(() => {
+        if (!cancelled) setEntriesLoading(false)
+      })
+    return () => { cancelled = true }
+  }, [activeCampaign, entriesReload])
 
   const selectEntry = (e) => {
     // Flush any pending save for the current entry before switching
@@ -123,8 +146,18 @@ export default function Journal() {
   if (user?.role === 'dm') return <Navigate to="/session-planner" replace />
 
   if (!activeCampaign) return (
-    <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-3)' }}>
-      Select or create a campaign to get started.
+    <div className="page-content">
+      <div className="page-header-row" style={{ marginBottom: 20 }}>
+        <h2 style={{ fontSize: 22 }}>Journal</h2>
+      </div>
+      {campaignsLoading
+        ? <SkeletonTextLines lines={10} style={{ maxWidth: 720 }} />
+        : campaignsError
+          ? <div style={{ color: 'var(--text-2)' }}>
+              <p style={{ marginBottom: 12 }}>{campaignsError}</p>
+              <button className="btn btn-ghost" onClick={reloadCampaigns}>Retry</button>
+            </div>
+          : <p style={{ color: 'var(--text-3)' }}>Select or create a campaign to get started.</p>}
     </div>
   )
 
@@ -180,7 +213,7 @@ export default function Journal() {
             </div>
           </div>
         ))}
-        {!entries.length && (
+        {!entriesLoading && !entries.length && (
           <div style={{ padding: '20px 14px', fontSize: 12, color: 'var(--text-3)' }}>No days yet.</div>
         )}
       </div>
@@ -232,7 +265,14 @@ export default function Journal() {
           </div>
         </div>
         <div style={{ flex: 1, overflowY: 'auto', padding: '24px 32px' }}>
-          {activeId ? (
+          {entriesLoading ? (
+            <SkeletonTextLines lines={12} style={{ maxWidth: 840 }} />
+          ) : entriesError ? (
+            <div style={{ color: 'var(--text-2)' }}>
+              <p style={{ marginBottom: 12 }}>{entriesError}</p>
+              <button className="btn btn-ghost" onClick={() => setEntriesReload(n => n + 1)}>Retry</button>
+            </div>
+          ) : activeId ? (
             <textarea
               value={content}
               onChange={handleContentChange}

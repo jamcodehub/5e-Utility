@@ -1,9 +1,10 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { api } from '../context/AuthContext'
 import { useCampaign } from '../context/CampaignContext'
 import { useAuth } from '../context/AuthContext'
 import { useToast } from '../hooks/useToast'
 import { getSocket } from '../utils/socket'
+import { SkeletonBlock } from '../components/Skeleton'
 
 // A3 landscape ratio ≈ 420/297
 const GRID_W = 32
@@ -29,12 +30,58 @@ function tileColor(id) {
 }
 
 function MapThumb({ content }) {
-  let grid = null
-  try { const p = JSON.parse(content); if (Array.isArray(p)) grid = p } catch { /* */ }
+  const canvasRef = useRef(null)
+  const grid = useMemo(() => {
+    try {
+      const parsed = JSON.parse(content)
+      return Array.isArray(parsed) ? parsed : null
+    } catch {
+      return null
+    }
+  }, [content])
+
+  useEffect(() => {
+    const canvas = canvasRef.current
+    const context = canvas?.getContext('2d')
+    if (!context || !grid) return
+    context.clearRect(0, 0, GRID_W, GRID_H)
+    grid.forEach((row, r) => row.forEach((cell, c) => {
+      context.fillStyle = tileColor(cell)
+      context.fillRect(c, r, 1, 1)
+    }))
+  }, [grid])
+
   if (!grid) return <div style={{ width: '100%', aspectRatio: `${GRID_W}/${GRID_H}`, background: '#eee', borderRadius: 4 }} />
   return (
-    <div style={{ width: '100%', aspectRatio: `${GRID_W}/${GRID_H}`, display: 'grid', gridTemplateColumns: `repeat(${GRID_W}, 1fr)`, borderRadius: 4, overflow: 'hidden' }}>
-      {grid.map((row, r) => row.map((c, ci) => <div key={`${r}-${ci}`} style={{ background: tileColor(c) }} />))}
+    <canvas
+      ref={canvasRef}
+      width={GRID_W}
+      height={GRID_H}
+      aria-hidden="true"
+      style={{
+        display: 'block',
+        width: '100%',
+        aspectRatio: `${GRID_W}/${GRID_H}`,
+        borderRadius: 4,
+        backgroundImage: 'linear-gradient(to right, rgba(0,0,0,0.12) 1px, transparent 1px), linear-gradient(to bottom, rgba(0,0,0,0.12) 1px, transparent 1px)',
+        backgroundSize: `${100 / GRID_W}% ${100 / GRID_H}%`,
+      }}
+    />
+  )
+}
+
+function MapSkeleton() {
+  return (
+    <div style={{ width: '100%', aspectRatio: `${GRID_W}/${GRID_H}`, position: 'relative' }}>
+      <SkeletonBlock width="100%" height="100%" radius={4} />
+      <div aria-hidden="true" style={{
+        position: 'absolute',
+        inset: 0,
+        borderRadius: 4,
+        backgroundImage: 'linear-gradient(to right, rgba(0,0,0,0.12) 1px, transparent 1px), linear-gradient(to bottom, rgba(0,0,0,0.12) 1px, transparent 1px)',
+        backgroundSize: `${100 / GRID_W}% ${100 / GRID_H}%`,
+        pointerEvents: 'none',
+      }} />
     </div>
   )
 }
@@ -83,10 +130,10 @@ function Token({ token, cellSize, onDragStart, dragging }) {
         boxShadow: '0 2px 6px rgba(0,0,0,0.4)',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         cursor: dragging ? 'grabbing' : 'grab',
+        opacity: dragging ? 0.25 : 1,
         zIndex: 10,
         userSelect: 'none',
         touchAction: 'none',
-        transform: dragging ? 'scale(1.08)' : undefined,
       }}
     >
       {token.avatar
@@ -98,13 +145,15 @@ function Token({ token, cellSize, onDragStart, dragging }) {
 }
 
 export default function LevelBuilder() {
-  const { activeCampaign } = useCampaign()
+  const { activeCampaign, campaignsLoading, campaignsError, reload: reloadCampaigns } = useCampaign()
   const { isPremium, user } = useAuth()
   const isDm = user?.role === 'dm'
   const { toast, ToastContainer } = useToast()
 
   // ── Map gallery state ──
   const [plans, setPlans] = useState([])
+  const [plansLoading, setPlansLoading] = useState(true)
+  const [plansError, setPlansError] = useState('')
   const [selectedPlanId, setSelectedPlanId] = useState(null)
 
   // ── Editor state ──
@@ -119,14 +168,19 @@ export default function LevelBuilder() {
   const [tokens, setTokens] = useState([]) // { id, name, avatar, color, row, col, hp, maxHp }
   const [availableTokens, setAvailableTokens] = useState([]) // sidebar token pool
   const [dragTokenId, setDragTokenId] = useState(null)
+  const [dragPreviewToken, setDragPreviewToken] = useState(null)
+  const [dragPosition, setDragPosition] = useState({ x: 0, y: 0 })
   const [cellSize, setCellSize] = useState(28)
   const gridRef = useRef(null)
+  const dragPreviewRef = useRef(null)
   const remoteUpdateRef = useRef(false)
   const [viewers, setViewers] = useState([]) // who's currently looking at this board
 
   const startTokenDrag = (e, tokenId) => {
     e.preventDefault()
     setDragTokenId(tokenId)
+    setDragPreviewToken(tokens.find(token => token.id === tokenId) || availableTokens.find(token => token.id === tokenId))
+    setDragPosition({ x: e.clientX, y: e.clientY })
   }
 
   useEffect(() => {
@@ -146,12 +200,23 @@ export default function LevelBuilder() {
         })
       }
       setDragTokenId(null)
+      setDragPreviewToken(null)
     }
-    const cancelDrag = () => setDragTokenId(null)
+    const moveDrag = (e) => {
+      if (!dragPreviewRef.current) return
+      dragPreviewRef.current.style.left = `${e.clientX}px`
+      dragPreviewRef.current.style.top = `${e.clientY}px`
+    }
+    const cancelDrag = () => {
+      setDragTokenId(null)
+      setDragPreviewToken(null)
+    }
 
+    window.addEventListener('pointermove', moveDrag)
     window.addEventListener('pointerup', finishDrag)
     window.addEventListener('pointercancel', cancelDrag)
     return () => {
+      window.removeEventListener('pointermove', moveDrag)
       window.removeEventListener('pointerup', finishDrag)
       window.removeEventListener('pointercancel', cancelDrag)
     }
@@ -160,8 +225,16 @@ export default function LevelBuilder() {
   // ── Data loading ──
   const loadPlans = useCallback(async () => {
     if (!activeCampaign) return
-    const data = await api(`/levels/${activeCampaign._id}`)
-    setPlans(data || [])
+    setPlansLoading(true)
+    setPlansError('')
+    try {
+      const data = await api(`/levels/${activeCampaign._id}`)
+      setPlans(data || [])
+    } catch (err) {
+      setPlansError(err.message || 'Failed to load maps')
+    } finally {
+      setPlansLoading(false)
+    }
   }, [activeCampaign])
 
   useEffect(() => { loadPlans() }, [loadPlans])
@@ -339,9 +412,14 @@ export default function LevelBuilder() {
   // ── Render ──
   const selectedPlan = plans.find(p => p._id === selectedPlanId)
 
-  if (!activeCampaign) return (
+  if (!activeCampaign && !campaignsLoading) return (
     <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-3)' }}>
-      Select a campaign.
+      {campaignsError
+        ? <div style={{ textAlign: 'center' }}>
+            <p style={{ marginBottom: 12 }}>{campaignsError}</p>
+            <button className="btn btn-ghost" onClick={reloadCampaigns}>Retry</button>
+          </div>
+        : 'Select a campaign.'}
     </div>
   )
 
@@ -484,7 +562,7 @@ export default function LevelBuilder() {
               <>
                 <div style={{ fontSize: 10, color: 'var(--text-3)', marginBottom: 4, marginTop: 4, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Party</div>
                 {availableTokens.filter(t => t.type === 'player').map(t => (
-                  <SidebarToken key={t.id} token={t} placed={!!tokens.find(x => x.id === t.id)} onDragStart={startTokenDrag} />
+                  <SidebarToken key={t.id} token={t} placed={!!tokens.find(x => x.id === t.id)} dragging={dragTokenId === t.id} onDragStart={startTokenDrag} />
                 ))}
               </>
             )}
@@ -493,7 +571,7 @@ export default function LevelBuilder() {
               <>
                 <div style={{ fontSize: 10, color: 'var(--text-3)', marginBottom: 4, marginTop: 8, textTransform: 'uppercase', letterSpacing: '0.05em' }}>NPCs</div>
                 {availableTokens.filter(t => t.type === 'npc').map(t => (
-                  <SidebarToken key={t.id} token={t} placed={!!tokens.find(x => x.id === t.id)} onDragStart={startTokenDrag} />
+                  <SidebarToken key={t.id} token={t} placed={!!tokens.find(x => x.id === t.id)} dragging={dragTokenId === t.id} onDragStart={startTokenDrag} />
                 ))}
               </>
             )}
@@ -502,7 +580,7 @@ export default function LevelBuilder() {
               <>
                 <div style={{ fontSize: 10, color: '#ef4444', marginBottom: 4, marginTop: 8, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Enemies</div>
                 {availableTokens.filter(t => t.type === 'enemy').map(t => (
-                  <SidebarToken key={t.id} token={t} placed={!!tokens.find(x => x.id === t.id)} onDragStart={startTokenDrag} />
+                  <SidebarToken key={t.id} token={t} placed={!!tokens.find(x => x.id === t.id)} dragging={dragTokenId === t.id} onDragStart={startTokenDrag} />
                 ))}
               </>
             )}
@@ -511,7 +589,7 @@ export default function LevelBuilder() {
               <>
                 <div style={{ fontSize: 10, color: '#f59e0b', marginBottom: 4, marginTop: 8, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Bosses</div>
                 {availableTokens.filter(t => t.type === 'boss').map(t => (
-                  <SidebarToken key={t.id} token={t} placed={!!tokens.find(x => x.id === t.id)} onDragStart={startTokenDrag} />
+                  <SidebarToken key={t.id} token={t} placed={!!tokens.find(x => x.id === t.id)} dragging={dragTokenId === t.id} onDragStart={startTokenDrag} />
                 ))}
               </>
             )}
@@ -547,6 +625,35 @@ export default function LevelBuilder() {
           )}
         </div>
       </div>
+      {dragPreviewToken && (
+        <div
+          ref={dragPreviewRef}
+          aria-hidden="true"
+          style={{
+            position: 'fixed',
+            left: dragPosition.x,
+            top: dragPosition.y,
+            width: Math.max(24, cellSize - 4),
+            height: Math.max(24, cellSize - 4),
+            transform: 'translate(-50%, -50%) scale(1.08)',
+            borderRadius: '50%',
+            overflow: 'hidden',
+            background: dragPreviewToken.color || '#6366f1',
+            border: '2px solid rgba(255,255,255,0.9)',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.45)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            pointerEvents: 'none',
+            zIndex: 10000,
+          }}
+        >
+          {dragPreviewToken.avatar
+            ? <img src={dragPreviewToken.avatar} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+            : <span style={{ fontSize: Math.max(10, cellSize * 0.35), color: '#fff', fontWeight: 700, fontFamily: 'Cinzel, serif' }}>{dragPreviewToken.name?.[0]?.toUpperCase() || '?'}</span>
+          }
+        </div>
+      )}
     </div>
   )
 
@@ -566,22 +673,35 @@ export default function LevelBuilder() {
         {isDm && <button className="btn btn-primary" onClick={() => openEditor(null)}>+ Create New Map</button>}
       </div>
 
-      {/* Horizontal scroll gallery */}
-      {plans.length === 0 ? (
+      {plansLoading ? (
+        <div style={{ flex: 1, overflowY: 'auto', padding: 24 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 280px), 1fr))', gap: 16, alignContent: 'start' }}>
+            {Array.from({ length: 3 }).map((_, i) => (
+              <div key={i} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, overflow: 'hidden' }}>
+                <MapSkeleton />
+                <div style={{ padding: '12px 14px' }}><SkeletonBlock width="62%" height={12} /></div>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : plansError ? (
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12, color: 'var(--text-2)' }}>
+          <p>{plansError}</p>
+          <button className="btn btn-ghost" onClick={loadPlans}>Retry</button>
+        </div>
+      ) : plans.length === 0 ? (
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 16, color: 'var(--text-3)' }}>
           <div style={{ fontSize: 40, opacity: 0.3 }}>...</div>
           <div style={{ fontSize: 14 }}>No maps yet. Create your first one above.</div>
         </div>
       ) : (
         <div style={{ flex: 1, overflowY: 'auto', padding: 24 }}>
-          <div style={{ display: 'flex', gap: 16, overflowX: 'auto', paddingBottom: 16 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 280px), 1fr))', gap: 16, alignContent: 'start' }}>
             {plans.map(plan => (
               <div
                 key={plan._id}
                 onClick={() => openPlay(plan)}
                 style={{
-                  flexShrink: 0,
-                  width: 280,
                   background: 'var(--surface)',
                   border: '1px solid var(--border)',
                   borderRadius: 12,
@@ -616,7 +736,7 @@ export default function LevelBuilder() {
 }
 
 // Sidebar token pill — draggable from the panel onto the map
-function SidebarToken({ token, placed, onDragStart }) {
+function SidebarToken({ token, placed, dragging, onDragStart }) {
   return (
     <div
       onPointerDown={e => { if (!placed) onDragStart(e, token.id) }}
@@ -625,7 +745,7 @@ function SidebarToken({ token, placed, onDragStart }) {
         borderRadius: 8, marginBottom: 4,
         background: placed ? 'var(--surface2)' : 'var(--surface)',
         border: '1px solid var(--border)',
-        opacity: placed ? 0.45 : 1,
+        opacity: placed ? 0.45 : dragging ? 0.25 : 1,
         cursor: placed ? 'default' : 'grab',
         userSelect: 'none',
         touchAction: 'none',

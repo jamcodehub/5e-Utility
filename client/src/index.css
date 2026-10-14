@@ -14,6 +14,7 @@ html, body { overflow-x: hidden; }
   background-size: 200% 100%;
   animation: skeleton-shimmer 1.4s ease-in-out infinite;
 }
+.pill-carousel-track::-webkit-scrollbar { display: none; }
 
 :root {
   --bg: #f5f4f1;
@@ -172,4 +173,30 @@ input, textarea, select { font-family: inherit; }
   .page-header-row { flex-direction: column !important; align-items: stretch !important; }
   .page-header-row > * { width: 100%; min-width: 0; }
   .page-header-row button { min-width: 0; }
+
+  /* Stack roleplay form and controls in one page-level scroll area on phones. */
+  .roleplay-page {
+    height: 100% !important;
+    min-height: 0;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    padding: 14px 12px 90px !important;
+  }
+  .roleplay-header { align-items: flex-start !important; margin-bottom: 12px !important; }
+  .roleplay-header > div { min-width: 0; }
+  .roleplay-header > div + div { margin-left: 8px !important; }
+  .roleplay-form-layout {
+    display: flex !important;
+    flex-direction: column !important;
+    flex: none !important;
+    gap: 12px !important;
+    overflow: visible !important;
+    padding-bottom: 12px !important;
+  }
+  .roleplay-form-column {
+    flex: none !important;
+    overflow: visible !important;
+    padding-right: 0 !important;
+  }
+  .roleplay-generate-column { width: 100% !important; }
 }

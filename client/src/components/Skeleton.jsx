@@ -11,6 +11,16 @@ export function SkeletonBlock({ width = '100%', height = 14, radius = 6, style =
   )
 }
 
+export function SkeletonTextLines({ lines = 10, style = {} }) {
+  return (
+    <div role="status" aria-label="Loading text" style={{ display: 'flex', flexDirection: 'column', gap: 12, ...style }}>
+      {Array.from({ length: lines }).map((_, i) => (
+        <SkeletonBlock key={i} width={i % 4 === 3 ? '72%' : i % 3 === 2 ? '88%' : '100%'} height={10} radius={3} />
+      ))}
+    </div>
+  )
+}
+
 export function SkeletonCard({ lines = 3, avatar = false, style = {} }) {
   return (
     <div

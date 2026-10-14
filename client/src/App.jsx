@@ -6,11 +6,13 @@ import { MusicProvider } from './context/MusicContext'
 import Shell from './components/Shell'
 import Auth from './pages/Auth'
 import Journal from './pages/Journal'
+import SessionPlanner from './pages/SessionPlanner'
 import { SkeletonPage, SkeletonShell } from './components/Skeleton'
-import { lazy, Suspense, useEffect } from 'react'
+import { lazy, Suspense } from 'react'
 
-// Journal loads in the initial bundle (first page users land on).
-// Every other page is code-split — downloaded in the background after login.
+// Keep both role-specific landing pages in the initial bundle so the first
+// authenticated screen never waits for a route chunk.
+// Secondary pages are downloaded only when needed.
 const Storyboard    = lazy(() => import('./pages/Storyboard'))
 const Lore          = lazy(() => import('./pages/Lore'))
 const Character     = lazy(() => import('./pages/Character'))
@@ -23,50 +25,12 @@ const MusicPlayer   = lazy(() => import('./pages/MusicPlayer'))
 const LevelBuilder  = lazy(() => import('./pages/LevelBuilder'))
 const RoleplayAssistant = lazy(() => import('./pages/RoleplayAssistant'))
 const CampaignGuide = lazy(() => import('./pages/CampaignGuide'))
-const SessionPlanner = lazy(() => import('./pages/SessionPlanner'))
 const HpTracker      = lazy(() => import('./pages/HPtracker'))
-
-// Kick off all remaining chunk downloads in idle time after Journal renders.
-// Uses requestIdleCallback so it never competes with the first paint.
-const prefetchAll = () => {
-  const pages = [
-    () => import('./pages/Storyboard'),
-    () => import('./pages/Lore'),
-    () => import('./pages/Character'),
-    () => import('./pages/Inventory'),
-    () => import('./pages/Dice'),
-    () => import('./pages/Premium'),
-    () => import('./pages/IdeaGenerator'),
-    () => import('./pages/RulesReference'),
-    () => import('./pages/MusicPlayer'),
-    () => import('./pages/LevelBuilder'),
-    () => import('./pages/RoleplayAssistant'),
-    () => import('./pages/CampaignGuide'),
-    () => import('./pages/SessionPlanner'),
-    () => import('./pages/HPtracker'),
-  ]
-  const schedule = window.requestIdleCallback || ((cb) => setTimeout(cb, 200))
-  let i = 0
-  const next = (deadline) => {
-    // Load one chunk per idle slice to avoid blocking the main thread
-    while (i < pages.length && (!deadline || deadline.timeRemaining() > 5)) {
-      pages[i++]().catch(() => {})
-    }
-    if (i < pages.length) schedule(next)
-  }
-  schedule(next)
-}
 
 const PageLoader = () => <SkeletonPage />
 
 function Guard() {
   const { user, loading } = useAuth()
-
-  // Start prefetching all other pages in the background as soon as the user
-  // is authenticated — runs once, quietly, without blocking the UI.
-  useEffect(() => {
-    if (user) prefetchAll()
-  }, [!!user])
 
   if (loading) return <SkeletonShell cards={6} />
   if (!user) return <Auth />

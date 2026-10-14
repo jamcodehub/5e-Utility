@@ -443,14 +443,11 @@ export default function RoleplayAssistant() {
   // ── Step 1: Context form ────────────────────────────────────────────────────
   if (step === 'context') {
     return (
-      <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden', padding: '20px 24px 0' }}>
+      <div className="roleplay-page" style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden', padding: '20px 24px 0' }}>
         {/* Header */}
-        <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 16, flexShrink: 0 }}>
+        <div className="roleplay-header" style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 16, flexShrink: 0 }}>
           <div>
             <h2 style={{ fontSize: 20, marginBottom: 2 }}>Roleplay Assistant</h2>
-            <p style={{ color: 'var(--text-2)', fontSize: 13, margin: 0 }}>
-              Fill in your character details — the more you add, the more personalised your session plan.
-            </p>
           </div>
           {sessionCount > 0 && (
             <div style={{ fontSize: 12, color: 'var(--text-3)', textAlign: 'right', flexShrink: 0, marginLeft: 16 }}>
@@ -461,10 +458,10 @@ export default function RoleplayAssistant() {
         </div>
 
         {/* Two-column body — fills remaining height */}
-        <div style={{ display: 'flex', gap: 16, flex: 1, overflow: 'hidden', paddingBottom: 20 }}>
+        <div className="roleplay-form-layout" style={{ display: 'flex', gap: 16, flex: 1, overflow: 'hidden', paddingBottom: 20 }}>
 
           {/* LEFT — scrollable form */}
-          <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 12, paddingRight: 4 }}>
+          <div className="roleplay-form-column" style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 12, paddingRight: 4 }}>
 
             <div className="card" style={{ padding: '14px 16px', flexShrink: 0 }}>
               <SectionLabel>Character Basics</SectionLabel>
@@ -493,7 +490,7 @@ export default function RoleplayAssistant() {
           </div>
 
           {/* RIGHT — sticky generate panel */}
-          <div style={{ width: 240, flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <div className="roleplay-generate-column" style={{ width: 240, flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 12 }}>
 
             {/* Generate card */}
             <div className="card" style={{ padding: '18px 16px', display: 'flex', flexDirection: 'column', gap: 12 }}>
