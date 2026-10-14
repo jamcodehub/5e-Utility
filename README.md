@@ -2,9 +2,9 @@
   <img src="https://res.cloudinary.com/crcbzpw6/image/upload/v1786529766/lore-ledger/storyboard/sdniavu2yeigjupqxgou.png" width="260" alt="5e Utility logo">
 </p>
 
-<p align="center">
+<h3 align="center">
   a D&D Companion App
-</p>
+</h3>
 
 <p align="center">
 5e Utility is an all-in-one companion for tabletop fantasy campaigns. It brings player tools and Dungeon Master prep into one shared, campaign-based website, helping groups keep character details, session notes, worldbuilding, and play aids together.
@@ -13,9 +13,9 @@ The app has tailored experiences for players and DMs, with shared campaign data 
 
 <img width="1508" height="831" alt="image" src="https://github.com/user-attachments/assets/327c3262-e449-4bea-95d5-9c41b255a157" />
 
-<p align="center">
+<h2 align="center">
 Features
-</p>
+</h2>
 
 ### Player pages
 
