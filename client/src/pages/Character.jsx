@@ -199,11 +199,17 @@ export default function Character() {
 
   const F = form
 
-  if (!activeCampaign) return <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-3)' }}>Select a campaign.</div>
+  if (!activeCampaign) return (
+    <div className="page-content">
+      <h2 style={{ fontSize: 22, marginBottom: 12 }}>My Characters</h2>
+      <div style={{ color: 'var(--text-3)' }}>Select a campaign.</div>
+    </div>
+  )
   if (!loaded) return <SkeletonCharacterPage />
 
   return (
     <div className="page-content">
+      <h2 style={{ fontSize: 22, marginBottom: 12 }}>My Characters</h2>
       {/* Character switcher — up to 2 free / unlimited premium per campaign */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 12, flexWrap: 'wrap' }}>
         {characters.map(c => (

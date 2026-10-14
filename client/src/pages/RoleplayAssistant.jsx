@@ -3,6 +3,7 @@ import { api, useAuth } from '../context/AuthContext'
 import { useCampaign } from '../context/CampaignContext'
 import { useToast } from '../hooks/useToast'
 import UpgradeModal from '../components/UpgradeModal'
+import { SkeletonBlock } from '../components/Skeleton'
 
 // ─── Template engine ────────────────────────────────────────────────────────
 // Builds a personalised 4-phase checklist from the rich context the player
@@ -434,8 +435,11 @@ export default function RoleplayAssistant() {
 
   if (!activeCampaign) {
     return (
-      <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-3)' }}>
-        Select a campaign to use the Roleplay Assistant.
+      <div className="page-content">
+        <div className="page-header-row" style={{ marginBottom: 16 }}>
+          <h2 style={{ fontSize: 20, marginBottom: 2 }}>Roleplay Assistant</h2>
+        </div>
+        <div style={{ color: 'var(--text-3)' }}>Select a campaign to use the Roleplay Assistant.</div>
       </div>
     )
   }
@@ -458,6 +462,15 @@ export default function RoleplayAssistant() {
         </div>
 
         {/* Two-column body — fills remaining height */}
+        {!charLoaded || !planLoaded ? (
+          <div className="roleplay-form-layout" style={{ display: 'flex', gap: 16, flex: 1, overflow: 'hidden', paddingBottom: 20 }}>
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <SkeletonBlock height={132} radius={12} />
+              <SkeletonBlock height={260} radius={12} style={{ flex: 1 }} />
+            </div>
+            <SkeletonBlock width={240} height={240} radius={12} style={{ flexShrink: 0 }} />
+          </div>
+        ) : (
         <div className="roleplay-form-layout" style={{ display: 'flex', gap: 16, flex: 1, overflow: 'hidden', paddingBottom: 20 }}>
 
           {/* LEFT — scrollable form */}
@@ -578,6 +591,7 @@ export default function RoleplayAssistant() {
 
           </div>
         </div>
+        )}
 
         <ToastContainer />
       </div>

@@ -3,7 +3,7 @@ import { api } from '../context/AuthContext'
 import { useAuth } from '../context/AuthContext'
 import { useCampaign } from '../context/CampaignContext'
 import { useToast } from '../hooks/useToast'
-import { SkeletonInventoryPage } from '../components/Skeleton'
+import { SkeletonInventoryContent } from '../components/Skeleton'
 
 const CURRENCY = [
   { key: 'pp', label: 'Platinum',  abbr: 'pp', sub: '1 pp = 10 gp',   color: '#b0cce0' },
@@ -114,8 +114,28 @@ export default function Inventory() {
 
   const totalWeight = inv.items.reduce((s, i) => s + (parseFloat(i.weight) || 0) * (i.qty || 1), 0)
 
-  if (!activeCampaign) return <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-3)' }}>Select a campaign.</div>
-  if (!loaded) return <SkeletonInventoryPage />
+  if (!activeCampaign) return (
+    <div className="page-content">
+      <div className="page-header-row" style={{ marginBottom: 20 }}>
+        <div>
+          <h2 style={{ fontSize: 22, marginBottom: 4 }}>Inventory</h2>
+          <p style={{ color: 'var(--text-2)', fontSize: 14, margin: 0 }}>Track your gear and coin purse.</p>
+        </div>
+      </div>
+      <div style={{ color: 'var(--text-3)' }}>Select a campaign.</div>
+    </div>
+  )
+  if (!loaded) return (
+    <div className="page-content">
+      <div className="page-header-row" style={{ marginBottom: 20 }}>
+        <div>
+          <h2 style={{ fontSize: 22, marginBottom: 4 }}>Inventory</h2>
+          <p style={{ color: 'var(--text-2)', fontSize: 14, margin: 0 }}>Track your gear and coin purse.</p>
+        </div>
+      </div>
+      <SkeletonInventoryContent />
+    </div>
+  )
 
   return (
     <div className="page-content">
@@ -242,4 +262,3 @@ export default function Inventory() {
     </div>
   )
 }
-

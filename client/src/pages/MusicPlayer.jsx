@@ -3,6 +3,7 @@ import { MOODS, useMusic } from '../context/MusicContext'
 import { api, useAuth } from '../context/AuthContext'
 import { useCampaign } from '../context/CampaignContext'
 import { useToast } from '../hooks/useToast'
+import { SkeletonBlock } from '../components/Skeleton'
 
 const CLOUD_NAME = 'crcbzpw6'
 const UPLOAD_PRESET = '5e_utility_music'
@@ -33,6 +34,7 @@ export default function MusicPlayer() {
   const { toast, ToastContainer } = useToast()
 
   const [playlist, setPlaylist] = useState([])
+  const [playlistLoading, setPlaylistLoading] = useState(true)
   const [uploading, setUploading] = useState(false)
   const [uploadProgress, setUploadProgress] = useState(0)
   const [manageTracksOpen, setManageTracksOpen] = useState(false)
@@ -45,6 +47,7 @@ export default function MusicPlayer() {
 
   // Session planner state
   const [sessions, setSessions] = useState([])
+  const [sessionsLoading, setSessionsLoading] = useState(true)
   const [newSessionName, setNewSessionName] = useState('')
   const [expandedSessionId, setExpandedSessionId] = useState(null)
   const [editingSessionId, setEditingSessionId] = useState(null)
@@ -53,8 +56,18 @@ export default function MusicPlayer() {
   const [cueLabelDraft, setCueLabelDraft] = useState('')
 
   useEffect(() => {
-    if (!activeCampaign) return
-    api(`/music/${activeCampaign._id}`).then(data => setPlaylist(data || [])).catch(() => {})
+    if (!activeCampaign) {
+      setPlaylist([])
+      setPlaylistLoading(false)
+      return
+    }
+    let cancelled = false
+    setPlaylistLoading(true)
+    api(`/music/${activeCampaign._id}`)
+      .then(data => { if (!cancelled) setPlaylist(data || []) })
+      .catch(() => { if (!cancelled) setPlaylist([]) })
+      .finally(() => { if (!cancelled) setPlaylistLoading(false) })
+    return () => { cancelled = true }
   }, [activeCampaign?._id])
 
   // Keep the shared playback context's queue (used for shuffle/next-track,
@@ -63,8 +76,18 @@ export default function MusicPlayer() {
   useEffect(() => { setQueue(playlist) }, [playlist, setQueue])
 
   useEffect(() => {
-    if (!activeCampaign) return
-    api(`/sessions/${activeCampaign._id}`).then(data => setSessions(data || [])).catch(() => {})
+    if (!activeCampaign) {
+      setSessions([])
+      setSessionsLoading(false)
+      return
+    }
+    let cancelled = false
+    setSessionsLoading(true)
+    api(`/sessions/${activeCampaign._id}`)
+      .then(data => { if (!cancelled) setSessions(data || []) })
+      .catch(() => { if (!cancelled) setSessions([]) })
+      .finally(() => { if (!cancelled) setSessionsLoading(false) })
+    return () => { cancelled = true }
   }, [activeCampaign?._id])
 
   const playTrackHandler = (track) => {
@@ -339,6 +362,12 @@ export default function MusicPlayer() {
 
           {!activeCampaign ? (
             <div style={{ fontSize: 12, color: 'var(--text-3)' }}>Select a campaign first.</div>
+          ) : playlistLoading ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <SkeletonBlock height={38} radius={8} />
+              <SkeletonBlock height={34} radius={8} />
+              <SkeletonBlock height={60} radius={8} />
+            </div>
           ) : playlist.length === 0 ? (
             <div style={{ fontSize: 12, color: 'var(--text-3)', lineHeight: 1.7 }}>
               No tracks yet — upload or drag & drop MP3, WAV, or OGG files.
@@ -467,6 +496,12 @@ export default function MusicPlayer() {
         </div>
         {!activeCampaign ? (
           <div style={{ fontSize: 12, color: 'var(--text-3)', padding: '8px 0' }}>Select a campaign to plan sessions.</div>
+        ) : sessionsLoading ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <SkeletonBlock height={36} radius={8} />
+            <SkeletonBlock height={70} radius={8} />
+            <SkeletonBlock height={70} radius={8} />
+          </div>
         ) : (
           <>
             <div style={{ display: 'flex', gap: 8 }}>

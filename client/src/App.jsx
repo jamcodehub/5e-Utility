@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import { CampaignProvider } from './context/CampaignContext'
 import { ThemeProvider } from './context/ThemeContext'
@@ -7,7 +7,19 @@ import Shell from './components/Shell'
 import Auth from './pages/Auth'
 import Journal from './pages/Journal'
 import SessionPlanner from './pages/SessionPlanner'
-import { SkeletonPage, SkeletonShell } from './components/Skeleton'
+import {
+  SkeletonCharacterPage,
+  SkeletonCombatPage,
+  SkeletonDicePage,
+  SkeletonInventoryContent,
+  SkeletonLorePage,
+  SkeletonMusicPage,
+  SkeletonPage,
+  SkeletonPremiumPage,
+  SkeletonRoleplayPage,
+  SkeletonRulesPage,
+  SkeletonShell,
+} from './components/Skeleton'
 import { lazy, Suspense } from 'react'
 
 // Keep both role-specific landing pages in the initial bundle so the first
@@ -27,7 +39,31 @@ const RoleplayAssistant = lazy(() => import('./pages/RoleplayAssistant'))
 const CampaignGuide = lazy(() => import('./pages/CampaignGuide'))
 const HpTracker      = lazy(() => import('./pages/HPtracker'))
 
-const PageLoader = () => <SkeletonPage />
+function PageLoader() {
+  const { pathname } = useLocation()
+  if (pathname === '/character') return <SkeletonCharacterPage />
+  if (pathname === '/inventory') {
+    return (
+      <div className="page-content">
+        <div className="page-header-row" style={{ marginBottom: 20 }}>
+          <div>
+            <h2 style={{ fontSize: 22, marginBottom: 4 }}>Inventory</h2>
+            <p style={{ color: 'var(--text-2)', fontSize: 14, margin: 0 }}>Track your gear and coin purse.</p>
+          </div>
+        </div>
+        <SkeletonInventoryContent />
+      </div>
+    )
+  }
+  if (pathname === '/lore') return <SkeletonLorePage />
+  if (pathname === '/roleplay') return <SkeletonRoleplayPage />
+  if (pathname === '/music') return <SkeletonMusicPage />
+  if (pathname === '/rules') return <SkeletonRulesPage />
+  if (pathname === '/premium') return <SkeletonPremiumPage />
+  if (pathname === '/dice') return <SkeletonDicePage />
+  if (pathname === '/combat') return <SkeletonCombatPage />
+  return <SkeletonPage />
+}
 
 function Guard() {
   const { user, loading } = useAuth()

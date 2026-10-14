@@ -20,6 +20,7 @@ export default function Journal() {
 
   const [entries, setEntries] = useState([])
   const [entriesLoading, setEntriesLoading] = useState(true)
+  const [entriesCampaignId, setEntriesCampaignId] = useState(null)
   const [entriesError, setEntriesError] = useState('')
   const [entriesReload, setEntriesReload] = useState(0)
   const [activeId, setActiveId] = useState(null)
@@ -28,15 +29,18 @@ export default function Journal() {
   const [showUpgrade, setShowUpgrade] = useState(false)
   const [renamingId, setRenamingId] = useState(null)
   const [titleDraft, setTitleDraft] = useState('')
+  const renameCancelled = useRef(false)
   const saveTimer = useRef(null)
 
   const active = entries.find(e => e._id === activeId)
   const entryNum = e => e.day ?? '?'
   const entryTitle = e => e.title || `Day ${entryNum(e)}`
+  const loadingContent = campaignsLoading || (activeCampaign && (entriesLoading || entriesCampaignId !== activeCampaign._id))
 
   useEffect(() => {
     if (!activeCampaign) {
       setEntries([])
+      setEntriesCampaignId(null)
       setActiveId(null)
       setContent('')
       setEntriesLoading(false)
@@ -52,10 +56,14 @@ export default function Journal() {
       .then(data => {
         if (cancelled) return
         setEntries(data)
+        setEntriesCampaignId(activeCampaign._id)
         if (data.length) { setActiveId(data[0]._id); setContent(data[0].content) }
       })
       .catch(err => {
-        if (!cancelled) setEntriesError(err.message || 'Failed to load journal entries')
+        if (!cancelled) {
+          setEntriesCampaignId(activeCampaign._id)
+          setEntriesError(err.message || 'Failed to load journal entries')
+        }
       })
       .finally(() => {
         if (!cancelled) setEntriesLoading(false)
@@ -105,8 +113,18 @@ export default function Journal() {
 
   const startRename = (e, entry) => {
     e.stopPropagation()
+    renameCancelled.current = false
     setRenamingId(entry._id)
     setTitleDraft(entryTitle(entry))
+  }
+
+  const finishRename = (id) => {
+    if (renameCancelled.current) {
+      renameCancelled.current = false
+      setRenamingId(null)
+      return
+    }
+    commitRename(id)
   }
 
   const commitRename = async (id) => {
@@ -145,22 +163,6 @@ export default function Journal() {
   // (Placed after all hooks above to satisfy the Rules of Hooks.)
   if (user?.role === 'dm') return <Navigate to="/session-planner" replace />
 
-  if (!activeCampaign) return (
-    <div className="page-content">
-      <div className="page-header-row" style={{ marginBottom: 20 }}>
-        <h2 style={{ fontSize: 22 }}>Journal</h2>
-      </div>
-      {campaignsLoading
-        ? <SkeletonTextLines lines={10} style={{ maxWidth: 720 }} />
-        : campaignsError
-          ? <div style={{ color: 'var(--text-2)' }}>
-              <p style={{ marginBottom: 12 }}>{campaignsError}</p>
-              <button className="btn btn-ghost" onClick={reloadCampaigns}>Retry</button>
-            </div>
-          : <p style={{ color: 'var(--text-3)' }}>Select or create a campaign to get started.</p>}
-    </div>
-  )
-
   // Sort sidebar numerically by day number, descending (newest first) —
   // independent of title text, so renaming a title never shuffles the list.
   const sorted = [...entries].sort((a, b) => (b.day ?? 0) - (a.day ?? 0))
@@ -171,7 +173,7 @@ export default function Journal() {
       <div className="journal-day-list" style={{ width: 180, flexShrink: 0, borderRight: '1px solid var(--border)', overflowY: 'auto', background: 'var(--surface)' }}>
         <div style={{ padding: '14px 14px 8px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Days</span>
-          <button className="btn btn-ghost btn-sm" onClick={newEntry} style={{ padding: '3px 8px' }}>+</button>
+          <button className="btn btn-ghost btn-sm" onClick={newEntry} disabled={!activeCampaign} style={{ padding: '3px 8px' }}>+</button>
         </div>
         {sorted.map(e => (
           <div key={e._id}
@@ -213,7 +215,7 @@ export default function Journal() {
             </div>
           </div>
         ))}
-        {!entriesLoading && !entries.length && (
+        {!loadingContent && activeCampaign && !entriesError && !entries.length && (
           <div style={{ padding: '20px 14px', fontSize: 12, color: 'var(--text-3)' }}>No days yet.</div>
         )}
       </div>
@@ -221,31 +223,31 @@ export default function Journal() {
       {/* Editor */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
         <div style={{ padding: '14px 24px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'var(--surface)' }}>
-          <h2 onClick={(ev) => { if (active && renamingId !== active._id) startRename(ev, active) }} style={{ fontSize: 16, display: 'flex', alignItems: 'center', gap: 8, cursor: 'text' }}>
+          <h2 style={{ fontSize: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
             {active ? (
               renamingId === active._id ? (
                 <input
                   autoFocus
                   className="input"
                   value={titleDraft}
-                  onClick={ev => ev.stopPropagation()}
                   onChange={ev => setTitleDraft(ev.target.value)}
-                  onBlur={() => commitRename(active._id)}
+                  onBlur={() => finishRename(active._id)}
                   onKeyDown={ev => {
-                    if (ev.key === 'Enter') { ev.preventDefault(); commitRename(active._id) }
-                    if (ev.key === 'Escape') setRenamingId(null)
+                    if (ev.key === 'Enter') { ev.preventDefault(); ev.currentTarget.blur() }
+                    if (ev.key === 'Escape') { ev.preventDefault(); renameCancelled.current = true; ev.currentTarget.blur() }
                   }}
                   style={{ fontSize: 15, padding: '3px 8px' }}
                 />
               ) : (
-                <span
-                  onMouseDown={(ev) => ev.stopPropagation()}
+                <button
+                  type="button"
                   onClick={(ev) => startRename(ev, active)}
                   title="Click to rename"
-                  style={{ cursor: 'text' }}
+                  aria-label={`Rename ${entryTitle(active)}`}
+                  style={{ background: 'none', border: 'none', padding: 0, color: 'inherit', font: 'inherit', letterSpacing: 'inherit', cursor: 'text', textAlign: 'left' }}
                 >
                   {entryTitle(active)}
-                </span>
+                </button>
               )
             ) : 'Select a day'}
             {active && renamingId !== active._id && (
@@ -253,6 +255,7 @@ export default function Journal() {
                 type="button"
                 onClick={(ev) => startRename(ev, active)}
                 title="Rename"
+                aria-label={`Rename ${entryTitle(active)}`}
                 style={{ background: 'none', border: 'none', color: 'var(--text-3)', cursor: 'pointer', fontSize: 13, padding: 2, lineHeight: 1 }}
               >✎</button>
             )}
@@ -265,8 +268,17 @@ export default function Journal() {
           </div>
         </div>
         <div style={{ flex: 1, overflowY: 'auto', padding: '24px 32px' }}>
-          {entriesLoading ? (
+          {loadingContent ? (
             <SkeletonTextLines lines={12} style={{ maxWidth: 840 }} />
+          ) : campaignsError ? (
+            <div style={{ textAlign: 'center', color: 'var(--text-2)', marginTop: 60, fontSize: 13 }}>
+              <p style={{ marginBottom: 12 }}>{campaignsError}</p>
+              <button className="btn btn-ghost" onClick={reloadCampaigns}>Retry</button>
+            </div>
+          ) : !activeCampaign ? (
+            <div style={{ textAlign: 'center', color: 'var(--text-3)', marginTop: 60, fontSize: 13 }}>
+              Select or create a campaign to get started.
+            </div>
           ) : entriesError ? (
             <div style={{ color: 'var(--text-2)' }}>
               <p style={{ marginBottom: 12 }}>{entriesError}</p>

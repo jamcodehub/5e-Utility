@@ -3,6 +3,7 @@ import { Navigate } from 'react-router-dom'
 import { api, useAuth } from '../context/AuthContext'
 import { useCampaign } from '../context/CampaignContext'
 import { useToast } from '../hooks/useToast'
+import { SkeletonBlock } from '../components/Skeleton'
 
 const nanoid = () => Math.random().toString(36).slice(2, 9)
 
@@ -146,6 +147,7 @@ export default function HpTracker() {
   const [combatants, setCombatants] = useState([])
   const [lorePool, setLorePool] = useState([])   // available lore entries to add
   const [round, setRound] = useState(1)
+  const [dataLoading, setDataLoading] = useState(true)
 
   // Custom combatant form
   const [customName, setCustomName] = useState('')
@@ -153,7 +155,11 @@ export default function HpTracker() {
   const [customType, setCustomType] = useState('enemy')
 
   const load = useCallback(async () => {
-    if (!activeCampaign) return
+    if (!activeCampaign) {
+      setDataLoading(false)
+      return
+    }
+    setDataLoading(true)
 
     // Load party characters
     try {
@@ -181,6 +187,7 @@ export default function HpTracker() {
       const lore = await api(`/lore/${activeCampaign._id}`)
       setLorePool((lore || []).filter(l => ['npc', 'enemy', 'boss'].includes(l.tag)))
     } catch { /* */ }
+    setDataLoading(false)
   }, [activeCampaign?._id])
 
   useEffect(() => { load() }, [load])
@@ -245,8 +252,11 @@ export default function HpTracker() {
   if (user?.role !== 'dm') return <Navigate to="/journal" replace />
 
   if (!activeCampaign) return (
-    <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-3)' }}>
-      Select a campaign.
+    <div style={{ height: '100%', padding: 20 }}>
+      <div style={{ paddingBottom: 14, borderBottom: '1px solid var(--border)' }}>
+        <h2 style={{ fontSize: 18, margin: 0 }}>HP Tracker</h2>
+      </div>
+      <div style={{ color: 'var(--text-3)', marginTop: 20 }}>Select a campaign.</div>
     </div>
   )
 
@@ -268,7 +278,11 @@ export default function HpTracker() {
 
         {/* Combatant grid */}
         <div style={{ flex: 1, overflowY: 'auto', padding: 16 }}>
-          {combatants.length === 0 ? (
+          {dataLoading ? (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 12 }}>
+              {Array.from({ length: 4 }).map((_, i) => <SkeletonBlock key={i} height={156} radius={10} />)}
+            </div>
+          ) : combatants.length === 0 ? (
             <div style={{ textAlign: 'center', color: 'var(--text-3)', padding: 60, fontSize: 13, lineHeight: 1.8 }}>
               No combatants yet.<br />Party members are loaded automatically.<br />Add enemies from the panel on the right.
             </div>
@@ -290,7 +304,11 @@ export default function HpTracker() {
           <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>
             Add from Lore
           </div>
-          {lorePool.length === 0 && (
+          {dataLoading ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {Array.from({ length: 5 }).map((_, i) => <SkeletonBlock key={i} height={48} radius={8} />)}
+            </div>
+          ) : lorePool.length === 0 && (
             <div style={{ fontSize: 12, color: 'var(--text-3)', lineHeight: 1.6 }}>
               No lore combatants. Add NPCs, enemies or bosses in the Lore section.
             </div>

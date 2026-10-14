@@ -64,62 +64,153 @@ export function SkeletonPage({ cards = 4 }) {
   )
 }
 
-// Matches Character.jsx's actual layout: character-switcher pills, a header
-// card (avatar + name + stat row), then a couple of detail-section cards —
-// so the loading state doesn't jump/reflow once the real data arrives.
+// Mirrors the character switcher, character-sheet panel, tab strip, and stats row.
 export function SkeletonCharacterPage() {
   return (
     <div className="page-content" style={{ overflow: 'hidden' }}>
+      <h2 style={{ fontSize: 22, marginBottom: 12 }}>My Characters</h2>
       <div style={{ display: 'flex', gap: 6, marginBottom: 12 }}>
         <SkeletonBlock width={110} height={28} radius={999} />
         <SkeletonBlock width={90} height={28} radius={999} />
       </div>
-      <div className="card" style={{ padding: '16px 20px', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 16 }}>
-        <SkeletonBlock width={56} height={56} radius={28} />
-        <div style={{ flex: 1, minWidth: 200, display: 'flex', flexDirection: 'column', gap: 8 }}>
-          <SkeletonBlock width="40%" height={18} />
-          <SkeletonBlock width="60%" height={12} />
+      <SkeletonBlock height={118} radius={12} style={{ marginBottom: 12 }} />
+      <div style={{ display: 'flex', gap: 6, marginBottom: 12, flexWrap: 'wrap' }}>
+        {Array.from({ length: 5 }).map((_, i) => <SkeletonBlock key={i} width={76} height={30} radius={999} />)}
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, minmax(0, 1fr))', gap: 8 }}>
+        {Array.from({ length: 6 }).map((_, i) => <SkeletonBlock key={i} height={76} radius={10} />)}
+      </div>
+    </div>
+  )
+}
+
+export function SkeletonInventoryContent() {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <SkeletonBlock height={104} radius={12} />
+      <SkeletonBlock height={260} radius={12} />
+    </div>
+  )
+}
+
+export function SkeletonLorePage() {
+  return (
+    <div className="page-content">
+      <div className="page-header-row" style={{ marginBottom: 20 }}>
+        <h2 style={{ fontSize: 18, flex: 1 }}>Info &amp; Lore</h2>
+        <div style={{ display: 'flex', gap: 4 }}>
+          {Array.from({ length: 4 }).map((_, i) => <SkeletonBlock key={i} width={58} height={30} radius={8} />)}
         </div>
-        <div style={{ display: 'flex', gap: 14 }}>
-          {Array.from({ length: 4 }).map((_, i) => (
-            <div key={i} style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'center' }}>
-              <SkeletonBlock width={26} height={8} />
-              <SkeletonBlock width={40} height={16} />
-            </div>
-          ))}
+        <SkeletonBlock width={92} height={30} radius={8} />
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 14 }}>
+        {Array.from({ length: 4 }).map((_, i) => <SkeletonCard key={i} lines={3} style={{ minHeight: 130 }} />)}
+      </div>
+    </div>
+  )
+}
+
+export function SkeletonRoleplayPage() {
+  return (
+    <div className="page-content">
+      <div className="page-header-row" style={{ marginBottom: 16 }}>
+        <h2 style={{ fontSize: 22, marginBottom: 4 }}>Roleplay Assistant</h2>
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 320px), 1fr))', gap: 16 }}>
+        <SkeletonCard lines={6} style={{ minHeight: 230 }} />
+        <SkeletonCard lines={5} style={{ minHeight: 230 }} />
+      </div>
+    </div>
+  )
+}
+
+export function SkeletonMusicPage() {
+  return (
+    <div className="page-content">
+      <div className="page-header-row" style={{ marginBottom: 24 }}>
+        <div>
+          <h2 style={{ fontSize: 22, marginBottom: 4 }}>Music</h2>
+          <p style={{ color: 'var(--text-2)', fontSize: 14, margin: 0 }}>Ambient moods &amp; your own tracks</p>
         </div>
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 14 }}>
-        {Array.from({ length: 4 }).map((_, i) => (
-          <SkeletonCard key={i} lines={3} />
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 320px), 1fr))', gap: 16 }}>
+        <SkeletonCard lines={5} style={{ minHeight: 200 }} />
+        <SkeletonCard lines={5} style={{ minHeight: 200 }} />
+      </div>
+    </div>
+  )
+}
+
+export function SkeletonRulesPage() {
+  return (
+    <div className="page-content">
+      <div className="page-header-row" style={{ marginBottom: 20 }}>
+        <div>
+          <h2 style={{ fontSize: 22, marginBottom: 4 }}>5e Rules Reference</h2>
+          <p style={{ color: 'var(--text-2)', fontSize: 14, margin: 0 }}>Quick lookups for the rules you forget mid-session.</p>
+        </div>
+      </div>
+      <SkeletonBlock width="min(100%, 400px)" height={38} style={{ marginBottom: 20 }} />
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 12, maxWidth: 720 }}>
+        {Array.from({ length: 5 }).map((_, i) => <SkeletonCard key={i} lines={2} />)}
+      </div>
+    </div>
+  )
+}
+
+export function SkeletonPremiumPage() {
+  return (
+    <div className="page-content">
+      <div className="page-header-row" style={{ marginBottom: 24 }}>
+        <div>
+          <h2 style={{ fontSize: 22, marginBottom: 4 }}>Premium</h2>
+          <p style={{ color: 'var(--text-2)', fontSize: 14, margin: 0 }}>Unlock the full &amp; Utility experience for your campaigns.</p>
+        </div>
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 16 }}>
+        {[0, 1].map(i => (
+          <div key={i} className="card" style={{ minHeight: 440, padding: 24, display: 'flex', flexDirection: 'column', gap: 14 }}>
+            <SkeletonBlock width="58%" height={20} />
+            <SkeletonBlock width="42%" height={34} style={{ marginBottom: 8 }} />
+            {Array.from({ length: i === 0 ? 8 : 5 }).map((_, row) => (
+              <SkeletonBlock key={row} width={row % 3 === 2 ? '72%' : '92%'} height={13} />
+            ))}
+          </div>
         ))}
       </div>
     </div>
   )
 }
 
-// Matches Inventory.jsx's layout: title, a row of currency pills, then a
-// grid of item cards below.
-export function SkeletonInventoryPage() {
+export function SkeletonDicePage() {
   return (
-    <div className="page-content" style={{ overflow: 'hidden' }}>
-      <div style={{ marginBottom: 20 }}>
-        <SkeletonBlock width={160} height={22} style={{ marginBottom: 8 }} />
-        <SkeletonBlock width={220} height={12} />
+    <div className="page-content dice-page" style={{ display: 'flex', flexDirection: 'column', gap: 14, padding: 14, height: '100%' }}>
+      <SkeletonBlock width="100%" height="100%" radius={32} style={{ flex: 1, minHeight: 280 }} />
+      <div style={{ display: 'flex', gap: 20 }}>
+        <SkeletonBlock height={88} radius={22} style={{ flex: 1 }} />
+        <SkeletonBlock height={88} radius={22} style={{ flex: 1 }} />
       </div>
-      <div className="card" style={{ padding: '16px 20px', marginBottom: 20 }}>
-        <SkeletonBlock width={100} height={14} style={{ marginBottom: 14 }} />
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
-          {Array.from({ length: 4 }).map((_, i) => (
-            <SkeletonBlock key={i} width={100} height={64} radius={12} />
-          ))}
+    </div>
+  )
+}
+
+export function SkeletonCombatPage() {
+  return (
+    <div style={{ display: 'flex', height: '100%', overflow: 'hidden' }}>
+      <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
+        <div style={{ padding: '14px 20px', borderBottom: '1px solid var(--border)', background: 'var(--surface)' }}>
+          <h2 style={{ fontSize: 18, margin: 0 }}>HP Tracker</h2>
+        </div>
+        <div style={{ flex: 1, overflow: 'hidden', padding: 16, display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', alignContent: 'start', gap: 12 }}>
+          {Array.from({ length: 4 }).map((_, i) => <SkeletonCard key={i} lines={3} style={{ minHeight: 150 }} />)}
         </div>
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 14 }}>
-        {Array.from({ length: 6 }).map((_, i) => (
-          <SkeletonCard key={i} lines={2} />
-        ))}
-      </div>
+      <aside style={{ width: 260, flexShrink: 0, borderLeft: '1px solid var(--border)', padding: 12 }}>
+        <SkeletonBlock width={90} height={12} style={{ marginBottom: 12 }} />
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {Array.from({ length: 5 }).map((_, i) => <SkeletonBlock key={i} height={48} radius={8} />)}
+        </div>
+      </aside>
     </div>
   )
 }

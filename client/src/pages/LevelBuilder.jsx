@@ -30,7 +30,6 @@ function tileColor(id) {
 }
 
 function MapThumb({ content }) {
-  const canvasRef = useRef(null)
   const grid = useMemo(() => {
     try {
       const parsed = JSON.parse(content)
@@ -40,33 +39,33 @@ function MapThumb({ content }) {
     }
   }, [content])
 
-  useEffect(() => {
-    const canvas = canvasRef.current
-    const context = canvas?.getContext('2d')
-    if (!context || !grid) return
-    context.clearRect(0, 0, GRID_W, GRID_H)
-    grid.forEach((row, r) => row.forEach((cell, c) => {
-      context.fillStyle = tileColor(cell)
-      context.fillRect(c, r, 1, 1)
-    }))
-  }, [grid])
-
   if (!grid) return <div style={{ width: '100%', aspectRatio: `${GRID_W}/${GRID_H}`, background: '#eee', borderRadius: 4 }} />
   return (
-    <canvas
-      ref={canvasRef}
-      width={GRID_W}
-      height={GRID_H}
+    <svg
+      viewBox={`0 0 ${GRID_W} ${GRID_H}`}
+      preserveAspectRatio="none"
       aria-hidden="true"
       style={{
         display: 'block',
         width: '100%',
         aspectRatio: `${GRID_W}/${GRID_H}`,
         borderRadius: 4,
-        backgroundImage: 'linear-gradient(to right, rgba(0,0,0,0.12) 1px, transparent 1px), linear-gradient(to bottom, rgba(0,0,0,0.12) 1px, transparent 1px)',
-        backgroundSize: `${100 / GRID_W}% ${100 / GRID_H}%`,
+        background: '#f5f4f1',
+        shapeRendering: 'crispEdges',
       }}
-    />
+    >
+      {grid.flatMap((row, r) => row.map((cell, c) => (
+        <rect key={`${r}-${c}`} x={c} y={r} width="1" height="1" fill={tileColor(cell)} />
+      )))}
+      <path
+        d={`M${Array.from({ length: GRID_W + 1 }, (_, x) => `M${x} 0V${GRID_H}`).join('')} ${Array.from({ length: GRID_H + 1 }, (_, y) => `M0 ${y}H${GRID_W}`).join('')}`}
+        fill="none"
+        stroke="rgba(0,0,0,0.24)"
+        strokeWidth="0.045"
+        vectorEffect="non-scaling-stroke"
+        shapeRendering="crispEdges"
+      />
+    </svg>
   )
 }
 
@@ -663,7 +662,7 @@ export default function LevelBuilder() {
       {/* Header */}
       <div style={{ padding: '16px 24px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0, background: 'var(--surface)' }}>
         <div style={{ flex: 1 }}>
-          <h2 style={{ fontSize: 20, marginBottom: 2 }}>Level Builder</h2>
+          <h2 style={{ fontSize: 20, marginBottom: 2 }}>Battle Map</h2>
           <p style={{ fontSize: 13, color: 'var(--text-2)', margin: 0 }}>
             {isDm
               ? <>Draw tile maps, then enter play mode to position your party. {!isPremium && `(${plans.length}/5 free)`}</>
