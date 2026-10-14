@@ -11,7 +11,8 @@
 The app has tailored experiences for players and DMs, with shared campaign data keeping everyone on the same page. Use it to prepare between sessions, then keep useful references and interactive tools close at the table.
 </p>
 
-<img width="1508" height="831" alt="image" src="https://github.com/user-attachments/assets/327c3262-e449-4bea-95d5-9c41b255a157" />
+<img width="1504" height="774" alt="image" src="https://github.com/user-attachments/assets/41ab2ef8-3d75-4258-b8b8-7adb0dcf3b2a" />
+
 
 <h2 align="center">
 Features
