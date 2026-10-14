@@ -8,14 +8,13 @@
 
 <p align="center">
 5e Utility is an all-in-one companion for tabletop fantasy campaigns. It brings player tools and Dungeon Master prep into one shared, campaign-based website, helping groups keep character details, session notes, worldbuilding, and play aids together.
-
 The app has tailored experiences for players and DMs, with shared campaign data keeping everyone on the same page. Use it to prepare between sessions, then keep useful references and interactive tools close at the table.
 </p>
 
 <img width="1508" height="831" alt="image" src="https://github.com/user-attachments/assets/327c3262-e449-4bea-95d5-9c41b255a157" />
 
 <p align="center">
-## Features
+Features
 </p>
 
 ### Player pages
