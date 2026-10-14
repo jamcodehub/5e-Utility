@@ -316,7 +316,6 @@ export default function MusicPlayer() {
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 24, gap: 12 }}>
         <div>
           <h2 style={{ fontSize: 22, marginBottom: 4 }}>Music</h2>
-          <p style={{ color: 'var(--text-2)', fontSize: 14, margin: 0 }}>Ambient moods &amp; your own tracks</p>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
           {/* Volume — kept beside the upload controls and follows the active theme accent */}

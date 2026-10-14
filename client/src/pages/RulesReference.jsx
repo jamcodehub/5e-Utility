@@ -20,7 +20,6 @@ export default function RulesReference() {
       <div className="page-header-row" style={{ marginBottom: 20 }}>
         <div>
           <h2 style={{ fontSize: 22, marginBottom: 4 }}>5e Rules Reference</h2>
-          <p style={{ color: 'var(--text-2)', fontSize: 14, margin: 0 }}>Quick lookups for the rules you forget mid-session.</p>
         </div>
       </div>
 

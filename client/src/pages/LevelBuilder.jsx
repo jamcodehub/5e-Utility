@@ -663,11 +663,6 @@ export default function LevelBuilder() {
       <div style={{ padding: '16px 24px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0, background: 'var(--surface)' }}>
         <div style={{ flex: 1 }}>
           <h2 style={{ fontSize: 20, marginBottom: 2 }}>Battle Map</h2>
-          <p style={{ fontSize: 13, color: 'var(--text-2)', margin: 0 }}>
-            {isDm
-              ? <>Draw tile maps, then enter play mode to position your party. {!isPremium && `(${plans.length}/5 free)`}</>
-              : 'Open a map below to view and move your token — everyone sees moves live.'}
-          </p>
         </div>
         {isDm && <button className="btn btn-primary" onClick={() => openEditor(null)}>+ Create New Map</button>}
       </div>
