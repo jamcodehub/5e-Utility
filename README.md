@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="https://res.cloudinary.com/crcbzpw6/image/upload/v1786529766/lore-ledger/storyboard/sdniavu2yeigjupqxgou.png" width="460" alt="5e Utility logo">
+  <img src="https://res.cloudinary.com/crcbzpw6/image/upload/v1786529766/lore-ledger/storyboard/sdniavu2yeigjupqxgou.png" width="260" alt="5e Utility logo">
 </p>
 
 <p align="center">
