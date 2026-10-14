@@ -12,8 +12,7 @@
 The app has tailored experiences for players and DMs, with shared campaign data keeping everyone on the same page. Use it to prepare between sessions, then keep useful references and interactive tools close at the table.
 </p>
 
-<img width="1512" height="835" alt="5e Utility application screenshot" src= <img width="1509" height="835" alt="image" src="https://github.com/user-attachments/assets/92ad307c-6b46-47f9-aad1-4b09d2c1144b" />
-" />
+<img width="1508" height="831" alt="image" src="https://github.com/user-attachments/assets/327c3262-e449-4bea-95d5-9c41b255a157" />
 
 ## Features
 
