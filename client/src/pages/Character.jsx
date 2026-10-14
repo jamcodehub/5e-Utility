@@ -1,8 +1,10 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { api } from '../context/AuthContext'
+import { api, useAuth } from '../context/AuthContext'
 import { useCampaign } from '../context/CampaignContext'
 import { useToast } from '../hooks/useToast'
 import { uploadToCloudinary } from '../utils/uploadToCloudinary'
+import UpgradeModal from '../components/UpgradeModal'
+import { SkeletonCharacterPage } from '../components/Skeleton'
 import { CloudinaryImage } from '@cloudinary/url-gen'
 import { quality, format } from '@cloudinary/url-gen/actions/delivery'
 import { auto as autoQuality } from '@cloudinary/url-gen/qualifiers/quality'
@@ -10,7 +12,7 @@ import { auto as autoFormat } from '@cloudinary/url-gen/qualifiers/format'
 import { thumbnail } from '@cloudinary/url-gen/actions/resize'
 import { autoGravity } from '@cloudinary/url-gen/qualifiers/gravity'
 
-const CLOUD_NAME = 'crcbzpw6'
+const CLOUD_NAME = 'crcbzpw6' //cloud id
 
 function getOptimisedUrl(cloudinaryUrl, width = null) {
   if (!cloudinaryUrl) return ''
@@ -41,26 +43,75 @@ const DEFAULT = {
 
 export default function Character() {
   const { activeCampaign } = useCampaign()
+  const { isPremium } = useAuth()
   const { toast, ToastContainer } = useToast()
   const [tab, setTab]       = useState('stats')
+  const [characters, setCharacters] = useState([])
+  const [activeCharId, setActiveCharId] = useState(null)
   const [char, setChar]     = useState(null)
   const [form, setForm]     = useState(DEFAULT)
   const [editing, setEditing] = useState(false)
   const [avatarPreview, setAvatarPreview] = useState('')
   const [loaded, setLoaded] = useState(false)
+  const [showUpgrade, setShowUpgrade] = useState(false)
 
+  const FREE_CHAR_LIMIT = 2
+  const atCharLimit = !isPremium && characters.length >= FREE_CHAR_LIMIT
+
+  // Loads every character this player owns in the active campaign, then
+  // selects the primary one (or the first) as the active sheet.
   const load = useCallback(async () => {
     if (!activeCampaign) return
-    const data = await api(`/campaigns/${activeCampaign._id}/character`)
-    console.log('character data:', data)
-    if (data) { setChar(data); setForm(data); setAvatarPreview(data.avatarUrl || '') }
+    const list = await api(`/campaigns/${activeCampaign._id}/characters`)
+    setCharacters(list)
+    const chosen = list.find(c => c.isPrimary) || list[0] || null
+    setActiveCharId(chosen?._id || null)
+    if (chosen) { setChar(chosen); setForm(chosen); setAvatarPreview(chosen.avatarUrl || '') }
     else { setChar(null); setForm(DEFAULT); setAvatarPreview('') }
     setLoaded(true)
   }, [activeCampaign])
 
   useEffect(() => { if (!activeCampaign) return; setLoaded(false); load() }, [activeCampaign, load])
 
+  const selectCharacter = (c) => {
+    setActiveCharId(c._id)
+    setChar(c)
+    setForm(c)
+    setAvatarPreview(c.avatarUrl || '')
+    setEditing(false)
+  }
+
+  const addCharacter = async () => {
+    if (!activeCampaign) return
+    if (atCharLimit) { setShowUpgrade(true); return }
+    try {
+      const created = await api(`/campaigns/${activeCampaign._id}/characters`, { method: 'POST', body: DEFAULT })
+      setCharacters(p => [...p, created])
+      selectCharacter(created)
+      setEditing(true)
+    } catch (err) {
+      if (err?.status === 403) { setShowUpgrade(true); return }
+      toast(err.message || 'Could not create character')
+    }
+  }
+
+  const deleteCharacter = async (c, e) => {
+    e.stopPropagation()
+    if (characters.length <= 1) { toast('You must have at least one character sheet.'); return }
+    if (!window.confirm(`Delete "${c.name || 'Unnamed Hero'}"? This cannot be undone.`)) return
+    try {
+      await api(`/campaigns/${activeCampaign._id}/characters/${c._id}`, { method: 'DELETE' })
+      const remaining = characters.filter(x => x._id !== c._id)
+      setCharacters(remaining)
+      if (activeCharId === c._id) selectCharacter(remaining[0])
+      toast('Character deleted')
+    } catch (err) { toast(err.message || 'Could not delete character') }
+  }
+
   const [avatarUploading, setAvatarUploading] = useState(false)
+
+  const activeCharIdRef = useRef(null)
+  activeCharIdRef.current = activeCharId
 
   const handleAvatar = async (e) => {
     const file = e.target.files[0]
@@ -78,9 +129,20 @@ export default function Character() {
 
   const save = async () => {
     try {
-      const updated = await api(`/campaigns/${activeCampaign._id}/character`, { method: 'PUT', body: form })
+      let updated
+      if (activeCharIdRef.current) {
+        updated = await api(`/campaigns/${activeCampaign._id}/characters/${activeCharIdRef.current}`, { method: 'PUT', body: form })
+        setCharacters(p => p.map(c => c._id === updated._id ? updated : c))
+      } else {
+        updated = await api(`/campaigns/${activeCampaign._id}/characters`, { method: 'POST', body: form })
+        setCharacters(p => [...p, updated])
+        setActiveCharId(updated._id)
+      }
       setChar(updated); setForm(updated); setEditing(false); toast('Character saved')
-    } catch (e) { toast(e.message || 'Save failed') }
+    } catch (e) {
+      if (e?.status === 403) { setShowUpgrade(true); return }
+      toast(e.message || 'Save failed')
+    }
   }
 
   const hpSaveTimer = useRef(null)
@@ -90,12 +152,13 @@ export default function Character() {
       const current = p.hp?.current ?? 10
       const next = Math.max(0, Math.min(max, current + delta))
       const nextForm = { ...p, hp: { current: next, max } }
-      if (activeCampaign) {
+      if (activeCampaign && activeCharIdRef.current) {
         clearTimeout(hpSaveTimer.current)
         hpSaveTimer.current = setTimeout(async () => {
           try {
-            const updated = await api(`/campaigns/${activeCampaign._id}/character`, { method: 'PUT', body: nextForm })
+            const updated = await api(`/campaigns/${activeCampaign._id}/characters/${activeCharIdRef.current}`, { method: 'PUT', body: nextForm })
             setChar(updated)
+            setCharacters(p => p.map(c => c._id === updated._id ? updated : c))
           } catch { toast('Could not save HP change') }
         }, 400)
       }
@@ -109,13 +172,14 @@ export default function Character() {
   const [autosaveStatus, setAutosaveStatus] = useState('') // '' | 'saving' | 'saved'
   const textSaveTimer = useRef(null)
   const scheduleTextAutosave = useCallback((nextForm) => {
-    if (!activeCampaign) return
+    if (!activeCampaign || !activeCharIdRef.current) return
     clearTimeout(textSaveTimer.current)
     setAutosaveStatus('saving')
     textSaveTimer.current = setTimeout(async () => {
       try {
-        const updated = await api(`/campaigns/${activeCampaign._id}/character`, { method: 'PUT', body: nextForm })
+        const updated = await api(`/campaigns/${activeCampaign._id}/characters/${activeCharIdRef.current}`, { method: 'PUT', body: nextForm })
         setChar(updated)
+        setCharacters(p => p.map(c => c._id === updated._id ? updated : c))
         setAutosaveStatus('saved')
       } catch { setAutosaveStatus(''); toast('Could not autosave') }
     }, 800)
@@ -135,11 +199,44 @@ export default function Character() {
 
   const F = form
 
-  if (!activeCampaign) return <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-3)' }}>Select a campaign.</div>
-  if (!loaded) return <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-3)' }}>Loading character...</div>
+  if (!activeCampaign) return (
+    <div className="page-content">
+      <h2 style={{ fontSize: 22, marginBottom: 12 }}>My Characters</h2>
+      <div style={{ color: 'var(--text-3)' }}>Select a campaign.</div>
+    </div>
+  )
+  if (!loaded) return <SkeletonCharacterPage />
 
   return (
     <div className="page-content">
+      <h2 style={{ fontSize: 22, marginBottom: 12 }}>My Characters</h2>
+      {/* Character switcher — up to 2 free / unlimited premium per campaign */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 12, flexWrap: 'wrap' }}>
+        {characters.map(c => (
+          <div key={c._id}
+            onClick={() => selectCharacter(c)}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 6, padding: '6px 10px', borderRadius: 999, cursor: 'pointer',
+              fontSize: 12, fontWeight: 500,
+              background: activeCharId === c._id ? 'var(--gold-bg)' : 'var(--surface2)',
+              color: activeCharId === c._id ? 'var(--gold)' : 'var(--text-2)',
+              border: `1px solid ${activeCharId === c._id ? 'var(--gold-border)' : 'var(--border)'}`,
+            }}>
+            <span>{c.name || 'Unnamed Hero'}</span>
+            {characters.length > 1 && (
+              <span onClick={(e) => deleteCharacter(c, e)} title="Delete character" style={{ opacity: 0.6, fontSize: 11 }}>✕</span>
+            )}
+          </div>
+        ))}
+        <button
+          onClick={addCharacter}
+          className="btn btn-ghost btn-sm"
+          style={{ fontSize: 12, opacity: atCharLimit ? 0.7 : 1 }}
+        >
+          {atCharLimit ? `✦ ${characters.length}/${FREE_CHAR_LIMIT} — Upgrade for more` : '+ New Character'}
+        </button>
+      </div>
+
       {/* Header card */}
       <div className="card" style={{ padding: '16px 20px', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
         {/* Avatar */}
@@ -289,6 +386,7 @@ export default function Character() {
         </div>
       )}
       <ToastContainer />
+      {showUpgrade && <UpgradeModal onClose={() => setShowUpgrade(false)} message={`Free accounts are limited to ${FREE_CHAR_LIMIT} characters per campaign. Upgrade to Premium for unlimited characters.`} />}
     </div>
   )
 }

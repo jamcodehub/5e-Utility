@@ -1,46 +1,75 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
+import { Navigate } from 'react-router-dom'
 import UpgradeModal from '../components/UpgradeModal'
 import { api, useAuth } from '../context/AuthContext'
 import { useCampaign } from '../context/CampaignContext'
 import { useToast } from '../hooks/useToast'
+import { SkeletonTextLines } from '../components/Skeleton'
 
 const wordCount = s => s.trim().split(/\s+/).filter(Boolean).length
 
+// Player-only journal — split out from the old shared Journal/Sessions page.
+// DMs now use SessionPlanner.jsx instead (see /session-planner route).
 export default function Journal() {
-  const { activeCampaign } = useCampaign()
+  const { activeCampaign, campaignsLoading, campaignsError, reload: reloadCampaigns } = useCampaign()
   const { user } = useAuth()
   const { toast, ToastContainer } = useToast()
-  const isDM = user?.role === 'dm'
 
-  const noun       = isDM ? 'Session' : 'Day'
-  const nounPlural = isDM ? 'Sessions' : 'Days'
-  const apiBase    = 'journal' // both DM and player use the same endpoint; field differs (session vs day)
-  const placeholder = isDM
-    ? 'Plan this session — encounters, NPCs, pacing, hooks, notes for the table…'
-    : 'Record what happened this session…'
+  const apiBase    = 'journal'
+  const placeholder = 'Record what happened this session…'
 
   const [entries, setEntries] = useState([])
+  const [entriesLoading, setEntriesLoading] = useState(true)
+  const [entriesCampaignId, setEntriesCampaignId] = useState(null)
+  const [entriesError, setEntriesError] = useState('')
+  const [entriesReload, setEntriesReload] = useState(0)
   const [activeId, setActiveId] = useState(null)
   const [content, setContent] = useState('')
   const [saving, setSaving] = useState(false)
   const [showUpgrade, setShowUpgrade] = useState(false)
   const [renamingId, setRenamingId] = useState(null)
   const [titleDraft, setTitleDraft] = useState('')
+  const renameCancelled = useRef(false)
   const saveTimer = useRef(null)
 
   const active = entries.find(e => e._id === activeId)
-  const entryNum = e => e.session ?? e.day ?? '?'
-  const entryTitle = e => e.title || `${noun} ${entryNum(e)}`
+  const entryNum = e => e.day ?? '?'
+  const entryTitle = e => e.title || `Day ${entryNum(e)}`
+  const loadingContent = campaignsLoading || (activeCampaign && (entriesLoading || entriesCampaignId !== activeCampaign._id))
 
-  const load = useCallback(async () => {
-    if (!activeCampaign) return
-    const data = await api(`/${apiBase}/${activeCampaign._id}`)
-    setEntries(data)
-    if (data.length) { setActiveId(data[0]._id); setContent(data[0].content) }
-    else { setActiveId(null); setContent('') }
-  }, [activeCampaign, apiBase])
-
-  useEffect(() => { load() }, [load])
+  useEffect(() => {
+    if (!activeCampaign) {
+      setEntries([])
+      setEntriesCampaignId(null)
+      setActiveId(null)
+      setContent('')
+      setEntriesLoading(false)
+      return
+    }
+    let cancelled = false
+    setEntries([])
+    setActiveId(null)
+    setContent('')
+    setEntriesLoading(true)
+    setEntriesError('')
+    api(`/${apiBase}/${activeCampaign._id}?kind=day`)
+      .then(data => {
+        if (cancelled) return
+        setEntries(data)
+        setEntriesCampaignId(activeCampaign._id)
+        if (data.length) { setActiveId(data[0]._id); setContent(data[0].content) }
+      })
+      .catch(err => {
+        if (!cancelled) {
+          setEntriesCampaignId(activeCampaign._id)
+          setEntriesError(err.message || 'Failed to load journal entries')
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setEntriesLoading(false)
+      })
+    return () => { cancelled = true }
+  }, [activeCampaign, entriesReload])
 
   const selectEntry = (e) => {
     // Flush any pending save for the current entry before switching
@@ -66,7 +95,7 @@ export default function Journal() {
       setEntries(p => p.map(e => e._id === id ? { ...e, content: text } : e))
     } catch { /* silently ignore — next keystroke will retry */ }
     setSaving(false)
-  }, [apiBase])
+  }, [])
 
   const handleContentChange = (e) => {
     const text = e.target.value
@@ -75,13 +104,27 @@ export default function Journal() {
     saveTimer.current = setTimeout(() => autosave(activeId, text), 800)
   }
 
-  // Flush on unmount
-  useEffect(() => () => { if (saveTimer.current) clearTimeout(saveTimer.current) }, [])
+  // Flush on unmount / tab close so nothing typed just before navigating away is lost.
+  useEffect(() => {
+    const flush = () => { if (saveTimer.current) clearTimeout(saveTimer.current) }
+    window.addEventListener('beforeunload', flush)
+    return () => { flush(); window.removeEventListener('beforeunload', flush) }
+  }, [])
 
   const startRename = (e, entry) => {
     e.stopPropagation()
+    renameCancelled.current = false
     setRenamingId(entry._id)
     setTitleDraft(entryTitle(entry))
+  }
+
+  const finishRename = (id) => {
+    if (renameCancelled.current) {
+      renameCancelled.current = false
+      setRenamingId(null)
+      return
+    }
+    commitRename(id)
   }
 
   const commitRename = async (id) => {
@@ -92,19 +135,17 @@ export default function Journal() {
     setEntries(p => p.map(e => e._id === id ? { ...e, title } : e))
     try {
       await api(`/${apiBase}/${id}`, { method: 'PUT', body: { title } })
-    } catch { toast(`Failed to rename ${noun.toLowerCase()}`) }
+    } catch { toast('Failed to rename day') }
   }
 
   const newEntry = async () => {
     if (!activeCampaign) return
-    const maxNum = entries.reduce((m, e) => Math.max(m, e.day ?? e.session ?? 0), 0)
+    const maxNum = entries.reduce((m, e) => Math.max(m, e.day ?? 0), 0)
     const nextNum = maxNum + 1
     try {
       const entry = await api(`/${apiBase}/${activeCampaign._id}`, {
         method: 'POST',
-        body: isDM
-          ? { session: nextNum, title: `Session ${nextNum}`, content: '' }
-          : { day: nextNum, title: `Day ${nextNum}`, content: '' },
+        body: { day: nextNum, title: `Day ${nextNum}`, content: '' },
       })
       setEntries(p => [entry, ...p])
       setActiveId(entry._id)
@@ -114,27 +155,29 @@ export default function Journal() {
         setShowUpgrade(true)
         return
       }
-      toast(`Failed to create ${noun.toLowerCase()}`)
+      toast('Failed to create day')
     }
   }
 
-  if (!activeCampaign) return (
-    <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-3)' }}>
-      Select or create a campaign to get started.
-    </div>
-  )
+  // DMs shouldn't land here — send them to their own Session Planner instead.
+  // (Placed after all hooks above to satisfy the Rules of Hooks.)
+  if (user?.role === 'dm') return <Navigate to="/session-planner" replace />
+
+  // Sort sidebar numerically by day number, descending (newest first) —
+  // independent of title text, so renaming a title never shuffles the list.
+  const sorted = [...entries].sort((a, b) => (b.day ?? 0) - (a.day ?? 0))
 
   return (
     <div className="journal-layout" style={{ display: 'flex', height: '100%', overflow: 'hidden' }}>
       {/* Sidebar list */}
       <div className="journal-day-list" style={{ width: 180, flexShrink: 0, borderRight: '1px solid var(--border)', overflowY: 'auto', background: 'var(--surface)' }}>
         <div style={{ padding: '14px 14px 8px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{nounPlural}</span>
-          <button className="btn btn-ghost btn-sm" onClick={newEntry} style={{ padding: '3px 8px' }}>+</button>
+          <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Days</span>
+          <button className="btn btn-ghost btn-sm" onClick={newEntry} disabled={!activeCampaign} style={{ padding: '3px 8px' }}>+</button>
         </div>
-        {entries.map(e => (
+        {sorted.map(e => (
           <div key={e._id}
-            onClick={() => renamingId !== e._id && selectEntry(e)}
+            onClick={(ev) => { if (renamingId === e._id) return; selectEntry(e) }}
             style={{
               width: '100%', textAlign: 'left', border: 'none',
               padding: '9px 14px',
@@ -151,17 +194,20 @@ export default function Journal() {
                   value={titleDraft}
                   onClick={ev => ev.stopPropagation()}
                   onChange={ev => setTitleDraft(ev.target.value)}
-                  onBlur={() => commitRename(e._id)}
+                  onBlur={() => finishRename(e._id)}
                   onKeyDown={ev => {
-                    if (ev.key === 'Enter') { ev.preventDefault(); commitRename(e._id) }
-                    if (ev.key === 'Escape') setRenamingId(null)
+                    if (ev.key === 'Enter') { ev.preventDefault(); ev.currentTarget.blur() }
+                    if (ev.key === 'Escape') { ev.preventDefault(); renameCancelled.current = true; ev.currentTarget.blur() }
                   }}
                   style={{ fontSize: 12, padding: '2px 6px', width: '100%' }}
                 />
               ) : (
-                <>
-                  <span onClick={(ev) => startRename(ev, e)} title="Click to rename" style={{ fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', cursor: 'text' }}>{entryTitle(e)}</span>
-                </>
+                <span
+                  onMouseDown={(ev) => ev.stopPropagation()}
+                  onClick={(ev) => startRename(ev, e)}
+                  title="Click to rename"
+                  style={{ fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', cursor: 'text', flex: 1 }}
+                >{entryTitle(e)}</span>
               )}
             </div>
             <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 2 }}>
@@ -169,15 +215,15 @@ export default function Journal() {
             </div>
           </div>
         ))}
-        {!entries.length && (
-          <div style={{ padding: '20px 14px', fontSize: 12, color: 'var(--text-3)' }}>No {nounPlural.toLowerCase()} yet.</div>
+        {!loadingContent && activeCampaign && !entriesError && !entries.length && (
+          <div style={{ padding: '20px 14px', fontSize: 12, color: 'var(--text-3)' }}>No days yet.</div>
         )}
       </div>
 
       {/* Editor */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
         <div style={{ padding: '14px 24px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'var(--surface)' }}>
-          <h2 style={{ fontSize: 16 }}>
+          <h2 style={{ fontSize: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
             {active ? (
               renamingId === active._id ? (
                 <input
@@ -185,19 +231,34 @@ export default function Journal() {
                   className="input"
                   value={titleDraft}
                   onChange={ev => setTitleDraft(ev.target.value)}
-                  onBlur={() => commitRename(active._id)}
+                  onBlur={() => finishRename(active._id)}
                   onKeyDown={ev => {
-                    if (ev.key === 'Enter') { ev.preventDefault(); commitRename(active._id) }
-                    if (ev.key === 'Escape') setRenamingId(null)
+                    if (ev.key === 'Enter') { ev.preventDefault(); ev.currentTarget.blur() }
+                    if (ev.key === 'Escape') { ev.preventDefault(); renameCancelled.current = true; ev.currentTarget.blur() }
                   }}
                   style={{ fontSize: 15, padding: '3px 8px' }}
                 />
               ) : (
-                <span onClick={(ev) => startRename(ev, active)} title="Click to rename" style={{ cursor: 'text' }}>
+                <button
+                  type="button"
+                  onClick={(ev) => startRename(ev, active)}
+                  title="Click to rename"
+                  aria-label={`Rename ${entryTitle(active)}`}
+                  style={{ background: 'none', border: 'none', padding: 0, color: 'inherit', font: 'inherit', letterSpacing: 'inherit', cursor: 'text', textAlign: 'left' }}
+                >
                   {entryTitle(active)}
-                </span>
+                </button>
               )
-            ) : `Select a ${noun.toLowerCase()}`}
+            ) : 'Select a day'}
+            {active && renamingId !== active._id && (
+              <button
+                type="button"
+                onClick={(ev) => startRename(ev, active)}
+                title="Edit title"
+                aria-label={`Edit title: ${entryTitle(active)}`}
+                style={{ background: 'none', border: 'none', color: 'var(--text-3)', cursor: 'pointer', fontSize: 13, padding: 2, lineHeight: 1 }}
+              >✎</button>
+            )}
           </h2>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{wordCount(content)} words</span>
@@ -207,7 +268,23 @@ export default function Journal() {
           </div>
         </div>
         <div style={{ flex: 1, overflowY: 'auto', padding: '24px 32px' }}>
-          {activeId ? (
+          {loadingContent ? (
+            <SkeletonTextLines lines={12} style={{ maxWidth: 840 }} />
+          ) : campaignsError ? (
+            <div style={{ textAlign: 'center', color: 'var(--text-2)', marginTop: 60, fontSize: 13 }}>
+              <p style={{ marginBottom: 12 }}>{campaignsError}</p>
+              <button className="btn btn-ghost" onClick={reloadCampaigns}>Retry</button>
+            </div>
+          ) : !activeCampaign ? (
+            <div style={{ textAlign: 'center', color: 'var(--text-3)', marginTop: 60, fontSize: 13 }}>
+              Select or create a campaign to get started.
+            </div>
+          ) : entriesError ? (
+            <div style={{ color: 'var(--text-2)' }}>
+              <p style={{ marginBottom: 12 }}>{entriesError}</p>
+              <button className="btn btn-ghost" onClick={() => setEntriesReload(n => n + 1)}>Retry</button>
+            </div>
+          ) : activeId ? (
             <textarea
               value={content}
               onChange={handleContentChange}
@@ -220,7 +297,7 @@ export default function Journal() {
             />
           ) : (
             <div style={{ textAlign: 'center', color: 'var(--text-3)', marginTop: 60, fontSize: 13 }}>
-              No {noun.toLowerCase()} selected. Start a new one with +
+              No day selected. Start a new one with +
             </div>
           )}
         </div>

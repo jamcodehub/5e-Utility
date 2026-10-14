@@ -21,7 +21,11 @@ router.put('/:id', auth, async (req, res) => {
     const entry = await Lore.findById(req.params.id)
     if (!entry) return res.status(404).json({ error: 'Not found' })
     if (!await isMember(entry.campaign, req.userId)) return res.status(403).json({ error: 'Not authorised' })
-    res.json(await Lore.findByIdAndUpdate(req.params.id, req.body, { new: true }))
+    // Exclude `campaign`/`_id` from the update — otherwise a client could
+    // smuggle in a different campaign id and move the entry somewhere they
+    // don't have access to.
+    const { campaign, _id, ...safeUpdates } = req.body
+    res.json(await Lore.findByIdAndUpdate(req.params.id, safeUpdates, { new: true }))
   } catch { res.status(500).json({ error: 'Failed to update' }) }
 })
 

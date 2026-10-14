@@ -29,7 +29,7 @@ const FEATURES = {
     free: [
       '1 campaign',
       '1 character sheet',
-      '10 Journal entries',
+      '15 Journal / Session Planner entries',
       'Lore board',
     ],
     premium: [

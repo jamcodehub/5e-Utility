@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { api, useAuth } from '../context/AuthContext'
 import { useCampaign } from '../context/CampaignContext'
 import { useToast } from '../hooks/useToast'
+import UpgradeModal from '../components/UpgradeModal'
 
 // ─── Template engine ────────────────────────────────────────────────────────
 // Builds a personalised 4-phase checklist from the rich context the player
@@ -284,6 +285,10 @@ function buildChecklist(ctx, dmGuide = {}) {
 
 // ─── Storage key ─────────────────────────────────────────────────────────────
 const storageKey = (campaignId) => `rp_context_${campaignId}`
+// Separate key for the generated plan itself (step/checklist/checked) so a
+// generated session plan survives navigating to other pages/tabs and back,
+// instead of resetting to the context form every time.
+const planStorageKey = (campaignId) => `rp_plan_${campaignId}`
 
 const emptyCtx = () => ({
   name: '', race: '', characterClass: '', level: '', profBonus: 2,
@@ -308,6 +313,8 @@ export default function RoleplayAssistant() {
   const [loading, setLoading]         = useState(false)
   const [checked, setChecked]         = useState({})
   const [charLoaded, setCharLoaded]   = useState(false)
+  const [showUpgrade, setShowUpgrade] = useState(false)
+  const [planLoaded, setPlanLoaded]   = useState(false)
 
   // Pre-fill form from character sheet; prefer saved context from localStorage
   const loadChar = useCallback(async () => {
@@ -347,6 +354,38 @@ export default function RoleplayAssistant() {
 
   useEffect(() => { loadChar() }, [loadChar])
 
+  // Restore a previously generated plan (if any) so switching tabs/pages and
+  // coming back doesn't reset the user to the context form.
+  useEffect(() => {
+    if (!activeCampaign) return
+    setPlanLoaded(false)
+    try {
+      const saved = localStorage.getItem(planStorageKey(activeCampaign._id))
+      if (saved) {
+        const parsed = JSON.parse(saved)
+        if (parsed.checklist) {
+          setChecklist(parsed.checklist)
+          setChecklistLevel(parsed.checklistLevel ?? null)
+          setChecked(parsed.checked || {})
+          setStep(parsed.step || 'checklist')
+        }
+      } else {
+        setChecklist(null); setChecklistLevel(null); setChecked({}); setStep('context')
+      }
+    } catch { /* ignore malformed storage */ }
+    setPlanLoaded(true)
+  }, [activeCampaign])
+
+  // Persist the generated plan whenever it changes
+  useEffect(() => {
+    if (!activeCampaign || !planLoaded) return
+    if (checklist) {
+      localStorage.setItem(planStorageKey(activeCampaign._id), JSON.stringify({ step, checklist, checklistLevel, checked }))
+    } else {
+      localStorage.removeItem(planStorageKey(activeCampaign._id))
+    }
+  }, [activeCampaign, planLoaded, step, checklist, checklistLevel, checked])
+
   // Persist context to localStorage whenever it changes
   useEffect(() => {
     if (activeCampaign && charLoaded) {
@@ -383,10 +422,23 @@ export default function RoleplayAssistant() {
   const reset  = () => { setStep('context'); setChecklist(null); setChecked({}); setChecklistLevel(null) }
   const toggle = (key) => setChecked(p => ({ ...p, [key]: !p[key] }))
 
+  // Regeneration should respect the same free/premium gate as the initial
+  // generation — previously it silently rebuilt the checklist for free users
+  // with no limit, and gave no feedback once the free session was used up.
+  const regenerate = (level) => {
+    if (!canGenerate) { setShowUpgrade(true); return }
+    setChecklist(buildChecklist(ctx, dmGuide))
+    setChecked({})
+    if (level !== undefined) setChecklistLevel(level)
+  }
+
   if (!activeCampaign) {
     return (
-      <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-3)' }}>
-        Select a campaign to use the Roleplay Assistant.
+      <div className="page-content">
+        <div className="page-header-row" style={{ marginBottom: 16 }}>
+          <h2 style={{ fontSize: 20, marginBottom: 2 }}>Roleplay Assistant</h2>
+        </div>
+        <div style={{ color: 'var(--text-3)' }}>Select a campaign to use the Roleplay Assistant.</div>
       </div>
     )
   }
@@ -394,14 +446,11 @@ export default function RoleplayAssistant() {
   // ── Step 1: Context form ────────────────────────────────────────────────────
   if (step === 'context') {
     return (
-      <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden', padding: '20px 24px 0' }}>
+      <div className="roleplay-page" style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden', padding: '20px 24px 0' }}>
         {/* Header */}
-        <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 16, flexShrink: 0 }}>
+        <div className="roleplay-header" style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 16, flexShrink: 0 }}>
           <div>
             <h2 style={{ fontSize: 20, marginBottom: 2 }}>Roleplay Assistant</h2>
-            <p style={{ color: 'var(--text-2)', fontSize: 13, margin: 0 }}>
-              Fill in your character details — the more you add, the more personalised your session plan.
-            </p>
           </div>
           {sessionCount > 0 && (
             <div style={{ fontSize: 12, color: 'var(--text-3)', textAlign: 'right', flexShrink: 0, marginLeft: 16 }}>
@@ -412,10 +461,10 @@ export default function RoleplayAssistant() {
         </div>
 
         {/* Two-column body — fills remaining height */}
-        <div style={{ display: 'flex', gap: 16, flex: 1, overflow: 'hidden', paddingBottom: 20 }}>
+        <div className="roleplay-form-layout" style={{ display: 'flex', gap: 16, flex: 1, overflow: 'hidden', paddingBottom: 20 }}>
 
           {/* LEFT — scrollable form */}
-          <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 12, paddingRight: 4 }}>
+          <div className="roleplay-form-column" style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 12, paddingRight: 4 }}>
 
             <div className="card" style={{ padding: '14px 16px', flexShrink: 0 }}>
               <SectionLabel>Character Basics</SectionLabel>
@@ -444,7 +493,7 @@ export default function RoleplayAssistant() {
           </div>
 
           {/* RIGHT — sticky generate panel */}
-          <div style={{ width: 240, flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <div className="roleplay-generate-column" style={{ width: 240, flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 12 }}>
 
             {/* Generate card */}
             <div className="card" style={{ padding: '18px 16px', display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -552,7 +601,7 @@ export default function RoleplayAssistant() {
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
           <button className="btn btn-ghost btn-sm" onClick={reset}>← Edit Context</button>
-          <button className="btn btn-ghost btn-sm" onClick={() => { setChecklist(buildChecklist(ctx, dmGuide)); setChecked({}) }}>↺ Regenerate</button>
+          <button className="btn btn-ghost btn-sm" onClick={() => regenerate()}>↺ Regenerate</button>
         </div>
       </div>
 
@@ -563,7 +612,7 @@ export default function RoleplayAssistant() {
           <button
             className="btn btn-primary btn-sm"
             style={{ flexShrink: 0 }}
-            onClick={() => { setChecklist(buildChecklist(ctx, dmGuide)); setChecklistLevel(Number(ctx.level)); setChecked({}) }}
+            onClick={() => regenerate(Number(ctx.level))}
           >Regenerate for Lvl {ctx.level}</button>
         </div>
       )}
@@ -622,6 +671,7 @@ export default function RoleplayAssistant() {
       </div>
 
       <ToastContainer />
+      {showUpgrade && <UpgradeModal onClose={() => setShowUpgrade(false)} message="Your first session plan was free. Upgrade to Premium to regenerate or run unlimited roleplay sessions." />}
     </div>
   )
 }

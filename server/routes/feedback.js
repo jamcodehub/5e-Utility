@@ -24,7 +24,16 @@ router.post('/', async (req, res) => {
       }
     }
 
-    const fb = await Feedback.create({ ...req.body, user: userId })
+    // Validate/whitelist fields explicitly instead of spreading the whole
+    // body into create() — previously any extra fields sent by a client
+    // were passed straight to Mongoose (mass-assignment), and `message`
+    // had no length cap, letting a single request store an arbitrarily
+    // large document.
+    const message = typeof req.body.message === 'string' ? req.body.message.trim().slice(0, 4000) : ''
+    const type = ['bug', 'feature', 'general'].includes(req.body.type) ? req.body.type : 'general'
+    if (!message) return res.status(400).json({ error: 'Message is required' })
+
+    const fb = await Feedback.create({ message, type, user: userId })
     res.json(fb)
   } catch (e) {
     res.status(500).json({ error: e.message })

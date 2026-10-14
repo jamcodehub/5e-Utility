@@ -1,8 +1,10 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { api } from '../context/AuthContext'
 import { useCampaign } from '../context/CampaignContext'
 import { useAuth } from '../context/AuthContext'
 import { useToast } from '../hooks/useToast'
+import { getSocket } from '../utils/socket'
+import { SkeletonBlock } from '../components/Skeleton'
 
 // A3 landscape ratio ≈ 420/297
 const GRID_W = 32
@@ -28,23 +30,94 @@ function tileColor(id) {
 }
 
 function MapThumb({ content }) {
-  let grid = null
-  try { const p = JSON.parse(content); if (Array.isArray(p)) grid = p } catch { /* */ }
+  const grid = useMemo(() => {
+    try {
+      const parsed = JSON.parse(content)
+      return Array.isArray(parsed) ? parsed : null
+    } catch {
+      return null
+    }
+  }, [content])
+
   if (!grid) return <div style={{ width: '100%', aspectRatio: `${GRID_W}/${GRID_H}`, background: '#eee', borderRadius: 4 }} />
   return (
-    <div style={{ width: '100%', aspectRatio: `${GRID_W}/${GRID_H}`, display: 'grid', gridTemplateColumns: `repeat(${GRID_W}, 1fr)`, borderRadius: 4, overflow: 'hidden' }}>
-      {grid.map((row, r) => row.map((c, ci) => <div key={`${r}-${ci}`} style={{ background: tileColor(c) }} />))}
+    <svg
+      viewBox={`0 0 ${GRID_W} ${GRID_H}`}
+      preserveAspectRatio="none"
+      aria-hidden="true"
+      style={{
+        display: 'block',
+        width: '100%',
+        aspectRatio: `${GRID_W}/${GRID_H}`,
+        borderRadius: 4,
+        background: '#f5f4f1',
+        shapeRendering: 'crispEdges',
+      }}
+    >
+      {grid.flatMap((row, r) => row.map((cell, c) => (
+        <rect key={`${r}-${c}`} x={c} y={r} width="1" height="1" fill={tileColor(cell)} />
+      )))}
+      <path
+        d={`M${Array.from({ length: GRID_W + 1 }, (_, x) => `M${x} 0V${GRID_H}`).join('')} ${Array.from({ length: GRID_H + 1 }, (_, y) => `M0 ${y}H${GRID_W}`).join('')}`}
+        fill="none"
+        stroke="rgba(0,0,0,0.24)"
+        strokeWidth="0.045"
+        vectorEffect="non-scaling-stroke"
+        shapeRendering="crispEdges"
+      />
+    </svg>
+  )
+}
+
+function MapSkeleton() {
+  return (
+    <div style={{ width: '100%', aspectRatio: `${GRID_W}/${GRID_H}`, position: 'relative' }}>
+      <SkeletonBlock width="100%" height="100%" radius={4} />
+      <div aria-hidden="true" style={{
+        position: 'absolute',
+        inset: 0,
+        borderRadius: 4,
+        backgroundImage: 'linear-gradient(to right, rgba(0,0,0,0.12) 1px, transparent 1px), linear-gradient(to bottom, rgba(0,0,0,0.12) 1px, transparent 1px)',
+        backgroundSize: `${100 / GRID_W}% ${100 / GRID_H}%`,
+        pointerEvents: 'none',
+      }} />
     </div>
   )
 }
 
 // Token component — draggable circle showing avatar or initials
-function Token({ token, cellSize, onDragStart }) {
+// Small overlapping "peeking" avatars — a minimal presence indicator showing
+// who else is currently viewing this board live (collaborative Play mode).
+function PeekingViewers({ viewers }) {
+  if (!viewers.length) return null
+  return (
+    <div style={{ display: 'flex', alignItems: 'center' }} title={viewers.map(v => v.username).join(', ')}>
+      {viewers.slice(0, 5).map((v, i) => (
+        <div key={v.userId} style={{
+          width: 24, height: 24, borderRadius: '50%', overflow: 'hidden',
+          background: 'var(--gold-bg)', border: '2px solid var(--surface)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          marginLeft: i === 0 ? 0 : -8, boxShadow: '0 1px 3px rgba(0,0,0,0.25)',
+          flexShrink: 0, position: 'relative', zIndex: 5 - i,
+        }}>
+          {v.avatar
+            ? <img src={v.avatar} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+            : <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--gold)', fontFamily: 'Cinzel, serif' }}>{v.username?.[0]?.toUpperCase()}</span>
+          }
+        </div>
+      ))}
+      {viewers.length > 5 && (
+        <span style={{ marginLeft: 4, fontSize: 11, color: 'var(--text-3)' }}>+{viewers.length - 5}</span>
+      )}
+    </div>
+  )
+}
+
+function Token({ token, cellSize, onDragStart, dragging }) {
   const initials = token.name?.[0]?.toUpperCase() || '?'
   return (
     <div
-      draggable
-      onDragStart={e => { e.dataTransfer.setData('tokenId', token.id); onDragStart(token.id) }}
+      onPointerDown={e => onDragStart(e, token.id)}
       title={token.name}
       style={{
         position: 'absolute',
@@ -55,9 +128,11 @@ function Token({ token, cellSize, onDragStart }) {
         border: '2px solid rgba(255,255,255,0.8)',
         boxShadow: '0 2px 6px rgba(0,0,0,0.4)',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
-        cursor: 'grab',
+        cursor: dragging ? 'grabbing' : 'grab',
+        opacity: dragging ? 0.25 : 1,
         zIndex: 10,
         userSelect: 'none',
+        touchAction: 'none',
       }}
     >
       {token.avatar
@@ -69,12 +144,15 @@ function Token({ token, cellSize, onDragStart }) {
 }
 
 export default function LevelBuilder() {
-  const { activeCampaign } = useCampaign()
-  const { isPremium } = useAuth()
+  const { activeCampaign, campaignsLoading, campaignsError, reload: reloadCampaigns } = useCampaign()
+  const { isPremium, user } = useAuth()
+  const isDm = user?.role === 'dm'
   const { toast, ToastContainer } = useToast()
 
   // ── Map gallery state ──
   const [plans, setPlans] = useState([])
+  const [plansLoading, setPlansLoading] = useState(true)
+  const [plansError, setPlansError] = useState('')
   const [selectedPlanId, setSelectedPlanId] = useState(null)
 
   // ── Editor state ──
@@ -89,56 +167,126 @@ export default function LevelBuilder() {
   const [tokens, setTokens] = useState([]) // { id, name, avatar, color, row, col, hp, maxHp }
   const [availableTokens, setAvailableTokens] = useState([]) // sidebar token pool
   const [dragTokenId, setDragTokenId] = useState(null)
+  const [dragPreviewToken, setDragPreviewToken] = useState(null)
+  const [dragPosition, setDragPosition] = useState({ x: 0, y: 0 })
   const [cellSize, setCellSize] = useState(28)
   const gridRef = useRef(null)
+  const dragPreviewRef = useRef(null)
+  const remoteUpdateRef = useRef(false)
+  const [viewers, setViewers] = useState([]) // who's currently looking at this board
+
+  const startTokenDrag = (e, tokenId) => {
+    e.preventDefault()
+    setDragTokenId(tokenId)
+    setDragPreviewToken(tokens.find(token => token.id === tokenId) || availableTokens.find(token => token.id === tokenId))
+    setDragPosition({ x: e.clientX, y: e.clientY })
+  }
+
+  useEffect(() => {
+    if (mode !== 'play' || !selectedPlanId || !dragTokenId) return
+
+    const finishDrag = (e) => {
+      const cell = document.elementFromPoint(e.clientX, e.clientY)?.closest('[data-map-cell]')
+      if (cell) {
+        const row = Number(cell.dataset.row)
+        const col = Number(cell.dataset.col)
+        setTokens(current => {
+          if (current.some(token => token.id === dragTokenId)) {
+            return current.map(token => token.id === dragTokenId ? { ...token, row, col } : token)
+          }
+          const source = availableTokens.find(token => token.id === dragTokenId)
+          return source ? [...current, { ...source, row, col }] : current
+        })
+      }
+      setDragTokenId(null)
+      setDragPreviewToken(null)
+    }
+    const moveDrag = (e) => {
+      if (!dragPreviewRef.current) return
+      dragPreviewRef.current.style.left = `${e.clientX}px`
+      dragPreviewRef.current.style.top = `${e.clientY}px`
+    }
+    const cancelDrag = () => {
+      setDragTokenId(null)
+      setDragPreviewToken(null)
+    }
+
+    window.addEventListener('pointermove', moveDrag)
+    window.addEventListener('pointerup', finishDrag)
+    window.addEventListener('pointercancel', cancelDrag)
+    return () => {
+      window.removeEventListener('pointermove', moveDrag)
+      window.removeEventListener('pointerup', finishDrag)
+      window.removeEventListener('pointercancel', cancelDrag)
+    }
+  }, [availableTokens, dragTokenId, mode, selectedPlanId])
 
   // ── Data loading ──
   const loadPlans = useCallback(async () => {
     if (!activeCampaign) return
-    const data = await api(`/levels/${activeCampaign._id}`)
-    setPlans(data || [])
+    setPlansLoading(true)
+    setPlansError('')
+    try {
+      const data = await api(`/levels/${activeCampaign._id}`)
+      setPlans(data || [])
+    } catch (err) {
+      setPlansError(err.message || 'Failed to load maps')
+    } finally {
+      setPlansLoading(false)
+    }
   }, [activeCampaign])
 
   useEffect(() => { loadPlans() }, [loadPlans])
 
-  // Load party members + lore combatants for token pool
+  // Load party members + lore combatants for token pool.
+  // Both requests are fetched in parallel via Promise.allSettled and the
+  // pool is only committed to state once BOTH have resolved — previously
+  // this called setAvailableTokens() inside the lore .then() alone, so if
+  // the lore request finished before the (usually slower) members/characters
+  // request, party members would silently be dropped from the pool and
+  // players could never be dragged onto the map.
   useEffect(() => {
     if (!activeCampaign) return
-    const pool = []
+    let cancelled = false
 
-    // Party characters
-    api(`/campaigns/${activeCampaign._id}/members/characters`)
-      .then(members => {
-        ;(members || []).forEach(m => {
-          if (m.character) pool.push({
-            id: `char-${m.userId}`,
-            name: m.character.name || m.username,
-            avatar: m.character.avatarUrl || null,
-            color: '#6366f1',
-            hp: m.character.hp?.current ?? m.character.hp?.max ?? 10,
-            maxHp: m.character.hp?.max ?? 10,
-            type: 'player',
-          })
-        })
-      }).catch(() => {})
+    Promise.allSettled([
+      api(`/campaigns/${activeCampaign._id}/members/characters`),
+      api(`/lore/${activeCampaign._id}`),
+    ]).then(([membersRes, loreRes]) => {
+      if (cancelled) return
+      const pool = []
 
-    // Lore combatants (npc, enemy, boss)
-    api(`/lore/${activeCampaign._id}`)
-      .then(lore => {
-        ;(lore || []).filter(l => ['npc', 'enemy', 'boss'].includes(l.tag)).forEach(l => {
-          pool.push({
-            id: `lore-${l._id}`,
-            loreId: l._id,
-            name: l.title,
-            avatar: null,
-            color: l.tag === 'boss' ? '#f59e0b' : l.tag === 'enemy' ? '#ef4444' : '#10b981',
-            hp: l.hp ?? l.maxHp ?? 10,
-            maxHp: l.maxHp ?? 10,
-            type: l.tag,
-          })
+      const members = membersRes.status === 'fulfilled' ? membersRes.value : []
+      ;(members || []).forEach(m => {
+        if (m.character) pool.push({
+          id: `char-${m.userId}`,
+          name: m.character.name || m.username,
+          avatar: m.character.avatarUrl || null,
+          color: '#6366f1',
+          hp: m.character.hp?.current ?? m.character.hp?.max ?? 10,
+          maxHp: m.character.hp?.max ?? 10,
+          type: 'player',
         })
-        setAvailableTokens([...pool])
-      }).catch(() => { setAvailableTokens([...pool]) })
+      })
+
+      const lore = loreRes.status === 'fulfilled' ? loreRes.value : []
+      ;(lore || []).filter(l => ['npc', 'enemy', 'boss'].includes(l.tag)).forEach(l => {
+        pool.push({
+          id: `lore-${l._id}`,
+          loreId: l._id,
+          name: l.title,
+          avatar: null,
+          color: l.tag === 'boss' ? '#f59e0b' : l.tag === 'enemy' ? '#ef4444' : '#10b981',
+          hp: l.hp ?? l.maxHp ?? 10,
+          maxHp: l.maxHp ?? 10,
+          type: l.tag,
+        })
+      })
+
+      setAvailableTokens(pool)
+    })
+
+    return () => { cancelled = true }
   }, [activeCampaign?._id, mode])
 
   // Measure cell size from grid DOM
@@ -151,8 +299,39 @@ export default function LevelBuilder() {
     return () => obs.disconnect()
   }, [mode])
 
+  // ── Real-time collaborative board ──
+  // Join the room for this map while in Play mode so every DM/player looking
+  // at the same board sees token moves, adds, removes, and HP changes live.
+  useEffect(() => {
+    if (mode !== 'play' || !selectedPlanId) return
+    const socket = getSocket()
+    socket.emit('level:join', selectedPlanId)
+    const onTokens = (remoteTokens) => {
+      remoteUpdateRef.current = true
+      setTokens(Array.isArray(remoteTokens) ? remoteTokens : [])
+    }
+    const onPresence = (users) => setViewers(Array.isArray(users) ? users : [])
+    socket.on('level:tokens', onTokens)
+    socket.on('level:presence', onPresence)
+    return () => {
+      socket.off('level:tokens', onTokens)
+      socket.off('level:presence', onPresence)
+      socket.emit('level:leave', selectedPlanId)
+      setViewers([])
+    }
+  }, [mode, selectedPlanId])
+
+  // Broadcast + persist whenever the local token layout changes — but not
+  // when the change just arrived from someone else, to avoid an echo loop.
+  useEffect(() => {
+    if (mode !== 'play' || !selectedPlanId) return
+    if (remoteUpdateRef.current) { remoteUpdateRef.current = false; return }
+    getSocket().emit('level:tokens', { planId: selectedPlanId, tokens })
+  }, [tokens, mode, selectedPlanId])
+
   // ── Gallery actions ──
   const openEditor = (plan = null) => {
+    if (!isDm) return
     if (plan) {
       setEditPlanId(plan._id)
       setEditTitle(plan.title)
@@ -170,19 +349,30 @@ export default function LevelBuilder() {
     setSelectedPlanId(plan._id)
     try { const g = JSON.parse(plan.content); if (Array.isArray(g)) setGrid(g) }
     catch { setGrid(blankGrid()) }
-    setTokens([])
+    setTokens(Array.isArray(plan.tokens) ? plan.tokens : [])
     setMode('play')
   }
 
+  // If the DM saves without naming the map, auto-assign the next free
+  // "Map N" name (Map1, Map2, ...) instead of blocking/prompting them.
+  const nextAutoMapName = () => {
+    let n = 1
+    const taken = new Set(plans.map(p => (p.title || '').trim().toLowerCase()))
+    while (taken.has(`map${n}`.toLowerCase())) n++
+    return `Map${n}`
+  }
+
   const saveMap = async () => {
-    if (!editTitle.trim() || !activeCampaign) return
+    if (!activeCampaign) return
+    const title = editTitle.trim() || nextAutoMapName()
     try {
-      const body = { title: editTitle, content: JSON.stringify(grid) }
+      const body = { title, content: JSON.stringify(grid) }
       const plan = editPlanId
         ? await api(`/levels/${editPlanId}`, { method: 'PUT', body })
         : await api(`/levels/${activeCampaign._id}`, { method: 'POST', body })
       setPlans(p => editPlanId ? p.map(x => x._id === plan._id ? plan : x) : [...p, plan])
       setEditPlanId(plan._id)
+      setEditTitle(title)
       toast('Map saved')
       setMode('gallery')
     } catch (e) { toast(e.message || 'Failed to save') }
@@ -200,40 +390,35 @@ export default function LevelBuilder() {
   // ── Paint ──
   const paint = (r, c) => setGrid(g => { const n = g.map(row => row.slice()); n[r][c] = tool; return n })
 
-  // ── Token drag onto grid ──
-  const dropOnCell = (e, r, c) => {
-    e.preventDefault()
-    const tokenId = e.dataTransfer.getData('tokenId')
-    if (!tokenId) return
-
-    // If token already on map, move it
-    if (tokens.find(t => t.id === tokenId)) {
-      setTokens(ts => ts.map(t => t.id === tokenId ? { ...t, row: r, col: c } : t))
-      return
-    }
-    // Otherwise place from pool
-    const src = availableTokens.find(t => t.id === tokenId)
-    if (!src) return
-    // Don't place same token twice
-    if (tokens.find(t => t.id === tokenId)) return
-    setTokens(ts => [...ts, { ...src, row: r, col: c }])
-  }
-
   const removeToken = (id) => setTokens(ts => ts.filter(t => t.id !== id))
 
+  // Adjusting HP on the map now persists back to the source Lore entry (for
+  // npc/enemy/boss tokens) via the existing PATCH /lore/:id/hp endpoint —
+  // previously this only updated local component state, so HP changes were
+  // lost on reload and lore combatants kept reverting to their default/10.
   const adjustTokenHp = (id, delta) => {
-    setTokens(ts => ts.map(t => t.id === id
-      ? { ...t, hp: Math.max(0, Math.min(t.maxHp, (t.hp || 0) + delta)) }
-      : t
-    ))
+    setTokens(ts => ts.map(t => {
+      if (t.id !== id) return t
+      const nextHp = Math.max(0, Math.min(t.maxHp, (t.hp || 0) + delta))
+      if (t.loreId) {
+        api(`/lore/${t.loreId}/hp`, { method: 'PATCH', body: { hp: nextHp } }).catch(() => {})
+        setAvailableTokens(ats => ats.map(a => a.id === t.id ? { ...a, hp: nextHp } : a))
+      }
+      return { ...t, hp: nextHp }
+    }))
   }
 
   // ── Render ──
   const selectedPlan = plans.find(p => p._id === selectedPlanId)
 
-  if (!activeCampaign) return (
+  if (!activeCampaign && !campaignsLoading) return (
     <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-3)' }}>
-      Select a campaign.
+      {campaignsError
+        ? <div style={{ textAlign: 'center' }}>
+            <p style={{ marginBottom: 12 }}>{campaignsError}</p>
+            <button className="btn btn-ghost" onClick={reloadCampaigns}>Retry</button>
+          </div>
+        : 'Select a campaign.'}
     </div>
   )
 
@@ -270,13 +455,14 @@ export default function LevelBuilder() {
         <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
           <button className="btn btn-ghost btn-sm" onClick={() => setMode('gallery')}>✕ Cancel</button>
           <button className="btn btn-ghost btn-sm" onClick={() => window.print()}>Print</button>
-          <button className="btn btn-primary btn-sm" onClick={saveMap} disabled={!editTitle.trim()}>Save & Close</button>
+          <button className="btn btn-primary btn-sm" onClick={saveMap}>Save & Close</button>
         </div>
       </div>
 
       {/* Grid — fills remaining height */}
       <div style={{ flex: 1, overflow: 'auto', padding: 16, background: '#2a2a2a', display: 'flex', alignItems: 'flex-start', justifyContent: 'center' }}>
         <div
+          id="level-print"
           onMouseUp={() => setPainting(false)}
           onMouseLeave={() => setPainting(false)}
           style={{
@@ -313,8 +499,9 @@ export default function LevelBuilder() {
       {/* Play toolbar */}
       <div style={{ padding: '10px 16px', background: 'var(--surface)', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
         <span style={{ fontFamily: 'Cinzel, serif', fontSize: 14, fontWeight: 600, flex: 1 }}>{selectedPlan?.title}</span>
+        <PeekingViewers viewers={viewers} />
         <button className="btn btn-ghost btn-sm" onClick={() => { setTokens([]); setMode('gallery') }}>← Back</button>
-        <button className="btn btn-primary btn-sm" onClick={() => openEditor(selectedPlan)}>Edit Map</button>
+        {isDm && <button className="btn btn-primary btn-sm" onClick={() => openEditor(selectedPlan)}>Edit Map</button>}
       </div>
 
       <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
@@ -339,20 +526,22 @@ export default function LevelBuilder() {
               return (
                 <div
                   key={`${r}-${c}`}
+                  data-map-cell
+                  data-row={r}
+                  data-col={c}
                   style={{
                     aspectRatio: '1',
                     background: tileColor(cellId),
                     border: '0.5px solid rgba(0,0,0,0.08)',
                     position: 'relative',
                   }}
-                  onDragOver={e => e.preventDefault()}
-                  onDrop={e => dropOnCell(e, r, c)}
                 >
                   {token && (
                     <Token
                       token={token}
                       cellSize={cellSize}
-                      onDragStart={setDragTokenId}
+                      onDragStart={startTokenDrag}
+                      dragging={dragTokenId === token.id}
                     />
                   )}
                 </div>
@@ -372,7 +561,7 @@ export default function LevelBuilder() {
               <>
                 <div style={{ fontSize: 10, color: 'var(--text-3)', marginBottom: 4, marginTop: 4, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Party</div>
                 {availableTokens.filter(t => t.type === 'player').map(t => (
-                  <SidebarToken key={t.id} token={t} placed={!!tokens.find(x => x.id === t.id)} />
+                  <SidebarToken key={t.id} token={t} placed={!!tokens.find(x => x.id === t.id)} dragging={dragTokenId === t.id} onDragStart={startTokenDrag} />
                 ))}
               </>
             )}
@@ -381,7 +570,7 @@ export default function LevelBuilder() {
               <>
                 <div style={{ fontSize: 10, color: 'var(--text-3)', marginBottom: 4, marginTop: 8, textTransform: 'uppercase', letterSpacing: '0.05em' }}>NPCs</div>
                 {availableTokens.filter(t => t.type === 'npc').map(t => (
-                  <SidebarToken key={t.id} token={t} placed={!!tokens.find(x => x.id === t.id)} />
+                  <SidebarToken key={t.id} token={t} placed={!!tokens.find(x => x.id === t.id)} dragging={dragTokenId === t.id} onDragStart={startTokenDrag} />
                 ))}
               </>
             )}
@@ -390,7 +579,7 @@ export default function LevelBuilder() {
               <>
                 <div style={{ fontSize: 10, color: '#ef4444', marginBottom: 4, marginTop: 8, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Enemies</div>
                 {availableTokens.filter(t => t.type === 'enemy').map(t => (
-                  <SidebarToken key={t.id} token={t} placed={!!tokens.find(x => x.id === t.id)} />
+                  <SidebarToken key={t.id} token={t} placed={!!tokens.find(x => x.id === t.id)} dragging={dragTokenId === t.id} onDragStart={startTokenDrag} />
                 ))}
               </>
             )}
@@ -399,7 +588,7 @@ export default function LevelBuilder() {
               <>
                 <div style={{ fontSize: 10, color: '#f59e0b', marginBottom: 4, marginTop: 8, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Bosses</div>
                 {availableTokens.filter(t => t.type === 'boss').map(t => (
-                  <SidebarToken key={t.id} token={t} placed={!!tokens.find(x => x.id === t.id)} />
+                  <SidebarToken key={t.id} token={t} placed={!!tokens.find(x => x.id === t.id)} dragging={dragTokenId === t.id} onDragStart={startTokenDrag} />
                 ))}
               </>
             )}
@@ -435,6 +624,35 @@ export default function LevelBuilder() {
           )}
         </div>
       </div>
+      {dragPreviewToken && (
+        <div
+          ref={dragPreviewRef}
+          aria-hidden="true"
+          style={{
+            position: 'fixed',
+            left: dragPosition.x,
+            top: dragPosition.y,
+            width: Math.max(24, cellSize - 4),
+            height: Math.max(24, cellSize - 4),
+            transform: 'translate(-50%, -50%) scale(1.08)',
+            borderRadius: '50%',
+            overflow: 'hidden',
+            background: dragPreviewToken.color || '#6366f1',
+            border: '2px solid rgba(255,255,255,0.9)',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.45)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            pointerEvents: 'none',
+            zIndex: 10000,
+          }}
+        >
+          {dragPreviewToken.avatar
+            ? <img src={dragPreviewToken.avatar} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+            : <span style={{ fontSize: Math.max(10, cellSize * 0.35), color: '#fff', fontWeight: 700, fontFamily: 'Cinzel, serif' }}>{dragPreviewToken.name?.[0]?.toUpperCase() || '?'}</span>
+          }
+        </div>
+      )}
     </div>
   )
 
@@ -444,30 +662,40 @@ export default function LevelBuilder() {
       {/* Header */}
       <div style={{ padding: '16px 24px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0, background: 'var(--surface)' }}>
         <div style={{ flex: 1 }}>
-          <h2 style={{ fontSize: 20, marginBottom: 2 }}>Level Builder</h2>
-          <p style={{ fontSize: 13, color: 'var(--text-2)', margin: 0 }}>
-            Draw tile maps, then enter play mode to position your party. {!isPremium && `(${plans.length}/5 free)`}
-          </p>
+          <h2 style={{ fontSize: 20, marginBottom: 2 }}>Battle Map</h2>
         </div>
-        <button className="btn btn-primary" onClick={() => openEditor(null)}>+ Create New Map</button>
+        {isDm && <button className="btn btn-primary" onClick={() => openEditor(null)}>+ Create New Map</button>}
       </div>
 
-      {/* Horizontal scroll gallery */}
-      {plans.length === 0 ? (
+      {plansLoading ? (
+        <div style={{ flex: 1, overflowY: 'auto', padding: 24 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 16, alignContent: 'start' }}>
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, overflow: 'hidden' }}>
+                <MapSkeleton />
+                <div style={{ padding: '12px 14px' }}><SkeletonBlock width="62%" height={12} /></div>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : plansError ? (
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12, color: 'var(--text-2)' }}>
+          <p>{plansError}</p>
+          <button className="btn btn-ghost" onClick={loadPlans}>Retry</button>
+        </div>
+      ) : plans.length === 0 ? (
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 16, color: 'var(--text-3)' }}>
           <div style={{ fontSize: 40, opacity: 0.3 }}>...</div>
           <div style={{ fontSize: 14 }}>No maps yet. Create your first one above.</div>
         </div>
       ) : (
         <div style={{ flex: 1, overflowY: 'auto', padding: 24 }}>
-          <div style={{ display: 'flex', gap: 16, overflowX: 'auto', paddingBottom: 16 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 280px), 1fr))', gap: 16, alignContent: 'start' }}>
             {plans.map(plan => (
               <div
                 key={plan._id}
                 onClick={() => openPlay(plan)}
                 style={{
-                  flexShrink: 0,
-                  width: 280,
                   background: 'var(--surface)',
                   border: '1px solid var(--border)',
                   borderRadius: 12,
@@ -481,12 +709,14 @@ export default function LevelBuilder() {
                 <MapThumb content={plan.content} />
                 <div style={{ padding: '10px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                   <span style={{ fontFamily: 'Cinzel, serif', fontSize: 13, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{plan.title}</span>
-                  <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
-                    <button onClick={e => { e.stopPropagation(); openEditor(plan) }} title="Edit tiles"
-                      style={{ background: 'none', border: 'none', color: 'var(--text-3)', cursor: 'pointer', fontSize: 13 }}>✎</button>
-                    <button onClick={e => deleteMap(plan._id, e)} title="Delete"
-                      style={{ background: 'none', border: 'none', color: 'var(--text-3)', cursor: 'pointer', fontSize: 13 }}>✕</button>
-                  </div>
+                  {isDm && (
+                    <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+                      <button onClick={e => { e.stopPropagation(); openEditor(plan) }} title="Edit tiles"
+                        style={{ background: 'none', border: 'none', color: 'var(--text-3)', cursor: 'pointer', fontSize: 13 }}>✎</button>
+                      <button onClick={e => deleteMap(plan._id, e)} title="Delete"
+                        style={{ background: 'none', border: 'none', color: 'var(--text-3)', cursor: 'pointer', fontSize: 13 }}>✕</button>
+                    </div>
+                  )}
                 </div>
               </div>
             ))}
@@ -500,19 +730,19 @@ export default function LevelBuilder() {
 }
 
 // Sidebar token pill — draggable from the panel onto the map
-function SidebarToken({ token, placed }) {
+function SidebarToken({ token, placed, dragging, onDragStart }) {
   return (
     <div
-      draggable={!placed}
-      onDragStart={e => { if (!placed) e.dataTransfer.setData('tokenId', token.id) }}
+      onPointerDown={e => { if (!placed) onDragStart(e, token.id) }}
       style={{
         display: 'flex', alignItems: 'center', gap: 8, padding: '5px 8px',
         borderRadius: 8, marginBottom: 4,
         background: placed ? 'var(--surface2)' : 'var(--surface)',
         border: '1px solid var(--border)',
-        opacity: placed ? 0.45 : 1,
+        opacity: placed ? 0.45 : dragging ? 0.25 : 1,
         cursor: placed ? 'default' : 'grab',
         userSelect: 'none',
+        touchAction: 'none',
       }}
     >
       <div style={{ width: 28, height: 28, borderRadius: '50%', background: token.color, border: '2px solid rgba(255,255,255,0.2)', flexShrink: 0, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>

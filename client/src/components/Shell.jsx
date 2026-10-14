@@ -2,8 +2,8 @@ import { NavLink, useNavigate, useLocation } from 'react-router-dom'
 import { useAuth, api } from '../context/AuthContext'
 import { useCampaign } from '../context/CampaignContext'
 import { useMusic, MOODS } from '../context/MusicContext'
-import { useTheme, THEMES } from '../context/ThemeContext'
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useTheme } from '../context/ThemeContext'
+import { useState, useEffect, useRef } from 'react'
 import SettingsModal from './SettingsModal'
 import { CloudinaryImage } from '@cloudinary/url-gen'
 import { quality, format } from '@cloudinary/url-gen/actions/delivery'
@@ -17,126 +17,127 @@ const logoUrl = new CloudinaryImage('5e_Utillity', { cloudName: CLOUD_NAME })
   .delivery(format(autoFormat()))
   .toURL()
 
+function preloadStoryboard() {
+  import('../pages/Storyboard').catch(error => {
+    console.error('Failed to preload Storyboard', error)
+  })
+}
+
 // ─── Infinite swipe carousel nav ────────────────────────────────────────────
-// All items sit side-by-side in a wide track. We maintain an offset and
-// duplicate items on each end so wrapping is seamless.
-function SwipeNav({ items, navLinkStyle }) {
+function SwipeNav({ items, navLinkStyle, darkMode }) {
   const location = useLocation()
-  const trackRef = useRef(null)
   const containerRef = useRef(null)
-
-  // We render items tripled: [items, items, items] and start in the middle
-  // copy so we can shift left or right and wrap infinitely.
-  const COPIES = 3
-  const tripled = [...items, ...items, ...items]
-  const ITEM_W = 80 // px per nav item
+  const COPIES = 5
+  const CENTER_COPY = 2
+  const tripled = Array.from({ length: COPIES }, () => items).flat()
+  const ITEM_W = 88 // px per nav item
   const GAP = 4
+  const fontSizeFor = (label) => {
+    if (label.length <= 6) return 12
+    if (label.length <= 9) return 11
+    return 10
+  }
 
-  const [offset, setOffset] = useState(0) // px offset of the track
-  const dragRef = useRef({ active: false, startX: 0, startOffset: 0 })
-  const centerOffset = useRef(0)
-
-  // Initialise so the middle copy is visible
+  // Native horizontal scrolling supplies touch momentum and scroll snapping.
+  // Identical copies on either side make recentering visually seamless.
   useEffect(() => {
-    const base = -(items.length * (ITEM_W + GAP))
-    centerOffset.current = base
-    setOffset(base)
-  }, [items.length])
+    const el = containerRef.current
+    if (!el) return
+    const segment = items.length * (ITEM_W + GAP)
+    const activeIndex = Math.max(0, items.findIndex(item => item.to === location.pathname))
+    el.scrollLeft = segment * CENTER_COPY + activeIndex * (ITEM_W + GAP) - (el.clientWidth - ITEM_W) / 2
 
-  // After settling, silently recentre if we've drifted too far
-  const recentre = useCallback(() => {
-    const base = centerOffset.current
-    const total = items.length * (ITEM_W + GAP)
-    setOffset(prev => {
-      let o = prev
-      if (o < base - total) o += total
-      if (o > base + total) o -= total
-      return o
-    })
-  }, [items.length])
-
-  const onTouchStart = (e) => {
-    dragRef.current = { active: true, startX: e.touches[0].clientX, startOffset: offset }
-  }
-  const onTouchMove = (e) => {
-    if (!dragRef.current.active) return
-    const dx = e.touches[0].clientX - dragRef.current.startX
-    setOffset(dragRef.current.startOffset + dx)
-  }
-  const onTouchEnd = () => {
-    dragRef.current.active = false
-    // Snap to nearest item
-    const itemStep = ITEM_W + GAP
-    setOffset(prev => {
-      const snapped = Math.round(prev / itemStep) * itemStep
-      return snapped
-    })
-    setTimeout(recentre, 50)
-  }
-
-  // Mouse drag for desktop testing
-  const onMouseDown = (e) => {
-    dragRef.current = { active: true, startX: e.clientX, startOffset: offset }
-    window.addEventListener('mousemove', onMouseMove)
-    window.addEventListener('mouseup', onMouseUp)
-  }
-  const onMouseMove = (e) => {
-    if (!dragRef.current.active) return
-    const dx = e.clientX - dragRef.current.startX
-    setOffset(dragRef.current.startOffset + dx)
-  }
-  const onMouseUp = () => {
-    dragRef.current.active = false
-    const itemStep = ITEM_W + GAP
-    setOffset(prev => Math.round(prev / itemStep) * itemStep)
-    setTimeout(recentre, 50)
-    window.removeEventListener('mousemove', onMouseMove)
-    window.removeEventListener('mouseup', onMouseUp)
-  }
+    const recenter = () => {
+      if (el.scrollLeft < segment) el.scrollLeft += segment
+      else if (el.scrollLeft > segment * (COPIES - 2)) el.scrollLeft -= segment
+    }
+    el.addEventListener('scroll', recenter, { passive: true })
+    return () => el.removeEventListener('scroll', recenter)
+  }, [items, location.pathname])
 
   return (
     <div
       ref={containerRef}
-      style={{ flex: 1, overflow: 'hidden', display: 'flex', alignItems: 'center', cursor: 'grab', userSelect: 'none' }}
-      onTouchStart={onTouchStart}
-      onTouchMove={onTouchMove}
-      onTouchEnd={onTouchEnd}
-      onMouseDown={onMouseDown}
+      className="pill-carousel-track"
+      style={{
+        flex: 1,
+        overflowX: 'auto',
+        overflowY: 'hidden',
+        display: 'flex',
+        alignItems: 'center',
+        touchAction: 'pan-x',
+        WebkitOverflowScrolling: 'touch',
+        scrollSnapType: 'x mandatory',
+        overscrollBehaviorX: 'contain',
+        scrollbarWidth: 'none',
+      }}
     >
-      <div
-        ref={trackRef}
-        style={{
-          display: 'flex',
-          gap: GAP,
-          transform: `translateX(${offset}px)`,
-          transition: dragRef.current?.active ? 'none' : 'transform 0.18s cubic-bezier(.4,0,.2,1)',
-          willChange: 'transform',
-        }}
-      >
-        {tripled.map((item, idx) => {
-          const isActive = location.pathname === item.to
-          return (
+      {tripled.map((item, idx) => {
+        return (
             <NavLink
               key={`${item.to}-${idx}`}
               to={item.to}
               draggable={false}
+              onMouseEnter={() => { if (item.to === '/storyboard') preloadStoryboard() }}
+              onFocus={() => { if (item.to === '/storyboard') preloadStoryboard() }}
+              onTouchStart={() => { if (item.to === '/storyboard') preloadStoryboard() }}
               style={({ isActive: a }) => ({
                 ...navLinkStyle(a),
                 width: ITEM_W,
+                marginRight: GAP,
                 flexShrink: 0,
+                scrollSnapAlign: 'center',
                 justifyContent: 'center',
                 whiteSpace: 'nowrap',
                 overflow: 'hidden',
-                textOverflow: 'ellipsis',
-                pointerEvents: dragRef.current?.active ? 'none' : 'auto',
+                fontSize: fontSizeFor(item.label),
               })}
             >
-              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', display: 'block', width: '100%', textAlign: 'center' }}>
-                {item.label}
+              <span style={{ overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4, width: '100%', whiteSpace: 'nowrap', userSelect: 'none', WebkitUserSelect: 'none' }}>
+                {item.iconUrl && <img src={item.iconUrl} alt="" aria-hidden="true" style={{ width: 16, height: 16, objectFit: 'contain', flexShrink: 0, filter: darkMode ? 'brightness(0) invert(1)' : 'none' }} />}
+                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.label}</span>
               </span>
             </NavLink>
           )
         })}
+    </div>
+  )
+}
+
+// ─── Persistent mini play/pause/skip bar ────────────────────────────────────
+// Small, always-visible strip (not hidden behind a toggle) showing whatever
+// is currently playing — an ambient mood or an uploaded track — with quick
+// prev/play-pause/next controls. Renders nothing when nothing is playing.
+function PersistentPlayerBar({ compact }) {
+  const { current, activeTrack, trackPlaying, playTrack, skipTrack, play, skipMood, queue } = useMusic()
+  if (!current && !activeTrack) return null
+
+  const isTrack = !!activeTrack
+  const label = isTrack ? (activeTrack.title || activeTrack.name || 'Track') : MOODS.find(m => m.id === current)?.label
+  const playing = isTrack ? trackPlaying : !!current
+  const canSkip = isTrack ? queue.length > 1 : true
+  const togglePlay = () => { if (isTrack) playTrack(activeTrack); else play(current) }
+  const skipPrev = () => { if (isTrack) skipTrack(-1); else skipMood(-1) }
+  const skipNext = () => { if (isTrack) skipTrack(1); else skipMood(1) }
+
+  return (
+    <div style={{
+      display: 'flex', alignItems: 'center', gap: 8,
+      padding: compact ? '6px 10px' : '8px 10px',
+      background: 'var(--surface2)', border: '1px solid var(--border)',
+      borderRadius: compact ? 999 : 10,
+      margin: compact ? 0 : '0 0 10px',
+    }}>
+      <span style={{ fontSize: 14, flexShrink: 0 }}>{isTrack ? '🎵' : '♪'}</span>
+      <span style={{ flex: 1, minWidth: 0, fontSize: 12, color: 'var(--text-2)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{label}</span>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 2, flexShrink: 0 }}>
+        {canSkip && (
+          <button onClick={skipPrev} title="Previous" style={{ width: 22, height: 22, border: 'none', background: 'none', color: 'var(--text-2)', cursor: 'pointer', fontSize: 13, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>⏮</button>
+        )}
+        <button onClick={togglePlay} title={playing ? 'Pause' : 'Play'} style={{ width: 24, height: 24, borderRadius: '50%', border: 'none', background: 'var(--gold)', color: '#2a1a00', cursor: 'pointer', fontSize: 11, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{playing ? '⏸' : '▶'}</button>
+        {canSkip && (
+          <button onClick={skipNext} title="Next" style={{ width: 22, height: 22, border: 'none', background: 'none', color: 'var(--text-2)', cursor: 'pointer', fontSize: 13, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>⏭</button>
+        )}
       </div>
     </div>
   )
@@ -174,26 +175,28 @@ function MusicMiniPlayer({ bottomOffset }) {
 }
 
 const NAV_PLAYER = [
-  { to: '/journal',    label: 'Journal' },
-  { to: '/storyboard', label: 'Storyboard' },
-  { to: '/lore',       label: 'Lore' },
-  { to: '/character',  label: 'Character' },
-  { to: '/inventory',  label: 'Inventory' },
-  { to: '/roleplay',   label: 'Roleplay' },
-  { to: '/dice',       label: 'Dice' },
+  { to: '/journal',    label: 'Journal',    iconUrl: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1791790758/01_fantasy_15_feather.png' },
+  { to: '/storyboard', label: 'Storyboard', iconUrl: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1791791388/book-solid-full.svg' },
+  { to: '/lore',       label: 'Lore',       iconUrl: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1791791415/scroll-solid-full.svg' },
+  { to: '/character',  label: 'Character',  iconUrl: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1791791397/circle-user-solid-full.svg' },
+  { to: '/inventory',  label: 'Inventory',  iconUrl: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1791791414/ring-solid-full.svg' },
+  { to: '/roleplay',   label: 'Roleplay',   iconUrl: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1791792735/comment-solid-full.svg' },
+  { to: '/levels',     label: 'Battle Map', iconUrl: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1791792887/map-solid-full.svg' },
+  { to: '/dice',       label: 'Dice',       iconUrl: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1791790757/01_fantasy_01_d20_gem.png' },
 ]
 
 const NAV_DM = [
-  { to: '/campaign-guide', label: 'Campaign' },
-  { to: '/journal',    label: 'Sessions' },
-  { to: '/storyboard', label: 'Storyboard' },
-  { to: '/lore',       label: 'Lore' },
-  { to: '/inventory',  label: 'Shop/Items' },
-  { to: '/ideas',      label: 'Ideas' },
-  { to: '/levels',     label: 'Levels' },
-  { to: '/rules',      label: 'Rules' },
-  { to: '/music',      label: 'Music' },
-  { to: '/dice',       label: 'Dice' },
+  { to: '/campaign-guide', label: 'Campaign',   iconUrl: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1791790757/01_fantasy_04_castle.png' },
+  { to: '/session-planner', label: 'Sessions',  iconUrl: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1791790758/01_fantasy_15_feather.png' },
+  { to: '/storyboard', label: 'Storyboard',     iconUrl: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1791791388/book-solid-full.svg' },
+  { to: '/lore',       label: 'Lore',           iconUrl: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1791791415/scroll-solid-full.svg' },
+  { to: '/inventory',  label: 'ShopItems',      iconUrl: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1791792290/coins-solid-full.svg' },
+  { to: '/ideas',      label: 'Ideas',          iconUrl: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1791792794/lightbulb-solid-full.svg' },
+  { to: '/levels',     label: 'BattleMap',      iconUrl: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1791792887/map-solid-full.svg' },
+  { to: '/combat',     label: 'Combat',         iconUrl: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1791791406/hand-fist-solid-full.svg' },
+  { to: '/rules',      label: 'Rules',          iconUrl: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1791793208/gavel-solid-full.svg' },
+  { to: '/music',      label: 'Music',          iconUrl: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1791793410/mix-brands-solid-full.svg' },
+  { to: '/dice',       label: 'Dice',           iconUrl: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1791790757/01_fantasy_01_d20_gem.png' },
 ]
 
 function useIsMobile() {
@@ -209,9 +212,11 @@ function useIsMobile() {
 export default function Shell({ children }) {
   const { user, logout, isPremium } = useAuth()
   const { campaigns, activeCampaign, setActive, createCampaign, joinCampaign } = useCampaign()
+  const { theme, lightMode } = useTheme()
   const navigate = useNavigate()
   const isMobile = useIsMobile()
   const isDM = user?.role === 'dm'
+  const darkMode = theme !== 'light' && (!lightMode || theme === 'dark')
   const NAV = isDM ? NAV_DM : NAV_PLAYER
 
   const [creating, setCreating] = useState(false)
@@ -301,7 +306,9 @@ export default function Shell({ children }) {
               {(activeCampaign && !activeCampaign.isPersonal) ? activeCampaign.name : 'Campaign'} ▾
             </button>
             {!isPremium && <button onClick={() => navigate('/premium')} style={{ background: 'none', border: 'none', color: 'var(--gold)', fontSize: 18, padding: 8, borderRadius: 10, cursor: 'pointer' }}>✦</button>}
-            <button onClick={() => setShowSettings(true)} title="Settings" style={{ background: 'none', border: 'none', color: 'var(--text-3)', fontSize: 18, cursor: 'pointer', padding: 8, borderRadius: 10, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>⚙️</button>
+            <button onClick={() => setShowSettings(true)} title="Settings" style={{ background: 'none', border: 'none', color: 'var(--text-3)', fontSize: 18, cursor: 'pointer', padding: 8, borderRadius: 10, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+              <img src="https://res.cloudinary.com/crcbzpw6/image/upload/v1791966298/ellipsis-solid-full.svg" alt="Settings" style={{ width: 18, height: 18 }} />
+            </button>
           </div>
         </div>
 
@@ -388,6 +395,15 @@ export default function Shell({ children }) {
 
         <main style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column', paddingBottom: '72px' }}>{children}</main>
 
+        {/* Persistent mini play/pause/skip — sits just above the bottom nav */}
+        <div style={{
+          position: 'fixed', left: '50%', transform: 'translateX(-50%)',
+          bottom: 'calc(66px + env(safe-area-inset-bottom, 12px))',
+          width: 'min(96%, 560px)', zIndex: 39,
+        }}>
+          <PersistentPlayerBar compact />
+        </div>
+
         {/* Bottom nav — swipeable infinite carousel */}
         <nav style={{
           position: 'fixed',
@@ -407,7 +423,7 @@ export default function Shell({ children }) {
           WebkitBackdropFilter: 'blur(20px)',
           overflow: 'hidden',
         }}>
-          <SwipeNav items={NAV} navLinkStyle={navLinkStyle} />
+          <SwipeNav items={NAV} navLinkStyle={navLinkStyle} darkMode={darkMode} />
         </nav>
 
         {showSettings && <SettingsModal onClose={() => setShowSettings(false)} />}
@@ -504,13 +520,21 @@ export default function Shell({ children }) {
 
         <nav style={{ padding: '10px', flex: 1, overflowY: 'auto' }}>
           {NAV.map(item => (
-            <NavLink key={item.to} to={item.to} style={({ isActive }) => navLinkStyle(isActive)}>
-              {item.label}
+            <NavLink
+              key={item.to}
+              to={item.to}
+              onMouseEnter={() => { if (item.to === '/storyboard') preloadStoryboard() }}
+              onFocus={() => { if (item.to === '/storyboard') preloadStoryboard() }}
+              style={({ isActive }) => navLinkStyle(isActive)}
+            >
+              {item.iconUrl && <img src={item.iconUrl} alt="" aria-hidden="true" style={{ width: 18, height: 18, objectFit: 'contain', flexShrink: 0, filter: darkMode ? 'brightness(0) invert(1)' : 'none' }} />}
+              <span>{item.label}</span>
             </NavLink>
           ))}
         </nav>
 
         <div style={{ padding: '12px 14px', borderTop: '1px solid var(--border)' }}>
+          <PersistentPlayerBar />
           {!isPremium && (
             <button onClick={() => navigate('/premium')} className="btn btn-gold" style={{ width: '100%', justifyContent: 'center', marginBottom: 10, fontSize: 12 }}>✦ Upgrade to Premium</button>
           )}
@@ -520,7 +544,9 @@ export default function Shell({ children }) {
               <div style={{ fontSize: 13, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user?.username}{isPremium && <span style={{ fontSize: 10, color: 'var(--gold)', marginLeft: 4 }}>✦ PRO</span>}</div>
               <div style={{ fontSize: 11, color: 'var(--text-3)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user?.email}</div>
             </div>
-            <button onClick={() => setShowSettings(true)} title="Settings" style={{ background: 'none', border: 'none', color: 'var(--text-3)', cursor: 'pointer', fontSize: 16, padding: 4 }}>⚙️</button>
+            <button onClick={() => setShowSettings(true)} title="Settings" aria-label="Settings" style={{ background: 'none', border: 'none', color: 'var(--text-3)', cursor: 'pointer', padding: 4, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <img src="https://res.cloudinary.com/crcbzpw6/image/upload/v1791966298/ellipsis-solid-full.svg" alt="" aria-hidden="true" style={{ width: 16, height: 16, objectFit: 'contain', filter: darkMode ? 'brightness(0) invert(1)' : 'none' }} />
+            </button>
           </div>
         </div>
       </aside>

@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { api } from '../context/AuthContext'
 import { useCampaign } from '../context/CampaignContext'
 import { useToast } from '../hooks/useToast'
+import { SkeletonBlock } from '../components/Skeleton'
 
 const TAGS = ['npc', 'location', 'item', 'faction', 'event', 'enemy', 'boss']
 const HP_TAGS = ['npc', 'enemy', 'boss'] // these get HP fields
@@ -26,17 +27,30 @@ function TagBadge({ tag }) {
 }
 
 export default function Lore() {
-  const { activeCampaign } = useCampaign()
+  const { activeCampaign, campaignsLoading, campaignsError, reload: reloadCampaigns } = useCampaign()
   const { toast, ToastContainer } = useToast()
   const [lore, setLore] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState('')
   const [filter, setFilter] = useState('all')
   const [adding, setAdding] = useState(false)
   const [form, setForm] = useState({ title: '', tag: 'npc', content: '', hp: '', maxHp: '' })
   const [editing, setEditing] = useState(null)
 
   const load = useCallback(async () => {
-    if (!activeCampaign) return
-    setLore(await api(`/lore/${activeCampaign._id}`))
+    if (!activeCampaign) {
+      setLoading(false)
+      return
+    }
+    setLoading(true)
+    setLoadError('')
+    try {
+      setLore(await api(`/lore/${activeCampaign._id}`))
+    } catch (err) {
+      setLoadError(err.message || 'Failed to load lore')
+    } finally {
+      setLoading(false)
+    }
   }, [activeCampaign])
 
   useEffect(() => { load() }, [load])
@@ -77,7 +91,27 @@ export default function Lore() {
   const filtered = filter === 'all' ? lore : lore.filter(l => l.tag === filter)
   const showHp = HP_TAGS.includes(form.tag)
 
-  if (!activeCampaign) return <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-3)' }}>Select a campaign.</div>
+  if (!activeCampaign) return (
+    <div className="page-content">
+      <div className="page-header-row" style={{ marginBottom: 20 }}>
+        <h2 style={{ fontSize: 18, flex: 1 }}>Info & Lore</h2>
+        <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+          {['all', ...TAGS].map(t => <button key={t} className="btn btn-ghost btn-sm" disabled>{t.charAt(0).toUpperCase() + t.slice(1)}</button>)}
+        </div>
+        <button className="btn btn-gold btn-sm" disabled>+ Add entry</button>
+      </div>
+      {campaignsLoading
+        ? <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 14 }}>
+            {Array.from({ length: 4 }).map((_, i) => <SkeletonBlock key={i} height={130} radius={12} />)}
+          </div>
+        : campaignsError
+          ? <div style={{ color: 'var(--text-2)' }}>
+              <p style={{ marginBottom: 12 }}>{campaignsError}</p>
+              <button className="btn btn-ghost" onClick={reloadCampaigns}>Retry</button>
+            </div>
+          : <p style={{ color: 'var(--text-3)' }}>Select a campaign.</p>}
+    </div>
+  )
 
   return (
     <div className="page-content">
@@ -125,7 +159,16 @@ export default function Lore() {
         </div>
       )}
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 14 }}>
+      {loading ? (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 14 }}>
+          {Array.from({ length: 4 }).map((_, i) => <SkeletonBlock key={i} height={130} radius={12} />)}
+        </div>
+      ) : loadError ? (
+        <div style={{ color: 'var(--text-2)' }}>
+          <p style={{ marginBottom: 12 }}>{loadError}</p>
+          <button className="btn btn-ghost" onClick={load}>Retry</button>
+        </div>
+      ) : <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 14 }}>
         {filtered.map(l => (
           <div key={l._id} className="card" style={{ padding: 16, borderLeft: (l.tag === 'boss') ? '3px solid #f59e0b' : (l.tag === 'enemy') ? '3px solid #ef4444' : undefined }}>
             <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, marginBottom: 8 }}>
@@ -152,6 +195,7 @@ export default function Lore() {
           </div>
         )}
       </div>
+      }
       <ToastContainer />
     </div>
   )

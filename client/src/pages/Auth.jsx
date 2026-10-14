@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { useAuth } from '../context/AuthContext'
+import { api, useAuth } from '../context/AuthContext'
 
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID
 
@@ -37,6 +37,7 @@ export default function Auth() {
   const [form, setForm] = useState({ username: '', email: '', password: '', phone: '', role: 'player' })
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [serverStatus, setServerStatus] = useState('connecting')
 
   // Two-factor step: once login() reports requires2FA, we show a code form.
   const [twoFA, setTwoFA] = useState(null) // { userId } | null
@@ -57,6 +58,13 @@ export default function Auth() {
     return token && id ? { token, id } : null
   })()
   useEffect(() => { if (resetParams) setMode('reset') }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    let cancelled = false
+    api('/health')
+      .then(() => { if (!cancelled) setServerStatus('ready') })
+      .catch(() => { if (!cancelled) setServerStatus('unavailable') })
+    return () => { cancelled = true }
+  }, [])
 
   const set = k => e => setForm(p => ({ ...p, [k]: e.target.value }))
 
@@ -67,6 +75,7 @@ export default function Auth() {
         const result = await login(form.email, form.password)
         if (result?.requires2FA) setTwoFA({ userId: result.userId })
       } else {
+        if (form.password.length < 8) throw new Error('Password must be at least 8 characters')
         await register(form.username, form.email, form.password, form.phone, form.role)
       }
     } catch (err) { setError(err.message) }
@@ -85,7 +94,7 @@ export default function Auth() {
   const submitReset = async (e) => {
     e.preventDefault(); setError(''); setLoading(true)
     try {
-      if (resetPw.password.length < 6) throw new Error('Password must be at least 6 characters')
+      if (resetPw.password.length < 8) throw new Error('Password must be at least 8 characters')
       if (resetPw.password !== resetPw.confirm) throw new Error('Passwords do not match')
       await resetPassword(resetParams.id, resetParams.token, resetPw.password)
       setResetDone(true)
@@ -231,6 +240,12 @@ return (
           <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 8, padding: '10px 14px', fontSize: 13, color: 'var(--red)', marginBottom: 16 }}>
             {error}
           </div>
+        )}
+        {mode === 'login' && serverStatus === 'connecting' && (
+          <div role="status" style={{ color: 'var(--text-3)', fontSize: 12, marginBottom: 12 }}>Connecting to the server…</div>
+        )}
+        {mode === 'login' && serverStatus === 'unavailable' && (
+          <div role="status" style={{ color: 'var(--text-3)', fontSize: 12, marginBottom: 12 }}>The server isn’t responding yet. You can still try signing in.</div>
         )}
 
         <GoogleButton onCredential={handleGoogleCredential} />

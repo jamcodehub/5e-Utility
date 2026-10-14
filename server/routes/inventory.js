@@ -31,9 +31,13 @@ router.get('/:campaignId', auth, async (req, res) => {
 // PUT /api/inventory/:campaignId — upsert (currency + items)
 router.put('/:campaignId', auth, async (req, res) => {
   try {
+    // Exclude `campaign`/`owner`/`_id` — these come from the URL/token, not
+    // the client body, otherwise a client could reassign their inventory
+    // doc to a different campaign or account via $set.
+    const { campaign, owner, _id, ...safeUpdates } = req.body
     const inv = await Inventory.findOneAndUpdate(
       { campaign: req.params.campaignId, owner: req.userId },
-      { $set: req.body },
+      { $set: safeUpdates },
       { new: true, upsert: true, runValidators: true }
     )
     res.json(inv)

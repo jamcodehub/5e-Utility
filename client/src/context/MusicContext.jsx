@@ -230,6 +230,14 @@ export function MusicProvider({ children }) {
     const ctx = ensureCtx()
     if (ctx.state === 'suspended') ctx.resume()
 
+    // Ambient moods and a custom track shouldn't play simultaneously.
+    if (trackAudioRef.current && !trackAudioRef.current.paused) {
+      trackAudioRef.current.pause()
+      trackAudioRef.current.currentTime = 0
+      setTrackPlaying(false)
+      setActiveTrack(null)
+    }
+
     // Bump generation so any in-flight delayed start (from a previous call)
     // is guaranteed to no-op even if its setTimeout somehow already fired.
     genRef.current++
@@ -272,10 +280,133 @@ export function MusicProvider({ children }) {
   const setVol = (v) => {
     setVolume(v)
     if (masterRef.current) masterRef.current.gain.value = v
+    if (trackAudioRef.current) trackAudioRef.current.volume = v
   }
 
+  // ── Custom track playback (uploaded tracks / session cues) ──
+  // Lives here at the provider level — not inside MusicPlayer.jsx — so
+  // playback survives navigating to other tabs, exactly like the ambient
+  // moods above. A plain `Audio()` object needs no DOM presence to keep
+  // playing since this provider is mounted once at the app root.
+  const trackAudioRef = useRef(typeof Audio !== 'undefined' ? new Audio() : null)
+  const [activeTrack, setActiveTrack] = useState(null)
+  const [trackPlaying, setTrackPlaying] = useState(false)
+  const [trackTime, setTrackTime] = useState(0)
+  const [trackDuration, setTrackDuration] = useState(0)
+  const [shuffleEnabled, setShuffleEnabled] = useState(false)
+  const [repeatMode, setRepeatMode] = useState('off') // 'off' | 'forever' | 'once'
+  const [queue, setQueue] = useState([]) // current playlist, used for shuffle/next-track
+  const repeatOnceUsedRef = useRef(false)
+  const activeTrackRef = useRef(null)
+  activeTrackRef.current = activeTrack
+
+  const playTrack = (track, playlist) => {
+    if (playlist) setQueue(playlist)
+    const el = trackAudioRef.current
+    if (!el) return
+    // Ambient moods and custom tracks shouldn't play simultaneously.
+    if (currentRef.current) { genRef.current++; hardStopNow(); setCurrent(null) }
+    if (activeTrackRef.current?._id === track._id && !el.paused) {
+      el.pause(); setTrackPlaying(false); return
+    }
+    if (activeTrackRef.current?._id === track._id && el.paused && el.currentTime > 0) {
+      el.play().then(() => setTrackPlaying(true)).catch(() => setTrackPlaying(false))
+      return
+    }
+    repeatOnceUsedRef.current = false
+    setActiveTrack(track)
+    el.src = track.url
+    el.volume = volume
+    return el.play().then(() => setTrackPlaying(true)).catch((err) => { setTrackPlaying(false); throw err })
+  }
+
+  const stopTrack = () => {
+    const el = trackAudioRef.current
+    if (!el) return
+    el.pause(); el.currentTime = 0
+    setTrackPlaying(false); setActiveTrack(null)
+  }
+
+  const seekTrack = (time) => {
+    const el = trackAudioRef.current
+    if (!el) return
+    el.currentTime = time
+    setTrackTime(time)
+  }
+
+  // Manual skip — used by the persistent mini-player controls. Wraps
+  // around the current queue in either direction.
+  const skipTrack = (dir) => {
+    if (!queue.length) return
+    const idx = queue.findIndex(t => t._id === activeTrackRef.current?._id)
+    const nextIdx = idx === -1 ? 0 : (idx + dir + queue.length) % queue.length
+    playTrack(queue[nextIdx])
+  }
+
+  // Toggle mood ambient tracks in a fixed cycle order (used by the
+  // persistent mini-player's "skip" control when no uploaded track queue
+  // is active — cycles Tavern → Battle → Forest → Dramatic → Tavern...).
+  const skipMood = (dir) => {
+    if (!currentRef.current) return
+    const idx = MOODS.findIndex(m => m.id === currentRef.current)
+    const nextIdx = (idx + dir + MOODS.length) % MOODS.length
+    play(MOODS[nextIdx].id)
+  }
+
+  useEffect(() => {
+    const el = trackAudioRef.current
+    if (!el) return
+    const onTime = () => setTrackTime(el.currentTime)
+    const onDur  = () => setTrackDuration(el.duration || 0)
+    const onEnd  = () => {
+      const endedTrackId = activeTrackRef.current?._id
+
+      if (repeatMode === 'forever') {
+        el.currentTime = 0
+        el.play().then(() => setTrackPlaying(true)).catch(() => setTrackPlaying(false))
+        return
+      }
+
+      if (repeatMode === 'once' && !repeatOnceUsedRef.current) {
+        repeatOnceUsedRef.current = true
+        el.currentTime = 0
+        el.play().then(() => setTrackPlaying(true)).catch(() => setTrackPlaying(false))
+        return
+      }
+
+      if (shuffleEnabled && queue.length > 1) {
+        const choices = queue.filter(t => t._id !== endedTrackId)
+        const nextTrack = choices[Math.floor(Math.random() * choices.length)]
+        if (nextTrack) { playTrack(nextTrack); return }
+      }
+
+      if (repeatMode === 'once' && queue.length > 1) {
+        const idx = queue.findIndex(t => t._id === endedTrackId)
+        const nextTrack = queue[(idx + 1) % queue.length] || queue[0]
+        playTrack(nextTrack)
+        return
+      }
+
+      setTrackPlaying(false)
+      setTrackTime(0)
+    }
+    el.addEventListener('timeupdate', onTime)
+    el.addEventListener('loadedmetadata', onDur)
+    el.addEventListener('ended', onEnd)
+    return () => {
+      el.removeEventListener('timeupdate', onTime)
+      el.removeEventListener('loadedmetadata', onDur)
+      el.removeEventListener('ended', onEnd)
+    }
+  }, [queue, repeatMode, shuffleEnabled])
+
   return (
-    <MusicContext.Provider value={{ current, volume, play, stop, setVol }}>
+    <MusicContext.Provider value={{
+      current, volume, play, stop, setVol,
+      activeTrack, trackPlaying, trackTime, trackDuration, trackDurationRef: trackDuration,
+      shuffleEnabled, setShuffleEnabled, repeatMode, setRepeatMode,
+      queue, setQueue, playTrack, stopTrack, seekTrack, skipTrack, skipMood,
+    }}>
       {children}
     </MusicContext.Provider>
   )

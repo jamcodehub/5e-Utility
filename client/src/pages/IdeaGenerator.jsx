@@ -49,7 +49,6 @@ export default function IdeaGenerator() {
       <div className="page-header-row" style={{ marginBottom: 20 }}>
         <div>
           <h2 style={{ fontSize: 22, marginBottom: 4 }}>Idea Generator</h2>
-          <p style={{ color: 'var(--text-2)', fontSize: 14, margin: 0 }}>Instant inspiration when the table goes quiet.</p>
         </div>
       </div>
 
