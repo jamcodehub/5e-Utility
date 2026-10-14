@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef, useId } from 'react'
 import { createPortal } from 'react-dom'
 import { useSearchParams } from 'react-router-dom'
 import { api } from '../context/AuthContext'
@@ -12,27 +12,83 @@ import { SkeletonBlock } from '../components/Skeleton'
 const GRID_W = 32
 const GRID_H = 22
 
+const TILE_IMAGE_URLS = {
+  // Ground textures
+  stoneFloor: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1791981262/stone_floor.png',
+  stoneWall: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1791981270/stone_wall.png',
+  woodWall: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1791981269/timber_wall.png',
+  stoneDoor: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1791981273/stone_door.png',
+  water: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1791981267/water.png',
+  grass: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1791981265/grass.png',
+  spikeTrap: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1791981276/spike_trap.png',
+  stairsUp: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1791981266/stairs_up.png',
+  stairsDown: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1791981277/stairs_down.png',
+  sand: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1791981275/sand.png',
+  rockyDirt: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1791981258/rocky_dirt.png',
+  lava: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1791981256/lava.png',
+  snow: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1791981263/snow.png',
+  mossyCobblestone: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1791981272/mossy_cobblestone.png',
+  woodPlanks: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1791981259/wood_planks.png',
+}
+
+const TILE_ICON_URLS = {
+  // Ground tiles
+  chest: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1791980486/toolbox-solid-full.svg',
+}
+
 const TILES = [
-  { id: 'floor',  label: 'Floor',  color: '#e8ddc4' },
-  { id: 'wall',   label: 'Wall',   color: '#4a3f33' },
-  { id: 'door',   label: 'Door',   color: '#8a5a2b', marker: '🚪' },
-  { id: 'water',  label: 'Water',  color: '#4a7fa5' },
-  { id: 'grass',  label: 'Grass',  color: '#5c8a4a' },
-  { id: 'trap',   label: 'Trap',   color: '#b03030' },
-  { id: 'stairs', label: 'Stairs Up', color: '#9a8a5a', marker: '↑' },
-  { id: 'stairs-down', label: 'Stairs Down', color: '#80704a', marker: '↓' },
-  { id: 'chest',  label: 'Chest',  color: '#c9a227' },
+  { id: 'floor',  label: 'Stone Floor', color: '#e8ddc4', imageUrl: TILE_IMAGE_URLS.stoneFloor },
+  { id: 'wall',   label: 'Stone Wall', color: '#4a3f33', imageUrl: TILE_IMAGE_URLS.stoneWall, blocksVision: true },
+  { id: 'wood-wall', label: 'Wood Wall', color: '#4a3f33', imageUrl: TILE_IMAGE_URLS.woodWall, blocksVision: true },
+  { id: 'door',   label: 'Stone Door', color: '#8a5a2b', imageUrl: TILE_IMAGE_URLS.stoneDoor },
+  { id: 'water',  label: 'Water',  color: '#4a7fa5', imageUrl: TILE_IMAGE_URLS.water },
+  { id: 'grass',  label: 'Grass',  color: '#5c8a4a', imageUrl: TILE_IMAGE_URLS.grass },
+  { id: 'trap',   label: 'Spike Trap', color: '#b03030', imageUrl: TILE_IMAGE_URLS.spikeTrap },
+  { id: 'stairs', label: 'Stairs Up', color: '#9a8a5a', imageUrl: TILE_IMAGE_URLS.stairsUp },
+  { id: 'stairs-down', label: 'Stairs Down', color: '#80704a', imageUrl: TILE_IMAGE_URLS.stairsDown },
+  { id: 'sand', label: 'Sand', color: '#d1b477', imageUrl: TILE_IMAGE_URLS.sand },
+  { id: 'rocky-dirt', label: 'Rocky Dirt', color: '#765b3c', imageUrl: TILE_IMAGE_URLS.rockyDirt },
+  { id: 'lava', label: 'Lava', color: '#d54a1e', imageUrl: TILE_IMAGE_URLS.lava },
+  { id: 'snow', label: 'Snow', color: '#dce7ef', imageUrl: TILE_IMAGE_URLS.snow },
+  { id: 'mossy-cobblestone', label: 'Mossy Cobblestone', color: '#777c67', imageUrl: TILE_IMAGE_URLS.mossyCobblestone },
+  { id: 'wood-planks', label: 'Wood Planks', color: '#795536', imageUrl: TILE_IMAGE_URLS.woodPlanks },
+  { id: 'chest',  label: 'Chest',  color: '#c9a227', iconColor: '#facc15', iconUrl: TILE_ICON_URLS.chest },
   { id: 'empty',  label: 'Erase',  color: 'transparent' },
 ]
 
 const OBJECT_TILES = [
-  { id: 'torch', label: 'Torch', marker: '🔥', lightRadius: 5 },
-  { id: 'tree', label: 'Tree', marker: '🌲' },
-  { id: 'bush', label: 'Bush', marker: '🌿' },
-  { id: 'rock-small', label: 'Small Rock', marker: '●', color: '#8a8986', size: 9 },
-  { id: 'rock-medium', label: 'Medium Rock', marker: '●', color: '#777673', size: 13 },
-  { id: 'rock-large', label: 'Large Rock', marker: '●', color: '#62615f', size: 17 },
-  { id: 'object-erase', label: 'Erase Object', marker: '⌫' },
+  { id: 'torch', label: 'Torch', imageUrl: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1791981284/torch.png', lightRadius: 5 },
+  { id: 'campfire', label: 'Campfire', imageUrl: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1791981281/campfire.png', lightRadius: 5 },
+  { id: 'brazier', label: 'Brazier', imageUrl: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1791981247/brazier.png', lightRadius: 5 },
+  { id: 'magic-rune', label: 'Magic Rune', imageUrl: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1791981251/magic_rune_circle.png', lightRadius: 2 },
+  { id: 'cauldron', label: 'Cauldron', imageUrl: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1791981253/glowing_alchemy_cauldron.png', lightRadius: 2 },
+  { id: 'blue-crystal', label: 'Blue Crystal', imageUrl: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1791981249/blue_crystal_cluster.png', lightRadius: 2 },
+  { id: 'tree', label: 'Evergreen Tree', imageUrl: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1791981286/evergreen_tree.png' },
+  { id: 'bush', label: 'Bush', imageUrl: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1791981297/bush.png' },
+  { id: 'yellow-flowers', label: 'Yellow Flowers', imageUrl: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1791981301/yellow_flowers.png' },
+  { id: 'thorny-brambles', label: 'Thorny Brambles', imageUrl: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1791981300/thorny_brambles.png' },
+  { id: 'rock-small', label: 'Small Rock', imageUrl: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1791981291/small_rock.png', size: 9 },
+  { id: 'rock-medium', label: 'Medium Rock', imageUrl: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1791981288/medium_rock.png', size: 13 },
+  { id: 'rock-large', label: 'Large Rock', imageUrl: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1791981291/small_rock.png', size: 17 },
+  { id: 'table', label: 'Table', imageUrl: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1791981238/wooden_table.png' },
+  { id: 'chair', label: 'Chair', imageUrl: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1791981235/wooden_chair.png' },
+  { id: 'bridge', label: 'Bridge', imageUrl: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1791981236/wooden_bridge.png' },
+  { id: 'treasure', label: 'Treasure Pile', imageUrl: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1791981242/treasure_pile.png' },
+  { id: 'well', label: 'Well', imageUrl: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1791981254/stone_well.png' },
+  { id: 'signpost', label: 'Signpost', imageUrl: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1791981239/signpost.png' },
+  { id: 'open-chest', label: 'Open Treasure Chest', imageUrl: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1791981246/open_treasure_chest.png' },
+  { id: 'locked-chest', label: 'Locked Chest', imageUrl: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1791981240/locked_chest.png' },
+  { id: 'tent', label: 'Tent', imageUrl: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1791981250/canvas_tent.png' },
+  { id: 'bookshelf', label: 'Bookshelf', imageUrl: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1791981244/bookcase.png' },
+  { id: 'bed', label: 'Bed', imageUrl: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1791981243/bed.png' },
+  { id: 'barrel', label: 'Barrel', imageUrl: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1791981298/barrel.png' },
+  { id: 'bones', label: 'Bones and Skull', imageUrl: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1791981295/bones_and_skull.png' },
+  { id: 'mushrooms', label: 'Red Mushrooms', imageUrl: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1791981294/red_mushrooms.png' },
+  { id: 'fallen-log', label: 'Fallen Log', imageUrl: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1791981279/fallen_log.png' },
+  { id: 'pillar', label: 'Stone Pillar', imageUrl: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1791981292/stone_pillar.png' },
+  { id: 'wooden-crate', label: 'Wooden Crate', imageUrl: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1791981290/wooden_crate.png' },
+  { id: 'gravestone', label: 'Gravestone', imageUrl: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1791981287/gravestone.png' },
+  { id: 'object-erase', label: 'Erase Object' },
 ]
 const TORCH_LIGHT_RADIUS = OBJECT_TILES.find(tile => tile.id === 'torch').lightRadius
 const DARKVISION_RADIUS = 6
@@ -74,7 +130,9 @@ function normalizeDoorStates(value) {
 }
 
 function blocksVision(ground, doorStates, row, col) {
-  return ground[row]?.[col] === 'wall' || (ground[row]?.[col] === 'door' && !doorStates[row]?.[col])
+  const tileId = ground[row]?.[col]
+  const tile = TILES.find(item => item.id === tileId)
+  return tileId === 'wall' || tile?.blocksVision === true || (tileId === 'door' && !doorStates[row]?.[col])
 }
 
 function hasLineOfSight(ground, doorStates, from, to) {
@@ -114,7 +172,49 @@ function objectTile(id) {
   return OBJECT_TILES.find(tile => tile.id === id)
 }
 
+function TileIconPlaceholder({ tile, style = {} }) {
+  if (tile.imageUrl) {
+    return <img
+      src={tile.imageUrl}
+      alt=""
+      aria-hidden="true"
+      draggable="false"
+      style={{ width: '94%', height: '94%', objectFit: 'contain', pointerEvents: 'none', ...style }}
+    />
+  }
+
+  return tile.iconUrl
+    ? <span aria-hidden="true" style={{
+        width: '72%',
+        height: '72%',
+        backgroundColor: tile.iconColor || '#444',
+        maskImage: `url("${tile.iconUrl}")`,
+        maskRepeat: 'no-repeat',
+        maskPosition: 'center',
+        maskSize: 'contain',
+        WebkitMaskImage: `url("${tile.iconUrl}")`,
+        WebkitMaskRepeat: 'no-repeat',
+        WebkitMaskPosition: 'center',
+        WebkitMaskSize: 'contain',
+        transform: tile.id === 'stairs-down' ? 'rotate(180deg)' : undefined,
+        pointerEvents: 'none',
+        ...style,
+      }} />
+    : <span aria-hidden="true" style={{
+        width: tile.id.startsWith('rock-') ? `${Math.min((tile.size || 12) * 4, 68)}%` : '58%',
+        aspectRatio: '1',
+        borderRadius: tile.id.startsWith('rock-') ? '50%' : 4,
+        background: tile.color || 'rgba(255,255,255,0.65)',
+        border: '1px dashed rgba(0,0,0,0.32)',
+        boxSizing: 'border-box',
+        pointerEvents: 'none',
+        ...style,
+      }} />
+}
+
 function MapThumb({ content }) {
+  const tintId = useId().replace(/:/g, '')
+  const iconColors = [...new Set([...TILES, ...OBJECT_TILES].map(tile => tile.iconColor).filter(Boolean))]
   const grid = useMemo(() => {
     return parseMapContent(content)
   }, [content])
@@ -133,18 +233,39 @@ function MapThumb({ content }) {
         shapeRendering: 'crispEdges',
       }}
     >
-      {grid.ground.flatMap((row, r) => row.map((cell, c) => (
-        <rect key={`${r}-${c}`} x={c} y={r} width="1" height="1" fill={tileColor(cell)} />
-      )))}
-      {grid.objects.flatMap((row, r) => row.map((id, c) => {
-        const tile = objectTile(id)
-        if (!tile) return null
+        <defs>
+          {iconColors.map(color => {
+            const red = parseInt(color.slice(1, 3), 16) / 255
+            const green = parseInt(color.slice(3, 5), 16) / 255
+            const blue = parseInt(color.slice(5, 7), 16) / 255
+            return (
+              <filter key={color} id={`${tintId}-${color.slice(1)}`} colorInterpolationFilters="sRGB">
+                <feColorMatrix type="matrix" values={`0 0 0 0 ${red} 0 0 0 0 ${green} 0 0 0 0 ${blue} 0 0 0 1 0`} />
+              </filter>
+            )
+          })}
+        </defs>
+        {grid.ground.flatMap((row, r) => row.map((cell, c) => (
+          <rect key={`${r}-${c}`} x={c} y={r} width="1" height="1" fill={tileColor(cell)} />
+        )))}
+        {grid.ground.flatMap((row, r) => row.map((id, c) => {
+          const tile = TILES.find(item => item.id === id)
+          return tile?.imageUrl
+            ? <image key={`ground-image-${r}-${c}`} href={tile.imageUrl} x={c} y={r} width="1" height="1" preserveAspectRatio="none" />
+            : null
+        }))}
+        {grid.objects.flatMap((row, r) => row.map((id, c) => {
+          const tile = objectTile(id)
+          if (!tile) return null
+          if (tile.imageUrl) return <image key={`object-${r}-${c}`} href={tile.imageUrl} x={c + 0.03} y={r + 0.03} width="0.94" height="0.94" preserveAspectRatio="xMidYMid meet" />
+          if (tile.iconUrl) return <image key={`object-${r}-${c}`} href={tile.iconUrl} x={c + 0.12} y={r + 0.12} width="0.76" height="0.76" preserveAspectRatio="xMidYMid meet" filter={`url(#${tintId}-${tile.iconColor.slice(1)})`} />
         if (id.startsWith('rock-')) return <circle key={`object-${r}-${c}`} cx={c + 0.5} cy={r + 0.5} r={id === 'rock-small' ? 0.18 : id === 'rock-medium' ? 0.28 : 0.36} fill={tile.color} />
-        return <text key={`object-${r}-${c}`} x={c + 0.5} y={r + 0.78} textAnchor="middle" fontSize="0.8">{tile.marker}</text>
+        return <rect key={`object-${r}-${c}`} x={c + 0.22} y={r + 0.22} width="0.56" height="0.56" rx="0.08" fill={tile.color || '#fff'} fillOpacity="0.7" stroke="#333" strokeOpacity="0.55" strokeDasharray="0.08 0.05" strokeWidth="0.04" />
       }))}
       {grid.ground.flatMap((row, r) => row.map((id, c) => {
-        const tile = TILES.find(item => item.id === id && item.marker)
-        return tile ? <text key={`ground-${r}-${c}`} x={c + 0.5} y={r + 0.78} textAnchor="middle" fontSize="0.8" fill="#fff">{tile.marker}</text> : null
+        const tile = TILES.find(item => item.id === id && item.iconUrl)
+        if (!tile) return null
+        return <image key={`ground-${r}-${c}`} href={tile.iconUrl} x={c + 0.12} y={r + 0.12} width="0.76" height="0.76" preserveAspectRatio="xMidYMid meet" filter={tile.iconColor ? `url(#${tintId}-${tile.iconColor.slice(1)})` : undefined} />
       }))}
       <path
         d={[...Array.from({ length: GRID_W + 1 }, (_, x) => `M${x} 0V${GRID_H}`), ...Array.from({ length: GRID_H + 1 }, (_, y) => `M0 ${y}H${GRID_W}`)].join(' ')}
@@ -728,14 +849,19 @@ export default function LevelBuilder() {
 
   // ── Render ──
   const selectedPlan = plans.find(p => p._id === selectedPlanId)
-  const torchLocations = useMemo(
-    () => objectGrid.flatMap((row, r) => row.flatMap((id, c) => id === 'torch' ? [{ row: r, col: c }] : [])),
+  const mapLightSources = useMemo(
+    () => objectGrid.flatMap((row, r) => row.flatMap((id, c) => {
+      const tile = objectTile(id)
+      return tile?.lightRadius ? [{ row: r, col: c, radius: tile.lightRadius }] : []
+    })),
     [objectGrid],
   )
   const sharedLightSources = useMemo(() => [
-    ...torchLocations,
-    ...tokens.filter(token => token.lightSource && Number.isInteger(token.row) && Number.isInteger(token.col)),
-  ], [tokens, torchLocations])
+    ...mapLightSources,
+    ...tokens
+      .filter(token => token.lightSource && Number.isInteger(token.row) && Number.isInteger(token.col))
+      .map(token => ({ ...token, radius: TORCH_LIGHT_RADIUS })),
+  ], [mapLightSources, tokens])
   const localPlayerToken = tokens.find(token => token.id === `char-${user?.id}`)
   const darkvisionSources = useMemo(() => isDm
     ? tokens.filter(token => token.darkvision && Number.isInteger(token.row) && Number.isInteger(token.col))
@@ -752,10 +878,13 @@ export default function LevelBuilder() {
       darkvision[row] = []
       lightStrength[row] = []
       for (let col = 0; col < GRID_W; col++) {
-        const lightDistances = sharedLightSources
-          .filter(source => canSeeFrom(grid, doorStates, source, row, col, TORCH_LIGHT_RADIUS))
-          .map(source => Math.max(Math.abs(source.row - row), Math.abs(source.col - col)))
-        const sharedLight = lightDistances.length > 0
+        const nearbyLights = sharedLightSources
+          .filter(source => canSeeFrom(grid, doorStates, source, row, col, source.radius))
+          .map(source => ({
+            distance: Math.max(Math.abs(source.row - row), Math.abs(source.col - col)),
+            radius: source.radius,
+          }))
+        const sharedLight = nearbyLights.length > 0
         const hasDarkvision = darkvisionSources.some(source =>
           canSeeFrom(grid, doorStates, source, row, col, DARKVISION_RADIUS)
         )
@@ -763,7 +892,12 @@ export default function LevelBuilder() {
         torchlit[row][col] = !darkMode || sharedLight
         darkvision[row][col] = darkMode && hasDarkvision && !sharedLight
         lightStrength[row][col] = sharedLight
-          ? Math.max(...lightDistances.map(distance => distance <= 3 ? 1 : 1 - ((distance - 3) / 2) * 0.55))
+          ? Math.max(...nearbyLights.map(({ distance, radius }) => {
+              const coreRadius = Math.floor(radius * 0.6)
+              return distance <= coreRadius
+                ? 1
+                : 1 - ((distance - coreRadius) / Math.max(1, radius - coreRadius)) * 0.55
+            }))
           : 0
       }
     }
@@ -829,7 +963,7 @@ export default function LevelBuilder() {
       <aside className="lb-editor-tools" aria-label="Map tile selection">
         <div className="lb-tool-palettes">
           {[
-            { layer: 'ground', title: 'Ground Tiles', tiles: TILES },
+            { layer: 'ground', title: 'Ground Tiles', tiles: TILES.filter(tile => tile.id !== 'chest') },
             { layer: 'objects', title: 'Upper Layer Objects', tiles: OBJECT_TILES },
           ].map(palette => (
             <div key={palette.layer} className="lb-tool-palette" style={{
@@ -851,11 +985,11 @@ export default function LevelBuilder() {
                       border: selected ? '2px solid var(--gold)' : '1px solid var(--border)',
                       background: selected ? 'var(--gold-bg)' : 'var(--surface)', color: 'var(--text)',
                     }}>
-                      {tile.marker
-                        ? <span style={{ color: tile.color || 'inherit', fontSize: tile.size || 13, lineHeight: 1 }}>{tile.marker}</span>
-                        : <span style={{ width: 12, height: 12, borderRadius: 2, background: tile.color === 'transparent' ? 'repeating-conic-gradient(#ccc 0% 25%, #fff 0% 50%) 50%/6px 6px' : tile.color, border: '1px solid rgba(0,0,0,0.2)', flexShrink: 0 }} />
+                      {tile.imageUrl || tile.iconUrl || tile.id.startsWith('rock-')
+                        ? <TileIconPlaceholder tile={tile} style={{ width: 14, height: 14, flexShrink: 0 }} />
+                        : <span style={{ width: 12, height: 12, borderRadius: 2, background: tile.color === 'transparent' || !tile.color ? 'repeating-conic-gradient(#ccc 0% 25%, #fff 0% 50%) 50%/6px 6px' : tile.color, border: '1px solid rgba(0,0,0,0.2)', flexShrink: 0 }} />
                       }
-                      {tile.label}
+                      <span title={tile.label} style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{tile.label}</span>
                     </button>
                   )
                 })}
@@ -921,11 +1055,10 @@ export default function LevelBuilder() {
                 onTouchStart={() => { if (!linkMode) paint(r, c) }}
                 style={{ background: t.color === 'transparent' ? '#f5f4f1' : t.color, display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative' }}
               >
-                {t.marker && <span style={{ color: '#fff', textShadow: '0 1px 2px #000', fontSize: 11, pointerEvents: 'none' }}>{t.marker}</span>}
+                {t.imageUrl && <TileIconPlaceholder tile={t} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />}
+                {t.iconUrl && <TileIconPlaceholder tile={t} style={{ position: 'absolute', inset: '21%', width: '58%', height: '58%' }} />}
                 {stairLinks[r]?.[c] && <span aria-label="Linked stairs" style={{ position: 'absolute', top: 0, right: 1, color: '#fff', fontSize: 8, textShadow: '0 1px 2px #000', pointerEvents: 'none' }}>↗</span>}
-                {object && object.id !== 'object-erase' && (
-                  <span style={{ color: object.color || 'inherit', fontSize: object.size || 15, lineHeight: 1, position: 'absolute', zIndex: 1, pointerEvents: 'none', textShadow: object.id === 'torch' ? '0 0 8px #ff8c00' : '0 1px 2px rgba(0,0,0,0.55)' }}>{object.marker}</span>
-                )}
+                {object && object.id !== 'object-erase' && (object.imageUrl || object.iconUrl || object.id.startsWith('rock-')) && <TileIconPlaceholder tile={object} style={{ position: 'absolute', zIndex: 1 }} />}
               </div>
             )
           }))}
@@ -1002,7 +1135,7 @@ export default function LevelBuilder() {
               const isStair = cellId === 'stairs' || cellId === 'stairs-down'
               const cellBase = isDoor && doorOpen ? 'floor' : cellId
               const lightStrength = visibility.lightStrength[r]?.[c] || 0
-              const groundTile = TILES.find(tile => tile.id === cellId)
+              const groundTile = TILES.find(tile => tile.id === cellBase)
               return (
                 <div
                   key={`${r}-${c}`}
@@ -1024,15 +1157,22 @@ export default function LevelBuilder() {
                     cursor: visible && (isDoor || isStair) ? 'pointer' : undefined,
                   }}
                 >
-                  {groundTile?.marker && visible && (
-                    <span aria-hidden="true" style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: Math.max(8, cellSize * 0.4), textShadow: '0 1px 2px #000', pointerEvents: 'none' }}>
-                      {isDoor && doorOpen ? '╱' : groundTile.marker}
-                    </span>
+                  {groundTile?.imageUrl && visible && (
+                    <img
+                      src={groundTile.imageUrl}
+                      alt=""
+                      aria-hidden="true"
+                      draggable="false"
+                      style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', pointerEvents: 'none' }}
+                    />
+                  )}
+                  {groundTile?.iconUrl && visible && !(isDoor && doorOpen) && (
+                    <TileIconPlaceholder tile={groundTile} style={{ position: 'absolute', inset: '21%', width: '58%', height: '58%', filter: darkvision ? 'brightness(0.35)' : undefined }} />
                   )}
                   {object && visible && (
-                    <span aria-hidden="true" style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: object.color || 'inherit', fontSize: object.size ? Math.max(8, cellSize * (object.size / 16)) : Math.max(10, cellSize * 0.7), lineHeight: 1, textShadow: object.id === 'torch' ? '0 0 12px #ff8c00' : '0 1px 2px rgba(0,0,0,0.55)', pointerEvents: 'none' }}>{object.marker}</span>
+                    <TileIconPlaceholder tile={object} style={{ position: 'absolute', zIndex: 1, filter: darkvision ? 'brightness(0.35)' : undefined }} />
                   )}
-                  {token && visible && (
+                  {token && (
                     <Token
                       token={token}
                       cellSize={cellSize}
@@ -1040,7 +1180,7 @@ export default function LevelBuilder() {
                       dragging={dragTokenId === token.id}
                     />
                   )}
-                  {token?.lightSource && visible && <span aria-hidden="true" style={{ position: 'absolute', top: -5, right: -3, zIndex: 11, fontSize: 10, pointerEvents: 'none' }}>🔥</span>}
+                  {token?.lightSource && <span aria-hidden="true" style={{ position: 'absolute', top: -5, right: -3, zIndex: 11, fontSize: 10, pointerEvents: 'none' }}>🔥</span>}
                 </div>
               )
             }))}
