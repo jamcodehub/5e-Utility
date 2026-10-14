@@ -101,7 +101,7 @@ function BookSpread({ card, index, onEdit, isMobile }) {
           <div style={{ position: 'absolute', top: 8, right: 12, fontFamily: 'Cinzel, serif', fontSize: 9, color: 'var(--sb-page-meta)', letterSpacing: '0.1em' }}>{index * 2 + 2}</div>
           <button onClick={onEdit} style={{ position: 'absolute', top: 10, right: 36, background: 'rgba(0,0,0,0.08)', border: '1px solid rgba(0,0,0,0.15)', color: 'var(--sb-page-meta)', borderRadius: 6, padding: '2px 8px', fontSize: 10, cursor: 'pointer', fontFamily: 'Cinzel, serif', zIndex: 2 }}>Edit</button>
           <h2 style={{ fontFamily: 'Cinzel, serif', fontSize: 15, color: 'var(--sb-page-title)', lineHeight: 1.3, margin: '0 0 10px 0', textAlign: 'center', position: 'relative', zIndex: 1 }}>{card.title}</h2>
-          <div style={{ flex: 1, overflow: 'auto' }}>
+          <div data-story-text style={{ flex: 1, overflow: 'auto', minHeight: 0, overscrollBehavior: 'contain' }}>
             <p style={{ fontFamily: 'Georgia, serif', fontSize: 12.5, color: 'var(--sb-page-body)', lineHeight: 1.85, margin: 0, textAlign: 'justify', hyphens: 'auto', position: 'relative', zIndex: 1 }}>{card.description}</p>
           </div>
           {card.createdAt && (
@@ -127,7 +127,7 @@ function BookSpread({ card, index, onEdit, isMobile }) {
         <div style={{ position: 'absolute', top: 14, right: 18, fontFamily: 'Cinzel, serif', fontSize: 10, color: 'var(--sb-page-meta)', letterSpacing: '0.1em' }}>{index * 2 + 2}</div>
         <button onClick={onEdit} style={{ position: 'absolute', top: 32, right: 18, background: 'rgba(0,0,0,0.08)', border: '1px solid rgba(0,0,0,0.15)', color: 'var(--sb-page-meta)', borderRadius: 6, padding: '3px 9px', fontSize: 11, cursor: 'pointer', fontFamily: 'Cinzel, serif', zIndex: 2 }}>Edit</button>
         <h2 style={{ fontFamily: 'Cinzel, serif', fontSize: 17, color: 'var(--sb-page-title)', lineHeight: 1.4, margin: '0 0 20px 0', textAlign: 'center', position: 'relative', zIndex: 1, paddingRight: 44 }}>{card.title}</h2>
-        <div style={{ flex: 1, overflow: 'auto', display: 'flex', justifyContent: 'center' }}>
+        <div data-story-text style={{ flex: 1, minHeight: 0, overflow: 'auto', display: 'flex', justifyContent: 'center', overscrollBehavior: 'contain' }}>
           <p style={{ fontFamily: 'Georgia, serif', fontSize: 13.5, color: 'var(--sb-page-body)', lineHeight: 2, margin: 0, maxWidth: 320, width: '100%', textAlign: 'justify', hyphens: 'auto', position: 'relative', zIndex: 1 }}>{card.description}</p>
         </div>
         {card.createdAt && (
@@ -146,7 +146,8 @@ export default function Storyboard() {
   const { activeCampaign } = useCampaign()
   const { toast, ToastContainer } = useToast()
   const [cards, setCards] = useState([])
-  const [cardsLoading, setCardsLoading] = useState(true)
+  const toastRef = useRef(toast)
+  toastRef.current = toast
   const [currentPage, setCurrentPage] = useState(-1)
   const bookRef = useRef(null)
   const [showForm, setShowForm] = useState(false)
@@ -171,15 +172,11 @@ export default function Storyboard() {
   const load = useCallback(async () => {
     if (!activeCampaign) {
       setCards([])
-      setCardsLoading(false)
       return
     }
-    setCardsLoading(true)
     try {
       setCards(await api(`/storyboard/${activeCampaign._id}`))
-    } finally {
-      setCardsLoading(false)
-    }
+    } catch (err) { toastRef.current(err.message || 'Failed to load storyboard') }
   }, [activeCampaign])
 
   useEffect(() => { load() }, [load])
@@ -194,6 +191,11 @@ export default function Storyboard() {
   useEffect(() => {
     const el = scrollRef.current; if (!el) return
     const onWheel = (e) => {
+      if (e.target instanceof Element && e.target.closest('[data-story-text]')) {
+        scrollAccum.current = 0
+        e.stopPropagation()
+        return
+      }
       e.preventDefault()
       scrollAccum.current += e.deltaY
       if (scrollAccum.current > THRESHOLD) { scrollAccum.current = 0; goTo(1) }
@@ -215,7 +217,7 @@ export default function Storyboard() {
       if (dx > dy && dx > 8) { locked = true; e.preventDefault() }
     }
     const onEnd = (e) => {
-      const diff = startX - e.changedTouches[0].clientX
+      const diff = e.changedTouches[0].clientX - startX
       const dy = Math.abs(e.changedTouches[0].clientY - startY)
       if (Math.abs(diff) > 44 && Math.abs(diff) > dy) goTo(diff > 0 ? 1 : -1)
     }
@@ -319,8 +321,8 @@ export default function Storyboard() {
         </div>
       )}
 
-      {/* Keep the canvas blank during the backend fetch; the toolbar stays visible. */}
-      {!cardsLoading && <div
+      {/* Keep the book frame mounted while scenes load so the dots stay below it. */}
+      <div
         ref={scrollRef}
         style={{
           flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -393,7 +395,7 @@ export default function Storyboard() {
             SWIPE TO OPEN
           </div>
         )}
-      </div>}
+      </div>
 
       {/* Dots */}
       <div style={{ padding: '6px 0 10px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5, background: 'var(--sb-outer)', flexShrink: 0 }}>

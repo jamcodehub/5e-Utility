@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { createPortal } from 'react-dom'
+import { useSearchParams } from 'react-router-dom'
 import { api } from '../context/AuthContext'
 import { useCampaign } from '../context/CampaignContext'
 import { useAuth } from '../context/AuthContext'
@@ -234,6 +235,7 @@ function Token({ token, cellSize, onDragStart, dragging }) {
 export default function LevelBuilder() {
   const { activeCampaign, campaignsLoading, campaignsError, reload: reloadCampaigns } = useCampaign()
   const { isPremium, user } = useAuth()
+  const [searchParams, setSearchParams] = useSearchParams()
   const isDm = user?.role === 'dm'
   const { toast, ToastContainer } = useToast()
 
@@ -286,6 +288,9 @@ export default function LevelBuilder() {
   useEffect(() => {
     if (mode !== 'play' || !selectedPlanId || !dragTokenId) return
 
+    const preventTouchScroll = (event) => event.preventDefault()
+    window.addEventListener('touchmove', preventTouchScroll, { passive: false })
+
     const finishDrag = (e) => {
       const cell = document.elementFromPoint(e.clientX, e.clientY)?.closest('[data-map-cell]')
       if (cell) {
@@ -319,6 +324,7 @@ export default function LevelBuilder() {
       window.removeEventListener('pointermove', moveDrag)
       window.removeEventListener('pointerup', finishDrag)
       window.removeEventListener('pointercancel', cancelDrag)
+      window.removeEventListener('touchmove', preventTouchScroll)
     }
   }, [availableTokens, dragTokenId, mode, selectedPlanId])
 
@@ -514,7 +520,29 @@ export default function LevelBuilder() {
     setDoorStates(normalizeDoorStates(plan.doorStates))
     setTokens(Array.isArray(plan.tokens) ? plan.tokens : [])
     setMode('play')
+    if (isDm && activeCampaign && !activeCampaign.isPersonal) {
+      getSocket().timeout(5000).emit('level:show', {
+        campaignId: activeCampaign._id,
+        planId: plan._id,
+      }, (error, response) => {
+        if (error) toast('Could not open the map for players')
+        else if (!response?.ok) toast(response?.error || 'Could not open the map for players')
+      })
+    }
   }
+
+  useEffect(() => {
+    const planId = searchParams.get('map')
+    if (!planId || !activeCampaign || plansLoading || mode === 'editor') return
+    const plan = plans.find(item => item._id === planId)
+    if (!plan) return
+    openPlay(plan)
+    setSearchParams(current => {
+      const next = new URLSearchParams(current)
+      next.delete('map')
+      return next
+    }, { replace: true })
+  }, [activeCampaign, mode, plans, plansLoading, searchParams, setSearchParams])
 
   // If the DM saves without naming the map, auto-assign the next free
   // "Map N" name (Map1, Map2, ...) instead of blocking/prompting them.
@@ -709,6 +737,10 @@ export default function LevelBuilder() {
     ...tokens.filter(token => token.lightSource && Number.isInteger(token.row) && Number.isInteger(token.col)),
   ], [tokens, torchLocations])
   const localPlayerToken = tokens.find(token => token.id === `char-${user?.id}`)
+  const darkvisionSources = useMemo(() => isDm
+    ? tokens.filter(token => token.darkvision && Number.isInteger(token.row) && Number.isInteger(token.col))
+    : localPlayerToken?.darkvision ? [localPlayerToken] : [],
+  [isDm, localPlayerToken, tokens])
   const visibility = useMemo(() => {
     const visible = []
     const torchlit = []
@@ -724,9 +756,10 @@ export default function LevelBuilder() {
           .filter(source => canSeeFrom(grid, doorStates, source, row, col, TORCH_LIGHT_RADIUS))
           .map(source => Math.max(Math.abs(source.row - row), Math.abs(source.col - col)))
         const sharedLight = lightDistances.length > 0
-        const hasDarkvision = Boolean(localPlayerToken?.darkvision
-          && canSeeFrom(grid, doorStates, localPlayerToken, row, col, DARKVISION_RADIUS))
-        visible[row][col] = !darkMode || sharedLight || hasDarkvision
+        const hasDarkvision = darkvisionSources.some(source =>
+          canSeeFrom(grid, doorStates, source, row, col, DARKVISION_RADIUS)
+        )
+        visible[row][col] = !darkMode || isDm || sharedLight || hasDarkvision
         torchlit[row][col] = !darkMode || sharedLight
         darkvision[row][col] = darkMode && hasDarkvision && !sharedLight
         lightStrength[row][col] = sharedLight
@@ -735,7 +768,7 @@ export default function LevelBuilder() {
       }
     }
     return { visible, torchlit, darkvision, lightStrength }
-  }, [darkMode, doorStates, grid, localPlayerToken, sharedLightSources])
+  }, [darkMode, doorStates, grid, isDm, darkvisionSources, sharedLightSources])
 
   if (!activeCampaign && !campaignsLoading) return (
     <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-3)' }}>
@@ -753,14 +786,24 @@ export default function LevelBuilder() {
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
       <style>{`
         .lb-cell { aspect-ratio: 1; border: 0.5px solid rgba(0,0,0,0.1); cursor: crosshair; touch-action: none; }
-        .lb-tool-palettes { display: flex; align-items: stretch; gap: 8px; flex: 1; min-width: 0; }
-        .lb-tool-palette { min-width: 0; padding: 5px 7px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface2); }
+        .lb-editor-workspace { display: flex; flex: 1; min-height: 0; overflow: hidden; }
+        .lb-editor-tools { width: 248px; flex: 0 0 248px; padding: 10px; overflow-y: auto; background: var(--surface); border-right: 1px solid var(--border); }
+        .lb-tool-palettes { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+        .lb-tool-palette { min-width: 0; padding: 7px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface2); }
         .lb-tool-palette-title { margin-bottom: 4px; color: var(--text-3); font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; }
-        .lb-tool-palette-buttons { display: flex; gap: 4px; flex-wrap: wrap; }
+        .lb-tool-palette-buttons { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px; }
+        .lb-tool-palette-buttons .btn { justify-content: flex-start; min-width: 0; padding: 5px 6px; font-size: 10px; }
+        .lb-tool-palette-buttons .btn span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .lb-editor-map { flex: 1; min-width: 0; min-height: 0; overflow: hidden; padding: 0; background: #2a2a2a; display: flex; flex-direction: column; align-items: stretch; }
+        .lb-editor-canvas-wrap { flex: 1; min-height: 0; width: 100%; overflow: auto; padding: 16px; display: flex; align-items: flex-start; justify-content: center; }
         @media (max-width: 700px) {
-          .lb-tool-palettes { flex: 1 1 100%; order: 3; }
+          .lb-editor-workspace { flex-direction: column; }
+          .lb-editor-tools { width: auto; flex: 0 0 auto; max-height: 28vh; padding: 6px; border-right: 0; border-bottom: 1px solid var(--border); }
+          .lb-tool-palettes { flex-direction: row; align-items: stretch; }
           .lb-tool-palette { flex: 1; }
-          .lb-tool-palette-buttons { max-height: 76px; overflow-y: auto; }
+          .lb-tool-palette-buttons { max-height: 84px; overflow-y: auto; }
+          .lb-tool-palette-buttons .btn { font-size: 9px; }
+          .lb-editor-canvas-wrap { padding: 8px; }
         }
         @media print {
           @page { size: A3 landscape; margin: 4mm; }
@@ -775,6 +818,15 @@ export default function LevelBuilder() {
       {/* Editor toolbar */}
       <div style={{ padding: '10px 16px', background: 'var(--surface)', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0, flexWrap: 'wrap' }}>
         <input className="input" placeholder="Map title" value={editTitle} onChange={e => setEditTitle(e.target.value)} style={{ width: 200 }} />
+        <div style={{ display: 'flex', gap: 8, flexShrink: 0, marginLeft: 'auto' }}>
+          <button className="btn btn-ghost btn-sm" onClick={() => setMode('gallery')}>✕ Cancel</button>
+          <button className="btn btn-ghost btn-sm" onClick={() => window.print()}>Print</button>
+          <button className="btn btn-primary btn-sm" onClick={saveMap}>Save & Close</button>
+        </div>
+      </div>
+
+      <div className="lb-editor-workspace">
+      <aside className="lb-editor-tools" aria-label="Map tile selection">
         <div className="lb-tool-palettes">
           {[
             { layer: 'ground', title: 'Ground Tiles', tiles: TILES },
@@ -811,20 +863,15 @@ export default function LevelBuilder() {
             </div>
           ))}
         </div>
-        <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
-          <button type="button" className="btn btn-ghost btn-sm" aria-pressed={linkMode} onClick={() => {
-            setEditLayer('ground')
-            setTool('wall')
-            setLinkMode(current => !current)
-            setPendingStair(null)
-            setPainting(false)
-          }}>🔗 Link stairs</button>
-          <button className="btn btn-ghost btn-sm" onClick={() => setMode('gallery')}>✕ Cancel</button>
-          <button className="btn btn-ghost btn-sm" onClick={() => window.print()}>Print</button>
-          <button className="btn btn-primary btn-sm" onClick={saveMap}>Save & Close</button>
-        </div>
-      </div>
-
+        <button type="button" className="btn btn-ghost btn-sm" aria-pressed={linkMode} onClick={() => {
+          setEditLayer('ground')
+          setTool('wall')
+          setLinkMode(current => !current)
+          setPendingStair(null)
+          setPainting(false)
+        }} style={{ width: '100%', marginTop: 8, justifyContent: 'center' }}>🔗 Link stairs</button>
+      </aside>
+      <main className="lb-editor-map">
       {linkMode && pendingStair && (
         <div style={{ padding: '8px 16px', display: 'flex', alignItems: 'center', gap: 8, background: 'var(--surface2)', borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
           <span style={{ fontSize: 12, color: 'var(--text-2)' }}>
@@ -846,7 +893,7 @@ export default function LevelBuilder() {
       )}
 
       {/* Grid — fills remaining height */}
-      <div style={{ flex: 1, overflow: 'auto', padding: 16, background: '#2a2a2a', display: 'flex', alignItems: 'flex-start', justifyContent: 'center' }}>
+      <div className="lb-editor-canvas-wrap">
         <div
           id="level-print"
           onMouseUp={() => setPainting(false)}
@@ -883,6 +930,8 @@ export default function LevelBuilder() {
             )
           }))}
         </div>
+      </div>
+      </main>
       </div>
     </div>
   )
@@ -968,8 +1017,8 @@ export default function LevelBuilder() {
                     border: `0.5px solid ${darkMode && !visible ? '#000' : 'rgba(0,0,0,0.08)'}`,
                     position: 'relative',
                     filter: darkvision
-                      ? 'brightness(0.4)'
-                      : darkMode && torchlit && lightStrength
+                      ? 'brightness(0.35)'
+                      : !isDm && darkMode && torchlit && lightStrength
                         ? `brightness(${0.45 + lightStrength * 0.55})`
                         : undefined,
                     cursor: visible && (isDoor || isStair) ? 'pointer' : undefined,
@@ -1001,7 +1050,7 @@ export default function LevelBuilder() {
         {/* Token sidebar */}
         <div className="level-play-tokens" style={{ width: 220, flexShrink: 0, background: 'var(--surface)', borderLeft: '1px solid var(--border)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
           <div style={{ padding: '10px 12px', borderBottom: '1px solid var(--border)', fontSize: 11, fontWeight: 600, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-            Tokens — drag or tap, then tap map
+            Tokens — drag (hold on mobile) or tap, then tap map
           </div>
           <div className="level-play-token-list">
             {/* Section: Players */}
@@ -1190,9 +1239,39 @@ export default function LevelBuilder() {
 
 // Sidebar token pill — draggable from the panel onto the map
 function SidebarToken({ token, placed, dragging, selected, onDragStart, onSelect }) {
+  const holdTimer = useRef(null)
+  const pointerOrigin = useRef(null)
+
+  const handlePointerDown = (event) => {
+    if (placed) return
+    if (event.pointerType !== 'touch') {
+      onDragStart(event, token.id)
+      return
+    }
+
+    pointerOrigin.current = { x: event.clientX, y: event.clientY }
+    holdTimer.current = window.setTimeout(() => {
+      onDragStart({ clientX: event.clientX, clientY: event.clientY, preventDefault() {} }, token.id)
+      holdTimer.current = null
+    }, 450)
+  }
+
+  const cancelHold = () => {
+    if (holdTimer.current !== null) {
+      window.clearTimeout(holdTimer.current)
+      holdTimer.current = null
+    }
+  }
+
   return (
     <div
-      onPointerDown={e => { if (!placed) onDragStart(e, token.id) }}
+      onPointerDown={handlePointerDown}
+      onPointerMove={event => {
+        const origin = pointerOrigin.current
+        if (origin && Math.hypot(event.clientX - origin.x, event.clientY - origin.y) > 8) cancelHold()
+      }}
+      onPointerUp={cancelHold}
+      onPointerCancel={cancelHold}
       className="level-play-token-entry"
       style={{
         display: 'flex', alignItems: 'center', gap: 8, padding: '5px 8px',
@@ -1202,7 +1281,7 @@ function SidebarToken({ token, placed, dragging, selected, onDragStart, onSelect
         opacity: placed ? 0.45 : dragging ? 0.25 : 1,
         cursor: placed ? 'default' : 'grab',
         userSelect: 'none',
-        touchAction: 'none',
+        touchAction: 'pan-x',
       }}
     >
       <div style={{ width: 28, height: 28, borderRadius: '50%', background: token.color, border: '2px solid rgba(255,255,255,0.2)', flexShrink: 0, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>

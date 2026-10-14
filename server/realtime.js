@@ -34,6 +34,53 @@ export function attachRealtime(httpServer) {
   }
 
   io.on('connection', (socket) => {
+    socket.on('campaign:join', async (campaignId, acknowledge) => {
+      const respond = typeof acknowledge === 'function' ? acknowledge : () => {}
+      if (typeof campaignId !== 'string' || !campaignId) {
+        respond({ ok: false, error: 'Invalid campaign' })
+        return
+      }
+      try {
+        if (!await isMember(campaignId, socket.userId)) {
+          respond({ ok: false, error: 'You cannot join this campaign' })
+          return
+        }
+        socket.join(`campaign:${campaignId}`)
+        respond({ ok: true })
+      } catch (error) {
+        console.error('Failed to join campaign realtime room:', error)
+        respond({ ok: false, error: 'Could not join campaign updates' })
+      }
+    })
+
+    socket.on('campaign:leave', (campaignId) => {
+      if (typeof campaignId === 'string' && campaignId) socket.leave(`campaign:${campaignId}`)
+    })
+
+    socket.on('level:show', async (payload = {}, acknowledge) => {
+      const respond = typeof acknowledge === 'function' ? acknowledge : () => {}
+      const { campaignId, planId } = payload
+      if (typeof campaignId !== 'string' || !campaignId || typeof planId !== 'string' || !planId) {
+        respond({ ok: false, error: 'Invalid map selection' })
+        return
+      }
+      try {
+        const [user, plan] = await Promise.all([
+          User.findById(socket.userId).select('role'),
+          LevelPlan.findOne({ _id: planId, campaign: campaignId }).select('_id'),
+        ])
+        if (user?.role !== 'dm' || !plan || !await isMember(campaignId, socket.userId)) {
+          respond({ ok: false, error: 'Only a campaign DM can show this map' })
+          return
+        }
+        socket.to(`campaign:${campaignId}`).emit('level:show', { campaignId, planId })
+        respond({ ok: true })
+      } catch (error) {
+        console.error('Failed to show battle map to campaign:', error)
+        respond({ ok: false, error: 'Could not show the map to players' })
+      }
+    })
+
     socket.on('level:join', async (planId) => {
       try {
         const plan = await LevelPlan.findById(planId)

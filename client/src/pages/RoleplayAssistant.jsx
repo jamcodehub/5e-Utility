@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { api, useAuth } from '../context/AuthContext'
 import { useCampaign } from '../context/CampaignContext'
 import { useToast } from '../hooks/useToast'
+import { SkeletonRoleplayPage } from '../components/Skeleton'
 import UpgradeModal from '../components/UpgradeModal'
 
 // ─── Template engine ────────────────────────────────────────────────────────
@@ -319,6 +320,7 @@ export default function RoleplayAssistant() {
   // Pre-fill form from character sheet; prefer saved context from localStorage
   const loadChar = useCallback(async () => {
     if (!activeCampaign) return
+    setCharLoaded(false)
     try {
       const saved = localStorage.getItem(storageKey(activeCampaign._id))
       if (saved) {
@@ -442,6 +444,8 @@ export default function RoleplayAssistant() {
       </div>
     )
   }
+
+  if (!charLoaded) return <SkeletonRoleplayPage />
 
   // ── Step 1: Context form ────────────────────────────────────────────────────
   if (step === 'context') {

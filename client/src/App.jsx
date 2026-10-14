@@ -19,27 +19,58 @@ import {
   SkeletonPage,
   SkeletonPremiumPage,
   SkeletonIdeaGeneratorContent,
+  SkeletonRoleplayPage,
   SkeletonRulesPage,
   SkeletonShell,
 } from './components/Skeleton'
-import { lazy, Suspense } from 'react'
+import { lazy, Suspense, useEffect } from 'react'
 
 // Keep both role-specific landing pages in the initial bundle so the first
 // authenticated screen never waits for a route chunk
 // Secondary pages are downloaded only when needed.
-const Storyboard    = lazy(() => import('./pages/Storyboard'))
-const Lore          = lazy(() => import('./pages/Lore'))
-const Character     = lazy(() => import('./pages/Character'))
-const Inventory     = lazy(() => import('./pages/Inventory'))
-const Dice          = lazy(() => import('./pages/Dice'))
-const Premium       = lazy(() => import('./pages/Premium'))
-const IdeaGenerator = lazy(() => import('./pages/IdeaGenerator'))
-const RulesReference = lazy(() => import('./pages/RulesReference'))
-const MusicPlayer   = lazy(() => import('./pages/MusicPlayer'))
-const LevelBuilder  = lazy(() => import('./pages/LevelBuilder'))
-const RoleplayAssistant = lazy(() => import('./pages/RoleplayAssistant'))
-const CampaignGuide = lazy(() => import('./pages/CampaignGuide'))
-const HpTracker      = lazy(() => import('./pages/HPtracker'))
+const loadStoryboard = () => import('./pages/Storyboard')
+const loadLore = () => import('./pages/Lore')
+const loadCharacter = () => import('./pages/Character')
+const loadInventory = () => import('./pages/Inventory')
+const loadDice = () => import('./pages/Dice')
+const loadPremium = () => import('./pages/Premium')
+const loadIdeaGenerator = () => import('./pages/IdeaGenerator')
+const loadRulesReference = () => import('./pages/RulesReference')
+const loadMusicPlayer = () => import('./pages/MusicPlayer')
+const loadLevelBuilder = () => import('./pages/LevelBuilder')
+const loadRoleplayAssistant = () => import('./pages/RoleplayAssistant')
+const loadCampaignGuide = () => import('./pages/CampaignGuide')
+const loadHpTracker = () => import('./pages/HPtracker')
+
+const routeChunkLoaders = [
+  loadStoryboard,
+  loadLore,
+  loadCharacter,
+  loadInventory,
+  loadDice,
+  loadPremium,
+  loadIdeaGenerator,
+  loadRulesReference,
+  loadMusicPlayer,
+  loadLevelBuilder,
+  loadRoleplayAssistant,
+  loadCampaignGuide,
+  loadHpTracker,
+]
+
+const Storyboard = lazy(loadStoryboard)
+const Lore = lazy(loadLore)
+const Character = lazy(loadCharacter)
+const Inventory = lazy(loadInventory)
+const Dice = lazy(loadDice)
+const Premium = lazy(loadPremium)
+const IdeaGenerator = lazy(loadIdeaGenerator)
+const RulesReference = lazy(loadRulesReference)
+const MusicPlayer = lazy(loadMusicPlayer)
+const LevelBuilder = lazy(loadLevelBuilder)
+const RoleplayAssistant = lazy(loadRoleplayAssistant)
+const CampaignGuide = lazy(loadCampaignGuide)
+const HpTracker = lazy(loadHpTracker)
 
 function PageLoader() {
   const { pathname } = useLocation()
@@ -56,9 +87,7 @@ function PageLoader() {
       </div>
     )
   }
-  if (pathname === '/roleplay') {
-    return <div className="page-content"><div className="page-header-row"><h2 style={{ fontSize: 20 }}>Roleplay Assistant</h2></div></div>
-  }
+  if (pathname === '/roleplay') return <SkeletonRoleplayPage />
   if (pathname === '/levels') {
     return (
       <div style={{ height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
@@ -113,7 +142,6 @@ function PageLoader() {
     )
   }
   if (pathname === '/lore') return <SkeletonLorePage />
-  if (pathname === '/roleplay') return <SkeletonRoleplayPage />
   if (pathname === '/music') return <SkeletonMusicPage />
   if (pathname === '/rules') return <SkeletonRulesPage />
   if (pathname === '/premium') return <SkeletonPremiumPage />
@@ -124,6 +152,45 @@ function PageLoader() {
 
 function Guard() {
   const { user, loading } = useAuth()
+
+  useEffect(() => {
+    if (loading || !user) return
+    const connection = navigator.connection
+    if (connection?.saveData || ['slow-2g', '2g'].includes(connection?.effectiveType)) return
+
+    let cancelled = false
+    let loaderIndex = 0
+    let startTimer
+    let idleCallbackId
+    let fallbackTimer
+
+    const loadNextChunk = () => {
+      if (cancelled || loaderIndex >= routeChunkLoaders.length) return
+      const loadChunk = routeChunkLoaders[loaderIndex++]
+      loadChunk()
+        .catch(error => console.error('Failed to preload a route', error))
+        .finally(scheduleNextChunk)
+    }
+
+    const scheduleNextChunk = () => {
+      if (cancelled || loaderIndex >= routeChunkLoaders.length) return
+      if ('requestIdleCallback' in window) {
+        idleCallbackId = window.requestIdleCallback(loadNextChunk, { timeout: 3000 })
+      } else {
+        fallbackTimer = window.setTimeout(loadNextChunk, 250)
+      }
+    }
+
+    startTimer = window.setTimeout(scheduleNextChunk, 1500)
+    return () => {
+      cancelled = true
+      window.clearTimeout(startTimer)
+      window.clearTimeout(fallbackTimer)
+      if (idleCallbackId !== undefined && 'cancelIdleCallback' in window) {
+        window.cancelIdleCallback(idleCallbackId)
+      }
+    }
+  }, [loading, user])
 
   if (loading) return <SkeletonShell cards={6} />
   if (!user) return <Auth />

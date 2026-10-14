@@ -3,6 +3,7 @@ import { useAuth, api } from '../context/AuthContext'
 import { useCampaign } from '../context/CampaignContext'
 import { useMusic, MOODS } from '../context/MusicContext'
 import { useTheme } from '../context/ThemeContext'
+import { getSocket } from '../utils/socket'
 import { useState, useEffect, useRef } from 'react'
 import SettingsModal from './SettingsModal'
 import { CloudinaryImage } from '@cloudinary/url-gen'
@@ -242,6 +243,25 @@ export default function Shell({ children }) {
   const [showSettings, setShowSettings] = useState(false)
   const [joinPending, setJoinPending] = useState(false)
   const [pendingMembers, setPendingMembers] = useState([])
+
+  useEffect(() => {
+    if (!user) return
+    const memberCampaigns = campaigns.filter(campaign => !campaign.isPersonal)
+    if (!memberCampaigns.length) return
+    const socket = getSocket()
+    const onShowMap = ({ campaignId, planId } = {}) => {
+      const campaign = memberCampaigns.find(item => item._id === campaignId)
+      if (!campaign || typeof planId !== 'string') return
+      if (activeCampaign?._id !== campaign._id) setActive(campaign)
+      navigate(`/levels?map=${encodeURIComponent(planId)}`)
+    }
+    socket.on('level:show', onShowMap)
+    memberCampaigns.forEach(campaign => socket.emit('campaign:join', campaign._id))
+    return () => {
+      socket.off('level:show', onShowMap)
+      memberCampaigns.forEach(campaign => socket.emit('campaign:leave', campaign._id))
+    }
+  }, [activeCampaign?._id, campaigns, navigate, setActive, user?._id, user?.id])
 
   useEffect(() => {
     if (!isDM || !activeCampaign) return
