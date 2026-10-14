@@ -14,7 +14,9 @@ The app has tailored experiences for players and DMs, with shared campaign data 
 
 <img width="1508" height="831" alt="image" src="https://github.com/user-attachments/assets/327c3262-e449-4bea-95d5-9c41b255a157" />
 
+<p align="center">
 ## Features
+</p>
 
 ### Player pages
 
