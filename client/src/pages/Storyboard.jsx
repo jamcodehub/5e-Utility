@@ -146,6 +146,7 @@ export default function Storyboard() {
   const { activeCampaign } = useCampaign()
   const { toast, ToastContainer } = useToast()
   const [cards, setCards] = useState([])
+  const [cardsLoading, setCardsLoading] = useState(true)
   const [currentPage, setCurrentPage] = useState(-1)
   const bookRef = useRef(null)
   const [showForm, setShowForm] = useState(false)
@@ -168,8 +169,17 @@ export default function Storyboard() {
   const [editSaving, setEditSaving] = useState(false)
 
   const load = useCallback(async () => {
-    if (!activeCampaign) return
-    setCards(await api(`/storyboard/${activeCampaign._id}`))
+    if (!activeCampaign) {
+      setCards([])
+      setCardsLoading(false)
+      return
+    }
+    setCardsLoading(true)
+    try {
+      setCards(await api(`/storyboard/${activeCampaign._id}`))
+    } finally {
+      setCardsLoading(false)
+    }
   }, [activeCampaign])
 
   useEffect(() => { load() }, [load])
@@ -309,8 +319,8 @@ export default function Storyboard() {
         </div>
       )}
 
-      {/* Book viewport — no side padding so cover fills edge to edge */}
-      <div
+      {/* Keep the canvas blank during the backend fetch; the toolbar stays visible. */}
+      {!cardsLoading && <div
         ref={scrollRef}
         style={{
           flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -380,7 +390,7 @@ export default function Storyboard() {
             SWIPE TO OPEN
           </div>
         )}
-      </div>
+      </div>}
 
       {/* Dots */}
       <div style={{ padding: '6px 0 10px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5, background: 'var(--sb-outer)', flexShrink: 0 }}>

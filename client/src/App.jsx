@@ -7,16 +7,18 @@ import Shell from './components/Shell'
 import Auth from './pages/Auth'
 import Journal from './pages/Journal'
 import SessionPlanner from './pages/SessionPlanner'
+import { useCampaign } from './context/CampaignContext'
 import {
   SkeletonCharacterPage,
   SkeletonCombatPage,
+  SkeletonCampaignGuideContent,
   SkeletonDicePage,
   SkeletonInventoryContent,
   SkeletonLorePage,
   SkeletonMusicPage,
   SkeletonPage,
   SkeletonPremiumPage,
-  SkeletonRoleplayPage,
+  SkeletonIdeaGeneratorContent,
   SkeletonRulesPage,
   SkeletonShell,
 } from './components/Skeleton'
@@ -41,6 +43,61 @@ const HpTracker      = lazy(() => import('./pages/HPtracker'))
 
 function PageLoader() {
   const { pathname } = useLocation()
+  const { activeCampaign } = useCampaign()
+  const { user } = useAuth()
+  if (pathname === '/storyboard') {
+    return (
+      <div style={{ height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden', background: 'var(--sb-outer)', color: 'var(--text)' }}>
+        <div style={{ padding: '8px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'var(--sb-bar)', borderBottom: '1px solid var(--sb-bar-border)', flexShrink: 0 }}>
+          <div style={{ fontFamily: 'Cinzel, serif', fontSize: 12, color: 'var(--sb-page-meta)' }}>{activeCampaign?.name || 'Storyboard'}</div>
+          <button className="btn btn-primary btn-sm" disabled>+ Add Scene</button>
+        </div>
+        <div style={{ flex: 1 }} />
+      </div>
+    )
+  }
+  if (pathname === '/roleplay') {
+    return <div className="page-content"><div className="page-header-row"><h2 style={{ fontSize: 20 }}>Roleplay Assistant</h2></div></div>
+  }
+  if (pathname === '/levels') {
+    return (
+      <div style={{ height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        <div style={{ padding: '16px 24px', borderBottom: '1px solid var(--border)', background: 'var(--surface)', flexShrink: 0 }}>
+          <h2 style={{ fontSize: 20, marginBottom: 2 }}>Battle Map</h2>
+          <p style={{ fontSize: 13, color: 'var(--text-2)', margin: 0 }}>
+            {user?.role === 'dm'
+              ? 'Draw tile maps, then enter play mode to position your party.'
+              : 'Open a map below to view and move your token — everyone sees moves live.'}
+          </p>
+        </div>
+        <div style={{ flex: 1 }} />
+      </div>
+    )
+  }
+  if (pathname === '/campaign-guide') {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden', paddingTop: 16 }}>
+        <div style={{ padding: '0 24px', marginBottom: 10, flexShrink: 0 }}>
+          <h2 style={{ fontSize: 18, marginBottom: 3 }}>Campaign Guide</h2>
+          <p style={{ color: 'var(--text-2)', fontSize: 12, margin: 0, lineHeight: 1.5 }}>Players' Roleplay Assistant reads this automatically. Gold fields personalise each player's session plan.</p>
+        </div>
+        <SkeletonCampaignGuideContent />
+      </div>
+    )
+  }
+  if (pathname === '/ideas') {
+    return (
+      <div className="page-content">
+        <div className="page-header-row" style={{ marginBottom: 20 }}>
+          <div>
+            <h2 style={{ fontSize: 22, marginBottom: 4 }}>Idea Generator</h2>
+            <p style={{ color: 'var(--text-2)', fontSize: 14, margin: 0 }}>Instant inspiration when the table goes quiet.</p>
+          </div>
+        </div>
+        <SkeletonIdeaGeneratorContent />
+      </div>
+    )
+  }
   if (pathname === '/character') return <SkeletonCharacterPage />
   if (pathname === '/inventory') {
     return (

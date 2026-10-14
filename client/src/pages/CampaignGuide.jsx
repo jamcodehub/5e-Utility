@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { api, useAuth } from '../context/AuthContext'
 import { useCampaign } from '../context/CampaignContext'
 import { useToast } from '../hooks/useToast'
+import { SkeletonCampaignGuideContent } from '../components/Skeleton'
 
 const nanoid = () => Math.random().toString(36).slice(2, 9)
 const emptyGuide = () => ({ story: '', currentArc: '', lastSession: '', worldNotes: '', npcs: [], quests: [] })
@@ -189,7 +190,7 @@ function CharModal({ player, onClose }) {
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
 export default function CampaignGuide() {
-  const { activeCampaign } = useCampaign()
+  const { activeCampaign, campaignsLoading } = useCampaign()
   const { user } = useAuth()
   const { toast, ToastContainer } = useToast()
   const isDM = user?.role === 'dm'
@@ -199,6 +200,7 @@ export default function CampaignGuide() {
   const [activePlayer, setActive] = useState(null)   // { userId, name } | null
   const [charModal, setCharModal] = useState(null)
   const [saving, setSaving]       = useState(false)
+  const [guideLoading, setGuideLoading] = useState(true)
   const [dirty, setDirty]         = useState(false)
   const [mobileTab, setMobileTab] = useState('story')
   const [isMobile, setIsMobile]   = useState(window.innerWidth <= 768)
@@ -211,14 +213,22 @@ export default function CampaignGuide() {
   }, [])
 
   const load = useCallback(async () => {
-    if (!activeCampaign || !isDM) return
-    const [guideData, memberData] = await Promise.all([
-      api(`/campaigns/${activeCampaign._id}/guide`).catch(() => ({})),
-      api(`/campaigns/${activeCampaign._id}/members/characters`).catch(() => []),
-    ])
-    setGuide({ ...emptyGuide(), ...guideData })
-    setMembers(memberData || [])
-    setDirty(false)
+    if (!activeCampaign || !isDM) {
+      setGuideLoading(false)
+      return
+    }
+    setGuideLoading(true)
+    try {
+      const [guideData, memberData] = await Promise.all([
+        api(`/campaigns/${activeCampaign._id}/guide`).catch(() => ({})),
+        api(`/campaigns/${activeCampaign._id}/members/characters`).catch(() => []),
+      ])
+      setGuide({ ...emptyGuide(), ...guideData })
+      setMembers(memberData || [])
+      setDirty(false)
+    } finally {
+      setGuideLoading(false)
+    }
   }, [activeCampaign?._id, isDM])
 
   useEffect(() => { load() }, [load])
@@ -261,7 +271,20 @@ export default function CampaignGuide() {
     setSaving(false)
   }
 
-  if (!activeCampaign) return <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-3)' }}>Select a campaign.</div>
+  if (!activeCampaign) return (
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden', paddingTop: 16 }}>
+      <div style={{ padding: '0 24px', marginBottom: 10, flexShrink: 0 }}>
+        <h2 style={{ fontSize: 18, marginBottom: 3 }}>Campaign Guide</h2>
+        <p style={{ color: 'var(--text-2)', fontSize: 12, margin: 0, lineHeight: 1.5 }}>
+          {isMobile ? "Players' Roleplay Assistant reads this automatically."
+            : "Players' Roleplay Assistant reads this automatically. Gold fields personalise each player's session plan."}
+        </p>
+      </div>
+      {campaignsLoading
+        ? <SkeletonCampaignGuideContent />
+        : <div style={{ color: 'var(--text-3)', padding: '8px 24px' }}>Select a campaign.</div>}
+    </div>
+  )
   if (!isDM) return <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-3)', flexDirection: 'column', gap: 8 }}><div style={{ fontSize: 28 }}>📖</div><div>Only Dungeon Masters can edit the Campaign Guide.</div></div>
 
   const StorySection = (
@@ -371,6 +394,19 @@ export default function CampaignGuide() {
           ✕ Cancel "{activePlayer.name}"
         </button>
       )}
+    </div>
+  )
+
+  if (guideLoading) return (
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden', paddingTop: 16 }}>
+      <div style={{ padding: '0 24px', marginBottom: 10, flexShrink: 0 }}>
+        <h2 style={{ fontSize: 18, marginBottom: 3 }}>Campaign Guide</h2>
+        <p style={{ color: 'var(--text-2)', fontSize: 12, margin: 0, lineHeight: 1.5 }}>
+          {isMobile ? "Players' Roleplay Assistant reads this automatically."
+            : "Players' Roleplay Assistant reads this automatically. Gold fields personalise each player's session plan."}
+        </p>
+      </div>
+      <SkeletonCampaignGuideContent />
     </div>
   )
 

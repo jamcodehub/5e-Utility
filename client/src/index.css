@@ -6,8 +6,8 @@ html, body { overflow-x: hidden; }
 
 /* Skeleton shimmer loading placeholders (Skeleton.jsx) */
 @keyframes skeleton-shimmer {
-  0% { background-position: -200% 0; }
-  100% { background-position: 200% 0; }
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
 }
 .skeleton-shimmer {
   background: linear-gradient(90deg, var(--surface2) 25%, var(--border) 50%, var(--surface2) 75%);

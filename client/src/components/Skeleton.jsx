@@ -110,20 +110,6 @@ export function SkeletonLorePage() {
   )
 }
 
-export function SkeletonRoleplayPage() {
-  return (
-    <div className="page-content">
-      <div className="page-header-row" style={{ marginBottom: 16 }}>
-        <h2 style={{ fontSize: 22, marginBottom: 4 }}>Roleplay Assistant</h2>
-      </div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 320px), 1fr))', gap: 16 }}>
-        <SkeletonCard lines={6} style={{ minHeight: 230 }} />
-        <SkeletonCard lines={5} style={{ minHeight: 230 }} />
-      </div>
-    </div>
-  )
-}
-
 export function SkeletonMusicPage() {
   return (
     <div className="page-content">
@@ -136,6 +122,37 @@ export function SkeletonMusicPage() {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 320px), 1fr))', gap: 16 }}>
         <SkeletonCard lines={5} style={{ minHeight: 200 }} />
         <SkeletonCard lines={5} style={{ minHeight: 200 }} />
+      </div>
+    </div>
+  )
+}
+
+export function SkeletonCampaignGuideContent() {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 14, height: '100%', overflow: 'hidden' }}>
+      <div style={{ display: 'flex', gap: 10, padding: '0 24px 4px' }}>
+        {[0, 1, 2, 3].map(i => <SkeletonBlock key={i} width={40} height={40} radius={20} />)}
+      </div>
+      <div style={{ flex: 1, minHeight: 0, display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(280px, 360px)', gap: 16, padding: '0 24px 20px' }}>
+        <SkeletonBlock height="100%" radius={12} />
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <SkeletonBlock height={220} radius={12} />
+          <SkeletonBlock height={160} radius={12} />
+        </div>
+      </div>
+    </div>
+  )
+}
+
+export function SkeletonIdeaGeneratorContent() {
+  return (
+    <div>
+      <div style={{ display: 'flex', gap: 6, marginBottom: 16, flexWrap: 'wrap' }}>
+        {[0, 1, 2, 3, 4].map(i => <SkeletonBlock key={i} width={76} height={30} radius={8} />)}
+      </div>
+      <SkeletonBlock width={142} height={36} radius={8} style={{ marginBottom: 20 }} />
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10, maxWidth: 640 }}>
+        {[0, 1, 2].map(i => <SkeletonBlock key={i} height={54} radius={10} />)}
       </div>
     </div>
   )
