@@ -13,33 +13,110 @@ const GRID_H = 22
 const TILES = [
   { id: 'floor',  label: 'Floor',  color: '#e8ddc4' },
   { id: 'wall',   label: 'Wall',   color: '#4a3f33' },
-  { id: 'door',   label: 'Door',   color: '#8a5a2b' },
+  { id: 'door',   label: 'Door',   color: '#8a5a2b', marker: '🚪' },
   { id: 'water',  label: 'Water',  color: '#4a7fa5' },
   { id: 'grass',  label: 'Grass',  color: '#5c8a4a' },
   { id: 'trap',   label: 'Trap',   color: '#b03030' },
-  { id: 'stairs', label: 'Stairs', color: '#9a8a5a' },
+  { id: 'stairs', label: 'Stairs Up', color: '#9a8a5a', marker: '↑' },
+  { id: 'stairs-down', label: 'Stairs Down', color: '#80704a', marker: '↓' },
   { id: 'chest',  label: 'Chest',  color: '#c9a227' },
   { id: 'empty',  label: 'Erase',  color: 'transparent' },
 ]
 
+const OBJECT_TILES = [
+  { id: 'torch', label: 'Torch', marker: '🔥', lightRadius: 5 },
+  { id: 'tree', label: 'Tree', marker: '🌲' },
+  { id: 'bush', label: 'Bush', marker: '🌿' },
+  { id: 'rock-small', label: 'Small Rock', marker: '●', color: '#8a8986', size: 9 },
+  { id: 'rock-medium', label: 'Medium Rock', marker: '●', color: '#777673', size: 13 },
+  { id: 'rock-large', label: 'Large Rock', marker: '●', color: '#62615f', size: 17 },
+  { id: 'object-erase', label: 'Erase Object', marker: '⌫' },
+]
+const TORCH_LIGHT_RADIUS = OBJECT_TILES.find(tile => tile.id === 'torch').lightRadius
+const DARKVISION_RADIUS = 6
+
 const blankGrid = () => Array.from({ length: GRID_H }, () => Array.from({ length: GRID_W }, () => 'empty'))
+const blankObjectGrid = () => Array.from({ length: GRID_H }, () => Array.from({ length: GRID_W }, () => null))
+const blankDoorStates = () => Array.from({ length: GRID_H }, () => Array.from({ length: GRID_W }, () => false))
+const blankStairLinks = () => Array.from({ length: GRID_H }, () => Array.from({ length: GRID_W }, () => null))
+
+function normalizeGrid(value, fallback) {
+  return Array.from({ length: GRID_H }, (_, r) =>
+    Array.from({ length: GRID_W }, (_, c) => value?.[r]?.[c] ?? fallback)
+  )
+}
+
+function parseMapContent(content) {
+  try {
+    const parsed = JSON.parse(content)
+    if (Array.isArray(parsed)) return {
+      ground: normalizeGrid(parsed, 'empty'),
+      objects: blankObjectGrid(),
+      stairLinks: blankStairLinks(),
+    }
+    if (parsed && Array.isArray(parsed.ground)) {
+      return {
+        ground: normalizeGrid(parsed.ground, 'empty'),
+        objects: normalizeGrid(parsed.objects, null),
+        stairLinks: normalizeGrid(parsed.stairLinks, null),
+      }
+    }
+  } catch {
+    // Older maps may have empty or malformed content; use an empty object layer.
+  }
+  return { ground: blankGrid(), objects: blankObjectGrid(), stairLinks: blankStairLinks() }
+}
+
+function normalizeDoorStates(value) {
+  return normalizeGrid(value, false).map(row => row.map(Boolean))
+}
+
+function blocksVision(ground, doorStates, row, col) {
+  return ground[row]?.[col] === 'wall' || (ground[row]?.[col] === 'door' && !doorStates[row]?.[col])
+}
+
+function hasLineOfSight(ground, doorStates, from, to) {
+  let x = from.col
+  let y = from.row
+  const dx = Math.abs(to.col - x)
+  const dy = Math.abs(to.row - y)
+  const sx = x < to.col ? 1 : -1
+  const sy = y < to.row ? 1 : -1
+  let error = dx - dy
+
+  while (x !== to.col || y !== to.row) {
+    const previousX = x
+    const previousY = y
+    const doubledError = error * 2
+    if (doubledError > -dy) { error -= dy; x += sx }
+    if (doubledError < dx) { error += dx; y += sy }
+    if (x !== previousX && y !== previousY
+      && (blocksVision(ground, doorStates, previousY, x) || blocksVision(ground, doorStates, y, previousX))) return false
+    if (x === to.col && y === to.row) return true
+    if (blocksVision(ground, doorStates, y, x)) return false
+  }
+  return true
+}
+
+function canSeeFrom(ground, doorStates, source, row, col, radius) {
+  return Math.max(Math.abs(source.row - row), Math.abs(source.col - col)) <= radius
+    && hasLineOfSight(ground, doorStates, source, { row, col })
+}
 
 function tileColor(id) {
   const t = TILES.find(x => x.id === id)
   return t && t.color !== 'transparent' ? t.color : '#f5f4f1'
 }
 
+function objectTile(id) {
+  return OBJECT_TILES.find(tile => tile.id === id)
+}
+
 function MapThumb({ content }) {
   const grid = useMemo(() => {
-    try {
-      const parsed = JSON.parse(content)
-      return Array.isArray(parsed) ? parsed : null
-    } catch {
-      return null
-    }
+    return parseMapContent(content)
   }, [content])
 
-  if (!grid) return <div style={{ width: '100%', aspectRatio: `${GRID_W}/${GRID_H}`, background: '#eee', borderRadius: 4 }} />
   return (
     <svg
       viewBox={`0 0 ${GRID_W} ${GRID_H}`}
@@ -54,9 +131,19 @@ function MapThumb({ content }) {
         shapeRendering: 'crispEdges',
       }}
     >
-      {grid.flatMap((row, r) => row.map((cell, c) => (
+      {grid.ground.flatMap((row, r) => row.map((cell, c) => (
         <rect key={`${r}-${c}`} x={c} y={r} width="1" height="1" fill={tileColor(cell)} />
       )))}
+      {grid.objects.flatMap((row, r) => row.map((id, c) => {
+        const tile = objectTile(id)
+        if (!tile) return null
+        if (id.startsWith('rock-')) return <circle key={`object-${r}-${c}`} cx={c + 0.5} cy={r + 0.5} r={id === 'rock-small' ? 0.18 : id === 'rock-medium' ? 0.28 : 0.36} fill={tile.color} />
+        return <text key={`object-${r}-${c}`} x={c + 0.5} y={r + 0.78} textAnchor="middle" fontSize="0.8">{tile.marker}</text>
+      }))}
+      {grid.ground.flatMap((row, r) => row.map((id, c) => {
+        const tile = TILES.find(item => item.id === id && item.marker)
+        return tile ? <text key={`ground-${r}-${c}`} x={c + 0.5} y={r + 0.78} textAnchor="middle" fontSize="0.8" fill="#fff">{tile.marker}</text> : null
+      }))}
       <path
         d={`M${Array.from({ length: GRID_W + 1 }, (_, x) => `M${x} 0V${GRID_H}`).join('')} ${Array.from({ length: GRID_H + 1 }, (_, y) => `M0 ${y}H${GRID_W}`).join('')}`}
         fill="none"
@@ -160,20 +247,33 @@ export default function LevelBuilder() {
   const [editTitle, setEditTitle] = useState('')
   const [editPlanId, setEditPlanId] = useState(null) // null = new
   const [grid, setGrid] = useState(blankGrid())
+  const [objectGrid, setObjectGrid] = useState(blankObjectGrid())
+  const [stairLinks, setStairLinks] = useState(blankStairLinks())
+  const [editLayer, setEditLayer] = useState('ground')
+  const [linkMode, setLinkMode] = useState(false)
+  const [pendingStair, setPendingStair] = useState(null)
+  const [linkDestinationId, setLinkDestinationId] = useState('')
   const [tool, setTool] = useState('wall')
   const [painting, setPainting] = useState(false)
 
   // ── Play mode state ──
   const [tokens, setTokens] = useState([]) // { id, name, avatar, color, row, col, hp, maxHp }
+  const [darkMode, setDarkMode] = useState(false)
+  const [doorStates, setDoorStates] = useState(blankDoorStates())
   const [availableTokens, setAvailableTokens] = useState([]) // sidebar token pool
   const [dragTokenId, setDragTokenId] = useState(null)
   const [dragPreviewToken, setDragPreviewToken] = useState(null)
   const [dragPosition, setDragPosition] = useState({ x: 0, y: 0 })
+  const [tapToPlaceTokenId, setTapToPlaceTokenId] = useState(null)
   const [cellSize, setCellSize] = useState(28)
   const gridRef = useRef(null)
   const dragPreviewRef = useRef(null)
   const remoteUpdateRef = useRef(false)
   const [viewers, setViewers] = useState([]) // who's currently looking at this board
+  const plansRef = useRef(plans)
+  plansRef.current = plans
+  const toastRef = useRef(toast)
+  toastRef.current = toast
 
   const startTokenDrag = (e, tokenId) => {
     e.preventDefault()
@@ -305,17 +405,65 @@ export default function LevelBuilder() {
   useEffect(() => {
     if (mode !== 'play' || !selectedPlanId) return
     const socket = getSocket()
-    socket.emit('level:join', selectedPlanId)
     const onTokens = (remoteTokens) => {
       remoteUpdateRef.current = true
       setTokens(Array.isArray(remoteTokens) ? remoteTokens : [])
     }
     const onPresence = (users) => setViewers(Array.isArray(users) ? users : [])
+    const onDarkMode = (enabled) => {
+      setDarkMode(Boolean(enabled))
+      setPlans(current => current.map(plan => plan._id === selectedPlanId ? { ...plan, darkMode: Boolean(enabled) } : plan))
+    }
+    const onDoorStates = (states) => {
+      const normalized = normalizeDoorStates(states)
+      setDoorStates(normalized)
+      setPlans(current => current.map(plan => plan._id === selectedPlanId ? { ...plan, doorStates: normalized } : plan))
+    }
+    const onTravel = ({ destinationId, destinationPlan } = {}) => {
+      const existingPlan = plansRef.current.find(plan => plan._id === destinationId)
+      const destination = destinationPlan ? { ...(existingPlan || {}), ...destinationPlan } : existingPlan
+      if (!destination) {
+        toastRef.current('The linked map is not available in this campaign')
+        return
+      }
+      setPlans(current => current.some(plan => plan._id === destination._id)
+        ? current.map(plan => plan._id === destination._id ? destination : plan)
+        : [...current, destination])
+      const parsed = parseMapContent(destination.content)
+      setSelectedPlanId(destination._id)
+      setGrid(parsed.ground)
+      setObjectGrid(parsed.objects)
+      setStairLinks(parsed.stairLinks)
+      setTokens(Array.isArray(destination.tokens) ? destination.tokens : [])
+      setDarkMode(Boolean(destination.darkMode))
+      setDoorStates(normalizeDoorStates(destination.doorStates))
+    }
+    const onDoorState = ({ row, col, open } = {}) => {
+      if (!Number.isInteger(row) || !Number.isInteger(col) || row < 0 || row >= GRID_H || col < 0 || col >= GRID_W || typeof open !== 'boolean') return
+      setDoorStates(current => current.map((cells, r) => r === row
+        ? cells.map((isOpen, c) => c === col ? open : isOpen)
+        : cells))
+      setPlans(current => current.map(plan => {
+        if (plan._id !== selectedPlanId) return plan
+        const states = normalizeDoorStates(plan.doorStates)
+        states[row][col] = open
+        return { ...plan, doorStates: states }
+      }))
+    }
     socket.on('level:tokens', onTokens)
     socket.on('level:presence', onPresence)
+    socket.on('level:dark-mode', onDarkMode)
+    socket.on('level:doors', onDoorStates)
+    socket.on('level:door', onDoorState)
+    socket.on('level:travel', onTravel)
+    socket.emit('level:join', selectedPlanId)
     return () => {
       socket.off('level:tokens', onTokens)
       socket.off('level:presence', onPresence)
+      socket.off('level:dark-mode', onDarkMode)
+      socket.off('level:doors', onDoorStates)
+      socket.off('level:door', onDoorState)
+      socket.off('level:travel', onTravel)
       socket.emit('level:leave', selectedPlanId)
       setViewers([])
     }
@@ -335,20 +483,34 @@ export default function LevelBuilder() {
     if (plan) {
       setEditPlanId(plan._id)
       setEditTitle(plan.title)
-      try { const g = JSON.parse(plan.content); if (Array.isArray(g)) { setGrid(g); } else setGrid(blankGrid()) }
-      catch { setGrid(blankGrid()) }
+      const parsed = parseMapContent(plan.content)
+      setGrid(parsed.ground)
+      setObjectGrid(parsed.objects)
+      setStairLinks(parsed.stairLinks)
+      setDoorStates(normalizeDoorStates(plan.doorStates))
     } else {
       setEditPlanId(null)
       setEditTitle('')
       setGrid(blankGrid())
+      setObjectGrid(blankObjectGrid())
+      setStairLinks(blankStairLinks())
+      setDoorStates(blankDoorStates())
     }
+    setEditLayer('ground')
+    setTool('wall')
+    setLinkMode(false)
+    setPendingStair(null)
     setMode('editor')
   }
 
   const openPlay = (plan) => {
     setSelectedPlanId(plan._id)
-    try { const g = JSON.parse(plan.content); if (Array.isArray(g)) setGrid(g) }
-    catch { setGrid(blankGrid()) }
+    const parsed = parseMapContent(plan.content)
+    setGrid(parsed.ground)
+    setObjectGrid(parsed.objects)
+    setStairLinks(parsed.stairLinks)
+    setDarkMode(Boolean(plan.darkMode))
+    setDoorStates(normalizeDoorStates(plan.doorStates))
     setTokens(Array.isArray(plan.tokens) ? plan.tokens : [])
     setMode('play')
   }
@@ -366,7 +528,11 @@ export default function LevelBuilder() {
     if (!activeCampaign) return
     const title = editTitle.trim() || nextAutoMapName()
     try {
-      const body = { title, content: JSON.stringify(grid) }
+      const body = {
+        title,
+        content: JSON.stringify({ ground: grid, objects: objectGrid, stairLinks }),
+        doorStates,
+      }
       const plan = editPlanId
         ? await api(`/levels/${editPlanId}`, { method: 'PUT', body })
         : await api(`/levels/${activeCampaign._id}`, { method: 'POST', body })
@@ -388,7 +554,130 @@ export default function LevelBuilder() {
   }
 
   // ── Paint ──
-  const paint = (r, c) => setGrid(g => { const n = g.map(row => row.slice()); n[r][c] = tool; return n })
+  const paint = (r, c) => {
+    if (editLayer === 'objects') {
+      setObjectGrid(current => {
+        const next = current.map(row => row.slice())
+        next[r][c] = tool === 'object-erase' ? null : tool
+        return next
+      })
+      return
+    }
+    setGrid(current => {
+      const next = current.map(row => row.slice())
+      next[r][c] = tool
+      return next
+    })
+    if (!['stairs', 'stairs-down'].includes(tool)) {
+      setStairLinks(current => {
+        const next = current.map(row => row.slice())
+        next[r][c] = null
+        return next
+      })
+    }
+    if (tool !== 'door') {
+      setDoorStates(current => current.map((row, index) =>
+        index === r ? row.map((isOpen, col) => col === c ? false : isOpen) : row
+      ))
+    }
+  }
+
+  const handleEditorCellClick = (row, col) => {
+    if (!linkMode) return
+    if (!['stairs', 'stairs-down'].includes(grid[row]?.[col])) {
+      toast('Place a stairs tile before linking it')
+      return
+    }
+    setPendingStair({ row, col, direction: grid[row][col] === 'stairs' ? 'up' : 'down' })
+    setLinkDestinationId(stairLinks[row]?.[col] || '')
+  }
+
+  const saveStairLink = () => {
+    if (!pendingStair || !linkDestinationId) return
+    setStairLinks(current => {
+      const next = current.map(row => row.slice())
+      next[pendingStair.row][pendingStair.col] = linkDestinationId
+      return next
+    })
+    setPendingStair(null)
+    setLinkDestinationId('')
+  }
+
+  const removeStairLink = () => {
+    if (!pendingStair) return
+    setStairLinks(current => {
+      const next = current.map(row => row.slice())
+      next[pendingStair.row][pendingStair.col] = null
+      return next
+    })
+    setPendingStair(null)
+  }
+
+  const toggleDoor = (row, col) => {
+    const socket = getSocket()
+    socket.timeout(5000).emit('level:door', {
+      planId: selectedPlanId,
+      row,
+      col,
+      open: !doorStates[row]?.[col],
+    }, (error, response) => {
+      if (error) toast('Could not update the door')
+      else if (!response?.ok) toast(response?.error || 'Could not update the door')
+    })
+  }
+
+  const travelViaStair = (row, col) => {
+    if (!stairLinks[row]?.[col]) {
+      toast('These stairs are not linked to another map')
+      return
+    }
+    getSocket().timeout(5000).emit('level:travel', { planId: selectedPlanId, row, col }, (error, response) => {
+      if (error) toast('Could not travel to the linked map')
+      else if (!response?.ok) toast(response?.error || 'Could not travel to the linked map')
+    })
+  }
+
+  const handlePlayCellClick = (event, row, col) => {
+    if ((!tapToPlaceTokenId && event.target !== event.currentTarget) || !visibility.visible[row]?.[col]) return
+    if (tapToPlaceTokenId) {
+      setTokens(current => {
+        if (current.some(token => token.id === tapToPlaceTokenId)) {
+          return current.map(token => token.id === tapToPlaceTokenId ? { ...token, row, col } : token)
+        }
+        const source = availableTokens.find(token => token.id === tapToPlaceTokenId)
+        return source ? [...current, { ...source, row, col }] : current
+      })
+      setTapToPlaceTokenId(null)
+      return
+    }
+    if (grid[row]?.[col] === 'door') {
+      toggleDoor(row, col)
+      return
+    }
+    if (grid[row]?.[col] === 'stairs' || grid[row]?.[col] === 'stairs-down') travelViaStair(row, col)
+  }
+
+  const toggleTokenVision = (id, field) => {
+    if (!isDm) return
+    setTokens(current => current.map(token => token.id === id ? { ...token, [field]: !token[field] } : token))
+  }
+
+  const toggleDarkMode = () => {
+    if (!isDm || !selectedPlanId) return
+    const socket = getSocket()
+    socket.timeout(5000).emit('level:dark-mode', { planId: selectedPlanId, darkMode: !darkMode }, (error, response) => {
+      if (error) {
+        toast('Could not update map lighting')
+        return
+      }
+      if (!response?.ok) {
+        toast(response?.error || 'Could not update map lighting')
+        return
+      }
+      setDarkMode(response.darkMode)
+      setPlans(current => current.map(plan => plan._id === selectedPlanId ? { ...plan, darkMode: response.darkMode } : plan))
+    })
+  }
 
   const removeToken = (id) => setTokens(ts => ts.filter(t => t.id !== id))
 
@@ -410,6 +699,41 @@ export default function LevelBuilder() {
 
   // ── Render ──
   const selectedPlan = plans.find(p => p._id === selectedPlanId)
+  const activeTools = editLayer === 'objects' ? OBJECT_TILES : TILES
+  const torchLocations = useMemo(
+    () => objectGrid.flatMap((row, r) => row.flatMap((id, c) => id === 'torch' ? [{ row: r, col: c }] : [])),
+    [objectGrid],
+  )
+  const sharedLightSources = useMemo(() => [
+    ...torchLocations,
+    ...tokens.filter(token => token.lightSource && Number.isInteger(token.row) && Number.isInteger(token.col)),
+  ], [tokens, torchLocations])
+  const localPlayerToken = tokens.find(token => token.id === `char-${user?.id}`)
+  const visibility = useMemo(() => {
+    const visible = []
+    const dimVision = []
+    const lightStrength = []
+    for (let row = 0; row < GRID_H; row++) {
+      visible[row] = []
+      dimVision[row] = []
+      lightStrength[row] = []
+      for (let col = 0; col < GRID_W; col++) {
+        const lightDistances = sharedLightSources
+          .filter(source => canSeeFrom(grid, doorStates, source, row, col, TORCH_LIGHT_RADIUS))
+          .map(source => Math.max(Math.abs(source.row - row), Math.abs(source.col - col)))
+        const sharedLight = lightDistances.length > 0
+        const hasDarkvision = Boolean(localPlayerToken?.darkvision
+          && canSeeFrom(grid, doorStates, localPlayerToken, row, col, DARKVISION_RADIUS))
+        const onOwnToken = localPlayerToken?.row === row && localPlayerToken?.col === col
+        visible[row][col] = !darkMode || isDm || sharedLight || hasDarkvision || onOwnToken
+        dimVision[row][col] = darkMode && hasDarkvision && !sharedLight
+        lightStrength[row][col] = sharedLight
+          ? Math.max(...lightDistances.map(distance => distance <= 3 ? 1 : 1 - ((distance - 3) / 2) * 0.55))
+          : 0
+      }
+    }
+    return { visible, dimVision, lightStrength }
+  }, [darkMode, doorStates, grid, isDm, localPlayerToken, sharedLightSources])
 
   if (!activeCampaign && !campaignsLoading) return (
     <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-3)' }}>
@@ -440,14 +764,45 @@ export default function LevelBuilder() {
       {/* Editor toolbar */}
       <div style={{ padding: '10px 16px', background: 'var(--surface)', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0, flexWrap: 'wrap' }}>
         <input className="input" placeholder="Map title" value={editTitle} onChange={e => setEditTitle(e.target.value)} style={{ width: 200 }} />
+        <div style={{ display: 'flex', gap: 4 }}>
+          {[
+            { id: 'ground', label: 'Ground Layer' },
+            { id: 'objects', label: 'Objects Layer' },
+          ].map(layer => (
+            <button key={layer.id} type="button" className="btn btn-sm" onClick={() => {
+              setEditLayer(layer.id)
+              setTool(layer.id === 'ground' ? 'wall' : 'torch')
+              setLinkMode(false)
+              setPendingStair(null)
+            }} style={{
+              border: editLayer === layer.id ? '2px solid var(--gold)' : '1px solid var(--border)',
+              background: editLayer === layer.id ? 'var(--gold-bg)' : 'var(--surface)',
+              color: 'var(--text)',
+            }} aria-pressed={editLayer === layer.id}>{layer.label}</button>
+          ))}
+          <button type="button" className="btn btn-sm" aria-pressed={linkMode} onClick={() => {
+            setEditLayer('ground')
+            setTool('wall')
+            setLinkMode(current => !current)
+            setPendingStair(null)
+            setPainting(false)
+          }} style={{
+            border: linkMode ? '2px solid var(--gold)' : '1px solid var(--border)',
+            background: linkMode ? 'var(--gold-bg)' : 'var(--surface)',
+            color: 'var(--text)',
+          }}>🔗 Link stairs</button>
+        </div>
         <div style={{ display: 'flex', gap: 4, flex: 1, flexWrap: 'wrap' }}>
-          {TILES.map(t => (
-            <button key={t.id} onClick={() => setTool(t.id)} className="btn btn-sm" style={{
+          {!linkMode && activeTools.map(t => (
+            <button key={t.id} type="button" onClick={() => setTool(t.id)} className="btn btn-sm" style={{
               display: 'flex', alignItems: 'center', gap: 5,
               border: tool === t.id ? '2px solid var(--gold)' : '1px solid var(--border)',
               background: tool === t.id ? 'var(--gold-bg)' : 'var(--surface)', color: 'var(--text)',
             }}>
-              <span style={{ width: 12, height: 12, borderRadius: 2, background: t.color === 'transparent' ? 'repeating-conic-gradient(#ccc 0% 25%, #fff 0% 50%) 50%/6px 6px' : t.color, border: '1px solid rgba(0,0,0,0.2)', flexShrink: 0 }} />
+              {t.marker
+                ? <span style={{ color: t.color || 'inherit', fontSize: t.size || 13, lineHeight: 1 }}>{t.marker}</span>
+                : <span style={{ width: 12, height: 12, borderRadius: 2, background: t.color === 'transparent' ? 'repeating-conic-gradient(#ccc 0% 25%, #fff 0% 50%) 50%/6px 6px' : t.color, border: '1px solid rgba(0,0,0,0.2)', flexShrink: 0 }} />
+              }
               {t.label}
             </button>
           ))}
@@ -458,6 +813,26 @@ export default function LevelBuilder() {
           <button className="btn btn-primary btn-sm" onClick={saveMap}>Save & Close</button>
         </div>
       </div>
+
+      {linkMode && pendingStair && (
+        <div style={{ padding: '8px 16px', display: 'flex', alignItems: 'center', gap: 8, background: 'var(--surface2)', borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
+          <span style={{ fontSize: 12, color: 'var(--text-2)' }}>
+            Link {pendingStair.direction} stairs at ({pendingStair.row + 1}, {pendingStair.col + 1}) to:
+          </span>
+          <select className="input" value={linkDestinationId} onChange={event => setLinkDestinationId(event.target.value)} style={{ width: 220, padding: '5px 8px' }}>
+            <option value="">Choose a map…</option>
+            {plans.filter(plan => plan._id !== editPlanId).map(plan => (
+              <option key={plan._id} value={plan._id}>{plan.title}</option>
+            ))}
+          </select>
+          <button type="button" className="btn btn-primary btn-sm" disabled={!linkDestinationId} onClick={saveStairLink}>Link</button>
+          {stairLinks[pendingStair.row]?.[pendingStair.col] && (
+            <button type="button" className="btn btn-ghost btn-sm" onClick={removeStairLink}>Unlink</button>
+          )}
+          <button type="button" className="btn btn-ghost btn-sm" onClick={() => setPendingStair(null)}>Cancel</button>
+          {!plans.some(plan => plan._id !== editPlanId) && <span style={{ fontSize: 12, color: 'var(--text-3)' }}>Save another map in this campaign first.</span>}
+        </div>
+      )}
 
       {/* Grid — fills remaining height */}
       <div style={{ flex: 1, overflow: 'auto', padding: 16, background: '#2a2a2a', display: 'flex', alignItems: 'flex-start', justifyContent: 'center' }}>
@@ -479,13 +854,21 @@ export default function LevelBuilder() {
         >
           {grid.map((row, r) => row.map((cellId, c) => {
             const t = TILES.find(x => x.id === cellId) || TILES[TILES.length - 1]
+            const object = objectTile(objectGrid[r]?.[c])
             return (
               <div key={`${r}-${c}`} className="lb-cell"
-                onMouseDown={() => { setPainting(true); paint(r, c) }}
-                onMouseEnter={() => { if (painting) paint(r, c) }}
-                onTouchStart={() => paint(r, c)}
-                style={{ background: t.color === 'transparent' ? '#f5f4f1' : t.color }}
-              />
+                onMouseDown={() => { if (linkMode) return; setPainting(true); paint(r, c) }}
+                onMouseEnter={() => { if (painting && !linkMode) paint(r, c) }}
+                onClick={() => handleEditorCellClick(r, c)}
+                onTouchStart={() => { if (!linkMode) paint(r, c) }}
+                style={{ background: t.color === 'transparent' ? '#f5f4f1' : t.color, display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative' }}
+              >
+                {t.marker && <span style={{ color: '#fff', textShadow: '0 1px 2px #000', fontSize: 11, pointerEvents: 'none' }}>{t.marker}</span>}
+                {stairLinks[r]?.[c] && <span aria-label="Linked stairs" style={{ position: 'absolute', top: 0, right: 1, color: '#fff', fontSize: 8, textShadow: '0 1px 2px #000', pointerEvents: 'none' }}>↗</span>}
+                {object && object.id !== 'object-erase' && (
+                  <span style={{ color: object.color || 'inherit', fontSize: object.size || 15, lineHeight: 1, position: 'absolute', zIndex: 1, pointerEvents: 'none', textShadow: object.id === 'torch' ? '0 0 8px #ff8c00' : '0 1px 2px rgba(0,0,0,0.55)' }}>{object.marker}</span>
+                )}
+              </div>
             )
           }))}
         </div>
@@ -495,18 +878,45 @@ export default function LevelBuilder() {
 
   // ── PLAY MODE ──
   if (mode === 'play') return (
-    <div style={{ height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+    <div className="level-play" style={{ height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+      <style>{`
+        .level-play-content { min-height: 0; }
+        .level-play-token-list { flex: 1; overflow-y: auto; padding: 8px; }
+        .level-play-token-heading { font-size: 10px; color: var(--text-3); margin-bottom: 4px; margin-top: 4px; text-transform: uppercase; letter-spacing: 0.05em; }
+        .level-play-token-entry { margin-bottom: 4px; }
+        .level-play-on-map { border-top: 1px solid var(--border); padding: 8px; }
+        .level-play-on-map-list { max-height: 220px; overflow-y: auto; }
+        .level-play-on-map-row { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; font-size: 12px; }
+        @media (max-width: 700px) {
+          .level-play { height: 100%; min-height: 0; }
+          .level-play-toolbar { gap: 6px !important; padding: 8px !important; flex-wrap: wrap; overflow-x: hidden; }
+          .level-play-toolbar > span:first-child { flex: 1 0 100%; }
+          .level-play-content { flex-direction: column; }
+          .level-play-map { min-height: 0; flex: 1 1 auto !important; padding: 8px !important; }
+          .level-play-map > div { width: 100% !important; max-width: 100% !important; }
+          .level-play-tokens { width: 100% !important; height: 38%; min-height: 155px; max-height: 270px; flex: 0 0 38%; border-left: 0 !important; border-top: 1px solid var(--border); }
+          .level-play-token-list { display: flex; flex: 1 1 auto; flex-direction: row; align-items: stretch; gap: 6px; overflow-x: auto; overflow-y: hidden; padding: 6px 8px; }
+          .level-play-token-heading { display: none; }
+          .level-play-token-entry { flex: 0 0 148px; margin: 0; }
+          .level-play-token-empty { flex: 0 0 100%; }
+          .level-play-on-map { flex: 0 0 43%; min-height: 0; overflow: hidden; padding: 6px 8px; }
+          .level-play-on-map-list { display: flex; gap: 6px; max-height: none; height: 100%; overflow-x: auto; overflow-y: hidden; }
+          .level-play-on-map-row { flex: 0 0 225px; margin: 0; padding: 5px; border: 1px solid var(--border); border-radius: 8px; }
+          .level-play-on-map-row button { min-width: 30px !important; min-height: 30px !important; }
+        }
+      `}</style>
       {/* Play toolbar */}
-      <div style={{ padding: '10px 16px', background: 'var(--surface)', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
+      <div className="level-play-toolbar" style={{ padding: '10px 16px', background: 'var(--surface)', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
         <span style={{ fontFamily: 'Cinzel, serif', fontSize: 14, fontWeight: 600, flex: 1 }}>{selectedPlan?.title}</span>
         <PeekingViewers viewers={viewers} />
+        {isDm && <button className="btn btn-ghost btn-sm" onClick={toggleDarkMode} aria-pressed={darkMode}>{darkMode ? '☀️ Turn darkness off' : '🌙 Turn darkness on'}</button>}
         <button className="btn btn-ghost btn-sm" onClick={() => { setTokens([]); setMode('gallery') }}>← Back</button>
         {isDm && <button className="btn btn-primary btn-sm" onClick={() => openEditor(selectedPlan)}>Edit Map</button>}
       </div>
 
-      <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
+      <div className="level-play-content" style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
         {/* Map area */}
-        <div style={{ flex: 1, overflow: 'auto', padding: 12, background: '#1a1a1a', display: 'flex', alignItems: 'flex-start', justifyContent: 'center' }}>
+        <div className="level-play-map" style={{ flex: 1, overflow: 'auto', padding: 12, background: '#1a1a1a', display: 'flex', alignItems: 'flex-start', justifyContent: 'center' }}>
           <div
             ref={gridRef}
             style={{
@@ -514,7 +924,7 @@ export default function LevelBuilder() {
               gridTemplateColumns: `repeat(${GRID_W}, 1fr)`,
               width: '100%',
               maxWidth: `calc((100vh - 120px) * ${GRID_W / GRID_H})`,
-              background: '#fff',
+              background: darkMode ? '#000' : '#fff',
               border: '3px solid #4a3f33',
               borderRadius: 4,
               overflow: 'hidden',
@@ -523,20 +933,44 @@ export default function LevelBuilder() {
           >
             {grid.map((row, r) => row.map((cellId, c) => {
               const token = tokens.find(t => t.row === r && t.col === c)
+              const object = objectTile(objectGrid[r]?.[c])
+              const visible = visibility.visible[r]?.[c]
+              const doorOpen = Boolean(doorStates[r]?.[c])
+              const isDoor = cellId === 'door'
+              const isStair = cellId === 'stairs' || cellId === 'stairs-down'
+              const cellBase = isDoor && doorOpen ? 'floor' : cellId
+              const lightStrength = visibility.lightStrength[r]?.[c] || 0
+              const dim = visibility.dimVision[r]?.[c]
+              const isOwnToken = token?.id === localPlayerToken?.id
+              const groundTile = TILES.find(tile => tile.id === cellId)
               return (
                 <div
                   key={`${r}-${c}`}
                   data-map-cell
                   data-row={r}
                   data-col={c}
+                  onClick={event => handlePlayCellClick(event, r, c)}
+                  title={visible && isDoor ? (doorOpen ? 'Click to close door' : 'Click to open door') : visible && isStair ? 'Click to use stairs' : undefined}
                   style={{
                     aspectRatio: '1',
-                    background: tileColor(cellId),
-                    border: '0.5px solid rgba(0,0,0,0.08)',
+                    background: !visible && !isDm ? '#000' : tileColor(cellBase),
+                    border: `0.5px solid ${darkMode && !visible ? '#050505' : 'rgba(0,0,0,0.08)'}`,
                     position: 'relative',
+                    filter: darkMode && visible
+                      ? dim ? 'brightness(0.22)' : lightStrength ? `brightness(${0.45 + lightStrength * 0.55})` : isDm ? 'brightness(0.18)' : undefined
+                      : undefined,
+                    cursor: visible && (isDoor || isStair) ? 'pointer' : undefined,
                   }}
                 >
-                  {token && (
+                  {groundTile?.marker && visible && (
+                    <span aria-hidden="true" style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: Math.max(8, cellSize * 0.4), textShadow: '0 1px 2px #000', pointerEvents: 'none' }}>
+                      {isDoor && doorOpen ? '╱' : groundTile.marker}
+                    </span>
+                  )}
+                  {object && visible && (
+                    <span aria-hidden="true" style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: object.color || 'inherit', fontSize: object.size ? Math.max(8, cellSize * (object.size / 16)) : Math.max(10, cellSize * 0.7), lineHeight: 1, textShadow: object.id === 'torch' ? '0 0 12px #ff8c00' : '0 1px 2px rgba(0,0,0,0.55)', pointerEvents: 'none' }}>{object.marker}</span>
+                  )}
+                  {token && (visible || isOwnToken) && (
                     <Token
                       token={token}
                       cellSize={cellSize}
@@ -544,6 +978,7 @@ export default function LevelBuilder() {
                       dragging={dragTokenId === token.id}
                     />
                   )}
+                  {token?.lightSource && visible && <span aria-hidden="true" style={{ position: 'absolute', top: -5, right: -3, zIndex: 11, fontSize: 10, pointerEvents: 'none' }}>🔥</span>}
                 </div>
               )
             }))}
@@ -551,49 +986,49 @@ export default function LevelBuilder() {
         </div>
 
         {/* Token sidebar */}
-        <div style={{ width: 220, flexShrink: 0, background: 'var(--surface)', borderLeft: '1px solid var(--border)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        <div className="level-play-tokens" style={{ width: 220, flexShrink: 0, background: 'var(--surface)', borderLeft: '1px solid var(--border)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
           <div style={{ padding: '10px 12px', borderBottom: '1px solid var(--border)', fontSize: 11, fontWeight: 600, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-            Tokens — drag onto map
+            Tokens — drag or tap, then tap map
           </div>
-          <div style={{ flex: 1, overflowY: 'auto', padding: 8 }}>
+          <div className="level-play-token-list">
             {/* Section: Players */}
             {availableTokens.filter(t => t.type === 'player').length > 0 && (
               <>
-                <div style={{ fontSize: 10, color: 'var(--text-3)', marginBottom: 4, marginTop: 4, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Party</div>
+                <div className="level-play-token-heading">Party</div>
                 {availableTokens.filter(t => t.type === 'player').map(t => (
-                  <SidebarToken key={t.id} token={t} placed={!!tokens.find(x => x.id === t.id)} dragging={dragTokenId === t.id} onDragStart={startTokenDrag} />
+                  <SidebarToken key={t.id} token={t} placed={!!tokens.find(x => x.id === t.id)} dragging={dragTokenId === t.id} selected={tapToPlaceTokenId === t.id} onDragStart={startTokenDrag} onSelect={setTapToPlaceTokenId} />
                 ))}
               </>
             )}
             {/* Section: NPCs */}
             {availableTokens.filter(t => t.type === 'npc').length > 0 && (
               <>
-                <div style={{ fontSize: 10, color: 'var(--text-3)', marginBottom: 4, marginTop: 8, textTransform: 'uppercase', letterSpacing: '0.05em' }}>NPCs</div>
+                <div className="level-play-token-heading">NPCs</div>
                 {availableTokens.filter(t => t.type === 'npc').map(t => (
-                  <SidebarToken key={t.id} token={t} placed={!!tokens.find(x => x.id === t.id)} dragging={dragTokenId === t.id} onDragStart={startTokenDrag} />
+                  <SidebarToken key={t.id} token={t} placed={!!tokens.find(x => x.id === t.id)} dragging={dragTokenId === t.id} selected={tapToPlaceTokenId === t.id} onDragStart={startTokenDrag} onSelect={setTapToPlaceTokenId} />
                 ))}
               </>
             )}
             {/* Section: Enemies */}
             {availableTokens.filter(t => t.type === 'enemy').length > 0 && (
               <>
-                <div style={{ fontSize: 10, color: '#ef4444', marginBottom: 4, marginTop: 8, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Enemies</div>
+                <div className="level-play-token-heading" style={{ color: '#ef4444' }}>Enemies</div>
                 {availableTokens.filter(t => t.type === 'enemy').map(t => (
-                  <SidebarToken key={t.id} token={t} placed={!!tokens.find(x => x.id === t.id)} dragging={dragTokenId === t.id} onDragStart={startTokenDrag} />
+                  <SidebarToken key={t.id} token={t} placed={!!tokens.find(x => x.id === t.id)} dragging={dragTokenId === t.id} selected={tapToPlaceTokenId === t.id} onDragStart={startTokenDrag} onSelect={setTapToPlaceTokenId} />
                 ))}
               </>
             )}
             {/* Section: Bosses */}
             {availableTokens.filter(t => t.type === 'boss').length > 0 && (
               <>
-                <div style={{ fontSize: 10, color: '#f59e0b', marginBottom: 4, marginTop: 8, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Bosses</div>
+                <div className="level-play-token-heading" style={{ color: '#f59e0b' }}>Bosses</div>
                 {availableTokens.filter(t => t.type === 'boss').map(t => (
-                  <SidebarToken key={t.id} token={t} placed={!!tokens.find(x => x.id === t.id)} dragging={dragTokenId === t.id} onDragStart={startTokenDrag} />
+                  <SidebarToken key={t.id} token={t} placed={!!tokens.find(x => x.id === t.id)} dragging={dragTokenId === t.id} selected={tapToPlaceTokenId === t.id} onDragStart={startTokenDrag} onSelect={setTapToPlaceTokenId} />
                 ))}
               </>
             )}
             {availableTokens.length === 0 && (
-              <div style={{ fontSize: 12, color: 'var(--text-3)', padding: '12px 4px', lineHeight: 1.6 }}>
+              <div className="level-play-token-empty" style={{ fontSize: 12, color: 'var(--text-3)', padding: '12px 4px', lineHeight: 1.6 }}>
                 No tokens available. Add party members to the campaign, or add NPCs/enemies/bosses in the Lore section.
               </div>
             )}
@@ -601,17 +1036,26 @@ export default function LevelBuilder() {
 
           {/* Placed tokens HP bar */}
           {tokens.length > 0 && (
-            <div style={{ borderTop: '1px solid var(--border)', padding: 8 }}>
+            <div className="level-play-on-map">
               <div style={{ fontSize: 10, color: 'var(--text-3)', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>On map</div>
+              <div className="level-play-on-map-list">
               {tokens.map(t => (
-                <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6, fontSize: 12 }}>
+                <div key={t.id} className="level-play-on-map-row">
                   <div style={{ width: 20, height: 20, borderRadius: '50%', background: t.color, border: '1px solid rgba(255,255,255,0.3)', flexShrink: 0, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                     {t.avatar
                       ? <img src={t.avatar} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                       : <span style={{ fontSize: 9, color: '#fff', fontWeight: 700 }}>{t.name?.[0]}</span>
                     }
                   </div>
-                  <span style={{ flex: 1, fontSize: 11, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.name}</span>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 11, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.name}</div>
+                    {isDm && t.type === 'player' && (
+                      <div style={{ display: 'flex', gap: 3, marginTop: 3 }}>
+                        <button type="button" aria-pressed={Boolean(t.lightSource)} onClick={() => toggleTokenVision(t.id, 'lightSource')} title="Toggle shared torchlight" style={{ padding: '2px 4px', border: '1px solid var(--border)', borderRadius: 4, background: t.lightSource ? 'var(--gold-bg)' : 'transparent', color: 'var(--text-2)', fontSize: 9 }}>🔥 Light {t.lightSource ? 'On' : 'Off'}</button>
+                        <button type="button" aria-pressed={Boolean(t.darkvision)} onClick={() => toggleTokenVision(t.id, 'darkvision')} title="Toggle this character’s darkvision" style={{ padding: '2px 4px', border: '1px solid var(--border)', borderRadius: 4, background: t.darkvision ? 'var(--gold-bg)' : 'transparent', color: 'var(--text-2)', fontSize: 9 }}>◉ Darkvision {t.darkvision ? 'On' : 'Off'}</button>
+                      </div>
+                    )}
+                  </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
                     <button onClick={() => adjustTokenHp(t.id, -1)} style={{ width: 16, height: 16, borderRadius: 3, border: '1px solid var(--border)', background: 'transparent', color: 'var(--red)', fontSize: 11, cursor: 'pointer', lineHeight: 1, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>−</button>
                     <span style={{ fontSize: 10, color: t.hp === 0 ? 'var(--red)' : 'var(--text-2)', minWidth: 28, textAlign: 'center' }}>{t.hp}/{t.maxHp}</span>
@@ -620,6 +1064,7 @@ export default function LevelBuilder() {
                   </div>
                 </div>
               ))}
+              </div>
             </div>
           )}
         </div>
@@ -730,15 +1175,16 @@ export default function LevelBuilder() {
 }
 
 // Sidebar token pill — draggable from the panel onto the map
-function SidebarToken({ token, placed, dragging, onDragStart }) {
+function SidebarToken({ token, placed, dragging, selected, onDragStart, onSelect }) {
   return (
     <div
       onPointerDown={e => { if (!placed) onDragStart(e, token.id) }}
+      className="level-play-token-entry"
       style={{
         display: 'flex', alignItems: 'center', gap: 8, padding: '5px 8px',
         borderRadius: 8, marginBottom: 4,
-        background: placed ? 'var(--surface2)' : 'var(--surface)',
-        border: '1px solid var(--border)',
+        background: selected ? 'var(--gold-bg)' : placed ? 'var(--surface2)' : 'var(--surface)',
+        border: `1px solid ${selected ? 'var(--gold)' : 'var(--border)'}`,
         opacity: placed ? 0.45 : dragging ? 0.25 : 1,
         cursor: placed ? 'default' : 'grab',
         userSelect: 'none',
@@ -755,7 +1201,14 @@ function SidebarToken({ token, placed, dragging, onDragStart }) {
         <div style={{ fontSize: 12, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{token.name}</div>
         {token.maxHp > 0 && <div style={{ fontSize: 10, color: 'var(--text-3)' }}>HP {token.hp}/{token.maxHp}</div>}
       </div>
-      {placed && <span style={{ fontSize: 9, color: 'var(--text-3)' }}>placed</span>}
+      <button
+        type="button"
+        aria-pressed={selected}
+        aria-label={`${selected ? 'Selected' : 'Select'} ${token.name} to place on map`}
+        onPointerDown={event => event.stopPropagation()}
+        onClick={event => { event.stopPropagation(); onSelect(selected ? null : token.id) }}
+        style={{ border: `1px solid ${selected ? 'var(--gold)' : 'var(--border)'}`, borderRadius: 5, background: selected ? 'var(--gold-bg)' : 'transparent', color: selected ? 'var(--gold)' : 'var(--text-2)', fontSize: 10, padding: '5px 7px', minHeight: 30, cursor: 'pointer', whiteSpace: 'nowrap' }}
+      >{selected ? 'Tap map' : placed ? 'Move' : 'Place'}</button>
     </div>
   )
 }

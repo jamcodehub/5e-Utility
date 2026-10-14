@@ -187,7 +187,7 @@ export default function Journal() {
               borderLeft: `2px solid ${activeId === e._id ? 'var(--gold)' : 'transparent'}`,
             }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6 }}>
-              {renamingId === e._id ? (
+              {renamingId === e._id && e._id !== activeId ? (
                 <input
                   autoFocus
                   className="input"
@@ -204,8 +204,8 @@ export default function Journal() {
               ) : (
                 <span
                   onMouseDown={(ev) => ev.stopPropagation()}
-                  onClick={(ev) => startRename(ev, e)}
-                  title="Click to rename"
+                  onClick={renamingId === e._id ? undefined : (ev) => startRename(ev, e)}
+                  title={renamingId === e._id ? undefined : 'Click to rename'}
                   style={{ fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', cursor: 'text', flex: 1 }}
                 >{entryTitle(e)}</span>
               )}

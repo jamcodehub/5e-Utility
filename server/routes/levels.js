@@ -31,6 +31,8 @@ router.put('/:id', auth, async (req, res) => {
   if (typeof req.body.title === 'string') updates.title = req.body.title
   if (typeof req.body.content === 'string') updates.content = req.body.content
   if (req.body.tokens !== undefined) updates.tokens = req.body.tokens
+  if (typeof req.body.darkMode === 'boolean') updates.darkMode = req.body.darkMode
+  if (Array.isArray(req.body.doorStates)) updates.doorStates = req.body.doorStates
   const plan = await LevelPlan.findOneAndUpdate({ _id: req.params.id, owner: req.userId }, updates, { new: true })
   res.json(plan)
 })

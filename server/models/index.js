@@ -100,6 +100,8 @@ const LevelPlanSchema = new Schema({
   // Live token positions for the collaborative Play mode board — persisted
   // so the board survives reloads and stays in sync across everyone viewing it.
   tokens:   { type: Schema.Types.Mixed, default: [] },
+  darkMode: { type: Boolean, default: false },
+  doorStates: { type: Schema.Types.Mixed, default: [] },
 }, { timestamps: true })
 
 const InventorySchema = new Schema({
