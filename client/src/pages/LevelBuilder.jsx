@@ -1080,6 +1080,59 @@ export default function LevelBuilder() {
         .level-play-on-map { border-top: 1px solid var(--border); padding: 8px; }
         .level-play-on-map-list { max-height: 220px; overflow-y: auto; }
         .level-play-on-map-row { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; font-size: 12px; }
+        .level-darkness-toggle {
+          position: relative;
+          display: inline-flex;
+          align-items: center;
+          width: 132px;
+          height: 34px;
+          padding: 3px;
+          border: 1px solid var(--border);
+          border-radius: 999px;
+          background: #f3cf72;
+          color: #44320a;
+          cursor: pointer;
+          flex-shrink: 0;
+          transition: background-color 220ms ease, border-color 220ms ease;
+        }
+        .level-darkness-toggle[data-dark="true"] {
+          background: #303541;
+          border-color: #596273;
+          color: #fff;
+        }
+        .level-darkness-toggle:focus-visible {
+          outline: 2px solid var(--gold);
+          outline-offset: 2px;
+        }
+        .level-darkness-toggle-label {
+          z-index: 1;
+          width: 50%;
+          text-align: center;
+          font-size: 10px;
+          font-weight: 700;
+          letter-spacing: 0.02em;
+          transition: color 220ms ease;
+        }
+        .level-darkness-toggle-thumb {
+          position: absolute;
+          top: 3px;
+          left: 3px;
+          width: calc(50% - 3px);
+          height: calc(100% - 6px);
+          border-radius: 999px;
+          background: rgba(255, 255, 255, 0.92);
+          box-shadow: 0 1px 4px rgba(0, 0, 0, 0.24);
+          transform: translateX(0);
+          transition: transform 220ms ease;
+        }
+        .level-darkness-toggle[data-dark="true"] .level-darkness-toggle-thumb {
+          transform: translateX(100%);
+          background: #8993a6;
+        }
+        .level-darkness-toggle:disabled {
+          opacity: 0.65;
+          cursor: wait;
+        }
         @media (max-width: 700px) {
           .level-play { height: 100%; min-height: 0; }
           .level-play-toolbar { gap: 6px !important; padding: 8px !important; flex-wrap: wrap; overflow-x: hidden; }
@@ -1102,7 +1155,21 @@ export default function LevelBuilder() {
       <div className="level-play-toolbar" style={{ padding: '10px 16px', background: 'var(--surface)', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
         <span style={{ fontFamily: 'Cinzel, serif', fontSize: 14, fontWeight: 600, flex: 1 }}>{selectedPlan?.title}</span>
         <PeekingViewers viewers={viewers} />
-        {isDm && <button className="btn btn-ghost btn-sm" onClick={toggleDarkMode} aria-pressed={darkMode}>{darkMode ? '☀️ Turn darkness off' : '🌙 Turn darkness on'}</button>}
+        {isDm && (
+          <button
+            type="button"
+            className="level-darkness-toggle"
+            data-dark={darkMode}
+            onClick={toggleDarkMode}
+            aria-label="Map lighting"
+            aria-pressed={darkMode}
+            title={darkMode ? 'Darkness is on for players' : 'Darkness is off for players'}
+          >
+            <span className="level-darkness-toggle-thumb" aria-hidden="true" />
+            <span className="level-darkness-toggle-label">☀ Light</span>
+            <span className="level-darkness-toggle-label">☾ Dark</span>
+          </button>
+        )}
         <button className="btn btn-ghost btn-sm" onClick={() => { setTokens([]); setMode('gallery') }}>← Back</button>
         {isDm && <button className="btn btn-primary btn-sm" onClick={() => openEditor(selectedPlan)}>Edit Map</button>}
       </div>
@@ -1171,6 +1238,18 @@ export default function LevelBuilder() {
                   )}
                   {object && visible && (
                     <TileIconPlaceholder tile={object} style={{ position: 'absolute', zIndex: 1, filter: darkvision ? 'brightness(0.35)' : undefined }} />
+                  )}
+                  {isDm && darkMode && !torchlit && !darkvision && (
+                    <div
+                      aria-hidden="true"
+                      style={{
+                        position: 'absolute',
+                        inset: 0,
+                        zIndex: 5,
+                        background: 'rgba(0, 0, 0, 0.86)',
+                        pointerEvents: 'none',
+                      }}
+                    />
                   )}
                   {token && (
                     <Token
