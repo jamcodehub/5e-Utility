@@ -25,7 +25,7 @@ import {
 import { lazy, Suspense } from 'react'
 
 // Keep both role-specific landing pages in the initial bundle so the first
-// authenticated screen never waits for a route chunk.
+// authenticated screen never waits for a route chunk
 // Secondary pages are downloaded only when needed.
 const Storyboard    = lazy(() => import('./pages/Storyboard'))
 const Lore          = lazy(() => import('./pages/Lore'))
