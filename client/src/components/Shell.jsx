@@ -17,6 +17,12 @@ const logoUrl = new CloudinaryImage('5e_Utillity', { cloudName: CLOUD_NAME })
   .delivery(format(autoFormat()))
   .toURL()
 
+function preloadStoryboard() {
+  import('../pages/Storyboard').catch(error => {
+    console.error('Failed to preload Storyboard', error)
+  })
+}
+
 // ─── Infinite swipe carousel nav ────────────────────────────────────────────
 function SwipeNav({ items, navLinkStyle, darkMode }) {
   const location = useLocation()
@@ -72,6 +78,9 @@ function SwipeNav({ items, navLinkStyle, darkMode }) {
               key={`${item.to}-${idx}`}
               to={item.to}
               draggable={false}
+              onMouseEnter={() => { if (item.to === '/storyboard') preloadStoryboard() }}
+              onFocus={() => { if (item.to === '/storyboard') preloadStoryboard() }}
+              onTouchStart={() => { if (item.to === '/storyboard') preloadStoryboard() }}
               style={({ isActive: a }) => ({
                 ...navLinkStyle(a),
                 width: ITEM_W,
@@ -511,7 +520,13 @@ export default function Shell({ children }) {
 
         <nav style={{ padding: '10px', flex: 1, overflowY: 'auto' }}>
           {NAV.map(item => (
-            <NavLink key={item.to} to={item.to} style={({ isActive }) => navLinkStyle(isActive)}>
+            <NavLink
+              key={item.to}
+              to={item.to}
+              onMouseEnter={() => { if (item.to === '/storyboard') preloadStoryboard() }}
+              onFocus={() => { if (item.to === '/storyboard') preloadStoryboard() }}
+              style={({ isActive }) => navLinkStyle(isActive)}
+            >
               {item.iconUrl && <img src={item.iconUrl} alt="" aria-hidden="true" style={{ width: 18, height: 18, objectFit: 'contain', flexShrink: 0, filter: darkMode ? 'brightness(0) invert(1)' : 'none' }} />}
               <span>{item.label}</span>
             </NavLink>
@@ -530,7 +545,7 @@ export default function Shell({ children }) {
               <div style={{ fontSize: 11, color: 'var(--text-3)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user?.email}</div>
             </div>
             <button onClick={() => setShowSettings(true)} title="Settings" aria-label="Settings" style={{ background: 'none', border: 'none', color: 'var(--text-3)', cursor: 'pointer', padding: 4, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <img src="https://res.cloudinary.com/crcbzpw6/image/upload/v1791966298/ellipsis-solid-full.svg" alt="" aria-hidden="true" style={{ width: 12, height: 12, objectFit: 'contain', filter: darkMode ? 'brightness(0) invert(1)' : 'none' }} />
+              <img src="https://res.cloudinary.com/crcbzpw6/image/upload/v1791966298/ellipsis-solid-full.svg" alt="" aria-hidden="true" style={{ width: 16, height: 16, objectFit: 'contain', filter: darkMode ? 'brightness(0) invert(1)' : 'none' }} />
             </button>
           </div>
         </div>

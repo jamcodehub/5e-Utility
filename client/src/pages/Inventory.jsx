@@ -129,7 +129,6 @@ export default function Inventory() {
       <div className="page-header-row" style={{ marginBottom: 20 }}>
         <div>
           <h2 style={{ fontSize: 22, marginBottom: 4 }}>Inventory</h2>
-          <p style={{ color: 'var(--text-2)', fontSize: 14, margin: 0 }}>Track your gear and coin purse.</p>
         </div>
       </div>
       <SkeletonInventoryContent />
@@ -141,7 +140,6 @@ export default function Inventory() {
       <div className="page-header-row" style={{ marginBottom: 20 }}>
         <div>
           <h2 style={{ fontSize: 22, marginBottom: 4 }}>Inventory</h2>
-          <p style={{ color: 'var(--text-2)', fontSize: 14, margin: 0 }}>Track your gear and coin purse.</p>
         </div>
       </div>
 

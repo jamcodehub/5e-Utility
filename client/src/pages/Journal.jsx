@@ -194,10 +194,10 @@ export default function Journal() {
                   value={titleDraft}
                   onClick={ev => ev.stopPropagation()}
                   onChange={ev => setTitleDraft(ev.target.value)}
-                  onBlur={() => commitRename(e._id)}
+                  onBlur={() => finishRename(e._id)}
                   onKeyDown={ev => {
-                    if (ev.key === 'Enter') { ev.preventDefault(); commitRename(e._id) }
-                    if (ev.key === 'Escape') setRenamingId(null)
+                    if (ev.key === 'Enter') { ev.preventDefault(); ev.currentTarget.blur() }
+                    if (ev.key === 'Escape') { ev.preventDefault(); renameCancelled.current = true; ev.currentTarget.blur() }
                   }}
                   style={{ fontSize: 12, padding: '2px 6px', width: '100%' }}
                 />
@@ -254,8 +254,8 @@ export default function Journal() {
               <button
                 type="button"
                 onClick={(ev) => startRename(ev, active)}
-                title="Rename"
-                aria-label={`Rename ${entryTitle(active)}`}
+                title="Edit title"
+                aria-label={`Edit title: ${entryTitle(active)}`}
                 style={{ background: 'none', border: 'none', color: 'var(--text-3)', cursor: 'pointer', fontSize: 13, padding: 2, lineHeight: 1 }}
               >✎</button>
             )}

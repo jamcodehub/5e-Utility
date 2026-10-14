@@ -358,18 +358,21 @@ export default function Storyboard() {
           </div>
 
           {/* Scene pages */}
-          {cards.map((card, i) => (
-            <div
-              key={card._id}
-              style={{
-                position: 'absolute', inset: 0,
-                opacity: i === currentPage ? 1 : 0,
-                pointerEvents: i === currentPage ? 'auto' : 'none',
-              }}
-            >
-              <BookSpread card={card} index={i} onEdit={() => setEditCard({ ...card })} isMobile={isMobile} />
-            </div>
-          ))}
+          {cards.map((card, i) => {
+            if (Math.abs(i - currentPage) > 1) return null
+            return (
+              <div
+                key={card._id}
+                style={{
+                  position: 'absolute', inset: 0,
+                  opacity: i === currentPage ? 1 : 0,
+                  pointerEvents: i === currentPage ? 'auto' : 'none',
+                }}
+              >
+                <BookSpread card={card} index={i} onEdit={() => setEditCard({ ...card })} isMobile={isMobile} />
+              </div>
+            )
+          })}
 
           {cards.length === 0 && !onCover && (
             <div style={{ position: 'absolute', inset: 0, background: 'var(--sb-page-start)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 12, color: 'var(--sb-page-meta)' }}>

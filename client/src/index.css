@@ -61,11 +61,11 @@ input, textarea, select { font-family: inherit; }
   transition: all .15s; line-height: 1;
 }
 .btn-primary { background: var(--gold); color: var(--text); }
-.btn-primary:hover { background: #b8914a; }
+.btn-primary:hover { background: var(--gold); }
 .btn-ghost { background: transparent; color: var(--text-2); border: 1px solid var(--border); }
 .btn-ghost:hover { background: var(--surface2); color: var(--text); }
 .btn-gold { background: var(--gold-bg); color: var(--gold); border: 1px solid var(--gold-border); }
-.btn-gold:hover { background: #f0e8cc; }
+.btn-gold:hover { background: var(--gold-bg); }
 .btn-sm { padding: 5px 10px; font-size: 12px; }
 
 .card {

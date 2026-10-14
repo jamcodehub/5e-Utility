@@ -669,8 +669,8 @@ export default function LevelBuilder() {
 
       {plansLoading ? (
         <div style={{ flex: 1, overflowY: 'auto', padding: 24 }}>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 280px), 1fr))', gap: 16, alignContent: 'start' }}>
-            {Array.from({ length: 3 }).map((_, i) => (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 16, alignContent: 'start' }}>
+            {Array.from({ length: 6 }).map((_, i) => (
               <div key={i} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, overflow: 'hidden' }}>
                 <MapSkeleton />
                 <div style={{ padding: '12px 14px' }}><SkeletonBlock width="62%" height={12} /></div>
