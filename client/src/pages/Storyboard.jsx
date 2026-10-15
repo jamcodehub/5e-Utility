@@ -219,7 +219,7 @@ export default function Storyboard() {
     const onEnd = (e) => {
       const diff = e.changedTouches[0].clientX - startX
       const dy = Math.abs(e.changedTouches[0].clientY - startY)
-      if (Math.abs(diff) > 44 && Math.abs(diff) > dy) goTo(diff > 0 ? 1 : -1)
+      if (Math.abs(diff) > 44 && Math.abs(diff) > dy) goTo(diff < 0 ? 1 : -1)
     }
     el.addEventListener('touchstart', onStart, { passive: true })
     el.addEventListener('touchmove', onMove, { passive: false })

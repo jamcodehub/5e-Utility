@@ -18,7 +18,7 @@ const TILE_IMAGE_URLS = {
   stoneWall: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1791981270/stone_wall.png',
   woodWall: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1791981269/timber_wall.png',
   stoneDoor: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1791981273/stone_door.png',
-  water: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1791981267/water.png',
+  water: 'https://res.cloudinary.com/crcbzpw6/video/upload/v1792050394/tmpsx5uiyo3.mp4',
   grass: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1791981265/grass.png',
   spikeTrap: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1791981276/spike_trap.png',
   stairsUp: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1791981266/stairs_up.png',
@@ -611,6 +611,7 @@ export default function LevelBuilder() {
     if (plan) {
       setEditPlanId(plan._id)
       setEditTitle(plan.title)
+      setDarkMode(Boolean(plan.darkMode))
       const parsed = parseMapContent(plan.content)
       setGrid(parsed.ground)
       setObjectGrid(parsed.objects)
@@ -619,6 +620,7 @@ export default function LevelBuilder() {
     } else {
       setEditPlanId(null)
       setEditTitle('')
+      setDarkMode(false)
       setGrid(blankGrid())
       setObjectGrid(blankObjectGrid())
       setStairLinks(blankStairLinks())
@@ -812,10 +814,10 @@ export default function LevelBuilder() {
     setTokens(current => current.map(token => token.id === id ? { ...token, [field]: !token[field] } : token))
   }
 
-  const toggleDarkMode = () => {
-    if (!isDm || !selectedPlanId) return
+  const toggleDarkMode = (planId = selectedPlanId) => {
+    if (!isDm || !planId) return
     const socket = getSocket()
-    socket.timeout(5000).emit('level:dark-mode', { planId: selectedPlanId, darkMode: !darkMode }, (error, response) => {
+    socket.timeout(5000).emit('level:dark-mode', { planId, darkMode: !darkMode }, (error, response) => {
       if (error) {
         toast('Could not update map lighting')
         return
@@ -825,7 +827,7 @@ export default function LevelBuilder() {
         return
       }
       setDarkMode(response.darkMode)
-      setPlans(current => current.map(plan => plan._id === selectedPlanId ? { ...plan, darkMode: response.darkMode } : plan))
+      setPlans(current => current.map(plan => plan._id === planId ? { ...plan, darkMode: response.darkMode } : plan))
     })
   }
 
@@ -930,6 +932,46 @@ export default function LevelBuilder() {
         .lb-tool-palette-buttons .btn span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .lb-editor-map { flex: 1; min-width: 0; min-height: 0; overflow: hidden; padding: 0; background: #2a2a2a; display: flex; flex-direction: column; align-items: stretch; }
         .lb-editor-canvas-wrap { flex: 1; min-height: 0; width: 100%; overflow: auto; padding: 16px; display: flex; align-items: flex-start; justify-content: center; }
+        .level-darkness-toggle {
+          position: relative;
+          display: inline-flex;
+          align-items: center;
+          width: 132px;
+          height: 34px;
+          padding: 3px;
+          border: 1px solid var(--border);
+          border-radius: 999px;
+          background: #f3cf72;
+          color: #44320a;
+          cursor: pointer;
+          flex-shrink: 0;
+          transition: background-color 220ms ease, border-color 220ms ease;
+        }
+        .level-darkness-toggle[data-dark="true"] { background: #303541; border-color: #596273; color: #fff; }
+        .level-darkness-toggle:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+        .level-darkness-toggle-label {
+          z-index: 1;
+          width: 50%;
+          text-align: center;
+          font-size: 10px;
+          font-weight: 700;
+          letter-spacing: 0.02em;
+          transition: color 220ms ease;
+        }
+        .level-darkness-toggle-thumb {
+          position: absolute;
+          top: 3px;
+          left: 3px;
+          width: calc(50% - 3px);
+          height: calc(100% - 6px);
+          border-radius: 999px;
+          background: rgba(255, 255, 255, 0.92);
+          box-shadow: 0 1px 4px rgba(0, 0, 0, 0.24);
+          transform: translateX(0);
+          transition: transform 220ms ease;
+        }
+        .level-darkness-toggle[data-dark="true"] .level-darkness-toggle-thumb { transform: translateX(100%); background: #8993a6; }
+        .level-darkness-toggle:disabled { opacity: 0.65; cursor: wait; }
         @media (max-width: 700px) {
           .lb-editor-workspace { flex-direction: column; }
           .lb-editor-tools { width: auto; flex: 0 0 auto; max-height: 28vh; padding: 6px; border-right: 0; border-bottom: 1px solid var(--border); }
@@ -952,6 +994,21 @@ export default function LevelBuilder() {
       {/* Editor toolbar */}
       <div style={{ padding: '10px 16px', background: 'var(--surface)', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0, flexWrap: 'wrap' }}>
         <input className="input" placeholder="Map title" value={editTitle} onChange={e => setEditTitle(e.target.value)} style={{ width: 200 }} />
+        {isDm && editPlanId && (
+          <button
+            type="button"
+            className="level-darkness-toggle"
+            data-dark={darkMode}
+            onClick={() => toggleDarkMode(editPlanId)}
+            aria-label="Map lighting"
+            aria-pressed={darkMode}
+            title={darkMode ? 'Darkness is on for players' : 'Darkness is off for players'}
+          >
+            <span className="level-darkness-toggle-thumb" aria-hidden="true" />
+            <span className="level-darkness-toggle-label">☀ Light</span>
+            <span className="level-darkness-toggle-label">☾ Dark</span>
+          </button>
+        )}
         <div style={{ display: 'flex', gap: 8, flexShrink: 0, marginLeft: 'auto' }}>
           <button className="btn btn-ghost btn-sm" onClick={() => setMode('gallery')}>✕ Cancel</button>
           <button className="btn btn-ghost btn-sm" onClick={() => window.print()}>Print</button>
@@ -1059,6 +1116,18 @@ export default function LevelBuilder() {
                 {t.iconUrl && <TileIconPlaceholder tile={t} style={{ position: 'absolute', inset: '21%', width: '58%', height: '58%' }} />}
                 {stairLinks[r]?.[c] && <span aria-label="Linked stairs" style={{ position: 'absolute', top: 0, right: 1, color: '#fff', fontSize: 8, textShadow: '0 1px 2px #000', pointerEvents: 'none' }}>↗</span>}
                 {object && object.id !== 'object-erase' && (object.imageUrl || object.iconUrl || object.id.startsWith('rock-')) && <TileIconPlaceholder tile={object} style={{ position: 'absolute', zIndex: 1 }} />}
+                {darkMode && !visibility.torchlit[r]?.[c] && !visibility.darkvision[r]?.[c] && (
+                  <div
+                    aria-hidden="true"
+                    style={{
+                      position: 'absolute',
+                      inset: 0,
+                      zIndex: 5,
+                      background: 'rgba(0, 0, 0, 0.86)',
+                      pointerEvents: 'none',
+                    }}
+                  />
+                )}
               </div>
             )
           }))}

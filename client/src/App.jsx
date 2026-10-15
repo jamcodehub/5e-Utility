@@ -5,6 +5,7 @@ import { ThemeProvider } from './context/ThemeContext'
 import { MusicProvider } from './context/MusicContext'
 import Shell from './components/Shell'
 import Auth from './pages/Auth'
+import PublicDemo from './pages/PublicDemo'
 import Journal from './pages/Journal'
 import SessionPlanner from './pages/SessionPlanner'
 import { useCampaign } from './context/CampaignContext'
@@ -193,7 +194,17 @@ function Guard() {
   }, [loading, user])
 
   if (loading) return <SkeletonShell cards={6} />
-  if (!user) return <Auth />
+  if (!user) {
+    return (
+      <Routes>
+        <Route path="/" element={<PublicDemo />} />
+        <Route path="/demo/:feature" element={<PublicDemo />} />
+        <Route path="/login" element={<Auth />} />
+        <Route path="/reset-password" element={<Auth />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    )
+  }
   // Players land on their Journal; DMs land on their Session Planner.
   const homePath = user.role === 'dm' ? '/session-planner' : '/journal'
   return (

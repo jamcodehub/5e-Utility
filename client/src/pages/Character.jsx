@@ -233,7 +233,7 @@ export default function Character() {
           className="btn btn-ghost btn-sm"
           style={{ fontSize: 12, opacity: atCharLimit ? 0.7 : 1 }}
         >
-          {atCharLimit ? `✦ ${characters.length}/${FREE_CHAR_LIMIT} — Upgrade for more` : '+ New Character'}
+          {atCharLimit ? `✦ ${characters.length}/${FREE_CHAR_LIMIT}` : '+ New Character'}
         </button>
       </div>
 
