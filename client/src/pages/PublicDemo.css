@@ -12,7 +12,7 @@
   min-height: 100vh;
   min-height: 100dvh;
   display: grid;
-  grid-template-columns: 218px minmax(0, 1fr) 282px;
+  grid-template-columns: 190px minmax(0, 1fr) 282px;
   overflow: hidden;
   background:
     radial-gradient(ellipse at 50% -15%, rgba(133, 105, 57, 0.13), transparent 50%),
@@ -314,7 +314,7 @@
   max-height: 170px;
   margin-bottom: 25px;
   object-fit: contain;
-  object-position: left center;
+  object-position: center;
   filter: none;
 }
 
@@ -322,7 +322,15 @@
   background: none;
 }
 
-.demo-hero-content { position: relative; z-index: 1; width: min(100%, 650px); }
+.demo-hero-content {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  width: min(100%, 650px);
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
 .demo-hero-kicker { display: flex; align-items: center; gap: 9px; color: var(--demo-gold-strong); font-size: 9px; font-weight: 700; letter-spacing: 0.2em; }
 .demo-hero-kicker span { background: var(--demo-gold); box-shadow: 0 0 12px rgba(215, 181, 109, 0.55); }
 
@@ -457,7 +465,7 @@
 .demo-not-found a { color: var(--demo-gold-strong); font-size: 12px; }
 
 @media (max-width: 1080px) {
-  .demo-app { grid-template-columns: 190px minmax(0, 1fr); }
+  .demo-app { grid-template-columns: 170px minmax(0, 1fr); }
   .demo-save-column { grid-column: 2; display: grid; grid-template-columns: minmax(0, 1fr) minmax(180px, 0.7fr); align-items: center; padding: 12px 24px 16px; border-top: 1px solid var(--demo-border); border-left: 0; }
   .demo-save-card { display: grid; grid-template-columns: 34px 1fr auto; align-items: center; column-gap: 12px; padding: 12px; }
   .demo-save-emblem { grid-row: span 2; width: 32px; height: 32px; margin: 0; }
@@ -565,7 +573,7 @@
   --sb-page-body: #514536;
   --sb-page-meta: #8a7858;
   display: grid;
-  grid-template-columns: 218px minmax(0, 1fr);
+  grid-template-columns: 190px minmax(0, 1fr);
   overflow: hidden;
   background: var(--bg);
   color: var(--text);
@@ -679,6 +687,9 @@
 
 .demo-hero {
   min-height: calc(100dvh - 62px);
+  align-items: center;
+  justify-content: flex-start;
+  padding-top: clamp(36px, 5vh, 64px);
 }
 
 .demo-actual-page {
@@ -709,7 +720,7 @@
 .demo-mobile-nav { display: none; }
 
 @media (max-width: 1080px) {
-  .demo-app { grid-template-columns: 190px minmax(0, 1fr); }
+  .demo-app { grid-template-columns: 170px minmax(0, 1fr); }
 }
 
 .journal-demo-save-link {

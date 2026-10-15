@@ -565,7 +565,7 @@ export default function Shell({ children }) {
               <div style={{ fontSize: 11, color: 'var(--text-3)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user?.email}</div>
             </div>
             <button onClick={() => setShowSettings(true)} title="Settings" aria-label="Settings" style={{ background: 'none', border: 'none', color: 'var(--text-3)', cursor: 'pointer', padding: 4, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <img src="https://res.cloudinary.com/crcbzpw6/image/upload/v1791966298/ellipsis-solid-full.svg" alt="" aria-hidden="true" style={{ width: 16, height: 16, objectFit: 'contain', filter: darkMode ? 'brightness(0) invert(1)' : 'none' }} />
+              <img src="https://res.cloudinary.com/crcbzpw6/image/upload/v1791966298/ellipsis-solid-full.svg" alt="" aria-hidden="true" style={{ width: 16, height: 16, objectFit: 'contain', filter: 'var(--logo-filter, none)' }} />
             </button>
           </div>
         </div>

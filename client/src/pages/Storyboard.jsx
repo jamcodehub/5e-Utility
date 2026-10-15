@@ -8,6 +8,7 @@ import { CloudinaryImage } from '@cloudinary/url-gen'
 import { quality, format } from '@cloudinary/url-gen/actions/delivery'
 import { auto as autoQuality } from '@cloudinary/url-gen/qualifiers/quality'
 import { auto as autoFormat } from '@cloudinary/url-gen/qualifiers/format'
+import './Storyboard.css'
 
 const CLOUD_NAME = 'crcbzpw6'
 
@@ -298,6 +299,9 @@ export default function Storyboard() {
           {onCover ? activeCampaign.name : `Scene ${currentPage + 1} / ${cards.length}`}
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
+          <button type="button" onClick={() => window.print()} style={{ background: 'var(--sb-bar-border)', border: 'none', color: 'var(--sb-accent)', padding: '6px 14px', borderRadius: 6, fontFamily: 'Cinzel, serif', fontSize: 11, cursor: 'pointer', letterSpacing: '0.05em' }}>
+            Print Book
+          </button>
           <button onClick={() => setShowForm(f => !f)} style={{ background: showForm ? 'var(--sb-accent)' : 'var(--sb-bar-border)', border: 'none', color: showForm ? 'var(--sb-outer)' : 'var(--sb-accent)', padding: '6px 14px', borderRadius: 6, fontFamily: 'Cinzel, serif', fontSize: 11, cursor: 'pointer', letterSpacing: '0.05em' }}>
             {showForm ? '✕ Close' : '+ Add Scene'}
           </button>
@@ -450,6 +454,36 @@ export default function Storyboard() {
         </div>
       )}
       <ToastContainer />
+      <div className="storyboard-print-book">
+        <section className="storyboard-print-page storyboard-print-cover">
+          <div className="storyboard-print-cover-spine" />
+          <div className="storyboard-print-cover-face">
+            <div className="storyboard-print-cover-frame">
+              <h1>{activeCampaign.name || 'Your Campaign'}</h1>
+              <p>CHRONICLE</p>
+            </div>
+          </div>
+        </section>
+        {cards.map((card, index) => (
+          <article className="storyboard-print-page storyboard-print-scene" key={`print-${card._id}`}>
+            <div className="storyboard-print-scene-image">
+              {card.imageUrl
+                ? <img src={getOptimisedUrl(card.imageUrl)} alt="" />
+                : <span>No image</span>}
+            </div>
+            <div className="storyboard-print-scene-copy">
+              <span className="storyboard-print-page-number">{String(index + 1).padStart(2, '0')}</span>
+              <h2>{card.title || `Scene ${index + 1}`}</h2>
+              <p>{card.description}</p>
+              {card.createdAt && (
+                <time dateTime={card.createdAt}>
+                  {new Date(card.createdAt).toLocaleDateString('en-AU', { day: 'numeric', month: 'long', year: 'numeric' })}
+                </time>
+              )}
+            </div>
+          </article>
+        ))}
+      </div>
     </div>
   )
 }

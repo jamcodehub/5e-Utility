@@ -4,7 +4,6 @@ import { CloudinaryImage } from '@cloudinary/url-gen'
 import { quality, format } from '@cloudinary/url-gen/actions/delivery'
 import { auto as autoQuality } from '@cloudinary/url-gen/qualifiers/quality'
 import { auto as autoFormat } from '@cloudinary/url-gen/qualifiers/format'
-import { useTheme } from '../context/ThemeContext'
 import './PublicDemo.css'
 
 const signInIconUrl = 'https://res.cloudinary.com/crcbzpw6/image/upload/v1792051212/right-to-bracket-solid-full.svg'
@@ -20,11 +19,11 @@ const DemoBattleTrackerPage = lazy(() => import('./HPtracker'))
 const DemoRoleplayPage = lazy(() => import('./RoleplayAssistant'))
 
 const FEATURES = [
-  { id: 'storyboard', label: 'Storyboard', icon: '▤', description: 'Bring your campaign scenes to life.' },
-  { id: 'journal', label: 'Journal', icon: '✎', description: 'Keep every character’s story close.' },
-  { id: 'battle-map', label: 'Battle Map', icon: '▦', description: 'Build a battlefield and move your party.' },
-  { id: 'battle-tracker', label: 'Battle Tracker', icon: '⚔', description: 'Keep initiative and hit points in hand.' },
-  { id: 'roleplay', label: 'Roleplay', icon: '❖', description: 'Find your character’s voice.' },
+  { id: 'storyboard', label: 'Storyboard', iconUrl: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1791791388/book-solid-full.svg', description: 'Bring your campaign scenes to life.' },
+  { id: 'journal', label: 'Journal', iconUrl: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1791790758/01_fantasy_15_feather.png', description: 'Keep every character’s story close.' },
+  { id: 'battle-map', label: 'Battle Map', icon: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1791792887/map-solid-full.svg', description: 'Build a battlefield and move your party.' },
+  { id: 'battle-tracker', label: 'Battle Tracker', iconUrl: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1791791406/hand-fist-solid-full.svg', description: 'Keep initiative and hit points in hand.' },
+  { id: 'roleplay', label: 'Roleplay', iconUrl: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1791792735/comment-solid-full.svg', description: 'Find your character’s voice.' },
 ]
 
 function DemoSidebar({ active }) {
@@ -131,7 +130,6 @@ export default function PublicDemo() {
   const { feature } = useParams()
   const location = useLocation()
   const navigate = useNavigate()
-  const { theme, setTheme } = useTheme()
   const onLanding = location.pathname === '/'
   const activeFeature = FEATURES.find(item => item.id === feature)
   const demoPages = {
@@ -144,8 +142,6 @@ export default function PublicDemo() {
   const DemoPage = demoPages[feature]
 
   const explore = () => navigate(`/demo/${FEATURES[0].id}`)
-  const isDarkTheme = theme === 'dark'
-  const toggleTheme = () => setTheme(isDarkTheme ? 'light' : 'dark')
   const content = onLanding
     ? <DemoLanding onExplore={explore} />
     : !activeFeature
@@ -153,25 +149,13 @@ export default function PublicDemo() {
       : <div className="demo-actual-page" onClickCapture={() => setShowSignupCta(true)}><Suspense fallback={<div className="demo-page-loading">Preparing the preview…</div>}><DemoPage /></Suspense></div>
 
   return (
-    <div className="demo-app" data-theme={isDarkTheme ? 'dark' : 'light'}>
+    <div className="demo-app" data-theme="light">
       <DemoSidebar active={feature} />
       <main className="demo-main">
         <header className="demo-topbar">
           <Link to="/" className="demo-mobile-brand" aria-label="5eUtility home">
-          <img src="https://res.cloudinary.com/crcbzpw6/image/upload/v1792054744/house-solid-full.svg" alt="home" />
+          <img src="https://res.cloudinary.com/crcbzpw6/image/upload/v1792054744/house-solid-full.svg" alt="home" width="24" height="24" color="#9a7c3a" />
           </Link>
-          <span className="demo-topbar-label">{onLanding ? 'EXPLORE 5EUTILITY' : `${activeFeature?.label || 'DEMO'} PREVIEW`}</span>
-          <button
-            type="button"
-            className="demo-theme-toggle"
-            onClick={toggleTheme}
-            aria-pressed={isDarkTheme}
-            aria-label={`Switch to ${isDarkTheme ? 'light' : 'dark'} mode`}
-            title={`Switch to ${isDarkTheme ? 'light' : 'dark'} mode`}
-          >
-            <span aria-hidden="true">{isDarkTheme ? '☀' : '☾'}</span>
-            <span>{isDarkTheme ? 'Light' : 'Dark'}</span>
-          </button>
           <Link to="/login" className="demo-topbar-signin">
             <img src={signInIconUrl} alt="" aria-hidden="true" />
             <span>Sign in</span>
@@ -179,12 +163,6 @@ export default function PublicDemo() {
         </header>
         {content}
       </main>
-      <DemoMobileNav active={feature} />
-      {showSignupCta && (
-        <Link to="/login" className="demo-signup-button demo-interaction-signup">
-          Sign up to save your content <span aria-hidden="true">→</span>
-        </Link>
-      )}
     </div>
   )
 }
