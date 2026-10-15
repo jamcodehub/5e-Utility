@@ -818,7 +818,7 @@ export default function LevelBuilder() {
         const hasDarkvision = darkvisionSources.some(source =>
           canSeeFrom(grid, doorStates, source, row, col, DARKVISION_RADIUS)
         )
-        visible[row][col] = !darkMode || isDm || sharedLight || hasDarkvision
+        visible[row][col] = !darkMode || sharedLight || hasDarkvision
         torchlit[row][col] = !darkMode || sharedLight
         darkvision[row][col] = darkMode && hasDarkvision && !sharedLight
         lightStrength[row][col] = sharedLight
