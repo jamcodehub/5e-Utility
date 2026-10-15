@@ -1236,18 +1236,6 @@ export default function LevelBuilder() {
                   {object && visible && (
                     <TileIconPlaceholder tile={object} style={{ position: 'absolute', zIndex: 1, filter: darkvision ? 'brightness(0.35)' : undefined }} />
                   )}
-                  {isDm && darkMode && !torchlit && !darkvision && (
-                    <div
-                      aria-hidden="true"
-                      style={{
-                        position: 'absolute',
-                        inset: 0,
-                        zIndex: 5,
-                        background: '#000',
-                        pointerEvents: 'none',
-                      }}
-                    />
-                  )}
                   {token && (
                     <Token
                       token={token}
