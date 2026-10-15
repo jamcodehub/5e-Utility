@@ -896,7 +896,7 @@ export default function LevelBuilder() {
           background: rgba(255, 255, 255, 0.92);
           box-shadow: 0 1px 4px rgba(0, 0, 0, 0.24);
           transform: translateX(0);
-          transition: transform 220ms ease;
+          transition: transform 220ms cubic-bezier(0.4, 0.0, 0.2, 1);
         }
         .level-darkness-toggle[data-dark="true"] .level-darkness-toggle-thumb { transform: translateX(100%); background: #8993a6; }
         .level-darkness-toggle:disabled { opacity: 0.65; cursor: wait; }
@@ -1120,7 +1120,7 @@ export default function LevelBuilder() {
           background: rgba(255, 255, 255, 0.92);
           box-shadow: 0 1px 4px rgba(0, 0, 0, 0.24);
           transform: translateX(0);
-          transition: transform 220ms ease;
+          transition: transform 220ms cubic-bezier(0.4, 0.0, 0.2, 1);
         }
         .level-darkness-toggle[data-dark="true"] .level-darkness-toggle-thumb {
           transform: translateX(100%);

@@ -47,7 +47,7 @@ function DemoSidebar({ active }) {
           </Link>
         ))}
       </nav>
-      <Link to="/login" className="demo-sidebar-signin">Sign in to save your content</Link>
+      <Link to="/login" className="demo-sidebar-signin">Sign up to save your content</Link>
     </aside>
   )
 }
@@ -109,7 +109,7 @@ function DemoLanding({ onExplore }) {
   return (
     <section className="demo-hero">
       <div className="demo-hero-backdrop" aria-hidden="true">
-        <video ref={videoRef} className="demo-hero-video" autoPlay muted loop playsInline preload="metadata" aria-hidden="true" onLoadedMetadata={speedVideo} onPlay={speedVideo}>
+        <video ref={videoRef} className="demo-hero-video" autoPlay muted loop playsInline preload="auto" aria-hidden="true" onLoadedMetadata={speedVideo} onPlay={speedVideo}>
           <source src="https://res.cloudinary.com/crcbzpw6/video/upload/v1792053072/dithered-video.mp4" type="video/mp4" />
         </video>
         <div className="demo-hero-shade" />
@@ -151,7 +151,7 @@ export default function PublicDemo() {
           {showSignupCta && (
             <div className="demo-interaction-prompt">
               <span>Your {activeFeature.label} is just a preview.</span>
-              <Link to="/login">Sign in to save your progress</Link>
+              <Link to="/login">Sign up to save your progress</Link>
             </div>
           )}
         </div>
@@ -163,11 +163,11 @@ export default function PublicDemo() {
       <main className="demo-main">
         <header className="demo-topbar">
           <Link to="/" className="demo-mobile-brand" aria-label="5eUtility home">
-            <img src="https://res.cloudinary.com/crcbzpw6/image/upload/v1792054744/house-solid-full.svg" alt="" aria-hidden="true" className="demo-home-icon" />
+            <img src="https://res.cloudinary.com/crcbzpw6/image/upload/v1792054744/house-solid-full.svg" alt="" aria-hidden="true" align="center" className="demo-home-icon" />
           </Link>
           <Link to="/login" className="demo-topbar-signin">
             <img src={signInIconUrl} alt="" aria-hidden="true" />
-            <span>Sign in</span>
+            <span>Sign up</span>
           </Link>
         </header>
         {content}
