@@ -741,10 +741,10 @@ export default function LevelBuilder() {
     setTokens(current => current.map(token => token.id === id ? { ...token, [field]: !token[field] } : token))
   }
 
-  const toggleDarkMode = () => {
-    if (!isDm || !selectedPlanId) return
+  const toggleDarkMode = (planId = selectedPlanId) => {
+    if (!isDm || !planId) return
     const socket = getSocket()
-    socket.timeout(5000).emit('level:dark-mode', { planId: selectedPlanId, darkMode: !darkMode }, (error, response) => {
+    socket.timeout(5000).emit('level:dark-mode', { planId, darkMode: !darkMode }, (error, response) => {
       if (error) {
         toast('Could not update map lighting')
         return
@@ -754,7 +754,7 @@ export default function LevelBuilder() {
         return
       }
       setDarkMode(response.darkMode)
-      setPlans(current => current.map(plan => plan._id === selectedPlanId ? { ...plan, darkMode: response.darkMode } : plan))
+      setPlans(current => current.map(plan => plan._id === planId ? { ...plan, darkMode: response.darkMode } : plan))
     })
   }
 
@@ -1157,7 +1157,7 @@ export default function LevelBuilder() {
             type="button"
             className="level-darkness-toggle"
             data-dark={darkMode}
-            onClick={toggleDarkMode}
+            onClick={() => toggleDarkMode(selectedPlanId)}
             aria-label="Map lighting"
             aria-pressed={darkMode}
             title={darkMode ? 'Darkness is on for players' : 'Darkness is off for players'}
