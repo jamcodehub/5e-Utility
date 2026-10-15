@@ -778,12 +778,13 @@ export default function LevelBuilder() {
 
   // ── Render ──
   const selectedPlan = plans.find(p => p._id === selectedPlanId)
+  const isDemo = isPublicDemoPath()
   const mapLightSources = useMemo(
-    () => objectGrid.flatMap((row, r) => row.flatMap((id, c) => {
+    () => isDemo ? [] : objectGrid.flatMap((row, r) => row.flatMap((id, c) => {
       const tile = objectTile(id)
       return tile?.lightRadius ? [{ row: r, col: c, radius: tile.lightRadius }] : []
     })),
-    [objectGrid],
+    [isDemo, objectGrid],
   )
   const sharedLightSources = useMemo(() => [
     ...mapLightSources,
@@ -1050,7 +1051,7 @@ export default function LevelBuilder() {
                       position: 'absolute',
                       inset: 0,
                       zIndex: 5,
-                      background: 'rgba(0, 0, 0, 0.86)',
+                      background: isDemo ? '#000' : 'rgba(0, 0, 0, 0.86)',
                       pointerEvents: 'none',
                     }}
                   />

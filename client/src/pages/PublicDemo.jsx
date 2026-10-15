@@ -21,7 +21,7 @@ const DemoRoleplayPage = lazy(() => import('./RoleplayAssistant'))
 const FEATURES = [
   { id: 'storyboard', label: 'Storyboard', iconUrl: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1791791388/book-solid-full.svg', description: 'Bring your campaign scenes to life.' },
   { id: 'journal', label: 'Journal', iconUrl: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1791790758/01_fantasy_15_feather.png', description: 'Keep every character’s story close.' },
-  { id: 'battle-map', label: 'Battle Map', icon: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1791792887/map-solid-full.svg', description: 'Build a battlefield and move your party.' },
+  { id: 'battle-map', label: 'Battle Map', iconUrl: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1791792887/map-solid-full.svg', description: 'Build a battlefield and move your party.' },
   { id: 'battle-tracker', label: 'Battle Tracker', iconUrl: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1791791406/hand-fist-solid-full.svg', description: 'Keep initiative and hit points in hand.' },
   { id: 'roleplay', label: 'Roleplay', iconUrl: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1791792735/comment-solid-full.svg', description: 'Find your character’s voice.' },
 ]
@@ -41,7 +41,7 @@ function DemoSidebar({ active }) {
             className={`demo-nav-link${active === feature.id ? ' is-active' : ''}`}
             aria-current={active === feature.id ? 'page' : undefined}
           >
-            <span className="demo-nav-icon" aria-hidden="true">{feature.icon}</span>
+            <img className="demo-nav-icon" src={feature.iconUrl} alt="" aria-hidden="true" />
             <span>{feature.label}</span>
             <span className="demo-nav-arrow" aria-hidden="true">›</span>
           </Link>
@@ -90,7 +90,7 @@ function DemoMobileNav({ active }) {
             aria-current={active === feature.id ? 'page' : undefined}
             aria-label={feature.label}
           >
-            <span className="demo-mobile-nav-icon" aria-hidden="true">{feature.icon}</span>
+            <img className="demo-mobile-nav-icon" src={feature.iconUrl} alt="" aria-hidden="true" />
             <span>{feature.label}</span>
           </Link>
         ))}
@@ -116,7 +116,6 @@ function DemoLanding({ onExplore }) {
       </div>
       <div className="demo-hero-content">
         <img className="demo-hero-logo" src={heroLogoUrl} alt="5e Utility" />
-        <p>Bring your characters, campaign, and adventures together in one welcoming home for your D&amp;D table.</p>
         <div className="demo-hero-actions">
           <button type="button" className="demo-hero-cta" onClick={onExplore}>Explore the demo <span aria-hidden="true">→</span></button>
         </div>
@@ -146,7 +145,17 @@ export default function PublicDemo() {
     ? <DemoLanding onExplore={explore} />
     : !activeFeature
       ? <section className="demo-not-found"><h1>That page isn’t in this preview.</h1><Link to={`/demo/${FEATURES[0].id}`}>Explore the demo</Link></section>
-      : <div className="demo-actual-page" onClickCapture={() => setShowSignupCta(true)}><Suspense fallback={<div className="demo-page-loading">Preparing the preview…</div>}><DemoPage /></Suspense></div>
+      : (
+        <div className="demo-actual-page" onClickCapture={() => setShowSignupCta(true)}>
+          <Suspense fallback={<div className="demo-page-loading">Preparing the preview…</div>}><DemoPage /></Suspense>
+          {showSignupCta && (
+            <div className="demo-interaction-prompt">
+              <span>Your {activeFeature.label} is just a preview.</span>
+              <Link to="/login">Sign in to save your progress</Link>
+            </div>
+          )}
+        </div>
+      )
 
   return (
     <div className="demo-app" data-theme="light">
@@ -154,7 +163,7 @@ export default function PublicDemo() {
       <main className="demo-main">
         <header className="demo-topbar">
           <Link to="/" className="demo-mobile-brand" aria-label="5eUtility home">
-          <img src="https://res.cloudinary.com/crcbzpw6/image/upload/v1792054744/house-solid-full.svg" alt="home" width="24" height="24" color="#9a7c3a" />
+            <img src="https://res.cloudinary.com/crcbzpw6/image/upload/v1792054744/house-solid-full.svg" alt="" aria-hidden="true" />
           </Link>
           <Link to="/login" className="demo-topbar-signin">
             <img src={signInIconUrl} alt="" aria-hidden="true" />

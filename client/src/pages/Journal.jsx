@@ -307,12 +307,6 @@ export default function Journal() {
                   fontFamily: 'Georgia, serif',
                 }}
               />
-              {isPublicDemoPath() && hasEditedContent && content.trim() && (
-                <div className="journal-demo-save-prompt">
-                  <span>Your journal is just a preview.</span>
-                  <Link to="/login">Sign in to save your progress</Link>
-                </div>
-              )}
             </>
           ) : (
             <div style={{ textAlign: 'center', color: 'var(--text-3)', marginTop: 60, fontSize: 13 }}>
