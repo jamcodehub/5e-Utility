@@ -1211,7 +1211,7 @@ export default function LevelBuilder() {
                   style={{
                     aspectRatio: '1',
                     background: darkMode && !visible ? '#000' : tileColor(cellBase),
-                    border: darkMode && !visible ? 'none' : `0.5px solid rgba(0,0,0,0.08)`,
+                    border: `0.5px solid ${darkMode && !visible ? 'transparent' : 'rgba(0,0,0,0.08)'}`,
                     position: 'relative',
                     filter: darkvision
                       ? 'brightness(0.35)'
