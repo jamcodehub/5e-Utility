@@ -1,5 +1,6 @@
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { lazy, Suspense, useEffect, useRef } from 'react'
+import { useTheme } from '../context/ThemeContext'
 import './PublicDemo.css'
 
 const signInIconUrl = 'https://res.cloudinary.com/crcbzpw6/image/upload/v1792051212/right-to-bracket-solid-full.svg'
@@ -122,6 +123,7 @@ export default function PublicDemo() {
   const { feature } = useParams()
   const location = useLocation()
   const navigate = useNavigate()
+  const { theme, setTheme } = useTheme()
   const onLanding = location.pathname === '/'
   const activeFeature = FEATURES.find(item => item.id === feature)
   const demoPages = {
@@ -134,6 +136,8 @@ export default function PublicDemo() {
   const DemoPage = demoPages[feature]
 
   const explore = () => navigate(`/demo/${FEATURES[0].id}`)
+  const isDarkTheme = theme === 'dark'
+  const toggleTheme = () => setTheme(isDarkTheme ? 'light' : 'dark')
   const content = onLanding
     ? <DemoLanding onExplore={explore} />
     : !activeFeature
@@ -141,7 +145,7 @@ export default function PublicDemo() {
       : <div className="demo-actual-page"><Suspense fallback={<div className="demo-page-loading">Preparing the preview…</div>}><DemoPage /></Suspense></div>
 
   return (
-    <div className="demo-app">
+    <div className="demo-app" data-theme={isDarkTheme ? 'dark' : 'light'}>
       <DemoSidebar active={feature} />
       <main className="demo-main">
         <header className="demo-topbar">
@@ -150,6 +154,17 @@ export default function PublicDemo() {
             <em>needs a place to begin.</em>
           </Link>
           <span className="demo-topbar-label">{onLanding ? 'EXPLORE 5EUTILITY' : `${activeFeature?.label || 'DEMO'} PREVIEW`}</span>
+          <button
+            type="button"
+            className="demo-theme-toggle"
+            onClick={toggleTheme}
+            aria-pressed={isDarkTheme}
+            aria-label={`Switch to ${isDarkTheme ? 'light' : 'dark'} mode`}
+            title={`Switch to ${isDarkTheme ? 'light' : 'dark'} mode`}
+          >
+            <span aria-hidden="true">{isDarkTheme ? '☀' : '☾'}</span>
+            <span>{isDarkTheme ? 'Light' : 'Dark'}</span>
+          </button>
           <Link to="/login" className="demo-topbar-signin">
             <img src={signInIconUrl} alt="" aria-hidden="true" />
             <span>Sign in</span>

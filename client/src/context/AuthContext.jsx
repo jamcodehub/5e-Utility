@@ -1,19 +1,16 @@
 import { createContext, useContext, useState, useEffect } from 'react'
-import { useLocation } from 'react-router-dom'
 import { demoApi, isPublicDemoPath } from '../utils/demoRuntime'
 
 const AuthContext = createContext(null)
 export const useAuth = () => useContext(AuthContext)
 
 export function DemoAuthProvider({ children }) {
-  const { pathname } = useLocation()
-  const isPlayerPage = pathname === '/demo/journal' || pathname === '/demo/roleplay'
   const user = {
-    id: isPlayerPage ? 'demo-player' : 'demo-dm',
-    _id: isPlayerPage ? 'demo-player' : 'demo-dm',
-    username: isPlayerPage ? 'Avery' : 'Game Master',
+    id: 'demo-dm',
+    _id: 'demo-dm',
+    username: 'Game Master',
     email: '',
-    role: isPlayerPage ? 'player' : 'dm',
+    role: 'dm',
     isPremium: true,
   }
 
