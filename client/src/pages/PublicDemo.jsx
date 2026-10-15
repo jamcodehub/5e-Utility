@@ -1,9 +1,17 @@
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
-import { lazy, Suspense, useEffect, useRef } from 'react'
+import { lazy, Suspense, useEffect, useRef, useState } from 'react'
+import { CloudinaryImage } from '@cloudinary/url-gen'
+import { quality, format } from '@cloudinary/url-gen/actions/delivery'
+import { auto as autoQuality } from '@cloudinary/url-gen/qualifiers/quality'
+import { auto as autoFormat } from '@cloudinary/url-gen/qualifiers/format'
 import { useTheme } from '../context/ThemeContext'
 import './PublicDemo.css'
 
 const signInIconUrl = 'https://res.cloudinary.com/crcbzpw6/image/upload/v1792051212/right-to-bracket-solid-full.svg'
+const heroLogoUrl = new CloudinaryImage('5e_Utillity', { cloudName: 'crcbzpw6' })
+  .delivery(quality(autoQuality()))
+  .delivery(format(autoFormat()))
+  .toURL()
 
 const DemoStoryboardPage = lazy(() => import('./Storyboard'))
 const DemoJournalPage = lazy(() => import('./Journal'))
@@ -96,30 +104,31 @@ function DemoMobileNav({ active }) {
 function DemoLanding({ onExplore }) {
   const videoRef = useRef(null)
   useEffect(() => {
-    if (videoRef.current) videoRef.current.playbackRate = 0.25
+    if (videoRef.current) videoRef.current.playbackRate = 0.4
   }, [])
-  const slowVideo = event => { event.currentTarget.playbackRate = 0.25 }
+  const speedVideo = event => { event.currentTarget.playbackRate = 0.7 }
 
   return (
     <section className="demo-hero">
       <div className="demo-hero-backdrop" aria-hidden="true">
-        <video ref={videoRef} className="demo-hero-video" autoPlay muted loop playsInline preload="metadata" aria-hidden="true" onLoadedMetadata={slowVideo} onPlay={slowVideo}>
+        <video ref={videoRef} className="demo-hero-video" autoPlay muted loop playsInline preload="metadata" aria-hidden="true" onLoadedMetadata={speedVideo} onPlay={speedVideo}>
           <source src="https://res.cloudinary.com/crcbzpw6/video/upload/v1792053072/dithered-video.mp4" type="video/mp4" />
         </video>
         <div className="demo-hero-shade" />
       </div>
       <div className="demo-hero-content">
+        <img className="demo-hero-logo" src={heroLogoUrl} alt="5e Utility" />
         <p>Bring your characters, campaign, and adventures together in one welcoming home for your D&amp;D table.</p>
         <div className="demo-hero-actions">
           <button type="button" className="demo-hero-cta" onClick={onExplore}>Explore the demo <span aria-hidden="true">→</span></button>
         </div>
-        <div className="demo-hero-footnote"><span>01 / 05</span><span>YOUR ADVENTURE STARTS HERE</span></div>
       </div>
     </section>
   )
 }
 
 export default function PublicDemo() {
+  const [showSignupCta, setShowSignupCta] = useState(false)
   const { feature } = useParams()
   const location = useLocation()
   const navigate = useNavigate()
@@ -142,7 +151,7 @@ export default function PublicDemo() {
     ? <DemoLanding onExplore={explore} />
     : !activeFeature
       ? <section className="demo-not-found"><h1>That page isn’t in this preview.</h1><Link to={`/demo/${FEATURES[0].id}`}>Explore the demo</Link></section>
-      : <div className="demo-actual-page"><Suspense fallback={<div className="demo-page-loading">Preparing the preview…</div>}><DemoPage /></Suspense></div>
+      : <div className="demo-actual-page" onClickCapture={() => setShowSignupCta(true)}><Suspense fallback={<div className="demo-page-loading">Preparing the preview…</div>}><DemoPage /></Suspense></div>
 
   return (
     <div className="demo-app" data-theme={isDarkTheme ? 'dark' : 'light'}>
@@ -150,8 +159,7 @@ export default function PublicDemo() {
       <main className="demo-main">
         <header className="demo-topbar">
           <Link to="/" className="demo-mobile-brand" aria-label="5eUtility home">
-            <span>Every great story</span>
-            <em>needs a place to begin.</em>
+          <img src="https://res.cloudinary.com/crcbzpw6/image/upload/v1792054744/house-solid-full.svg" alt="home" />
           </Link>
           <span className="demo-topbar-label">{onLanding ? 'EXPLORE 5EUTILITY' : `${activeFeature?.label || 'DEMO'} PREVIEW`}</span>
           <button
@@ -173,6 +181,11 @@ export default function PublicDemo() {
         {content}
       </main>
       <DemoMobileNav active={feature} />
+      {showSignupCta && (
+        <Link to="/login" className="demo-signup-button demo-interaction-signup">
+          Sign up to save your content <span aria-hidden="true">→</span>
+        </Link>
+      )}
     </div>
   )
 }

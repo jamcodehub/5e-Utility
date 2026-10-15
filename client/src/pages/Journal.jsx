@@ -168,7 +168,7 @@ export default function Journal() {
 
   // DMs shouldn't land here — send them to their own Session Planner instead.
   // (Placed after all hooks above to satisfy the Rules of Hooks.)
-  if (user?.role === 'dm') return <Navigate to="/session-planner" replace />
+  if (user?.role === 'dm' && !isPublicDemoPath()) return <Navigate to="/session-planner" replace />
 
   // Sort sidebar numerically by day number, descending (newest first) —
   // independent of title text, so renaming a title never shuffles the list.
