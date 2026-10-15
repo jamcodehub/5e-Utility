@@ -3,6 +3,7 @@ import { api } from '../context/AuthContext'
 import { useCampaign } from '../context/CampaignContext'
 import { useToast } from '../hooks/useToast'
 import { uploadToCloudinary } from '../utils/uploadToCloudinary'
+import { isPublicDemoPath } from '../utils/demoRuntime'
 import { CloudinaryImage } from '@cloudinary/url-gen'
 import { quality, format } from '@cloudinary/url-gen/actions/delivery'
 import { auto as autoQuality } from '@cloudinary/url-gen/qualifiers/quality'
@@ -236,6 +237,7 @@ export default function Storyboard() {
 
   const handleImagePick = async (e) => {
     const file = e.target.files[0]; if (!file) return
+    if (isPublicDemoPath()) { toast('Image uploads are available after signing in.'); e.target.value = ''; return }
     setImageUploading(true)
     try { const url = await uploadToCloudinary(file, 'lore-ledger/storyboard'); setNewImage(url) }
     catch (err) { toast(err.message || 'Upload failed') }
@@ -244,6 +246,7 @@ export default function Storyboard() {
 
   const handleEditImagePick = async (e) => {
     const file = e.target.files[0]; if (!file) return
+    if (isPublicDemoPath()) { toast('Image uploads are available after signing in.'); e.target.value = ''; return }
     setEditImgUploading(true)
     try { const url = await uploadToCloudinary(file, 'lore-ledger/storyboard'); setEditCard(p => ({ ...p, imageUrl: url })) }
     catch (err) { toast(err.message || 'Upload failed') }

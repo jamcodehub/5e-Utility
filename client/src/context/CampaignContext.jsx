@@ -4,6 +4,33 @@ import { api, useAuth } from './AuthContext'
 const CampaignContext = createContext(null)
 export const useCampaign = () => useContext(CampaignContext)
 
+const DEMO_CAMPAIGN = {
+  _id: 'demo-campaign',
+  name: 'The Ashen Crown',
+  isPersonal: false,
+  ownerId: 'demo-dm',
+}
+
+export function DemoCampaignProvider({ children }) {
+  return (
+    <CampaignContext.Provider value={{
+      campaigns: [DEMO_CAMPAIGN],
+      activeCampaign: DEMO_CAMPAIGN,
+      campaignsLoading: false,
+      campaignsError: '',
+      setActive: () => {},
+      createCampaign: async () => 'Campaigns are disabled in the demo.',
+      updateCampaign: async () => {},
+      deleteCampaign: async () => {},
+      leaveCampaign: async () => {},
+      joinCampaign: async () => 'Campaigns are disabled in the demo.',
+      reload: async () => {},
+    }}>
+      {children}
+    </CampaignContext.Provider>
+  )
+}
+
 export function CampaignProvider({ children }) {
   const { user } = useAuth()
   const [campaigns, setCampaigns]   = useState([])

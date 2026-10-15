@@ -3,6 +3,7 @@ import { api, useAuth } from '../context/AuthContext'
 import { useCampaign } from '../context/CampaignContext'
 import { useToast } from '../hooks/useToast'
 import { SkeletonRoleplayPage } from '../components/Skeleton'
+import { isPublicDemoPath } from '../utils/demoRuntime'
 import UpgradeModal from '../components/UpgradeModal'
 
 // ─── Template engine ────────────────────────────────────────────────────────
@@ -322,7 +323,7 @@ export default function RoleplayAssistant() {
     if (!activeCampaign) return
     setCharLoaded(false)
     try {
-      const saved = localStorage.getItem(storageKey(activeCampaign._id))
+      const saved = isPublicDemoPath() ? null : localStorage.getItem(storageKey(activeCampaign._id))
       if (saved) {
         try { setCtx(JSON.parse(saved)); setCharLoaded(true); } catch {}
       }
@@ -362,7 +363,7 @@ export default function RoleplayAssistant() {
     if (!activeCampaign) return
     setPlanLoaded(false)
     try {
-      const saved = localStorage.getItem(planStorageKey(activeCampaign._id))
+      const saved = isPublicDemoPath() ? null : localStorage.getItem(planStorageKey(activeCampaign._id))
       if (saved) {
         const parsed = JSON.parse(saved)
         if (parsed.checklist) {
@@ -382,16 +383,16 @@ export default function RoleplayAssistant() {
   useEffect(() => {
     if (!activeCampaign || !planLoaded) return
     if (checklist) {
-      localStorage.setItem(planStorageKey(activeCampaign._id), JSON.stringify({ step, checklist, checklistLevel, checked }))
+      if (!isPublicDemoPath()) localStorage.setItem(planStorageKey(activeCampaign._id), JSON.stringify({ step, checklist, checklistLevel, checked }))
     } else {
-      localStorage.removeItem(planStorageKey(activeCampaign._id))
+      if (!isPublicDemoPath()) localStorage.removeItem(planStorageKey(activeCampaign._id))
     }
   }, [activeCampaign, planLoaded, step, checklist, checklistLevel, checked])
 
   // Persist context to localStorage whenever it changes
   useEffect(() => {
     if (activeCampaign && charLoaded) {
-      localStorage.setItem(storageKey(activeCampaign._id), JSON.stringify(ctx))
+      if (!isPublicDemoPath()) localStorage.setItem(storageKey(activeCampaign._id), JSON.stringify(ctx))
     }
   }, [ctx, activeCampaign, charLoaded])
 

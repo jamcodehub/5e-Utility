@@ -1,14 +1,14 @@
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
-import { AuthProvider, useAuth } from './context/AuthContext'
-import { CampaignProvider } from './context/CampaignContext'
+import { AuthProvider, DemoAuthProvider, useAuth } from './context/AuthContext'
+import { CampaignProvider, DemoCampaignProvider } from './context/CampaignContext'
 import { ThemeProvider } from './context/ThemeContext'
 import { MusicProvider } from './context/MusicContext'
 import Shell from './components/Shell'
 import Auth from './pages/Auth'
 import PublicDemo from './pages/PublicDemo'
-import Journal from './pages/Journal'
 import SessionPlanner from './pages/SessionPlanner'
 import { useCampaign } from './context/CampaignContext'
+import { resetDemoApi } from './utils/demoRuntime'
 import {
   SkeletonCharacterPage,
   SkeletonCombatPage,
@@ -30,6 +30,7 @@ import { lazy, Suspense, useEffect } from 'react'
 // authenticated screen never waits for a route chunk
 // Secondary pages are downloaded only when needed.
 const loadStoryboard = () => import('./pages/Storyboard')
+const loadJournal = () => import('./pages/Journal')
 const loadLore = () => import('./pages/Lore')
 const loadCharacter = () => import('./pages/Character')
 const loadInventory = () => import('./pages/Inventory')
@@ -45,6 +46,7 @@ const loadHpTracker = () => import('./pages/HPtracker')
 
 const routeChunkLoaders = [
   loadStoryboard,
+  loadJournal,
   loadLore,
   loadCharacter,
   loadInventory,
@@ -60,6 +62,7 @@ const routeChunkLoaders = [
 ]
 
 const Storyboard = lazy(loadStoryboard)
+const Journal = lazy(loadJournal)
 const Lore = lazy(loadLore)
 const Character = lazy(loadCharacter)
 const Inventory = lazy(loadInventory)
@@ -155,6 +158,10 @@ function Guard() {
   const { user, loading } = useAuth()
 
   useEffect(() => {
+    if (user) resetDemoApi()
+  }, [user])
+
+  useEffect(() => {
     if (loading || !user) return
     const connection = navigator.connection
     if (connection?.saveData || ['slow-2g', '2g'].includes(connection?.effectiveType)) return
@@ -195,10 +202,17 @@ function Guard() {
 
   if (loading) return <SkeletonShell cards={6} />
   if (!user) {
+    const demoPage = (
+      <DemoAuthProvider>
+        <DemoCampaignProvider>
+          <PublicDemo />
+        </DemoCampaignProvider>
+      </DemoAuthProvider>
+    )
     return (
       <Routes>
-        <Route path="/" element={<PublicDemo />} />
-        <Route path="/demo/:feature" element={<PublicDemo />} />
+        <Route path="/" element={demoPage} />
+        <Route path="/demo/:feature" element={demoPage} />
         <Route path="/login" element={<Auth />} />
         <Route path="/reset-password" element={<Auth />} />
         <Route path="*" element={<Navigate to="/" replace />} />

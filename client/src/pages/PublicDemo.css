@@ -490,3 +490,181 @@
 @media (prefers-reduced-motion: reduce) {
   .demo-app *, .demo-app *::before, .demo-app *::after { scroll-behavior: auto !important; transition-duration: 0.01ms !important; }
 }
+
+.demo-app {
+  --bg: #f5f4f1;
+  --surface: #fff;
+  --surface2: #f0ede8;
+  --border: #e4e0d8;
+  --border-strong: #ccc8bf;
+  --text: #1a1917;
+  --text-2: #6b6760;
+  --text-3: #a8a49c;
+  --gold: #9a7c3a;
+  --gold-bg: #faf6ed;
+  --gold-border: #e8d9a8;
+  --demo-bg: var(--bg);
+  --demo-panel: var(--surface);
+  --demo-panel-2: var(--surface2);
+  --demo-border: var(--border);
+  --demo-text: var(--text);
+  --demo-muted: var(--text-2);
+  --demo-dim: var(--text-3);
+  --demo-gold: var(--gold);
+  --demo-gold-strong: #80652d;
+  --sb-outer: #ece7dc;
+  --sb-bar: #493722;
+  --sb-bar-border: #826c48;
+  --sb-spine: #826c48;
+  --sb-page-start: #fffdf7;
+  --sb-page-end: #f4eedf;
+  --sb-page-title: #3b2c18;
+  --sb-page-body: #514536;
+  --sb-page-meta: #8a7858;
+  display: grid;
+  grid-template-columns: 218px minmax(0, 1fr);
+  overflow: hidden;
+  background: var(--bg);
+  color: var(--text);
+}
+
+.demo-sidebar {
+  background: var(--surface);
+  border-right-color: var(--border);
+}
+
+.demo-brand {
+  min-height: 48px;
+  margin: 0 0 36px 4px;
+}
+
+.demo-brand img {
+  display: block;
+  width: min(100%, 160px);
+  max-height: 64px;
+  object-fit: contain;
+  object-position: left center;
+}
+
+.demo-sidebar-label { color: var(--text-3); }
+
+.demo-sidebar-signin {
+  display: inline-block;
+  align-self: flex-start;
+  margin: 20px 8px 0;
+  color: var(--gold);
+  font-size: 11px;
+  line-height: 1.5;
+  text-decoration: none;
+}
+
+.demo-sidebar-signin:hover {
+  color: var(--demo-gold-strong);
+  text-decoration: underline;
+}
+
+.demo-nav-link {
+  color: var(--text-2);
+}
+
+.demo-nav-link:hover,
+.demo-nav-link.is-active {
+  color: var(--gold);
+  background: var(--gold-bg);
+  border-color: var(--gold-border);
+}
+
+.demo-nav-icon { color: var(--gold); }
+.demo-nav-arrow { color: var(--text-3); }
+
+.demo-main {
+  min-height: 100dvh;
+  overflow: hidden;
+  background: var(--bg);
+}
+
+.demo-topbar {
+  flex: 0 0 62px;
+  min-height: 62px;
+  padding: 0 clamp(16px, 3vw, 36px);
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-3);
+  letter-spacing: 0.1em;
+}
+
+.demo-topbar-signin {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 38px;
+  padding: 0 17px;
+  border: 1px solid var(--gold);
+  border-radius: 999px;
+  background: var(--gold);
+  box-shadow: 0 2px 7px rgba(75, 55, 15, 0.14);
+  color: #fff !important;
+  font-size: 12px !important;
+  font-weight: 600;
+  letter-spacing: 0 !important;
+  text-decoration: none;
+  transition: background 150ms ease, box-shadow 150ms ease, transform 150ms ease;
+}
+
+.demo-topbar-signin:hover {
+  transform: translateY(-1px);
+  background: #876b32;
+  box-shadow: 0 4px 12px rgba(75, 55, 15, 0.2);
+}
+
+.demo-topbar-signin img {
+  width: 14px;
+  height: 14px;
+  object-fit: contain;
+  filter: brightness(0) invert(1);
+}
+
+.demo-hero {
+  min-height: calc(100dvh - 62px);
+}
+
+.demo-actual-page {
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  background: var(--bg);
+}
+
+.demo-page-loading {
+  display: grid;
+  height: 100%;
+  min-height: 220px;
+  place-items: center;
+  color: var(--text-3);
+  font-size: 13px;
+}
+
+.demo-not-found {
+  flex: 1;
+  background: var(--bg);
+  color: var(--text);
+}
+
+.demo-not-found a { color: var(--gold); }
+
+@media (max-width: 1080px) {
+  .demo-app { grid-template-columns: 190px minmax(0, 1fr); }
+}
+
+@media (max-width: 700px) {
+  .demo-app { display: flex; flex-direction: column; overflow: visible; }
+  .demo-sidebar { background: var(--surface); border-bottom-color: var(--border); }
+  .demo-brand { min-height: 34px; margin: 0 0 11px 2px; }
+  .demo-brand img { width: 128px; max-height: 38px; }
+  .demo-main { min-height: 0; overflow: visible; }
+  .demo-topbar { flex: 0 0 48px; min-height: 48px; }
+  .demo-hero { min-height: calc(100svh - 151px); }
+  .demo-actual-page { min-height: 480px; overflow: visible; }
+}
