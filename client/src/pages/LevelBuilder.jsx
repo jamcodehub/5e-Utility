@@ -1157,7 +1157,7 @@ export default function LevelBuilder() {
             type="button"
             className="level-darkness-toggle"
             data-dark={darkMode}
-            onClick={toggleDarkMode}
+            onClick={() => toggleDarkMode(selectedPlanId)}
             aria-label="Map lighting"
             aria-pressed={darkMode}
             title={darkMode ? 'Darkness is on for players' : 'Darkness is off for players'}
@@ -1243,7 +1243,7 @@ export default function LevelBuilder() {
                         position: 'absolute',
                         inset: 0,
                         zIndex: 5,
-                        background: 'rgba(0, 0, 0, 0.86)',
+                        background: '#000',
                         pointerEvents: 'none',
                       }}
                     />
