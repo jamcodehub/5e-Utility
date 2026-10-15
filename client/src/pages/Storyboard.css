@@ -10,7 +10,7 @@
 @media print {
   html,
   body {
-    width: 297mm;
+    width: 100%;
     height: auto !important;
     margin: 0 !important;
     padding: 0 !important;
@@ -33,17 +33,17 @@
   .storyboard-print-page {
     position: relative;
     display: flex;
-    width: 297mm;
-    height: 210mm;
+    width: 100%;
+    height: 207mm;
     box-sizing: border-box;
     overflow: hidden;
-    break-after: page;
-    page-break-after: always;
+    break-inside: avoid;
+    page-break-inside: avoid;
   }
 
-  .storyboard-print-page:last-child {
-    break-after: auto;
-    page-break-after: auto;
+  .storyboard-print-page + .storyboard-print-page {
+    break-before: page;
+    page-break-before: always;
   }
 
   .storyboard-print-cover {
