@@ -35,40 +35,27 @@
 
 .demo-brand {
   display: flex;
-  align-items: center;
-  gap: 11px;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
   margin: 0 0 48px 4px;
   color: var(--demo-text);
   text-decoration: none;
 }
 
-.demo-brand-mark {
-  display: grid;
-  place-items: center;
-  width: 39px;
-  height: 39px;
-  border: 1px solid rgba(215, 181, 109, 0.55);
-  border-radius: 11px 11px 11px 4px;
-  color: var(--demo-gold-strong);
-  font-family: 'Cinzel', serif;
-  font-size: 15px;
-  font-weight: 700;
-}
-
-.demo-brand strong {
+.demo-brand span,
+.demo-brand em {
   display: block;
   font-family: 'Cinzel', serif;
-  font-size: 15px;
+  font-size: 18px;
   font-weight: 600;
-  letter-spacing: 0.03em;
+  line-height: 1.2;
 }
 
-.demo-brand small {
-  display: block;
-  margin-top: 2px;
-  color: var(--demo-dim);
-  font-size: 8px;
-  letter-spacing: 0.13em;
+.demo-brand em {
+  color: var(--gold);
+  font-size: 15px;
+  font-weight: 400;
 }
 
 .demo-sidebar-label,
@@ -271,12 +258,12 @@
 .demo-hero-backdrop,
 .demo-hero-shade,
 .demo-hero-video { position: absolute; inset: 0; width: 100%; height: 100%; }
-.demo-hero-backdrop { z-index: -2; overflow: hidden; background: #151b19; }
+.demo-hero-backdrop { z-index: -2; overflow: hidden; background: #fff; }
 
 .demo-hero-video {
-  object-fit: cover;
-  object-position: center 48%;
-  transform: translateY(25%) scale(0.5);
+  object-fit: contain;
+  object-position: center;
+  transform: translate(14%, 10%) scale(0.9);
 }
 
 .demo-hero-shade {
@@ -298,12 +285,12 @@
   text-shadow: 0 4px 32px rgba(0, 0, 0, 0.35);
 }
 .demo-hero h1 em { color: #e0c482; font-style: normal; }
-.demo-hero-content > p { max-width: 440px; color: #c0c0b6; font-size: 13px; line-height: 1.8; }
+.demo-hero-content > p { max-width: 440px; color: #514536; font-size: 13px; line-height: 1.8; }
 .demo-hero-actions { display: flex; align-items: center; gap: 25px; margin-top: 30px; }
 .demo-hero-cta { width: 194px; cursor: pointer; }
 .demo-hero-signin { color: #ded9cc; font-size: 11px; text-decoration: none; }
 .demo-hero-signin:hover { color: var(--demo-gold-strong); }
-.demo-hero-footnote { display: flex; gap: 12px; align-items: center; margin-top: 60px; color: #777d73; font-size: 8px; letter-spacing: 0.13em; }
+.demo-hero-footnote { display: flex; gap: 12px; align-items: center; margin-top: 60px; color: #6b6760; font-size: 8px; letter-spacing: 0.13em; }
 .demo-hero-footnote span:first-child { color: var(--demo-gold); }
 .demo-hero-watermark { position: absolute; right: 2%; bottom: -19%; color: rgba(239, 226, 197, 0.018); font-family: 'Cinzel', serif; font-size: clamp(250px, 43vw, 630px); line-height: 1; pointer-events: none; }
 
@@ -535,18 +522,7 @@
   border-right-color: var(--border);
 }
 
-.demo-brand {
-  min-height: 48px;
-  margin: 0 0 36px 4px;
-}
-
-.demo-brand img {
-  display: block;
-  width: min(100%, 160px);
-  max-height: 64px;
-  object-fit: contain;
-  object-position: left center;
-}
+.demo-brand { min-height: 48px; margin: 0 0 36px 4px; }
 
 .demo-sidebar-label { color: var(--text-3); }
 
@@ -629,6 +605,8 @@
   filter: brightness(0) invert(1);
 }
 
+.demo-topbar-signin span { color: #fff !important; }
+
 .demo-hero {
   min-height: calc(100dvh - 62px);
 }
@@ -657,6 +635,8 @@
 }
 
 .demo-not-found a { color: var(--gold); }
+
+.demo-mobile-nav { display: none; }
 
 @media (max-width: 1080px) {
   .demo-app { grid-template-columns: 190px minmax(0, 1fr); }
@@ -729,8 +709,8 @@
   }
 
   .demo-topbar {
-    flex: 0 0 58px;
-    min-height: 58px;
+    flex: 0 0 72px;
+    min-height: 72px;
     gap: 10px;
     padding: 0 14px;
     letter-spacing: 0;
@@ -739,23 +719,27 @@
   .demo-mobile-brand {
     display: flex;
     flex: 0 0 auto;
-    align-items: center;
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: center;
+    gap: 2px;
+    max-width: calc(100% - 100px);
+    color: var(--text);
+    font-family: 'Cinzel', serif;
+    font-size: 14px;
+    font-weight: 600;
+    line-height: 1.15;
+    text-decoration: none;
   }
 
-  .demo-mobile-brand img {
-    display: block;
-    width: auto;
-    height: 34px;
-    object-fit: contain;
+  .demo-mobile-brand em {
+    color: var(--gold);
+    font-size: 12px;
+    font-weight: 400;
   }
 
   .demo-topbar-label {
-    flex: 1;
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    font-size: 9px;
+    display: none;
   }
 
   .demo-topbar-signin {
@@ -772,7 +756,10 @@
     overflow-y: auto;
   }
 
-  .demo-hero-video { object-position: 62% center; }
+  .demo-hero-video {
+    object-position: center;
+    transform: translate(10%, 8%) scale(0.85);
+  }
 
   .demo-actual-page {
     min-height: 0;

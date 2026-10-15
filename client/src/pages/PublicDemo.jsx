@@ -1,15 +1,7 @@
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { lazy, Suspense, useEffect, useRef } from 'react'
-import { CloudinaryImage } from '@cloudinary/url-gen'
-import { quality, format } from '@cloudinary/url-gen/actions/delivery'
-import { auto as autoQuality } from '@cloudinary/url-gen/qualifiers/quality'
-import { auto as autoFormat } from '@cloudinary/url-gen/qualifiers/format'
 import './PublicDemo.css'
 
-const logoUrl = new CloudinaryImage('5e_Utillity', { cloudName: 'crcbzpw6' })
-  .delivery(quality(autoQuality()))
-  .delivery(format(autoFormat()))
-  .toURL()
 const signInIconUrl = 'https://res.cloudinary.com/crcbzpw6/image/upload/v1792051212/right-to-bracket-solid-full.svg'
 
 const DemoStoryboardPage = lazy(() => import('./Storyboard'))
@@ -30,7 +22,8 @@ function DemoSidebar({ active }) {
   return (
     <aside className="demo-sidebar">
       <Link to="/" className="demo-brand" aria-label="5eUtility home">
-        <img src={logoUrl} alt="5eUtility" />
+        <span>Every great story</span>
+        <em>needs a place to begin.</em>
       </Link>
       <div className="demo-sidebar-label">EXPLORE THE DEMO</div>
       <nav className="demo-nav" aria-label="Demo pages">
@@ -115,7 +108,6 @@ function DemoLanding({ onExplore }) {
         <div className="demo-hero-shade" />
       </div>
       <div className="demo-hero-content">
-        <h1>Every great story<br /><em>needs a place to begin.</em></h1>
         <p>Bring your characters, campaign, and adventures together in one welcoming home for your D&amp;D table.</p>
         <div className="demo-hero-actions">
           <button type="button" className="demo-hero-cta" onClick={onExplore}>Explore the demo <span aria-hidden="true">→</span></button>
@@ -154,7 +146,8 @@ export default function PublicDemo() {
       <main className="demo-main">
         <header className="demo-topbar">
           <Link to="/" className="demo-mobile-brand" aria-label="5eUtility home">
-            <img src={logoUrl} alt="5eUtility" />
+            <span>Every great story</span>
+            <em>needs a place to begin.</em>
           </Link>
           <span className="demo-topbar-label">{onLanding ? 'EXPLORE 5EUTILITY' : `${activeFeature?.label || 'DEMO'} PREVIEW`}</span>
           <Link to="/login" className="demo-topbar-signin">
