@@ -743,17 +743,20 @@ export default function LevelBuilder() {
 
   const toggleDarkMode = (planId = selectedPlanId) => {
     if (!isDm || !planId) return
+    const newDarkMode = !darkMode
+    setDarkMode(newDarkMode)
     const socket = getSocket()
-    socket.timeout(5000).emit('level:dark-mode', { planId, darkMode: !darkMode }, (error, response) => {
+    socket.timeout(5000).emit('level:dark-mode', { planId, darkMode: newDarkMode }, (error, response) => {
       if (error) {
         toast('Could not update map lighting')
+        setDarkMode(!newDarkMode)
         return
       }
       if (!response?.ok) {
         toast(response?.error || 'Could not update map lighting')
+        setDarkMode(!newDarkMode)
         return
       }
-      setDarkMode(response.darkMode)
       setPlans(current => current.map(plan => plan._id === planId ? { ...plan, darkMode: response.darkMode } : plan))
     })
   }
