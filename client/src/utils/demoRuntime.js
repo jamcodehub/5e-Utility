@@ -59,22 +59,22 @@ function makeSampleMap() {
 const demoSceneCards = [
   {
     _id: 'demo-scene-1',
-    title: 'The Road to Emberfall',
-    description: 'Rain follows the old kingsroad. Ahead, a lantern burns in the window of an inn that should have been abandoned.',
+    title: 'The Road to Eldermere',
+    description: 'The road to Eldermere had been abandoned for nearly a century, but the ruins along its path still carried signs of life. With reports of strange lights beyond the old forest, the party set out before sunrise, following a trail that disappeared beneath ancient stone arches. Their rogue took point, searching for traps and watching the shadows between the trees, while the elven ranger kept a careful eye on the distant ruins. The warrior carried the heavier burden of protecting the group, and their young mage studied every strange carving they passed. By nightfall, the ruined city stood before them. Whatever had awakened beneath Eldermere, the adventurers were beginning to suspect that they were not the first to go looking for it..',
     imageUrl: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1792052037/epic_fantasy_cinematic_scene_a_realistic_high_de.png',
     createdAt: '2026-10-15T00:00:00.000Z',
   },
   {
     _id: 'demo-scene-2',
-    title: 'A Debt in the Dark',
-    description: 'A hooded courier offers a brass signet and a warning: someone in Emberfall already knows your names.',
+    title: 'Beneath the Ruins',
+    description: 'The entrance beneath the ruins led to a temple untouched for generations. Water ran across the ancient stone floor as the party descended into the darkness. Symbols carved into the walls began to glow as the mage approached, revealing a hidden passage deeper beneath the temple. While the rogue worked carefully at an ancient mechanism, the ranger watched the corridors for movement. Their dwarf companion stood ready with axe and lantern, certain that something was waiting beyond the shadows. Then the runes awakened. A blue light spread across the chamber, and somewhere in the darkness below, something enormous stirred..',
     imageUrl: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1792052046/Rogues_Beneath_the_Ancient_Runes.png',
     createdAt: '2026-10-15T00:00:00.000Z',
   },
   {
     _id: 'demo-scene-3',
-    title: 'The Ashen Crown',
-    description: 'Beneath the ruined chapel, a crown of blackened iron hums with a power that remembers its last wearer.',
+    title: 'The Map at the Crossroads',
+    description: 'With the temple behind them, the party returned to the nearest tavern to piece together what they had discovered. Spread across the table was a battered map covered in notes, sketches, and symbols copied from the temple walls. One mark pointed north toward the mountains. Another indicated a forgotten fortress hidden somewhere beyond the old forest. The group argued over their next move while their exhausted rogue quietly examined a small relic taken from the ruins. It had not been there when they entered. The relic was warm. And it had begun pointing toward the mountains.',
     imageUrl: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1792052520/Epic_Fantasy_Adventure_Triptych.png',
     createdAt: '2026-10-15T00:00:00.000Z',
   },

@@ -52,18 +52,65 @@ function DemoSidebar({ active }) {
   )
 }
 
+function DemoMobileNav({ active }) {
+  const trackRef = useRef(null)
+  const copies = 5
+  const centerCopy = 2
+  const itemWidth = 88
+  const gap = 4
+  const items = Array.from({ length: copies }, (_, copyIndex) =>
+    FEATURES.map(feature => ({ ...feature, copyIndex })),
+  ).flat()
+
+  useEffect(() => {
+    const track = trackRef.current
+    if (!track) return
+
+    const segmentWidth = FEATURES.length * (itemWidth + gap)
+    const activeIndex = Math.max(0, FEATURES.findIndex(feature => feature.id === active))
+    track.scrollLeft = segmentWidth * centerCopy + activeIndex * (itemWidth + gap)
+      - (track.clientWidth - itemWidth) / 2
+
+    const recenter = () => {
+      if (track.scrollLeft < segmentWidth) track.scrollLeft += segmentWidth
+      else if (track.scrollLeft > segmentWidth * (copies - 2)) track.scrollLeft -= segmentWidth
+    }
+    track.addEventListener('scroll', recenter, { passive: true })
+    return () => track.removeEventListener('scroll', recenter)
+  }, [active])
+
+  return (
+    <nav className="demo-mobile-nav" aria-label="Demo pages">
+      <div className="demo-mobile-nav-track" ref={trackRef}>
+        {items.map(feature => (
+          <Link
+            key={`${feature.id}-${feature.copyIndex}`}
+            to={`/demo/${feature.id}`}
+            className={`demo-mobile-nav-link${active === feature.id ? ' is-active' : ''}`}
+            aria-current={active === feature.id ? 'page' : undefined}
+            aria-label={feature.label}
+          >
+            <span className="demo-mobile-nav-icon" aria-hidden="true">{feature.icon}</span>
+            <span>{feature.label}</span>
+          </Link>
+        ))}
+      </div>
+    </nav>
+  )
+}
+
 function DemoLanding({ onExplore }) {
   const videoRef = useRef(null)
   useEffect(() => {
-    if (videoRef.current) videoRef.current.playbackRate = 0.5
+    if (videoRef.current) videoRef.current.playbackRate = 0.25
   }, [])
-  const slowVideo = event => { event.currentTarget.playbackRate = 0.5 }
+  const slowVideo = event => { event.currentTarget.playbackRate = 0.25 }
 
   return (
     <section className="demo-hero">
       <div className="demo-hero-backdrop" aria-hidden="true">
         <video ref={videoRef} className="demo-hero-video" autoPlay muted loop playsInline preload="metadata" aria-hidden="true" onLoadedMetadata={slowVideo} onPlay={slowVideo}>
-          <source src="https://res.cloudinary.com/crcbzpw6/video/upload/v1792050326/tmpq4v_63hj.mp4" type="video/mp4" />
+          <source src="https://res.cloudinary.com/crcbzpw6/video/upload/v1792053072/dithered-video.mp4" type="video/mp4" />
         </video>
         <div className="demo-hero-shade" />
       </div>
@@ -106,7 +153,10 @@ export default function PublicDemo() {
       <DemoSidebar active={feature} />
       <main className="demo-main">
         <header className="demo-topbar">
-          <span>{onLanding ? 'EXPLORE 5EUTILITY' : `${activeFeature?.label || 'DEMO'} PREVIEW`}</span>
+          <Link to="/" className="demo-mobile-brand" aria-label="5eUtility home">
+            <img src={logoUrl} alt="5eUtility" />
+          </Link>
+          <span className="demo-topbar-label">{onLanding ? 'EXPLORE 5EUTILITY' : `${activeFeature?.label || 'DEMO'} PREVIEW`}</span>
           <Link to="/login" className="demo-topbar-signin">
             <img src={signInIconUrl} alt="" aria-hidden="true" />
             <span>Sign in</span>
@@ -114,6 +164,7 @@ export default function PublicDemo() {
         </header>
         {content}
       </main>
+      <DemoMobileNav active={feature} />
     </div>
   )
 }
