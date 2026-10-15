@@ -3,33 +3,26 @@
 }
 
 @page {
-  size: landscape;
+  size: A4 landscape;
   margin: 0;
 }
 
 @media print {
   html,
-  body,
-  #root {
-    width: 100%;
-    height: 100%;
+  body {
+    width: 297mm;
+    height: auto !important;
     margin: 0 !important;
     padding: 0 !important;
+    overflow: visible !important;
   }
 
-  body * {
-    visibility: hidden !important;
-  }
-
-  .storyboard-print-book,
-  .storyboard-print-book * {
-    visibility: visible !important;
+  #root {
+    display: none !important;
   }
 
   .storyboard-print-book {
-    position: fixed;
-    inset: 0;
-    z-index: 99999;
+    position: static;
     display: block;
     color: #241b12;
     font-family: Georgia, serif;
@@ -40,8 +33,8 @@
   .storyboard-print-page {
     position: relative;
     display: flex;
-    width: 100vw;
-    height: 100vh;
+    width: 297mm;
+    height: 210mm;
     box-sizing: border-box;
     overflow: hidden;
     break-after: page;

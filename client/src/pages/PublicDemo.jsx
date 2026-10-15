@@ -171,6 +171,7 @@ export default function PublicDemo() {
           </Link>
         </header>
         {content}
+        {!onLanding && <DemoMobileNav active={feature} />}
       </main>
     </div>
   )

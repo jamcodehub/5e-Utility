@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
+import { createPortal } from 'react-dom'
 import { api } from '../context/AuthContext'
 import { useCampaign } from '../context/CampaignContext'
 import { useToast } from '../hooks/useToast'
@@ -454,7 +455,7 @@ export default function Storyboard() {
         </div>
       )}
       <ToastContainer />
-      <div className="storyboard-print-book">
+      {createPortal(<div className="storyboard-print-book">
         <section className="storyboard-print-page storyboard-print-cover">
           <div className="storyboard-print-cover-spine" />
           <div className="storyboard-print-cover-face">
@@ -483,7 +484,7 @@ export default function Storyboard() {
             </div>
           </article>
         ))}
-      </div>
+      </div>, document.body)}
     </div>
   )
 }

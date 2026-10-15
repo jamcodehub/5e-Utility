@@ -850,6 +850,7 @@ export default function LevelBuilder() {
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
       <style>{`
         .lb-cell { aspect-ratio: 1; border: 0.5px solid rgba(0,0,0,0.1); cursor: crosshair; touch-action: none; }
+        .lb-editor-canvas-wrap, .lb-editor-canvas-wrap * { user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
         .lb-editor-workspace { display: flex; flex: 1; min-height: 0; overflow: hidden; }
         .lb-editor-tools { width: 248px; flex: 0 0 248px; padding: 10px; overflow-y: auto; background: var(--surface); border-right: 1px solid var(--border); }
         .lb-tool-palettes { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
@@ -1070,6 +1071,7 @@ export default function LevelBuilder() {
   if (mode === 'play') return (
     <div className="level-play" style={{ height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
       <style>{`
+        .level-play-map, .level-play-map * { user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
         .level-play-content { min-height: 0; }
         .level-play-token-list { flex: 1; overflow-y: auto; padding: 8px; }
         .level-play-token-heading { font-size: 10px; color: var(--text-3); margin-bottom: 4px; margin-top: 4px; text-transform: uppercase; letter-spacing: 0.05em; }
@@ -1186,6 +1188,9 @@ export default function LevelBuilder() {
               borderRadius: 4,
               overflow: 'hidden',
               position: 'relative',
+              userSelect: 'none',
+              WebkitUserSelect: 'none',
+              WebkitTouchCallout: 'none',
             }}
           >
             {grid.map((row, r) => row.map((cellId, c) => {
