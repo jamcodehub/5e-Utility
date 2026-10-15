@@ -19,10 +19,10 @@ const DemoBattleTrackerPage = lazy(() => import('./HPtracker'))
 const DemoRoleplayPage = lazy(() => import('./RoleplayAssistant'))
 
 const FEATURES = [
-  { id: 'storyboard', label: 'Storyboard', iconUrl: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1791791388/book-solid-full.svg', description: 'Bring your campaign scenes to life.' },
-  { id: 'journal', label: 'Journal', iconUrl: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1791790758/01_fantasy_15_feather.png', description: 'Keep every character’s story close.' },
   { id: 'battle-map', label: 'Battle Map', iconUrl: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1791792887/map-solid-full.svg', description: 'Build a battlefield and move your party.' },
+  { id: 'journal', label: 'Journal', iconUrl: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1791790758/01_fantasy_15_feather.png', description: 'Keep every character’s story close.' },
   { id: 'battle-tracker', label: 'Battle Tracker', iconUrl: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1791791406/hand-fist-solid-full.svg', description: 'Keep initiative and hit points in hand.' },
+  { id: 'storyboard', label: 'Storyboard', iconUrl: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1791791388/book-solid-full.svg', description: 'Bring your campaign scenes to life.' },
   { id: 'roleplay', label: 'Roleplay', iconUrl: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1791792735/comment-solid-full.svg', description: 'Find your character’s voice.' },
 ]
 
@@ -30,7 +30,7 @@ function DemoSidebar({ active }) {
   return (
     <aside className="demo-sidebar">
       <Link to="/" className="demo-brand" aria-label="5eUtility home">
-        <img src="https://res.cloudinary.com/crcbzpw6/image/upload/v1792054744/house-solid-full.svg" alt="home" className="demo-hero-logo" />
+        <img src="https://res.cloudinary.com/crcbzpw6/image/upload/v1792054744/house-solid-full.svg" alt="" aria-hidden="true" className="demo-home-icon" />
       </Link>
       <div className="demo-sidebar-label">EXPLORE THE DEMO</div>
       <nav className="demo-nav" aria-label="Demo pages">
@@ -163,7 +163,7 @@ export default function PublicDemo() {
       <main className="demo-main">
         <header className="demo-topbar">
           <Link to="/" className="demo-mobile-brand" aria-label="5eUtility home">
-            <img src="https://res.cloudinary.com/crcbzpw6/image/upload/v1792054744/house-solid-full.svg" alt="" aria-hidden="true" />
+            <img src="https://res.cloudinary.com/crcbzpw6/image/upload/v1792054744/house-solid-full.svg" alt="" aria-hidden="true" className="demo-home-icon" />
           </Link>
           <Link to="/login" className="demo-topbar-signin">
             <img src={signInIconUrl} alt="" aria-hidden="true" />

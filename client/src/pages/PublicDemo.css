@@ -632,12 +632,19 @@
 
 .demo-nav-arrow { color: var(--text-3); }
 
-.demo-mobile-brand img {
-  width: 24px;
-  height: 24px;
+.demo-home-icon {
+  display: block;
+  width: 18px;
+  height: 18px;
   object-fit: contain;
-  opacity: 0.4;
+  opacity: 0.35;
   filter: invert(49%) sepia(19%) saturate(1075%) hue-rotate(4deg) brightness(92%) contrast(88%);
+  transition: opacity 150ms ease;
+}
+
+.demo-mobile-brand:hover .demo-home-icon,
+.demo-brand:hover .demo-home-icon {
+  opacity: 0.6;
 }
 
 .demo-main {
