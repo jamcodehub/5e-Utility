@@ -31,8 +31,7 @@ function DemoSidebar({ active }) {
   return (
     <aside className="demo-sidebar">
       <Link to="/" className="demo-brand" aria-label="5eUtility home">
-        <span>Every great story</span>
-        <em>needs a place to begin.</em>
+        <img src="https://res.cloudinary.com/crcbzpw6/image/upload/v1792054744/house-solid-full.svg" alt="home" className="demo-hero-logo" />
       </Link>
       <div className="demo-sidebar-label">EXPLORE THE DEMO</div>
       <nav className="demo-nav" aria-label="Demo pages">

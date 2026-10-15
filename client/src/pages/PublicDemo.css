@@ -51,16 +51,6 @@
   box-shadow: 0 16px 55px rgba(73, 60, 34, 0.1);
 }
 
-.demo-app[data-theme="dark"] .demo-main {
-  background:
-    radial-gradient(ellipse at 50% 0, rgba(200, 160, 96, 0.055), transparent 46%),
-    #111214;
-}
-
-.demo-app[data-theme="dark"] .demo-hero-video {
-  filter: invert(1);
-}
-
 .demo-sidebar {
   position: relative;
   z-index: 2;
@@ -190,33 +180,6 @@
 .demo-topbar a span { color: var(--demo-dim); font-weight: 500; }
 .demo-topbar a:last-child { color: var(--demo-gold-strong); letter-spacing: 0; font-size: 11px; }
 
-.demo-theme-toggle {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  margin-left: auto;
-  padding: 6px 9px;
-  border: 1px solid var(--demo-border);
-  border-radius: 999px;
-  background: transparent;
-  color: var(--demo-muted);
-  cursor: pointer;
-  font: inherit;
-  font-size: 10px;
-  letter-spacing: 0;
-}
-
-.demo-theme-toggle:hover,
-.demo-theme-toggle:focus-visible {
-  border-color: rgba(215, 181, 109, 0.45);
-  color: var(--demo-gold-strong);
-}
-
-.demo-theme-toggle:focus-visible {
-  outline: 2px solid var(--demo-gold);
-  outline-offset: 2px;
-}
-
 .demo-save-column {
   display: flex;
   flex-direction: column;
@@ -335,7 +298,9 @@
 .demo-hero-backdrop,
 .demo-hero-shade,
 .demo-hero-video { position: absolute; inset: 0; width: 100%; height: 100%; }
-.demo-hero-backdrop { z-index: -2; overflow: hidden; background: var(--demo-bg); }
+.demo-hero,
+.demo-hero-backdrop { background: #fff; }
+.demo-hero-backdrop { z-index: -2; overflow: hidden; }
 
 .demo-hero-video {
   object-fit: contain;
@@ -350,7 +315,7 @@
   margin-bottom: 25px;
   object-fit: contain;
   object-position: left center;
-  filter: var(--logo-filter, none);
+  filter: none;
 }
 
 .demo-hero-shade {
