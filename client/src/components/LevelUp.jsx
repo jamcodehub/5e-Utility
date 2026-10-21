@@ -21,6 +21,7 @@ export default function LevelUp({ char, onClose, onComplete }) {
   const [rolled, setRolled] = useState(null)
   const [subclassId, setSubclassId] = useState('')
   const [asi, setAsi] = useState([])
+  const [feat, setFeat] = useState(false)
   const [spellSel, setSpellSel] = useState(null)
 
   useEffect(() => { loadSrdMany('classes', 'spells', 'features').then(setData) }, [])
@@ -57,7 +58,8 @@ export default function LevelUp({ char, onClose, onComplete }) {
   const newFeatureIds = cls ? featuresThrough(cls, subclassId || char.srd.subclassId, level).filter(f => !(char.srd.features || []).includes(f)) : []
   const hpDelta = hpMode === 'roll' && rolled != null ? hpGain(cls?.hitDie, conMod, rolled) : cls ? hpGain(cls.hitDie, conMod) : 0
   // ASI choice must be exactly 2 points; a +2 to one ability is two picks of the same ability
-  const asiOk = !needsAsi || asi.length === 2
+  const asiOk = !needsAsi || feat || asi.length === 2
+  const canGrapple = (char.stats?.str || 10) >= 13 && !(char.srd?.feats || []).includes('grappler')
   const subOk = !needsSubclass || !!subclassId
   const hpOk = hpMode === 'average' || rolled != null
 
@@ -72,7 +74,7 @@ export default function LevelUp({ char, onClose, onComplete }) {
     const roll = hpMode === 'roll' ? rolled : null
     onComplete({
       level,
-      stats: newStats,
+      stats: feat ? char.stats : newStats,
       profBonus: proficiencyBonus(level),
       hp: { current: (char.hp?.current ?? 0) + hpDelta, max: (char.hp?.max ?? 0) + hpDelta },
       srd: {
@@ -80,7 +82,8 @@ export default function LevelUp({ char, onClose, onComplete }) {
         subclassId: subclassId || char.srd.subclassId || '',
         features: [...new Set([...(char.srd.features || []), ...newFeatureIds])],
         hpRolls: [...(char.srd.hpRolls || []), roll ?? averageHpGain(cls.hitDie)],
-        asiLog: needsAsi ? [...(char.srd.asiLog || []), { level, increases: asi }] : char.srd.asiLog || [],
+        feats: feat ? [...(char.srd.feats || []), 'grappler'] : char.srd.feats || [],
+        asiLog: needsAsi ? [...(char.srd.asiLog || []), { level, increases: feat ? [] : asi }] : char.srd.asiLog || [],
       },
       spells: casting && spellSel ? { ...currentSpells, ...spellSel } : currentSpells,
     })
@@ -112,13 +115,19 @@ export default function LevelUp({ char, onClose, onComplete }) {
               <>
                 <span style={label}>Ability Score Improvement: +2 total ({asi.length}/2)</span>
                 <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 6 }}>Click one ability twice for +2, or two abilities for +1 each. Scores cap at 20.</div>
-                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', opacity: feat ? 0.4 : 1 }}>
                   {ABILITIES.map(a => (
-                    <span key={a} style={chip(asi.includes(a))} onClick={() => pickAsi(a)}>
+                    <span key={a} style={chip(asi.includes(a))} onClick={() => !feat && pickAsi(a)}>
                       {ABILITY_NAMES[a]} {stats[a]}{asi.filter(x => x === a).length ? ` (+${asi.filter(x => x === a).length})` : ''}
                     </span>
                   ))}
                 </div>
+                {canGrapple && (
+                  <div style={{ marginTop: 8 }}>
+                    <span style={chip(feat)} onClick={() => setFeat(f => !f)}>Take the Grappler feat instead (SRD)</span>
+                    {feat && <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 4 }}>Advantage on attacks against a creature you're grappling, and you can pin it. Replaces the ability score increase.</div>}
+                  </div>
+                )}
               </>
             )}
 

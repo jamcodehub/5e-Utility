@@ -2,18 +2,30 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { loadSrdMany } from '../utils/srd'
 import {
   ABILITIES, ABILITY_NAMES, STANDARD_ARRAY, abilityMod, fmtMod, proficiencyBonus, pointBuyCost, POINT_BUY_BUDGET,
-  canRaise, canLower, hpAtFirstLevel, isCaster, featuresThrough, subclassLevel,
+  canRaise, canLower, hpAtFirstLevel, armorClass, isCaster, featuresThrough, subclassLevel,
 } from '../utils/rules5e'
 import SpellsStep from './SpellsStep'
+import { startingGroups, resolveGear } from '../utils/startingGear'
 import SrdAttribution from './SrdAttribution'
 import { useCampaign } from '../context/CampaignContext'
 
-const STEPS = ['Campaign', 'Race', 'Class', 'Abilities', 'Skills', 'Spells', 'Review']
+const STEPS = ['Campaign', 'Race', 'Class', 'Abilities', 'Skills', 'Equipment', 'Spells', 'Review']
 const chip = (on) => ({
   padding: '6px 12px', borderRadius: 8, fontSize: 13, cursor: 'pointer', userSelect: 'none',
   background: on ? 'var(--gold-bg)' : 'var(--surface2)', color: on ? 'var(--gold)' : 'var(--text-2)',
   border: `1px solid ${on ? 'var(--gold-border)' : 'var(--border)'}`,
 })
+function PickWeapon({ item, equipment, value, onChange }) {
+  const list = equipment.filter(e => e.category === 'weapon' && e.weaponCategory === item.weaponCategory && (!item.range || e.weaponRange === item.range))
+  return (
+    <div style={{ marginTop: 6 }}>
+      <select className="input" style={{ fontSize: 13, maxWidth: 320 }} value={value || ''} onChange={e => onChange(e.target.value)}>
+        <option value="">Choose a {item.weaponCategory.toLowerCase()}{item.range ? ` ${item.range.toLowerCase()}` : ''} weapon{item.qty > 1 ? ` (×${item.qty})` : ''}…</option>
+        {list.map(w => <option key={w.id} value={w.id}>{w.name} — {w.damage?.dice} {w.damage?.type}</option>)}
+      </select>
+    </div>
+  )
+}
 const label = { fontSize: 11, fontWeight: 600, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.06em', margin: '14px 0 6px', display: 'block' }
 const roll4d6 = () => {
   const d = Array.from({ length: 4 }, () => 1 + Math.floor(Math.random() * 6)).sort((a, b) => a - b)
@@ -44,12 +56,14 @@ export default function CharacterCreator({ onClose, onComplete, draftKey = 'crea
   const [bgSkills, setBgSkills] = useState(d.bgSkills ?? [])
   const [classSkills, setClassSkills] = useState(d.classSkills ?? [])
   const [name, setName] = useState(d.name ?? '')
+  const [gearChoice, setGearChoice] = useState(d.gearChoice ?? {})
+  const [gearPicks, setGearPicks] = useState(d.gearPicks ?? {})
   const [spellSel, setSpellSel] = useState(d.spellSel ?? { cantrips: [], known: [], prepared: [] })
 
   // Auto-save progress so closing the wizard doesn't lose it
   useEffect(() => {
-    localStorage.setItem(draftKey, JSON.stringify({ campaignId, step, raceId, subraceId, flexBonus, classId, method, pool, assign, buy, bgMode, bgSkills, classSkills, name, spellSel }))
-  }, [draftKey, campaignId, step, raceId, subraceId, flexBonus, classId, method, pool, assign, buy, bgMode, bgSkills, classSkills, name, spellSel])
+    localStorage.setItem(draftKey, JSON.stringify({ campaignId, step, raceId, subraceId, flexBonus, classId, method, pool, assign, buy, bgMode, bgSkills, classSkills, name, spellSel, gearChoice, gearPicks }))
+  }, [draftKey, campaignId, step, raceId, subraceId, flexBonus, classId, method, pool, assign, buy, bgMode, bgSkills, classSkills, name, spellSel, gearChoice, gearPicks])
 
   useEffect(() => { loadSrdMany('core', 'classes', 'races', 'backgrounds', 'spells', 'equipment').then(setData) }, [])
 
@@ -78,6 +92,11 @@ export default function CharacterCreator({ onClose, onComplete, draftKey = 'crea
   const bgFixed = bgMode === 'acolyte' ? acolyte?.proficiencies || [] : []
   const bgPick = bgMode === 'custom' ? 2 : 0
   const casting = isCaster(cls) && cls.spellcasting.level <= 1
+  const gear = useMemo(() => (cls && data ? startingGroups(cls, data.equipment) : { fixed: [], groups: [] }), [cls, data])
+  const pickKeys = () => [
+    ...gear.fixed.map((it, i) => (it.kind === 'pick' ? `f${i}` : null)),
+    ...gear.groups.flatMap((g, gi) => g.choices[gearChoice[gi] ?? 0].items.map((it, ii) => (it.kind === 'pick' ? `${gi}.${gearChoice[gi] ?? 0}.${ii}` : null))),
+  ].filter(Boolean)
   const flexNeeded = race?.abilityBonusOptions?.choose || 0
 
   const stepValid = () => {
@@ -87,6 +106,7 @@ export default function CharacterCreator({ onClose, onComplete, draftKey = 'crea
       case 'Class': return !!cls
       case 'Abilities': return method === 'pointbuy' ? pointBuyCost(buy) <= POINT_BUY_BUDGET : ABILITIES.every(a => assign[a] != null)
       case 'Skills': return classSkills.length === (skillChoice?.choose || 0) && bgSkills.length === bgPick
+      case 'Equipment': return pickKeys().every(k => gearPicks[k])
       case 'Spells': return true
       default: return !!name.trim()
     }
@@ -101,10 +121,15 @@ export default function CharacterCreator({ onClose, onComplete, draftKey = 'crea
     const conMod = abilityMod(stats.con)
     const hp = hpAtFirstLevel(cls.hitDie, conMod)
     const skills = [...new Set([...classSkills, ...bgFixed.filter(p => p.startsWith('skill-')), ...bgSkills])]
-    const equipment = (cls.startingEquipment || []).map(e => ({ id: e.id, qty: e.qty }))
-    const dexMod = abilityMod(stats.dex)
-    const hasArmor = equipment.some(e => /armor|mail/.test(e.id))
-    const ac = hasArmor && /leather/.test(equipment.map(e => e.id).join()) ? 11 + dexMod : 10 + dexMod
+    const byId = Object.fromEntries(data.equipment.map(e => [e.id, e]))
+    const equipment = resolveGear(gear, gearChoice, gearPicks).map(e => {
+      const def = byId[e.id]
+      return def?.category === 'armor' ? { ...e, equipped: true } : e
+    })
+    const worn = equipment.filter(e => e.equipped).map(e => byId[e.id])
+    const ac = armorClass({
+      stats, classId, armor: worn.find(w => w.armorCategory !== 'Shield'), shield: worn.find(w => w.armorCategory === 'Shield'),
+    })
     localStorage.removeItem(draftKey)
     onComplete(campaignId, {
       name: name.trim(),
@@ -289,6 +314,29 @@ export default function CharacterCreator({ onClose, onComplete, draftKey = 'crea
                   </div>
                 </>
               )}
+            </>
+          )}
+
+          {data && stepName === 'Equipment' && cls && (
+            <>
+              <span style={label}>{cls.name} starting equipment</span>
+              {gear.fixed.length > 0 && (
+                <div style={{ fontSize: 13, color: 'var(--text-2)', marginBottom: 8 }}>
+                  You start with: {gear.fixed.map((it, i) => it.kind === 'pick' ? null : `${it.name}${it.qty > 1 ? ` ×${it.qty}` : ''}`).filter(Boolean).join(', ')}
+                  {gear.fixed.map((it, i) => it.kind === 'pick' && <PickWeapon key={i} item={it} equipment={data.equipment} value={gearPicks[`f${i}`]} onChange={v => setGearPicks(p => ({ ...p, [`f${i}`]: v }))} />)}
+                </div>
+              )}
+              {gear.groups.map((g, gi) => (
+                <div key={gi} style={{ marginBottom: 12 }}>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                    {g.choices.map((ch, ci) => <span key={ci} style={chip((gearChoice[gi] ?? 0) === ci)} onClick={() => setGearChoice(c => ({ ...c, [gi]: ci }))}>{ch.text}</span>)}
+                  </div>
+                  {g.choices[gearChoice[gi] ?? 0].items.map((it, ii) => it.kind === 'pick' && (
+                    <PickWeapon key={ii} item={it} equipment={data.equipment} value={gearPicks[`${gi}.${gearChoice[gi] ?? 0}.${ii}`]} onChange={v => setGearPicks(p => ({ ...p, [`${gi}.${gearChoice[gi] ?? 0}.${ii}`]: v }))} />
+                  ))}
+                </div>
+              ))}
+              <div style={{ fontSize: 12, color: 'var(--text-3)' }}>Armor and shields are equipped automatically and set your Armor Class. You can change everything later on the Gear tab.</div>
             </>
           )}
 
