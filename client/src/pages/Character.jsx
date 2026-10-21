@@ -12,6 +12,7 @@ import { Spellbook } from './Spells'
 import RestPanel from '../components/RestPanel'
 import CombatPanel from '../components/CombatPanel'
 import GearTab from '../components/GearTab'
+import { InventoryPanel } from './Inventory'
 import { PrintOverlay } from '../components/CharacterSheet'
 import { derive } from '../utils/sheet'
 import { useRoller, RollPanel } from '../components/RollPanel'
@@ -53,11 +54,18 @@ const DEFAULT = {
   background: '', personality: '', goals: '', lore: '',
 }
 
+// Remembers which character was last open per campaign (per browser), so
+// returning to the Character page shows that character again instead of
+// always resetting to the primary one.
+const lastCharKey = (campaignId) => `lastChar:${campaignId}`
+const recallLastChar = (campaignId) => { try { return localStorage.getItem(lastCharKey(campaignId)) } catch { return null } }
+const rememberLastChar = (campaignId, charId) => { try { localStorage.setItem(lastCharKey(campaignId), charId) } catch { /* ignore */ } }
+
 export default function Character() {
   const { activeCampaign, setActive, campaigns } = useCampaign()
   const { isPremium } = useAuth()
   const { toast, ToastContainer } = useToast()
-  const [tab, setTab]       = useState('stats')
+  const [tab, setTab]       = useState('actions')
   const [characters, setCharacters] = useState([])
   const [activeCharId, setActiveCharId] = useState(null)
   const [char, setChar]     = useState(null)
@@ -88,9 +96,10 @@ export default function Character() {
     if (!activeCampaign) return
     const list = await api(`/campaigns/${activeCampaign._id}/characters`)
     setCharacters(list)
-    const chosen = list.find(c => c.isPrimary) || list[0] || null
+    const rememberedId = recallLastChar(activeCampaign._id)
+    const chosen = (rememberedId && list.find(c => c._id === rememberedId)) || list.find(c => c.isPrimary) || list[0] || null
     setActiveCharId(chosen?._id || null)
-    if (chosen) { setChar(chosen); setForm(chosen); setAvatarPreview(chosen.avatarUrl || '') }
+    if (chosen) { setChar(chosen); setForm(chosen); setAvatarPreview(chosen.avatarUrl || ''); rememberLastChar(activeCampaign._id, chosen._id) }
     else { setChar(null); setForm(DEFAULT); setAvatarPreview('') }
     setLoaded(true)
   }, [activeCampaign])
@@ -103,6 +112,7 @@ export default function Character() {
     setForm(c)
     setAvatarPreview(c.avatarUrl || '')
     setEditing(false)
+    if (activeCampaign) rememberLastChar(activeCampaign._id, c._id)
   }
 
   const [creatorNew, setCreatorNew] = useState(false) // creator launched from "+ New Character"
@@ -396,7 +406,7 @@ export default function Character() {
 
       {/* Tabs */}
       <div style={{ display: 'flex', gap: 4, marginBottom: 16, flexWrap: 'wrap' }}>
-        {['stats', 'actions', 'spells', 'gear', 'backstory', 'notes'].map(t => (
+        {['stats', 'actions', 'spells', 'gear', 'inventory', 'backstory', 'notes'].map(t => (
           <button key={t} onClick={() => setTab(t)} className={`btn btn-sm ${tab === t ? 'btn-primary' : 'btn-ghost'}`}>
             {t.charAt(0).toUpperCase() + t.slice(1)}
           </button>
@@ -413,6 +423,7 @@ export default function Character() {
             : <><RestPanel char={char} srd={srdData} roller={roller} onPatch={patchChar} /><Spellbook srd={srdData} campaignId={activeCampaign._id} toast={toast} roller={roller} character={char} onSpellsChange={(spells) => patchChar({ spells })}
                 concentrating={char.combat?.concentrating} onConcentrate={(name) => patchChar({ combat: { ...(char.combat || {}), concentrating: name } })} /></>
       )}
+      {tab === 'inventory' && <InventoryPanel toast={toast} />}
       {(tab === 'actions' || tab === 'spells') && char && <RollPanel roller={roller} />}
 
       {tab === 'stats' && (

@@ -38,7 +38,6 @@ const loadDice = () => import('./pages/Dice')
 const loadPremium = () => import('./pages/Premium')
 const loadIdeaGenerator = () => import('./pages/IdeaGenerator')
 const loadRulesReference = () => import('./pages/RulesReference')
-const loadSpells = () => import('./pages/Spells')
 const loadMusicPlayer = () => import('./pages/MusicPlayer')
 const loadLevelBuilder = () => import('./pages/LevelBuilder')
 const loadRoleplayAssistant = () => import('./pages/RoleplayAssistant')
@@ -55,7 +54,6 @@ const routeChunkLoaders = [
   loadPremium,
   loadIdeaGenerator,
   loadRulesReference,
-  loadSpells,
   loadMusicPlayer,
   loadLevelBuilder,
   loadRoleplayAssistant,
@@ -72,7 +70,6 @@ const Dice = lazy(loadDice)
 const Premium = lazy(loadPremium)
 const IdeaGenerator = lazy(loadIdeaGenerator)
 const RulesReference = lazy(loadRulesReference)
-const Spells = lazy(loadSpells)
 const SharedSheet = lazy(() => import('./pages/SharedSheet'))
 const MusicPlayer = lazy(loadMusicPlayer)
 const LevelBuilder = lazy(loadLevelBuilder)
@@ -141,7 +138,7 @@ function PageLoader() {
       <div className="page-content">
         <div className="page-header-row" style={{ marginBottom: 20 }}>
           <div>
-            <h2 style={{ fontSize: 22, marginBottom: 4 }}>Inventory</h2>
+            <h2 style={{ fontSize: 22, marginBottom: 4 }}>{user?.role === 'dm' ? 'Shop Items' : 'Inventory'}</h2>
             <p style={{ color: 'var(--text-2)', fontSize: 14, margin: 0 }}>Track your gear and coin purse.</p>
           </div>
         </div>
@@ -242,7 +239,6 @@ function Guard() {
               <Route path="/premium"    element={<Premium />} />
               <Route path="/ideas"      element={<IdeaGenerator />} />
               <Route path="/rules"      element={<RulesReference />} />
-              <Route path="/spells"     element={<Spells />} />
               <Route path="/music"      element={<MusicPlayer />} />
               <Route path="/levels"     element={<LevelBuilder />} />
               <Route path="/roleplay"   element={<RoleplayAssistant />} />

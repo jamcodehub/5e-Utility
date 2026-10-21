@@ -1,16 +1,11 @@
 import { alwaysPrepared } from '../utils/sheet'
 import { useEffect, useMemo, useState, useCallback } from 'react'
-import { api, useAuth } from '../context/AuthContext'
-import { useCampaign } from '../context/CampaignContext'
-import { useToast } from '../hooks/useToast'
-import { loadSrdMany } from '../utils/srd'
+import { api } from '../context/AuthContext'
 import {
   ABILITY_NAMES, abilityMod, fmtMod, spellSlots, cantripsKnown, maxSpellLevel, spellMode, spellbookLimit,
   preparedLimit, spellsKnownFixed, spellSaveDc, spellAttackBonus, spellRollSpec,
 } from '../utils/rules5e'
-import { useRoller, RollPanel } from '../components/RollPanel'
 import MiniMarkdown from '../components/MiniMarkdown'
-import SrdAttribution from '../components/SrdAttribution'
 
 const levelName = (n) => (n === 0 ? 'Cantrip' : `Level ${n}`)
 const label = { fontSize: 10, fontWeight: 600, color: 'var(--text-3)', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 4 }
@@ -41,7 +36,7 @@ function SpellDetail({ spell, children }) {
 }
 
 // ── Spell browser ───────────────────────────────────────────────────────────
-function SpellBrowser({ srd, renderActions, lockClass }) {
+export function SpellBrowser({ srd, renderActions, lockClass }) {
   const [query, setQuery] = useState('')
   const [level, setLevel] = useState('all')
   const [cls, setCls] = useState(lockClass || 'all')
@@ -355,56 +350,5 @@ export function Spellbook({ srd, campaignId, toast, roller, character, onSpellsC
         </div>
       )}
     </>
-  )
-}
-
-export default function Spells() {
-  const { user } = useAuth()
-  const { activeCampaign } = useCampaign()
-  const { toast, ToastContainer } = useToast()
-  const isDM = user?.role === 'dm'
-  const [tab, setTab] = useState(isDM ? 'Spell Browser' : 'My Spells')
-  const [srd, setSrd] = useState(null)
-  const [error, setError] = useState('')
-  const roller = useRoller()
-
-  useEffect(() => {
-    loadSrdMany('spells', 'classes').then(setSrd).catch(() => setError('Could not load the spell data.'))
-  }, [])
-
-  const tabs = isDM ? ['Spell Browser'] : ['My Spells', 'Spell Browser']
-
-  return (
-    <div className="page-content">
-      <div className="page-header-row" style={{ marginBottom: 16 }}>
-        <div>
-          <h2 style={{ fontSize: 22, marginBottom: 4 }}>Spells</h2>
-          <p style={{ color: 'var(--text-2)', fontSize: 13, margin: 0 }}>Browse every spell{isDM ? '' : ', prepare your list and track spell slots'}. 5E compatible.</p>
-        </div>
-      </div>
-
-      <div role="tablist" style={{ display: 'flex', gap: 4, marginBottom: 16, borderBottom: '1px solid var(--border)' }}>
-        {tabs.map(t => (
-          <div key={t} role="tab" aria-selected={tab === t} onClick={() => setTab(t)}
-            style={{ padding: '8px 14px', cursor: 'pointer', fontSize: 13, fontWeight: 600, color: tab === t ? 'var(--gold)' : 'var(--text-3)', borderBottom: `2px solid ${tab === t ? 'var(--gold)' : 'transparent'}`, marginBottom: -1 }}>
-            {t}
-          </div>
-        ))}
-      </div>
-
-      {error && <div style={{ color: 'var(--red)', fontSize: 13 }}>{error}</div>}
-      {!srd && !error && <div style={{ color: 'var(--text-3)', fontSize: 13 }}>Loading…</div>}
-
-      {srd && tab === 'My Spells' && !isDM && (
-        activeCampaign
-          ? <Spellbook srd={srd} campaignId={activeCampaign._id} toast={toast} roller={roller} />
-          : <div style={{ color: 'var(--text-3)', fontSize: 13 }}>Select a campaign to manage your spells.</div>
-      )}
-      {srd && tab === 'Spell Browser' && <SpellBrowser srd={srd} />}
-
-      {tab === 'My Spells' && !isDM && <RollPanel roller={roller} />}
-      <SrdAttribution />
-      <ToastContainer />
-    </div>
   )
 }

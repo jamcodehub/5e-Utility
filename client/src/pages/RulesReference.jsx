@@ -3,8 +3,9 @@ import { loadSrdMany } from '../utils/srd'
 import { ABILITY_NAMES, fmtMod, spellSlots } from '../utils/rules5e'
 import MiniMarkdown from '../components/MiniMarkdown'
 import SrdAttribution from '../components/SrdAttribution'
+import { SpellBrowser } from './Spells'
 
-const TABS = ['Rules', 'Conditions', 'Classes', 'Races', 'Equipment']
+const TABS = ['Rules', 'Conditions', 'Classes', 'Races', 'Equipment', 'Spells']
 
 const label = { fontSize: 10, fontWeight: 600, color: 'var(--text-3)', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 4 }
 const title = { fontFamily: 'Cinzel, serif', fontSize: 18, color: 'var(--gold)', marginBottom: 8 }
@@ -177,7 +178,7 @@ export default function RulesReference() {
   const [error, setError] = useState('')
 
   useEffect(() => {
-    loadSrdMany('core', 'rules', 'classes', 'races', 'traits', 'features', 'equipment')
+    loadSrdMany('core', 'rules', 'classes', 'races', 'traits', 'features', 'equipment', 'spells')
       .then(setSrd).catch(() => setError('Could not load the rules data.'))
   }, [])
 
@@ -186,7 +187,7 @@ export default function RulesReference() {
       <div className="page-header-row" style={{ marginBottom: 16 }}>
         <div>
           <h2 style={{ fontSize: 22, marginBottom: 4 }}>5e Rules Reference</h2>
-          <p style={{ color: 'var(--text-2)', fontSize: 13, margin: 0 }}>Searchable rules, classes, races and gear. 5E compatible.</p>
+          <p style={{ color: 'var(--text-2)', fontSize: 13, margin: 0 }}>Searchable rules, classes, races, gear and spells. 5E compatible.</p>
         </div>
       </div>
 
@@ -213,6 +214,7 @@ export default function RulesReference() {
       {srd && tab === 'Classes' && <Browser placeholder="Search classes…" items={srd.classes} render={c => <ClassDetail cls={c} srd={srd} />} />}
       {srd && tab === 'Races' && <Browser placeholder="Search races…" items={srd.races} render={r => <RaceDetail race={r} srd={srd} />} />}
       {srd && tab === 'Equipment' && <Browser placeholder="Search equipment…" items={srd.equipment} render={i => <EquipmentDetail item={i} srd={srd} />} />}
+      {srd && tab === 'Spells' && <SpellBrowser srd={srd} />}
 
       <SrdAttribution />
     </div>
