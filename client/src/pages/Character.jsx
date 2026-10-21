@@ -44,7 +44,7 @@ const DEFAULT = {
 }
 
 export default function Character() {
-  const { activeCampaign } = useCampaign()
+  const { activeCampaign, setActive, campaigns } = useCampaign()
   const { isPremium } = useAuth()
   const { toast, ToastContainer } = useToast()
   const [tab, setTab]       = useState('stats')
@@ -84,9 +84,17 @@ export default function Character() {
     setEditing(false)
   }
 
+  const [creatorNew, setCreatorNew] = useState(false) // creator launched from "+ New Character"
+  const openNewChooser = () => {
+    if (!activeCampaign) return
+    if (atCharLimit) { setShowUpgrade(true); return }
+    setBuilder('choose')
+  }
+
   const addCharacter = async () => {
     if (!activeCampaign) return
     if (atCharLimit) { setShowUpgrade(true); return }
+    setBuilder(null)
     try {
       const created = await api(`/campaigns/${activeCampaign._id}/characters`, { method: 'POST', body: DEFAULT })
       setCharacters(p => [...p, created])
@@ -112,18 +120,28 @@ export default function Character() {
   }
 
   // Persist a creator / level-up result onto the active sheet
-  const applyBuild = async (patch) => {
+  const applyBuild = async (campaignId, patch) => {
+    // The level-up flow passes only a patch; the creator also passes a target campaign
+    if (typeof campaignId === 'object') { patch = campaignId; campaignId = activeCampaign._id }
     try {
       let updated
-      if (activeCharIdRef.current) {
-        updated = await api(`/campaigns/${activeCampaign._id}/characters/${activeCharIdRef.current}`, { method: 'PUT', body: { ...form, ...patch } })
+      if (campaignId === activeCampaign._id && activeCharIdRef.current && !creatorNew) {
+        updated = await api(`/campaigns/${campaignId}/characters/${activeCharIdRef.current}`, { method: 'PUT', body: { ...form, ...patch } })
         setCharacters(p => p.map(c => c._id === updated._id ? updated : c))
       } else {
-        updated = await api(`/campaigns/${activeCampaign._id}/characters`, { method: 'POST', body: { ...form, ...patch } })
-        setCharacters(p => [...p, updated])
-        setActiveCharId(updated._id)
+        updated = await api(`/campaigns/${campaignId}/characters`, { method: 'POST', body: { ...(campaignId === activeCampaign._id && !creatorNew ? form : DEFAULT), ...patch } })
+        if (campaignId === activeCampaign._id) {
+          setCharacters(p => [...p, updated])
+          setActiveCharId(updated._id)
+        } else {
+          setBuilder(null)
+          setActive(campaigns.find(c => c._id === campaignId))
+          toast('Character created in that campaign')
+          return
+        }
       }
-      setChar(updated); setForm(updated); setBuilder(null)
+      if (creatorNew) selectCharacter(updated); else { setChar(updated); setForm(updated) }
+      setBuilder(null); setCreatorNew(false)
       toast('Character updated')
     } catch (e) {
       if (e?.status === 403) { setShowUpgrade(true); return }
@@ -252,7 +270,7 @@ export default function Character() {
           </div>
         ))}
         <button
-          onClick={addCharacter}
+          onClick={openNewChooser}
           className="btn btn-ghost btn-sm"
           style={{ fontSize: 12, opacity: atCharLimit ? 0.7 : 1 }}
         >
@@ -334,7 +352,7 @@ export default function Character() {
             ? <><button className="btn btn-primary btn-sm" onClick={save}>Save</button><button className="btn btn-ghost btn-sm" onClick={() => { setEditing(false); setForm(char || DEFAULT); setAvatarPreview(char?.avatarUrl || '') }}>Cancel</button></>
             : <>
                 <button className="btn btn-ghost btn-sm" onClick={() => setEditing(true)}>Edit</button>
-                {!form.srd?.classId && <button className="btn btn-primary btn-sm" onClick={() => setBuilder('create')}>Guided Creator</button>}
+                {!form.srd?.classId && <button className="btn btn-primary btn-sm" onClick={() => { setCreatorNew(false); setBuilder('create') }}>Guided Creator</button>}
                 {form.srd?.classId && (form.level || 1) < 20 && <button className="btn btn-primary btn-sm" onClick={() => setBuilder('levelup')}>Level Up</button>}
               </>}
         </div>
@@ -413,7 +431,25 @@ export default function Character() {
         </div>
       )}
       <ToastContainer />
-      {builder === 'create' && <CharacterCreator onClose={() => setBuilder(null)} onComplete={applyBuild} />}
+      {builder === 'choose' && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }} onClick={() => setBuilder(null)}>
+          <div className="card" style={{ width: '100%', maxWidth: 420, padding: 22 }} onClick={e => e.stopPropagation()}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+              <h3 style={{ margin: 0, fontSize: 17 }}>New Character</h3>
+              <button onClick={() => setBuilder(null)} style={{ background: 'none', border: 'none', fontSize: 18, cursor: 'pointer', color: 'var(--text-2)' }}>✕</button>
+            </div>
+            <div style={{ fontSize: 13, color: 'var(--text-2)', marginBottom: 16 }}>How would you like to build your character?</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <button className="btn btn-primary" style={{ justifyContent: 'center' }} onClick={() => { setCreatorNew(true); setBuilder('create') }}>
+                Guided Creator <span style={{ opacity: 0.7, fontWeight: 400, marginLeft: 6, fontSize: 11 }}>WOTC</span>
+              </button>
+              <button className="btn btn-ghost" style={{ justifyContent: 'center' }} onClick={addCharacter}>Custom</button>
+            </div>
+            <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 12, lineHeight: 1.5 }}>Guided Creator walks you through the 5e rules step by step. Custom gives you a blank sheet to fill in yourself.</div>
+          </div>
+        </div>
+      )}
+      {builder === 'create' && <CharacterCreator onClose={() => { setBuilder(null); setCreatorNew(false) }} onComplete={applyBuild} />}
       {builder === 'levelup' && <LevelUp char={form} onClose={() => setBuilder(null)} onComplete={applyBuild} />}
       {showUpgrade && <UpgradeModal onClose={() => setShowUpgrade(false)} message={`Free accounts are limited to ${FREE_CHAR_LIMIT} characters per campaign. Upgrade to Premium for unlimited characters.`} />}
     </div>

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { loadSrdMany } from '../utils/srd'
 import {
   ABILITIES, ABILITY_NAMES, STANDARD_ARRAY, abilityMod, fmtMod, proficiencyBonus, pointBuyCost, POINT_BUY_BUDGET,
@@ -6,8 +6,9 @@ import {
 } from '../utils/rules5e'
 import SpellsStep from './SpellsStep'
 import SrdAttribution from './SrdAttribution'
+import { useCampaign } from '../context/CampaignContext'
 
-const STEPS = ['Race', 'Class', 'Abilities', 'Skills', 'Spells', 'Review']
+const STEPS = ['Campaign', 'Race', 'Class', 'Abilities', 'Skills', 'Spells', 'Review']
 const chip = (on) => ({
   padding: '6px 12px', borderRadius: 8, fontSize: 13, cursor: 'pointer', userSelect: 'none',
   background: on ? 'var(--gold-bg)' : 'var(--surface2)', color: on ? 'var(--gold)' : 'var(--text-2)',
@@ -21,22 +22,34 @@ const roll4d6 = () => {
 const skillName = (id) => id.replace('skill-', '').replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
 const bonusText = (list) => (list || []).map(b => `${ABILITY_NAMES[b.ability]} +${b.bonus}`).join(', ')
 
-export default function CharacterCreator({ onClose, onComplete }) {
+export default function CharacterCreator({ onClose, onComplete, draftKey = 'creator_draft' }) {
+  const { campaigns, activeCampaign } = useCampaign()
+  const draft = useRef(null)
+  if (draft.current === null) {
+    try { draft.current = JSON.parse(localStorage.getItem(draftKey)) || {} } catch { draft.current = {} }
+  }
+  const d = draft.current
+  const [campaignId, setCampaignId] = useState(d.campaignId ?? activeCampaign?._id ?? '')
   const [data, setData] = useState(null)
-  const [step, setStep] = useState(0)
-  const [raceId, setRaceId] = useState('')
-  const [subraceId, setSubraceId] = useState('')
-  const [flexBonus, setFlexBonus] = useState([])
-  const [classId, setClassId] = useState('')
-  const [method, setMethod] = useState('standard')
-  const [pool, setPool] = useState(STANDARD_ARRAY)
-  const [assign, setAssign] = useState({})
-  const [buy, setBuy] = useState(Object.fromEntries(ABILITIES.map(a => [a, 8])))
-  const [bgMode, setBgMode] = useState('acolyte')
-  const [bgSkills, setBgSkills] = useState([])
-  const [classSkills, setClassSkills] = useState([])
-  const [name, setName] = useState('')
-  const [spellSel, setSpellSel] = useState({ cantrips: [], known: [], prepared: [] })
+  const [step, setStep] = useState(d.step ?? 0)
+  const [raceId, setRaceId] = useState(d.raceId ?? '')
+  const [subraceId, setSubraceId] = useState(d.subraceId ?? '')
+  const [flexBonus, setFlexBonus] = useState(d.flexBonus ?? [])
+  const [classId, setClassId] = useState(d.classId ?? '')
+  const [method, setMethod] = useState(d.method ?? 'standard')
+  const [pool, setPool] = useState(d.pool ?? STANDARD_ARRAY)
+  const [assign, setAssign] = useState(d.assign ?? {})
+  const [buy, setBuy] = useState(d.buy ?? Object.fromEntries(ABILITIES.map(a => [a, 8])))
+  const [bgMode, setBgMode] = useState(d.bgMode ?? 'acolyte')
+  const [bgSkills, setBgSkills] = useState(d.bgSkills ?? [])
+  const [classSkills, setClassSkills] = useState(d.classSkills ?? [])
+  const [name, setName] = useState(d.name ?? '')
+  const [spellSel, setSpellSel] = useState(d.spellSel ?? { cantrips: [], known: [], prepared: [] })
+
+  // Auto-save progress so closing the wizard doesn't lose it
+  useEffect(() => {
+    localStorage.setItem(draftKey, JSON.stringify({ campaignId, step, raceId, subraceId, flexBonus, classId, method, pool, assign, buy, bgMode, bgSkills, classSkills, name, spellSel }))
+  }, [draftKey, campaignId, step, raceId, subraceId, flexBonus, classId, method, pool, assign, buy, bgMode, bgSkills, classSkills, name, spellSel])
 
   useEffect(() => { loadSrdMany('core', 'classes', 'races', 'backgrounds', 'spells', 'equipment').then(setData) }, [])
 
@@ -69,6 +82,7 @@ export default function CharacterCreator({ onClose, onComplete }) {
 
   const stepValid = () => {
     switch (STEPS[step]) {
+      case 'Campaign': return !!campaignId && campaigns.some(c => c._id === campaignId)
       case 'Race': return !!race && flexBonus.length === flexNeeded
       case 'Class': return !!cls
       case 'Abilities': return method === 'pointbuy' ? pointBuyCost(buy) <= POINT_BUY_BUDGET : ABILITIES.every(a => assign[a] != null)
@@ -91,7 +105,8 @@ export default function CharacterCreator({ onClose, onComplete }) {
     const dexMod = abilityMod(stats.dex)
     const hasArmor = equipment.some(e => /armor|mail/.test(e.id))
     const ac = hasArmor && /leather/.test(equipment.map(e => e.id).join()) ? 11 + dexMod : 10 + dexMod
-    onComplete({
+    localStorage.removeItem(draftKey)
+    onComplete(campaignId, {
       name: name.trim(),
       race: subrace?.name || race.name,
       class: cls.name,
@@ -134,6 +149,17 @@ export default function CharacterCreator({ onClose, onComplete }) {
 
         <div style={{ padding: '4px 20px 16px', overflowY: 'auto', flex: 1 }}>
           {!data && <div style={{ padding: 20, color: 'var(--text-3)' }}>Loading rules…</div>}
+
+          {stepName === 'Campaign' && (
+            <>
+              <span style={label}>Which campaign is this character for?</span>
+              {campaigns.length === 0 && <div style={{ fontSize: 13, color: 'var(--text-2)' }}>You haven't joined a campaign yet. Create or join one first.</div>}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {campaigns.map(c => <span key={c._id} style={chip(campaignId === c._id)} onClick={() => setCampaignId(c._id)}>{c.name}</span>)}
+              </div>
+              <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 10 }}>The character will be saved to this campaign and only appear there.</div>
+            </>
+          )}
 
           {data && stepName === 'Race' && (
             <>

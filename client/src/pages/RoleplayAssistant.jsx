@@ -318,6 +318,20 @@ export default function RoleplayAssistant() {
   const checklist      = activePlan?.checklist || null
   const checklistLevel = activePlan?.checklistLevel ?? null   // level when last generated
   const checked        = activePlan?.checked || {}
+  const [renamingId, setRenamingId] = useState(null)
+  const [renameValue, setRenameValue] = useState('')
+  const startRename = (p) => { setRenamingId(p.id); setRenameValue(p.label) }
+  const commitRename = () => {
+    const v = renameValue.trim()
+    if (renamingId && v) updatePlan(renamingId, { label: v.slice(0, 60) })
+    setRenamingId(null)
+  }
+  const renameInput = (
+    <input className="input" autoFocus value={renameValue} maxLength={60}
+      onChange={e => setRenameValue(e.target.value)} onBlur={commitRename} onClick={e => e.stopPropagation()}
+      onKeyDown={e => { if (e.key === 'Enter') commitRename(); if (e.key === 'Escape') setRenamingId(null) }}
+      style={{ padding: '2px 6px', fontSize: 13, width: 140 }} />
+  )
   const updatePlan = (id, patch) => setPlans(ps => ps.map(p => p.id === id ? { ...p, ...patch } : p))
   const [charLoaded, setCharLoaded]   = useState(false)
   const [showUpgrade, setShowUpgrade] = useState(false)
@@ -631,7 +645,9 @@ export default function RoleplayAssistant() {
           return (
             <div key={p.id} role="tab" aria-selected={isActive} onClick={() => setActivePlanId(p.id)}
               style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 14px', cursor: 'pointer', whiteSpace: 'nowrap', fontSize: 13, fontWeight: 600, color: isActive ? 'var(--gold)' : 'var(--text-3)', borderBottom: `2px solid ${isActive ? 'var(--gold)' : 'transparent'}`, marginBottom: -1 }}>
-              {p.label}
+              {renamingId === p.id ? renameInput : (
+                <span title="Double-click to rename" onDoubleClick={() => startRename(p)}>{p.label}</span>
+              )}
               <span title="Close plan" aria-label={`Close ${p.label}`} onClick={(ev) => { ev.stopPropagation(); closePlan(p.id) }} style={{ fontSize: 14, opacity: 0.6, lineHeight: 1 }}>×</span>
             </div>
           )
@@ -642,7 +658,9 @@ export default function RoleplayAssistant() {
 
       <div className="page-header-row" style={{ marginBottom: 16 }}>
         <div>
-          <h2 style={{ fontSize: 22, marginBottom: 4 }}>{activePlan?.label} Plan</h2>
+          {renamingId === activePlan?.id ? renameInput : (
+            <h2 style={{ fontSize: 22, marginBottom: 4, cursor: 'text' }} title="Click to rename" onClick={() => startRename(activePlan)}>{activePlan?.label}</h2>
+          )}
           <p style={{ color: 'var(--text-2)', fontSize: 14, margin: 0 }}>
             {ctx.name}{[ctx.race, ctx.characterClass, ctx.level ? `Level ${ctx.level}` : ''].filter(Boolean).length > 0
               ? ' · ' + [ctx.race, ctx.characterClass, ctx.level ? `Level ${ctx.level}` : ''].filter(Boolean).join(' · ')

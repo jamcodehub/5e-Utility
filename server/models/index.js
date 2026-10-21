@@ -94,10 +94,10 @@ const CharacterSchema = new Schema({
     expertise: [String],
     languages: [String],
     features: [String],
-    equipment: [String],
+    equipment: [{ _id: false, id: String, qty: { type: Number, default: 1 } }],
     hpRolls: [Number],
     hitDiceUsed: { type: Number, default: 0 },
-    asiLog: [{ level: Number, kind: String, detail: String }],
+    asiLog: [{ _id: false, level: Number, increases: [String] }],
   },
   spells: {
     cantrips: [String],
