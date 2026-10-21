@@ -6,7 +6,7 @@ export const useCampaign = () => useContext(CampaignContext)
 
 const DEMO_CAMPAIGN = {
   _id: 'demo-campaign',
-  name: 'The Storyboard is shared between the dm and all party members, collaborate and make a wonderous book that you can later print.',
+  name: 'The Tale of Eldermere',
   isPersonal: false,
   ownerId: 'demo-dm',
 }
