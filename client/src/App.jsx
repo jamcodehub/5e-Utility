@@ -38,6 +38,7 @@ const loadDice = () => import('./pages/Dice')
 const loadPremium = () => import('./pages/Premium')
 const loadIdeaGenerator = () => import('./pages/IdeaGenerator')
 const loadRulesReference = () => import('./pages/RulesReference')
+const loadSpells = () => import('./pages/Spells')
 const loadMusicPlayer = () => import('./pages/MusicPlayer')
 const loadLevelBuilder = () => import('./pages/LevelBuilder')
 const loadRoleplayAssistant = () => import('./pages/RoleplayAssistant')
@@ -54,6 +55,7 @@ const routeChunkLoaders = [
   loadPremium,
   loadIdeaGenerator,
   loadRulesReference,
+  loadSpells,
   loadMusicPlayer,
   loadLevelBuilder,
   loadRoleplayAssistant,
@@ -70,6 +72,7 @@ const Dice = lazy(loadDice)
 const Premium = lazy(loadPremium)
 const IdeaGenerator = lazy(loadIdeaGenerator)
 const RulesReference = lazy(loadRulesReference)
+const Spells = lazy(loadSpells)
 const MusicPlayer = lazy(loadMusicPlayer)
 const LevelBuilder = lazy(loadLevelBuilder)
 const RoleplayAssistant = lazy(loadRoleplayAssistant)
@@ -238,6 +241,7 @@ function Guard() {
               <Route path="/premium"    element={<Premium />} />
               <Route path="/ideas"      element={<IdeaGenerator />} />
               <Route path="/rules"      element={<RulesReference />} />
+              <Route path="/spells"     element={<Spells />} />
               <Route path="/music"      element={<MusicPlayer />} />
               <Route path="/levels"     element={<LevelBuilder />} />
               <Route path="/roleplay"   element={<RoleplayAssistant />} />

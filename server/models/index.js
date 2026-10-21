@@ -85,6 +85,26 @@ const CharacterSchema = new Schema({
   goals:        { type: String, default: '' },
   lore:         { type: String, default: '' },
   roleplaySessionCount: { type: Number, default: 0 },
+  // Optional SRD 5.1 build data, written by the guided creator / level-up.
+  // Sheets without it keep working exactly as before.
+  srd: {
+    raceId: String, subraceId: String, classId: String, subclassId: String, backgroundId: String,
+    abilityMethod: String,
+    skills: [String],
+    expertise: [String],
+    languages: [String],
+    features: [String],
+    equipment: [String],
+    hpRolls: [Number],
+    hitDiceUsed: { type: Number, default: 0 },
+    asiLog: [{ level: Number, kind: String, detail: String }],
+  },
+  spells: {
+    cantrips: [String],
+    known: [String],
+    prepared: [String],
+    slotsUsed: { type: Map, of: Number, default: {} },
+  },
 }, { timestamps: true })
 
 // Non-unique index (kept for query performance) — players may now have

@@ -182,6 +182,8 @@ const NAV_PLAYER = [
   { to: '/character',  label: 'Character',  iconUrl: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1791791397/circle-user-solid-full.svg' },
   { to: '/inventory',  label: 'Inventory',  iconUrl: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1791791414/ring-solid-full.svg' },
   { to: '/roleplay',   label: 'Roleplay',   iconUrl: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1791792735/comment-solid-full.svg' },
+  { to: '/spells',     label: 'Spells',     iconUrl: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1791791415/scroll-solid-full.svg' },
+  { to: '/rules',      label: 'Rules',      iconUrl: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1791793208/gavel-solid-full.svg' },
   { to: '/levels',     label: 'Battle Map', iconUrl: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1791792887/map-solid-full.svg' },
   { to: '/dice',       label: 'Dice',       iconUrl: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1791790757/01_fantasy_01_d20_gem.png' },
 ]
@@ -196,6 +198,7 @@ const NAV_DM = [
   { to: '/levels',     label: 'BattleMap',      iconUrl: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1791792887/map-solid-full.svg' },
   { to: '/combat',     label: 'Combat',         iconUrl: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1791791406/hand-fist-solid-full.svg' },
   { to: '/rules',      label: 'Rules',          iconUrl: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1791793208/gavel-solid-full.svg' },
+  { to: '/spells',     label: 'Spells',         iconUrl: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1791791415/scroll-solid-full.svg' },
   { to: '/music',      label: 'Music',          iconUrl: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1791793410/mix-brands-solid-full.svg' },
   { to: '/dice',       label: 'Dice',           iconUrl: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1791790757/01_fantasy_01_d20_gem.png' },
 ]

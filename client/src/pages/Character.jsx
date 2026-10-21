@@ -4,6 +4,8 @@ import { useCampaign } from '../context/CampaignContext'
 import { useToast } from '../hooks/useToast'
 import { uploadToCloudinary } from '../utils/uploadToCloudinary'
 import UpgradeModal from '../components/UpgradeModal'
+import CharacterCreator from '../components/CharacterCreator'
+import LevelUp from '../components/LevelUp'
 import { SkeletonCharacterPage } from '../components/Skeleton'
 import { CloudinaryImage } from '@cloudinary/url-gen'
 import { quality, format } from '@cloudinary/url-gen/actions/delivery'
@@ -54,6 +56,7 @@ export default function Character() {
   const [avatarPreview, setAvatarPreview] = useState('')
   const [loaded, setLoaded] = useState(false)
   const [showUpgrade, setShowUpgrade] = useState(false)
+  const [builder, setBuilder] = useState(null) // null | 'create' | 'levelup'
 
   const FREE_CHAR_LIMIT = 2
   const atCharLimit = !isPremium && characters.length >= FREE_CHAR_LIMIT
@@ -106,6 +109,26 @@ export default function Character() {
       if (activeCharId === c._id) selectCharacter(remaining[0])
       toast('Character deleted')
     } catch (err) { toast(err.message || 'Could not delete character') }
+  }
+
+  // Persist a creator / level-up result onto the active sheet
+  const applyBuild = async (patch) => {
+    try {
+      let updated
+      if (activeCharIdRef.current) {
+        updated = await api(`/campaigns/${activeCampaign._id}/characters/${activeCharIdRef.current}`, { method: 'PUT', body: { ...form, ...patch } })
+        setCharacters(p => p.map(c => c._id === updated._id ? updated : c))
+      } else {
+        updated = await api(`/campaigns/${activeCampaign._id}/characters`, { method: 'POST', body: { ...form, ...patch } })
+        setCharacters(p => [...p, updated])
+        setActiveCharId(updated._id)
+      }
+      setChar(updated); setForm(updated); setBuilder(null)
+      toast('Character updated')
+    } catch (e) {
+      if (e?.status === 403) { setShowUpgrade(true); return }
+      toast(e.message || 'Save failed')
+    }
   }
 
   const [avatarUploading, setAvatarUploading] = useState(false)
@@ -309,7 +332,11 @@ export default function Character() {
         <div style={{ display: 'flex', gap: 8 }}>
           {editing
             ? <><button className="btn btn-primary btn-sm" onClick={save}>Save</button><button className="btn btn-ghost btn-sm" onClick={() => { setEditing(false); setForm(char || DEFAULT); setAvatarPreview(char?.avatarUrl || '') }}>Cancel</button></>
-            : <button className="btn btn-ghost btn-sm" onClick={() => setEditing(true)}>Edit</button>}
+            : <>
+                <button className="btn btn-ghost btn-sm" onClick={() => setEditing(true)}>Edit</button>
+                {!form.srd?.classId && <button className="btn btn-primary btn-sm" onClick={() => setBuilder('create')}>Guided Creator</button>}
+                {form.srd?.classId && (form.level || 1) < 20 && <button className="btn btn-primary btn-sm" onClick={() => setBuilder('levelup')}>Level Up</button>}
+              </>}
         </div>
       </div>
 
@@ -386,6 +413,8 @@ export default function Character() {
         </div>
       )}
       <ToastContainer />
+      {builder === 'create' && <CharacterCreator onClose={() => setBuilder(null)} onComplete={applyBuild} />}
+      {builder === 'levelup' && <LevelUp char={form} onClose={() => setBuilder(null)} onComplete={applyBuild} />}
       {showUpgrade && <UpgradeModal onClose={() => setShowUpgrade(false)} message={`Free accounts are limited to ${FREE_CHAR_LIMIT} characters per campaign. Upgrade to Premium for unlimited characters.`} />}
     </div>
   )
