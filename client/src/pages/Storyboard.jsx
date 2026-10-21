@@ -182,7 +182,7 @@ export default function Storyboard() {
     } catch (err) { toastRef.current(err.message || 'Failed to load storyboard') }
   }, [activeCampaign])
 
-  useEffect(() => { load() }, [load])
+  useEffect(() => { setCards([]); load() }, [load])
 
   const goTo = useCallback((dir) => {
     const next = currentPage + dir
