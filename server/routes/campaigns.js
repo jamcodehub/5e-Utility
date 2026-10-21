@@ -1,4 +1,5 @@
 import { Router } from 'express'
+import crypto from 'crypto'
 import jwt from 'jsonwebtoken'
 import { Campaign, Character, User, CampaignGuide } from '../models/index.js'
 
@@ -213,6 +214,7 @@ router.get('/:id/character', auth, async (req, res) => {
 
 router.put('/:id/character', auth, async (req, res) => {
   try {
+    delete req.body.shareToken
     let primary = await ensurePrimary(req.params.id, req.userId)
     if (primary) {
       Object.assign(primary, req.body)
@@ -236,6 +238,7 @@ router.get('/:id/characters', auth, async (req, res) => {
 
 router.post('/:id/characters', auth, async (req, res) => {
   try {
+    delete req.body.shareToken
     const user = await User.findById(req.userId)
     const count = await Character.countDocuments({ campaign: req.params.id, owner: req.userId })
     if (!user.isPremium && count >= 2) {
@@ -256,11 +259,24 @@ router.put('/:id/characters/:charId', auth, async (req, res) => {
       ? { _id: req.params.charId, campaign: req.params.id }
       : { _id: req.params.charId, campaign: req.params.id, owner: req.userId }
     // The DM may only touch HP (combat tracker); full edits remain owner-only.
+    delete req.body.shareToken
     const body = isDm ? { hp: req.body.hp } : req.body
     const char = await Character.findOneAndUpdate(filter, body, { new: true })
     if (!char) return res.status(404).json({ error: 'Character not found' })
     res.json(char)
   } catch (e) { res.status(500).json({ error: e.message }) }
+})
+
+// Turn the read-only share link for a character on or off (owner only).
+router.post('/:id/characters/:charId/share', auth, async (req, res) => {
+  try {
+    const char = await Character.findOne({ _id: req.params.charId, campaign: req.params.id, owner: req.userId })
+    if (!char) return res.status(404).json({ error: 'Character not found' })
+    if (req.body.enabled) char.shareToken = char.shareToken || crypto.randomBytes(16).toString('hex')
+    else char.shareToken = undefined
+    await char.save()
+    res.json({ shareToken: char.shareToken || null })
+  } catch { res.status(500).json({ error: 'Could not update sharing' }) }
 })
 
 router.delete('/:id/characters/:charId', auth, async (req, res) => {

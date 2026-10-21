@@ -17,6 +17,7 @@ import inventoryRoutes from './routes/inventory.js'
 import uploadRoutes from './routes/upload.js'
 import musicRoutes from './routes/music.js'
 import sessionsRoutes from './routes/sessions.js'
+import sharedRoutes from './routes/shared.js'
 import { attachRealtime } from './realtime.js'
 import { Character } from './models/index.js'
 
@@ -58,6 +59,7 @@ app.use('/api/inventory', inventoryRoutes)
 app.use('/api/upload',    uploadRoutes)
 app.use('/api/music',     musicRoutes)
 app.use('/api/sessions',  sessionsRoutes)
+app.use('/api/shared',    sharedRoutes)
 
 mongoose.connect(process.env.MONGO_URI).then(async () => {
   console.log('MongoDB connected')

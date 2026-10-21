@@ -1,5 +1,7 @@
 // Pure 5e rules helpers (SRD 5.1). No React, no I/O — easy to test.
 
+import { findDice } from './dice'
+
 export const ABILITIES = ['str', 'dex', 'con', 'int', 'wis', 'cha']
 export const ABILITY_NAMES = { str: 'Strength', dex: 'Dexterity', con: 'Constitution', int: 'Intelligence', wis: 'Wisdom', cha: 'Charisma' }
 
@@ -110,4 +112,30 @@ export function featuresThrough(cls, subclassId, level) {
   const sub = cls?.subclasses?.find(s => s.id === subclassId)
   for (const row of sub?.levels || []) if (row.level <= level) ids.push(...(row.features || []))
   return [...new Set(ids)]
+}
+
+// Entry of a level-keyed table at the highest key <= n ({ "1": "1d10", "5": "2d10" })
+const atOrBelow = (table, n) => {
+  let best = null
+  for (const k of Object.keys(table || {}).map(Number).sort((a, b) => a - b)) if (k <= n) best = k
+  return best == null ? null : table[best]
+}
+
+// What to roll for a spell: { attackMod, saveText, damage:{expr,type}, heal, subtitle } or null when there is nothing to roll
+export function spellRollSpec(spell, { slotLevel, charLevel, castMod, attackBonus, dc }) {
+  const d = spell.damage
+  let damage = null
+  const expr = d?.atSlot ? atOrBelow(d.atSlot, slotLevel) : d?.atLevel ? atOrBelow(d.atLevel, charLevel) : null
+  if (expr) damage = { expr, type: d.type }
+  const healExpr = spell.heal ? atOrBelow(spell.heal, slotLevel) : null
+  const heal = healExpr ? healExpr.replace(/\s*\+\s*MOD/i, castMod >= 0 ? `+${castMod}` : `${castMod}`) : null
+  // Spells without structured data: fall back to the first dice expression in the description
+  if (!damage && !heal) {
+    const found = findDice((spell.desc || []).join(' '))
+    if (found) damage = { expr: found, type: '' }
+  }
+  const attackMod = spell.attackType ? attackBonus : undefined
+  const saveText = spell.save ? `DC ${dc} ${ABILITY_NAMES[spell.save.ability] || spell.save.ability} save${spell.save.success === 'half' ? ' (half damage on success)' : ''}` : undefined
+  if (!damage && !heal && attackMod == null && !saveText) return null
+  return { attackMod, saveText, damage, heal, subtitle: slotLevel > spell.level ? `at level ${slotLevel}` : undefined }
 }

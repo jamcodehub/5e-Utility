@@ -1,3 +1,4 @@
+import { alwaysPrepared } from '../utils/sheet'
 import { useEffect, useMemo, useState, useCallback } from 'react'
 import { api, useAuth } from '../context/AuthContext'
 import { useCampaign } from '../context/CampaignContext'
@@ -5,8 +6,9 @@ import { useToast } from '../hooks/useToast'
 import { loadSrdMany } from '../utils/srd'
 import {
   ABILITY_NAMES, abilityMod, fmtMod, spellSlots, cantripsKnown, maxSpellLevel, spellMode, spellbookLimit,
-  preparedLimit, spellsKnownFixed, spellSaveDc, spellAttackBonus,
+  preparedLimit, spellsKnownFixed, spellSaveDc, spellAttackBonus, spellRollSpec,
 } from '../utils/rules5e'
+import { useRoller, RollPanel } from '../components/RollPanel'
 import MiniMarkdown from '../components/MiniMarkdown'
 import SrdAttribution from '../components/SrdAttribution'
 
@@ -97,7 +99,7 @@ function SpellRow({ spell, open, setOpen, action }) {
   return (
     <div style={{ borderBottom: '1px solid var(--border)' }}>
       <div onClick={() => setOpen(isOpen ? null : spell.id)} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 0', cursor: 'pointer', gap: 8 }}>
-        <span style={{ fontSize: 13, color: 'var(--text)' }}>{spell.name}{spell.concentration && <span style={{ fontSize: 10, color: 'var(--text-3)', marginLeft: 6 }}>C</span>}</span>
+        <span style={{ fontSize: 13, color: 'var(--text)' }}>{spell.name}{spell.concentration && <span title="Concentration" style={{ fontSize: 10, color: 'var(--text-3)', marginLeft: 6 }}>C</span>}{spell.ritual && <span title="Ritual" style={{ fontSize: 10, color: 'var(--text-3)', marginLeft: 6 }}>R</span>}{spell.always && <span title="Always prepared" style={{ fontSize: 10, color: 'var(--gold)', marginLeft: 6 }}>★</span>}</span>
         {action}
       </div>
       {isOpen && <div style={{ padding: '4px 0 10px' }}><SpellDetail spell={spell} /></div>}
@@ -106,14 +108,19 @@ function SpellRow({ spell, open, setOpen, action }) {
 }
 
 // ── Player spellbook ────────────────────────────────────────────────────────
-function Spellbook({ srd, campaignId, toast }) {
-  const [chars, setChars] = useState(null)
-  const [charId, setCharId] = useState(null)
+// Standalone (picks its own character) or embedded in the Character page (`character` + `onSpellsChange`)
+export function Spellbook({ srd, campaignId, toast, roller, character, onSpellsChange, concentrating, onConcentrate }) {
+  const embedded = !!character
+  const [fetchedChars, setChars] = useState(null)
+  const [pickedId, setCharId] = useState(null)
+  const chars = embedded ? [character] : fetchedChars
+  const charId = embedded ? character._id : pickedId
   const [open, setOpen] = useState(null)
   const [adding, setAdding] = useState(false)
   const [castLevel, setCastLevel] = useState({})
 
   useEffect(() => {
+    if (embedded) return undefined
     let live = true
     setChars(null)
     api(`/campaigns/${campaignId}/characters`).then(list => {
@@ -123,24 +130,26 @@ function Spellbook({ srd, campaignId, toast }) {
       setCharId((caster || list.find(c => c.isPrimary) || list[0])?._id || null)
     }).catch(() => live && setChars([]))
     return () => { live = false }
-  }, [campaignId, srd])
+  }, [campaignId, srd, embedded])
 
   const char = chars?.find(c => c._id === charId)
   const cls = srd.classes.find(c => c.id === char?.srd?.classId)
+    || srd.classes.find(c => c.name.toLowerCase() === (char?.class || '').trim().toLowerCase())
   const spells = char?.spells || {}
   const slotsUsed = spells.slotsUsed || {}
 
   const save = useCallback(async (nextSpells) => {
+    if (embedded) { onSpellsChange(nextSpells); return }
     setChars(cs => cs.map(c => c._id === charId ? { ...c, spells: nextSpells } : c))
     try {
       await api(`/campaigns/${campaignId}/characters/${charId}`, { method: 'PUT', body: { spells: nextSpells } })
     } catch (e) { toast(e.message || 'Could not save spells') }
-  }, [campaignId, charId, toast])
+  }, [campaignId, charId, toast, embedded, onSpellsChange])
 
   if (!chars) return <div style={{ color: 'var(--text-3)', fontSize: 13 }}>Loading…</div>
   if (!chars.length) return <div className="card" style={{ padding: 20, fontSize: 13, color: 'var(--text-2)' }}>Create a character first — then you can manage spells here.</div>
 
-  const picker = (
+  const picker = embedded ? null : (
     <div style={{ display: 'flex', gap: 6, marginBottom: 16, flexWrap: 'wrap' }}>
       {chars.map(c => (
         <div key={c._id} onClick={() => { setCharId(c._id); setAdding(false) }}
@@ -152,7 +161,7 @@ function Spellbook({ srd, campaignId, toast }) {
   )
   const note = (msg) => <>{picker}<div className="card" style={{ padding: 20, fontSize: 13, color: 'var(--text-2)', lineHeight: 1.6 }}>{msg}</div></>
 
-  if (!cls) return note('This character wasn\'t built with the guided creator, so there\'s no class to read spell slots from. Use the guided creator on the Character page to set a class and level.')
+  if (!cls) return note('This character wasn\'t built with the guided creator, and its class doesn\'t match an SRD class, so there\'s nothing to read spell slots from. Set the class (e.g. Wizard) and level on the Character page.')
   if (!cls.spellcasting) return note(`${cls.name}s don't cast spells.`)
 
   const level = char.level || 1
@@ -184,7 +193,10 @@ function Spellbook({ srd, campaignId, toast }) {
   }
   const longRest = () => save({ ...spells, slotsUsed: {} })
 
-  const active = (mode === 'known' ? known : prepared).map(id => byId[id]).filter(Boolean)
+  // Domain / oath spells are always prepared and don't count against the preparation limit
+  const always = alwaysPrepared(char.srd?.subclassId, level).filter(id => byId[id])
+  const active = [...new Set([...(mode === 'known' ? known : prepared), ...always])].map(id => ({ ...byId[id], always: always.includes(id) && !prepared.includes(id) && mode !== 'known' })).filter(s => s.id)
+  const ritualBook = mode === 'spellbook' ? known.filter(id => byId[id]?.ritual && !prepared.includes(id)).map(id => byId[id]) : []
   const activeByLevel = (lvl) => active.filter(s => s.level === lvl)
 
   const cast = (spell) => {
@@ -192,7 +204,27 @@ function Spellbook({ srd, campaignId, toast }) {
     const used = slotsUsed[lvl] || 0
     if (!slots[lvl] || used >= slots[lvl]) { toast(`No level ${lvl} slots left.`); return }
     save({ ...spells, slotsUsed: { ...slotsUsed, [lvl]: used + 1 } })
-    toast(`Cast ${spell.name}${lvl > spell.level ? ` at level ${lvl}` : ''}.`)
+    startConcentration(spell)
+    if (!rollFor(spell, lvl)) toast(`Cast ${spell.name}${lvl > spell.level ? ` at level ${lvl}` : ''}.`)
+  }
+
+  // Casting a concentration spell ends the previous one (SRD)
+  function startConcentration(spell) {
+    if (!spell.concentration || !onConcentrate) return
+    if (concentrating && concentrating !== spell.name) toast(`You stop concentrating on ${concentrating}.`)
+    onConcentrate(spell.name)
+  }
+  const castRitual = (spell) => {
+    startConcentration(spell)
+    toast(`Cast ${spell.name} as a ritual: takes 10 minutes longer, no spell slot used.`)
+  }
+
+  // Rolls attack / damage / healing for the spell and shows it in the roll panel; false when there is nothing to roll
+  function rollFor(spell, lvl) {
+    const spec = spellRollSpec(spell, { slotLevel: lvl, charLevel: level, castMod, attackBonus: spellAttackBonus(prof, castMod), dc: spellSaveDc(prof, castMod) })
+    if (!spec) return false
+    roller.rollSpell(spell.name, spec)
+    return true
   }
 
   const pickerActions = (spell) => {
@@ -239,7 +271,7 @@ function Spellbook({ srd, campaignId, toast }) {
         <div><div style={label}>Spell save DC</div><div style={{ fontSize: 14 }}>{spellSaveDc(prof, castMod)}</div></div>
         <div><div style={label}>Spell attack</div><div style={{ fontSize: 14 }}>{fmtMod(spellAttackBonus(prof, castMod))}</div></div>
         <div style={{ flex: 1 }} />
-        <button className="btn btn-ghost btn-sm" onClick={longRest}>Long rest</button>
+        {!embedded && <button className="btn btn-ghost btn-sm" onClick={longRest}>Long rest</button>}
       </div>
 
       {Object.keys(slots).length > 0 && (
@@ -270,6 +302,7 @@ function Spellbook({ srd, campaignId, toast }) {
             My spells
             {cantripLimit > 0 && ` · ${cantrips.length}/${cantripLimit} cantrips`}
             {mode === 'known' ? ` · ${known.length}/${knownLimit} known` : ` · ${prepared.length}/${prepLimit} prepared`}
+            {always.length > 0 && ` · ${always.length} always prepared`}
           </div>
           <button className="btn btn-ghost btn-sm" onClick={() => setAdding(true)}>Add / change spells</button>
         </div>
@@ -277,7 +310,13 @@ function Spellbook({ srd, campaignId, toast }) {
           <div style={{ marginBottom: 10 }}>
             <div style={{ fontSize: 11, color: 'var(--text-3)', marginBottom: 4 }}>Cantrips (cast at will)</div>
             {cantrips.map(id => byId[id] && <SpellRow key={id} spell={byId[id]} open={open} setOpen={setOpen}
-              action={<span style={{ fontSize: 11, color: 'var(--text-3)' }}>At will</span>} />)}
+              action={
+                <span style={{ display: 'flex', gap: 8, alignItems: 'center' }} onClick={e => e.stopPropagation()}>
+                  <span style={{ fontSize: 11, color: 'var(--text-3)' }}>At will</span>
+                  {spellRollSpec(byId[id], { slotLevel: 0, charLevel: level, castMod, attackBonus: 0, dc: 0 }) && (
+                    <button className="btn btn-primary btn-sm" onClick={() => rollFor(byId[id], 0)}>🎲 Roll</button>
+                  )}
+                </span>} />)}
           </div>
         )}
         {[1, 2, 3, 4, 5, 6, 7, 8, 9].filter(l => activeByLevel(l).length).map(lvl => (
@@ -291,6 +330,7 @@ function Spellbook({ srd, campaignId, toast }) {
                       onChange={e => setCastLevel(p => ({ ...p, [s.id]: Number(e.target.value) }))} aria-label={`Cast ${s.name} at slot level`}>
                       {Object.keys(slots).map(Number).filter(n => n >= s.level).map(n => <option key={n} value={n}>Lv {n}</option>)}
                     </select>
+                    {s.ritual && <button className="btn btn-ghost btn-sm" onClick={() => castRitual(s)} title="Ritual: +10 minutes, no slot">Ritual</button>}
                     <button className="btn btn-primary btn-sm" onClick={() => cast(s)}>Cast</button>
                   </span>
                 } />
@@ -306,6 +346,12 @@ function Spellbook({ srd, campaignId, toast }) {
         <div className="card" style={{ padding: '14px 18px', marginBottom: 16 }}>
           <div style={label}>Spellbook · {known.length}/{knownLimit}</div>
           <div>{known.map(id => byId[id] && <Chip key={id}>{byId[id].name}</Chip>)}</div>
+          {ritualBook.length > 0 && (
+            <div style={{ marginTop: 10 }}>
+              <div style={{ fontSize: 11, color: 'var(--text-3)', marginBottom: 4 }}>Ritual spells you can cast straight from your spellbook</div>
+              {ritualBook.map(sp => <SpellRow key={sp.id} spell={sp} open={open} setOpen={setOpen} action={<button className="btn btn-ghost btn-sm" onClick={e => { e.stopPropagation(); castRitual(sp) }}>Ritual</button>} />)}
+            </div>
+          )}
         </div>
       )}
     </>
@@ -320,6 +366,7 @@ export default function Spells() {
   const [tab, setTab] = useState(isDM ? 'Spell Browser' : 'My Spells')
   const [srd, setSrd] = useState(null)
   const [error, setError] = useState('')
+  const roller = useRoller()
 
   useEffect(() => {
     loadSrdMany('spells', 'classes').then(setSrd).catch(() => setError('Could not load the spell data.'))
@@ -350,11 +397,12 @@ export default function Spells() {
 
       {srd && tab === 'My Spells' && !isDM && (
         activeCampaign
-          ? <Spellbook srd={srd} campaignId={activeCampaign._id} toast={toast} />
+          ? <Spellbook srd={srd} campaignId={activeCampaign._id} toast={toast} roller={roller} />
           : <div style={{ color: 'var(--text-3)', fontSize: 13 }}>Select a campaign to manage your spells.</div>
       )}
       {srd && tab === 'Spell Browser' && <SpellBrowser srd={srd} />}
 
+      {tab === 'My Spells' && !isDM && <RollPanel roller={roller} />}
       <SrdAttribution />
       <ToastContainer />
     </div>

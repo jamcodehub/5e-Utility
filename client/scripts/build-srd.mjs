@@ -139,8 +139,8 @@ out.spells = spells.map(s => strip({
   classes: ids(s.classes), subclasses: ids(s.subclasses),
   attackType: s.attack_type,
   save: s.dc ? { ability: id(s.dc.dc_type), success: s.dc.dc_success } : undefined,
-  damage: s.damage ? strip({
-    type: id(s.damage.damage_type), atSlot: s.damage.damage_at_slot_level, atLevel: s.damage.damage_at_character_level,
+  damage: s.damage?.[0] ? strip({
+    type: id(s.damage[0].damage_type), atSlot: s.damage[0].damage_at_slot_level, atLevel: s.damage[0].damage_at_character_level,
   }) : undefined,
   heal: s.heal_at_slot_level,
   area: s.area_of_effect ? { type: s.area_of_effect.type, size: s.area_of_effect.size } : undefined,

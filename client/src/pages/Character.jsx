@@ -6,6 +6,16 @@ import { uploadToCloudinary } from '../utils/uploadToCloudinary'
 import UpgradeModal from '../components/UpgradeModal'
 import CharacterCreator from '../components/CharacterCreator'
 import LevelUp from '../components/LevelUp'
+import CustomCharacterBuilder from '../components/CustomCharacterBuilder'
+import CharacterActions from '../components/CharacterActions'
+import { Spellbook } from './Spells'
+import RestPanel from '../components/RestPanel'
+import CombatPanel from '../components/CombatPanel'
+import GearTab from '../components/GearTab'
+import { PrintOverlay } from '../components/CharacterSheet'
+import { derive } from '../utils/sheet'
+import { useRoller, RollPanel } from '../components/RollPanel'
+import { loadSrdMany } from '../utils/srd'
 import { SkeletonCharacterPage } from '../components/Skeleton'
 import { CloudinaryImage } from '@cloudinary/url-gen'
 import { quality, format } from '@cloudinary/url-gen/actions/delivery'
@@ -57,6 +67,17 @@ export default function Character() {
   const [loaded, setLoaded] = useState(false)
   const [showUpgrade, setShowUpgrade] = useState(false)
   const [builder, setBuilder] = useState(null) // null | 'create' | 'levelup'
+  const roller = useRoller()
+  const [srdData, setSrdData] = useState(null)
+  const [printing, setPrinting] = useState(false)
+  const [sharing, setSharing] = useState(false)
+
+  // Rules data is only fetched once the Actions / Spells tabs are opened
+  useEffect(() => {
+    if ((tab === 'actions' || tab === 'spells' || tab === 'gear' || printing || sharing) && !srdData) {
+      loadSrdMany('core', 'classes', 'races', 'traits', 'features', 'equipment', 'spells').then(setSrdData).catch(() => toast('Could not load the rules data'))
+    }
+  }, [tab]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const FREE_CHAR_LIMIT = 2
   const atCharLimit = !isPremium && characters.length >= FREE_CHAR_LIMIT
@@ -89,21 +110,6 @@ export default function Character() {
     if (!activeCampaign) return
     if (atCharLimit) { setShowUpgrade(true); return }
     setBuilder('choose')
-  }
-
-  const addCharacter = async () => {
-    if (!activeCampaign) return
-    if (atCharLimit) { setShowUpgrade(true); return }
-    setBuilder(null)
-    try {
-      const created = await api(`/campaigns/${activeCampaign._id}/characters`, { method: 'POST', body: DEFAULT })
-      setCharacters(p => [...p, created])
-      selectCharacter(created)
-      setEditing(true)
-    } catch (err) {
-      if (err?.status === 403) { setShowUpgrade(true); return }
-      toast(err.message || 'Could not create character')
-    }
   }
 
   const deleteCharacter = async (c, e) => {
@@ -206,6 +212,27 @@ export default function Character() {
       return nextForm
     })
   }
+
+  // Saves a partial update (spell slots, carried weapons…) without touching unsaved sheet edits
+  const setShare = async (enabled) => {
+    try {
+      const r = await api(`/campaigns/${activeCampaign._id}/characters/${activeCharIdRef.current}/share`, { method: 'POST', body: { enabled } })
+      const patch = { shareToken: r.shareToken || undefined }
+      setChar(c => (c ? { ...c, ...patch } : c))
+      setCharacters(p => p.map(c => (c._id === activeCharIdRef.current ? { ...c, ...patch } : c)))
+    } catch (e) { toast(e.message || 'Could not update sharing') }
+  }
+
+  const patchChar = useCallback(async (patch) => {
+    const id = activeCharIdRef.current
+    if (!activeCampaign || !id) return
+    setChar(c => (c ? { ...c, ...patch } : c))
+    setForm(f => ({ ...f, ...patch }))
+    setCharacters(p => p.map(c => (c._id === id ? { ...c, ...patch } : c)))
+    try {
+      await api(`/campaigns/${activeCampaign._id}/characters/${id}`, { method: 'PUT', body: patch })
+    } catch (e) { toast(e.message || 'Could not save') }
+  }, [activeCampaign]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Autosave for free-text fields (notes + backstory tabs) — debounced 800ms
   // after typing stops, so nothing is lost if the user navigates away or the
@@ -352,8 +379,10 @@ export default function Character() {
             ? <><button className="btn btn-primary btn-sm" onClick={save}>Save</button><button className="btn btn-ghost btn-sm" onClick={() => { setEditing(false); setForm(char || DEFAULT); setAvatarPreview(char?.avatarUrl || '') }}>Cancel</button></>
             : <>
                 <button className="btn btn-ghost btn-sm" onClick={() => setEditing(true)}>Edit</button>
+                {char && <button className="btn btn-ghost btn-sm" onClick={() => setPrinting(true)} title="Printable sheet for playing without a device">Print</button>}
+                {char && <button className="btn btn-ghost btn-sm" onClick={() => setSharing(true)}>Share</button>}
                 {!form.srd?.classId && <button className="btn btn-primary btn-sm" onClick={() => { setCreatorNew(false); setBuilder('create') }}>Guided Creator</button>}
-                {form.srd?.classId && (form.level || 1) < 20 && <button className="btn btn-primary btn-sm" onClick={() => setBuilder('levelup')}>Level Up</button>}
+                {form.srd?.classId && !form.srd?.custom && (form.level || 1) < 20 && <button className="btn btn-primary btn-sm" onClick={() => setBuilder('levelup')}>Level Up</button>}
               </>}
         </div>
       </div>
@@ -367,12 +396,24 @@ export default function Character() {
 
       {/* Tabs */}
       <div style={{ display: 'flex', gap: 4, marginBottom: 16, flexWrap: 'wrap' }}>
-        {['stats', 'backstory', 'notes', 'dndbeyond'].map(t => (
+        {['stats', 'actions', 'spells', 'gear', 'backstory', 'notes'].map(t => (
           <button key={t} onClick={() => setTab(t)} className={`btn btn-sm ${tab === t ? 'btn-primary' : 'btn-ghost'}`}>
-            {t === 'dndbeyond' ? 'D&D Beyond' : t.charAt(0).toUpperCase() + t.slice(1)}
+            {t.charAt(0).toUpperCase() + t.slice(1)}
           </button>
         ))}
       </div>
+
+      {(tab === 'actions' || tab === 'spells' || tab === 'gear') && (
+        !char ? <div className="card" style={{ padding: 20, fontSize: 13, color: 'var(--text-2)' }}>Save your character first, then your actions and spells will show up here.</div>
+        : !srdData ? <div style={{ color: 'var(--text-3)', fontSize: 13 }}>Loading rules…</div>
+        : tab === 'actions'
+          ? <><RestPanel char={char} srd={srdData} roller={roller} onPatch={patchChar} /><CombatPanel char={char} srd={srdData} d={derive(char, srdData)} roller={roller} onPatch={patchChar} /><CharacterActions char={char} srd={srdData} roller={roller} onPatch={patchChar} /></>
+          : tab === 'gear'
+            ? <GearTab char={char} srd={srdData} d={derive(char, srdData)} onPatch={patchChar} />
+            : <><RestPanel char={char} srd={srdData} roller={roller} onPatch={patchChar} /><Spellbook srd={srdData} campaignId={activeCampaign._id} toast={toast} roller={roller} character={char} onSpellsChange={(spells) => patchChar({ spells })}
+                concentrating={char.combat?.concentrating} onConcentrate={(name) => patchChar({ combat: { ...(char.combat || {}), concentrating: name } })} /></>
+      )}
+      {(tab === 'actions' || tab === 'spells') && char && <RollPanel roller={roller} />}
 
       {tab === 'stats' && (
         <div className="stat-grid-6">
@@ -420,14 +461,24 @@ export default function Character() {
         </div>
       )}
 
-      {tab === 'dndbeyond' && (
-        <div className="card" style={{ padding: 20 }}>
-          <div style={{ fontSize: 13, color: 'var(--text-2)', marginBottom: 12 }}>Link your D&amp;D Beyond character sheet to embed it here.</div>
-          <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
-            <input className="input" style={{ flex: 1 }} placeholder="https://www.dndbeyond.com/characters/..." value={F.dndBeyondUrl || ''} onChange={e => setForm(p => ({ ...p, dndBeyondUrl: e.target.value }))} />
-            <button className="btn btn-primary" onClick={save}>Link</button>
+      {printing && srdData && char && <PrintOverlay char={char} srd={srdData} onClose={() => setPrinting(false)} />}
+      {printing && !srdData && <div style={{ position: 'fixed', inset: 0, zIndex: 2000, background: 'rgba(0,0,0,.5)', color: '#fff', display: 'grid', placeItems: 'center' }}>Preparing sheet…</div>}
+      {sharing && char && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }} onClick={() => setSharing(false)}>
+          <div className="card" style={{ width: '100%', maxWidth: 460, padding: 22 }} onClick={e => e.stopPropagation()}>
+            <div style={{ fontFamily: 'Cinzel, serif', fontSize: 17, color: 'var(--gold)', marginBottom: 8 }}>Share {char.name || 'this character'}</div>
+            <div style={{ fontSize: 13, color: 'var(--text-2)', lineHeight: 1.5, marginBottom: 12 }}>Anyone with the link can view a read-only sheet and print it, even without an account. Your notes, lore and goals are never shared.</div>
+            {char.shareToken ? (
+              <>
+                <input className="input" readOnly value={`${window.location.origin}/s/${char.shareToken}`} onFocus={e => e.target.select()} style={{ fontSize: 12, marginBottom: 10 }} />
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button className="btn btn-primary btn-sm" onClick={() => navigator.clipboard?.writeText(`${window.location.origin}/s/${char.shareToken}`).then(() => toast('Link copied'))}>Copy link</button>
+                  <button className="btn btn-ghost btn-sm" onClick={() => setShare(false)}>Stop sharing</button>
+                </div>
+              </>
+            ) : <button className="btn btn-primary btn-sm" onClick={() => setShare(true)}>Create share link</button>}
+            <div style={{ marginTop: 14 }}><button className="btn btn-ghost btn-sm" onClick={() => setSharing(false)}>Close</button></div>
           </div>
-          {F.dndBeyondUrl && <iframe src={F.dndBeyondUrl} title="D&D Beyond" style={{ width: '100%', height: 'calc(100vh - 260px)', minHeight: 500, border: 'none', borderRadius: 8 }} sandbox="allow-scripts allow-same-origin" />}
         </div>
       )}
       <ToastContainer />
@@ -443,13 +494,14 @@ export default function Character() {
               <button className="btn btn-primary" style={{ justifyContent: 'center' }} onClick={() => { setCreatorNew(true); setBuilder('create') }}>
                 Guided Creator <span style={{ opacity: 0.7, fontWeight: 400, marginLeft: 6, fontSize: 11 }}>WOTC</span>
               </button>
-              <button className="btn btn-ghost" style={{ justifyContent: 'center' }} onClick={addCharacter}>Custom</button>
+              <button className="btn btn-ghost" style={{ justifyContent: 'center' }} onClick={() => { setCreatorNew(true); setBuilder('custom') }}>Custom</button>
             </div>
-            <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 12, lineHeight: 1.5 }}>Guided Creator walks you through the 5e rules step by step. Custom gives you a blank sheet to fill in yourself.</div>
+            <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 12, lineHeight: 1.5 }}>Guided Creator walks you through the 5e rules step by step. Custom lets you build freely (homebrew races, classes and backgrounds) through the same stages.</div>
           </div>
         </div>
       )}
       {builder === 'create' && <CharacterCreator onClose={() => { setBuilder(null); setCreatorNew(false) }} onComplete={applyBuild} />}
+      {builder === 'custom' && <CustomCharacterBuilder onClose={() => { setBuilder(null); setCreatorNew(false) }} onComplete={applyBuild} />}
       {builder === 'levelup' && <LevelUp char={form} onClose={() => setBuilder(null)} onComplete={applyBuild} />}
       {showUpgrade && <UpgradeModal onClose={() => setShowUpgrade(false)} message={`Free accounts are limited to ${FREE_CHAR_LIMIT} characters per campaign. Upgrade to Premium for unlimited characters.`} />}
     </div>
