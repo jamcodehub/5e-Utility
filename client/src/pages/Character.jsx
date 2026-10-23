@@ -4,11 +4,8 @@ import { useCampaign } from '../context/CampaignContext'
 import { useToast } from '../hooks/useToast'
 import { uploadToCloudinary } from '../utils/uploadToCloudinary'
 import UpgradeModal from '../components/UpgradeModal'
-import CharacterCreator from '../components/CharacterCreator'
-import LevelUp from '../components/LevelUp'
 import CustomCharacterBuilder from '../components/CustomCharacterBuilder'
 import CharacterActions from '../components/CharacterActions'
-import { Spellbook } from './Spells'
 import RestPanel from '../components/RestPanel'
 import CombatPanel from '../components/CombatPanel'
 import GearTab from '../components/GearTab'
@@ -74,15 +71,15 @@ export default function Character() {
   const [avatarPreview, setAvatarPreview] = useState('')
   const [loaded, setLoaded] = useState(false)
   const [showUpgrade, setShowUpgrade] = useState(false)
-  const [builder, setBuilder] = useState(null) // null | 'create' | 'levelup'
+  const [builder, setBuilder] = useState(null) // null | 'custom'
   const roller = useRoller()
   const [srdData, setSrdData] = useState(null)
   const [printing, setPrinting] = useState(false)
   const [sharing, setSharing] = useState(false)
 
-  // Rules data is only fetched once the Actions / Spells tabs are opened
+  // Rules data is only fetched once the Actions / Gear tabs are opened
   useEffect(() => {
-    if ((tab === 'actions' || tab === 'spells' || tab === 'gear' || printing || sharing) && !srdData) {
+    if ((tab === 'actions' || tab === 'gear' || printing || sharing) && !srdData) {
       loadSrdMany('core', 'classes', 'races', 'traits', 'features', 'equipment', 'spells').then(setSrdData).catch(() => toast('Could not load the rules data'))
     }
   }, [tab]) // eslint-disable-line react-hooks/exhaustive-deps
@@ -119,7 +116,8 @@ export default function Character() {
   const openNewChooser = () => {
     if (!activeCampaign) return
     if (atCharLimit) { setShowUpgrade(true); return }
-    setBuilder('choose')
+    setCreatorNew(true)
+    setBuilder('custom')
   }
 
   const deleteCharacter = async (c, e) => {
@@ -391,8 +389,6 @@ export default function Character() {
                 <button className="btn btn-ghost btn-sm" onClick={() => setEditing(true)}>Edit</button>
                 {char && <button className="btn btn-ghost btn-sm" onClick={() => setPrinting(true)} title="Printable sheet for playing without a device">Print</button>}
                 {char && <button className="btn btn-ghost btn-sm" onClick={() => setSharing(true)}>Share</button>}
-                {!form.srd?.classId && <button className="btn btn-primary btn-sm" onClick={() => { setCreatorNew(false); setBuilder('create') }}>Guided Creator</button>}
-                {form.srd?.classId && !form.srd?.custom && (form.level || 1) < 20 && <button className="btn btn-primary btn-sm" onClick={() => setBuilder('levelup')}>Level Up</button>}
               </>}
         </div>
       </div>
@@ -406,25 +402,22 @@ export default function Character() {
 
       {/* Tabs */}
       <div style={{ display: 'flex', gap: 4, marginBottom: 16, flexWrap: 'wrap' }}>
-        {['stats', 'actions', 'spells', 'gear', 'inventory', 'backstory', 'notes'].map(t => (
+        {['stats', 'actions', 'gear', 'inventory', 'backstory', 'notes'].map(t => (
           <button key={t} onClick={() => setTab(t)} className={`btn btn-sm ${tab === t ? 'btn-primary' : 'btn-ghost'}`}>
             {t.charAt(0).toUpperCase() + t.slice(1)}
           </button>
         ))}
       </div>
 
-      {(tab === 'actions' || tab === 'spells' || tab === 'gear') && (
-        !char ? <div className="card" style={{ padding: 20, fontSize: 13, color: 'var(--text-2)' }}>Save your character first, then your actions and spells will show up here.</div>
+      {(tab === 'actions' || tab === 'gear') && (
+        !char ? <div className="card" style={{ padding: 20, fontSize: 13, color: 'var(--text-2)' }}>Save your character first, then your actions will show up here.</div>
         : !srdData ? <div style={{ color: 'var(--text-3)', fontSize: 13 }}>Loading rules…</div>
         : tab === 'actions'
           ? <><RestPanel char={char} srd={srdData} roller={roller} onPatch={patchChar} /><CombatPanel char={char} srd={srdData} d={derive(char, srdData)} roller={roller} onPatch={patchChar} /><CharacterActions char={char} srd={srdData} roller={roller} onPatch={patchChar} /></>
-          : tab === 'gear'
-            ? <GearTab char={char} srd={srdData} d={derive(char, srdData)} onPatch={patchChar} />
-            : <><RestPanel char={char} srd={srdData} roller={roller} onPatch={patchChar} /><Spellbook srd={srdData} campaignId={activeCampaign._id} toast={toast} roller={roller} character={char} onSpellsChange={(spells) => patchChar({ spells })}
-                concentrating={char.combat?.concentrating} onConcentrate={(name) => patchChar({ combat: { ...(char.combat || {}), concentrating: name } })} /></>
+          : <GearTab char={char} srd={srdData} d={derive(char, srdData)} onPatch={patchChar} />
       )}
       {tab === 'inventory' && <InventoryPanel toast={toast} />}
-      {(tab === 'actions' || tab === 'spells') && char && <RollPanel roller={roller} />}
+      {tab === 'actions' && char && <RollPanel roller={roller} />}
 
       {tab === 'stats' && (
         <div className="stat-grid-6">
@@ -493,27 +486,7 @@ export default function Character() {
         </div>
       )}
       <ToastContainer />
-      {builder === 'choose' && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }} onClick={() => setBuilder(null)}>
-          <div className="card" style={{ width: '100%', maxWidth: 420, padding: 22 }} onClick={e => e.stopPropagation()}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
-              <h3 style={{ margin: 0, fontSize: 17 }}>New Character</h3>
-              <button onClick={() => setBuilder(null)} style={{ background: 'none', border: 'none', fontSize: 18, cursor: 'pointer', color: 'var(--text-2)' }}>✕</button>
-            </div>
-            <div style={{ fontSize: 13, color: 'var(--text-2)', marginBottom: 16 }}>How would you like to build your character?</div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              <button className="btn btn-primary" style={{ justifyContent: 'center' }} onClick={() => { setCreatorNew(true); setBuilder('create') }}>
-                Guided Creator <span style={{ opacity: 0.7, fontWeight: 400, marginLeft: 6, fontSize: 11 }}>WOTC</span>
-              </button>
-              <button className="btn btn-ghost" style={{ justifyContent: 'center' }} onClick={() => { setCreatorNew(true); setBuilder('custom') }}>Custom</button>
-            </div>
-            <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 12, lineHeight: 1.5 }}>Guided Creator walks you through the 5e rules step by step. Custom lets you build freely (homebrew races, classes and backgrounds) through the same stages.</div>
-          </div>
-        </div>
-      )}
-      {builder === 'create' && <CharacterCreator onClose={() => { setBuilder(null); setCreatorNew(false) }} onComplete={applyBuild} />}
       {builder === 'custom' && <CustomCharacterBuilder onClose={() => { setBuilder(null); setCreatorNew(false) }} onComplete={applyBuild} />}
-      {builder === 'levelup' && <LevelUp char={form} onClose={() => setBuilder(null)} onComplete={applyBuild} />}
       {showUpgrade && <UpgradeModal onClose={() => setShowUpgrade(false)} message={`Free accounts are limited to ${FREE_CHAR_LIMIT} characters per campaign. Upgrade to Premium for unlimited characters.`} />}
     </div>
   )

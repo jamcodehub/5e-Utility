@@ -1,6 +1,7 @@
 import { Router } from 'express'
 import jwt from 'jsonwebtoken'
 import { Inventory } from '../models/index.js'
+import { isMember } from './campaigns.js'
 
 const router = Router()
 
@@ -15,6 +16,7 @@ const auth = (req, res, next) => {
 // GET /api/inventory/:campaignId — fetch or auto-create inventory doc
 router.get('/:campaignId', auth, async (req, res) => {
   try {
+    if (!await isMember(req.params.campaignId, req.userId)) return res.status(403).json({ error: 'Not a campaign member' })
     let inv = await Inventory.findOne({ campaign: req.params.campaignId, owner: req.userId })
     if (!inv) {
       inv = await Inventory.create({
@@ -31,6 +33,7 @@ router.get('/:campaignId', auth, async (req, res) => {
 // PUT /api/inventory/:campaignId — upsert (currency + items)
 router.put('/:campaignId', auth, async (req, res) => {
   try {
+    if (!await isMember(req.params.campaignId, req.userId)) return res.status(403).json({ error: 'Not a campaign member' })
     // Exclude `campaign`/`owner`/`_id` — these come from the URL/token, not
     // the client body, otherwise a client could reassign their inventory
     // doc to a different campaign or account via $set.

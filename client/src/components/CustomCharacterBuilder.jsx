@@ -1,10 +1,10 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { loadSrdMany } from '../utils/srd'
-import { ABILITIES, ABILITY_NAMES, abilityMod, fmtMod, proficiencyBonus, hpAtFirstLevel, averageHpGain, spellMode } from '../utils/rules5e'
+import { ABILITIES, ABILITY_NAMES, abilityMod, fmtMod, proficiencyBonus, hpAtFirstLevel, averageHpGain } from '../utils/rules5e'
 import { useCampaign } from '../context/CampaignContext'
 import SrdAttribution from './SrdAttribution'
 
-const STEPS = ['Campaign', 'Race', 'Class', 'Abilities', 'Background', 'Spells', 'Review']
+const STEPS = ['Campaign', 'Race', 'Class', 'Abilities', 'Background', 'Review']
 const chip = (on) => ({
   padding: '5px 11px', borderRadius: 999, fontSize: 12, cursor: 'pointer', userSelect: 'none',
   background: on ? 'var(--gold-bg)' : 'var(--surface2)', color: on ? 'var(--gold)' : 'var(--text-2)',
@@ -13,8 +13,9 @@ const chip = (on) => ({
 const label = { fontSize: 11, fontWeight: 600, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.06em', margin: '14px 0 6px', display: 'block' }
 const skillName = (id) => id.replace('skill-', '').replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
 
-// Free-form character builder: same stages as the guided creator, but nothing is
-// restricted to the SRD, so homebrew races/classes/backgrounds work. SRD lists are suggestions only.
+// Free-form character builder — the only way to create a character. Races and
+// classes offer SRD suggestions as clickable chips, but a homebrew name can
+// always be typed in instead; nothing is restricted to the SRD list.
 export default function CustomCharacterBuilder({ onClose, onComplete, draftKey = 'custom_draft' }) {
   const { campaigns, activeCampaign } = useCampaign()
   const draft = useRef(null)
@@ -36,30 +37,19 @@ export default function CustomCharacterBuilder({ onClose, onComplete, draftKey =
   const [background, setBackground] = useState(d.background ?? '')
   const [skills, setSkills] = useState(d.skills ?? [])
   const [extraProf, setExtraProf] = useState(d.extraProf ?? '')
-  const [spellSel, setSpellSel] = useState(d.spellSel ?? [])
-  const [query, setQuery] = useState('')
-  const [spellLevel, setSpellLevel] = useState('all')
   const [name, setName] = useState(d.name ?? '')
 
   useEffect(() => {
-    localStorage.setItem(draftKey, JSON.stringify({ step, campaignId, race, speed, languages, className, level, hpMax, ac, stats, background, skills, extraProf, spellSel, name }))
-  }, [draftKey, step, campaignId, race, speed, languages, className, level, hpMax, ac, stats, background, skills, extraProf, spellSel, name])
+    localStorage.setItem(draftKey, JSON.stringify({ step, campaignId, race, speed, languages, className, level, hpMax, ac, stats, background, skills, extraProf, name }))
+  }, [draftKey, step, campaignId, race, speed, languages, className, level, hpMax, ac, stats, background, skills, extraProf, name])
 
-  useEffect(() => { loadSrdMany('core', 'classes', 'races', 'backgrounds', 'spells').then(setData) }, [])
+  useEffect(() => { loadSrdMany('core', 'classes', 'races', 'backgrounds').then(setData) }, [])
 
   const srdClass = data?.classes.find(c => c.name.toLowerCase() === className.trim().toLowerCase())
   const lvl = Math.max(1, Math.min(20, Number(level) || 1))
   const conMod = abilityMod(stats.con)
   const suggestedHp = srdClass ? hpAtFirstLevel(srdClass.hitDie, conMod) + (lvl - 1) * Math.max(1, averageHpGain(srdClass.hitDie) + conMod) : 10
   const hp = hpMax === '' ? suggestedHp : Math.max(1, Number(hpMax) || 1)
-
-  const spellList = useMemo(() => {
-    if (!data) return []
-    const q = query.toLowerCase()
-    return data.spells.filter(s => s.name.toLowerCase().includes(q)
-      && (spellLevel === 'all' || s.level === Number(spellLevel))
-      && (!srdClass || !srdClass.spellcasting || s.classes.includes(srdClass.id)))
-  }, [data, query, spellLevel, srdClass])
 
   const stepName = STEPS[step]
   const valid = () => {
@@ -71,16 +61,6 @@ export default function CustomCharacterBuilder({ onClose, onComplete, draftKey =
   }
 
   const finish = () => {
-    const byId = Object.fromEntries((data?.spells || []).map(s => [s.id, s]))
-    const cantrips = spellSel.filter(id => byId[id]?.level === 0)
-    const leveled = spellSel.filter(id => byId[id]?.level > 0)
-    const mode = srdClass?.spellcasting ? spellMode(srdClass.id) : 'known'
-    const spells = {
-      cantrips,
-      known: mode === 'prepare-all' ? [] : leveled,
-      prepared: mode === 'known' ? [] : leveled,
-      slotsUsed: {},
-    }
     localStorage.removeItem(draftKey)
     onComplete(campaignId, {
       name: name.trim(),
@@ -98,7 +78,6 @@ export default function CustomCharacterBuilder({ onClose, onComplete, draftKey =
         classId: srdClass?.id || '', raceId: '', backgroundId: 'custom', abilityMethod: 'manual', custom: true,
         skills, languages: languages.split(',').map(s => s.trim()).filter(Boolean), equipment: [], features: [], hpRolls: [], asiLog: [],
       },
-      spells,
     })
   }
 
@@ -128,8 +107,13 @@ export default function CustomCharacterBuilder({ onClose, onComplete, draftKey =
           {stepName === 'Race' && (
             <>
               <span style={label}>Race / Species</span>
-              <input className="input" list="cb-races" value={race} onChange={e => setRace(e.target.value)} placeholder="Type your own, or pick a suggestion" autoFocus />
-              <datalist id="cb-races">{data?.races.map(r => <option key={r.id} value={r.name} />)}</datalist>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                {data?.races.map(r => (
+                  <span key={r.id} style={chip(race.trim().toLowerCase() === r.name.toLowerCase())} onClick={() => setRace(r.name)}>{r.name}</span>
+                ))}
+              </div>
+              <span style={label}>Or your own (homebrew)</span>
+              <input className="input" value={race} onChange={e => setRace(e.target.value)} placeholder="Name your race / species" />
               <span style={label}>Speed (ft.)</span>
               <input className="input" type="number" value={speed} onChange={e => setSpeed(e.target.value)} style={{ maxWidth: 120 }} />
               <span style={label}>Languages (comma separated)</span>
@@ -140,8 +124,13 @@ export default function CustomCharacterBuilder({ onClose, onComplete, draftKey =
           {stepName === 'Class' && (
             <>
               <span style={label}>Class</span>
-              <input className="input" list="cb-classes" value={className} onChange={e => setClassName(e.target.value)} placeholder="Type your own, or pick a suggestion" autoFocus />
-              <datalist id="cb-classes">{data?.classes.map(c => <option key={c.id} value={c.name} />)}</datalist>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                {data?.classes.map(c => (
+                  <span key={c.id} style={chip(className.trim().toLowerCase() === c.name.toLowerCase())} onClick={() => setClassName(c.name)}>{c.name}</span>
+                ))}
+              </div>
+              <span style={label}>Or your own (homebrew)</span>
+              <input className="input" value={className} onChange={e => setClassName(e.target.value)} placeholder="Name your class" />
               <span style={label}>Level</span>
               <input className="input" type="number" min={1} max={20} value={level} onChange={e => setLevel(e.target.value)} style={{ maxWidth: 120 }} />
               <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 8 }}>
@@ -180,30 +169,6 @@ export default function CustomCharacterBuilder({ onClose, onComplete, draftKey =
             </>
           )}
 
-          {stepName === 'Spells' && (
-            <>
-              <div style={{ fontSize: 12, color: 'var(--text-3)', margin: '10px 0' }}>
-                Optional. Pick any spells your character has — there are no limits in custom mode.{srdClass?.spellcasting ? ` Showing the ${srdClass.name} spell list.` : ''} ({spellSel.length} selected)
-              </div>
-              <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
-                <input className="input" placeholder="Search spells…" value={query} onChange={e => setQuery(e.target.value)} />
-                <select className="input" style={{ maxWidth: 130 }} value={spellLevel} onChange={e => setSpellLevel(e.target.value)}>
-                  <option value="all">All levels</option>
-                  <option value="0">Cantrips</option>
-                  {[1, 2, 3, 4, 5, 6, 7, 8, 9].map(l => <option key={l} value={l}>Level {l}</option>)}
-                </select>
-              </div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                {spellList.slice(0, 150).map(s => (
-                  <span key={s.id} style={chip(spellSel.includes(s.id))} onClick={() => setSpellSel(c => c.includes(s.id) ? c.filter(x => x !== s.id) : [...c, s.id])}>
-                    {s.name} <span style={{ opacity: 0.6 }}>{s.level === 0 ? 'C' : s.level}</span>
-                  </span>
-                ))}
-              </div>
-              {spellList.length > 150 && <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 6 }}>Showing the first 150. Use search to narrow down.</div>}
-            </>
-          )}
-
           {stepName === 'Review' && (
             <>
               <span style={label}>Character name</span>
@@ -216,11 +181,10 @@ export default function CustomCharacterBuilder({ onClose, onComplete, draftKey =
                 <div><strong>{race} {className}</strong>, level {lvl}{background ? ` · ${background}` : ''}</div>
                 <div>HP {hp} · AC {Number(ac) || 10} · Prof +{proficiencyBonus(lvl)} · Speed {speed} ft.</div>
                 <div>{ABILITIES.map(a => `${a.toUpperCase()} ${stats[a]}`).join(' · ')}</div>
-                {spellSel.length > 0 && <div>{spellSel.length} spell{spellSel.length === 1 ? '' : 's'} selected</div>}
               </div>
             </>
           )}
-          {stepName === 'Spells' && <SrdAttribution />}
+          {(stepName === 'Race' || stepName === 'Class' || stepName === 'Background') && <SrdAttribution />}
         </div>
 
         <div style={{ padding: '12px 20px', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between' }}>

@@ -11,13 +11,17 @@ router.get('/:campaignId', auth, async (req, res) => {
 
 router.post('/:campaignId', auth, async (req, res) => {
   try {
+    if (!await isMember(req.params.campaignId, req.userId)) return res.status(403).json({ error: 'Not a campaign member' })
     const campaign = await Campaign.findById(req.params.campaignId)
     const owner = campaign ? await User.findById(campaign.owner) : null
     if (!owner?.isPremium) {
       const count = await LevelPlan.countDocuments({ campaign: req.params.campaignId })
       if (count >= 5) return res.status(403).json({ error: 'Free campaigns are limited to 5 level plans. Upgrade to the Ultimate DM Toolkit for unlimited plans.' })
     }
-    const plan = await LevelPlan.create({ ...req.body, campaign: req.params.campaignId, owner: req.userId })
+    const plan = await LevelPlan.create({
+      title: req.body.title, content: req.body.content, tokens: req.body.tokens, stairLinks: req.body.stairLinks,
+      campaign: req.params.campaignId, owner: req.userId,
+    })
     res.json(plan)
   } catch (e) { res.status(500).json({ error: e.message }) }
 })

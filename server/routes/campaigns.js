@@ -13,7 +13,13 @@ export const auth = (req, res, next) => {
   } catch { res.status(401).json({ error: 'Unauthorized' }) }
 }
 
-const genCode = () => Math.random().toString(36).slice(2, 8).toUpperCase()
+const genCode = () => Array.from({ length: 6 }, () => '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ'[crypto.randomInt(36)]).join('')
+
+// Fields the client must never set on a character.
+const stripServerFields = (body = {}) => {
+  const { _id, __v, owner, campaign, isPrimary, shareToken, roleplaySessionCount, createdAt, updatedAt, ...safe } = body
+  return safe
+}
 
 router.get('/', auth, async (req, res) => {
   let campaigns = await Campaign.find({
@@ -214,16 +220,17 @@ router.get('/:id/character', auth, async (req, res) => {
 
 router.put('/:id/character', auth, async (req, res) => {
   try {
-    delete req.body.shareToken
+    if (!await isMember(req.params.id, req.userId)) return res.status(403).json({ error: 'Not a campaign member' })
+    const body = stripServerFields(req.body)
     let primary = await ensurePrimary(req.params.id, req.userId)
     if (primary) {
-      Object.assign(primary, req.body)
+      Object.assign(primary, body)
       await primary.save()
       return res.json(primary)
     }
     // No characters at all yet for this campaign — creating the first one
     // is always within the free 2-per-campaign limit.
-    const char = await Character.create({ ...req.body, campaign: req.params.id, owner: req.userId, isPrimary: true })
+    const char = await Character.create({ ...body, campaign: req.params.id, owner: req.userId, isPrimary: true })
     res.json(char)
   } catch (e) { res.status(500).json({ error: e.message }) }
 })
@@ -238,13 +245,13 @@ router.get('/:id/characters', auth, async (req, res) => {
 
 router.post('/:id/characters', auth, async (req, res) => {
   try {
-    delete req.body.shareToken
+    if (!await isMember(req.params.id, req.userId)) return res.status(403).json({ error: 'Not a campaign member' })
     const user = await User.findById(req.userId)
     const count = await Character.countDocuments({ campaign: req.params.id, owner: req.userId })
     if (!user.isPremium && count >= 2) {
       return res.status(403).json({ error: 'Free accounts are limited to 2 characters per campaign. Upgrade to Premium for unlimited characters.' })
     }
-    const char = await Character.create({ ...req.body, campaign: req.params.id, owner: req.userId, isPrimary: count === 0 })
+    const char = await Character.create({ ...stripServerFields(req.body), campaign: req.params.id, owner: req.userId, isPrimary: count === 0 })
     res.json(char)
   } catch (e) { res.status(500).json({ error: e.message }) }
 })
@@ -259,8 +266,7 @@ router.put('/:id/characters/:charId', auth, async (req, res) => {
       ? { _id: req.params.charId, campaign: req.params.id }
       : { _id: req.params.charId, campaign: req.params.id, owner: req.userId }
     // The DM may only touch HP (combat tracker); full edits remain owner-only.
-    delete req.body.shareToken
-    const body = isDm ? { hp: req.body.hp } : req.body
+    const body = isDm ? { hp: req.body.hp } : stripServerFields(req.body)
     const char = await Character.findOneAndUpdate(filter, body, { new: true })
     if (!char) return res.status(404).json({ error: 'Character not found' })
     res.json(char)

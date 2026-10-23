@@ -111,7 +111,17 @@ export function attachRealtime(httpServer) {
       try {
         const plan = await LevelPlan.findById(planId)
         if (!plan || !await isMember(plan.campaign, socket.userId)) return
-        plan.tokens = tokens || []
+        let next = Array.isArray(tokens) ? tokens : []
+        if (String(plan.owner) !== socket.userId) {
+          // Non-DMs may only move existing tokens; hp and membership are DM-controlled.
+          const existing = new Map((plan.tokens || []).map(t => [t.id, t]))
+          next = next.filter(t => existing.has(t.id)).map(t => {
+            const prev = existing.get(t.id)
+            return { ...t, hp: prev.hp, maxHp: prev.maxHp }
+          })
+          if (next.length !== existing.size) next = (plan.tokens || []).map(prev => next.find(t => t.id === prev.id) || prev)
+        }
+        plan.tokens = next
         await plan.save()
         socket.to(`level:${planId}`).emit('level:tokens', plan.tokens)
       } catch { /* ignore persist failure, clients stay locally in sync */ }

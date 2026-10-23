@@ -52,6 +52,13 @@ const sendOtp = async (user, code) => {
   })
 }
 
+// Failed 2FA guesses per user; the code is burned after too many.
+const otpAttempts = new Map()
+const safeEqual = (a, b) => {
+  const x = Buffer.from(a), y = Buffer.from(b)
+  return x.length === y.length && crypto.timingSafeEqual(x, y)
+}
+
 const publicUser = (user) => ({
   id: user._id, username: user.username, email: user.email,
   phone: user.phone || '', isPremium: user.isPremium,
@@ -97,7 +104,8 @@ router.post('/login', async (req, res) => {
       return res.status(401).json({ error: 'Invalid credentials' })
 
     if (user.twoFactorEnabled) {
-      const code = String(Math.floor(100000 + Math.random() * 900000))
+      const code = String(crypto.randomInt(100000, 1000000))
+      otpAttempts.delete(String(user._id))
       user.twoFactorCode = code
       user.twoFactorCodeExpires = new Date(Date.now() + 10 * 60 * 1000)
       await user.save()
@@ -116,8 +124,19 @@ router.post('/2fa/verify', async (req, res) => {
     const code = asString(req.body.code)
     if (!userId || !code) return res.status(401).json({ error: 'Invalid or expired code' })
     const user = await User.findById(userId)
-    if (!user || !user.twoFactorCode || user.twoFactorCode !== code)
+    if (!user || !user.twoFactorCode) return res.status(401).json({ error: 'Invalid or expired code' })
+    if (!safeEqual(user.twoFactorCode, code)) {
+      const fails = (otpAttempts.get(userId) || 0) + 1
+      otpAttempts.set(userId, fails)
+      if (fails >= 5) {
+        user.twoFactorCode = ''
+        user.twoFactorCodeExpires = undefined
+        await user.save()
+        otpAttempts.delete(userId)
+      }
       return res.status(401).json({ error: 'Invalid or expired code' })
+    }
+    otpAttempts.delete(userId)
     if (user.twoFactorCodeExpires && user.twoFactorCodeExpires < new Date())
       return res.status(401).json({ error: 'Code expired, please log in again' })
 

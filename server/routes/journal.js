@@ -24,6 +24,7 @@ router.get('/:campaignId', auth, async (req, res) => {
 
 router.post('/:campaignId', auth, async (req, res) => {
   try {
+    if (!await isMember(req.params.campaignId, req.userId)) return res.status(403).json({ error: 'Not a campaign member' })
     const user = await User.findById(req.userId)
     if (!user.isPremium) {
       const count = await Journal.countDocuments({ campaign: req.params.campaignId, author: req.userId })

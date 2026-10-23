@@ -315,6 +315,11 @@ export default function LevelBuilder() {
   const [tapToPlaceTokenId, setTapToPlaceTokenId] = useState(null)
   const [cellSize, setCellSize] = useState(28)
   const gridRef = useRef(null)
+  const scrollRef = useRef(null)
+  const playRootRef = useRef(null)
+  const panRef = useRef(null)
+  const [zoom, setZoom] = useState(1)
+  const [isFullscreen, setIsFullscreen] = useState(false)
   const dragPreviewRef = useRef(null)
   const remoteUpdateRef = useRef(false)
   const [viewers, setViewers] = useState([]) // who's currently looking at this board
@@ -324,10 +329,44 @@ export default function LevelBuilder() {
   toastRef.current = toast
 
   const startTokenDrag = (e, tokenId) => {
-    e.preventDefault()
+    e.preventDefault?.()
+    e.stopPropagation?.()
     setDragTokenId(tokenId)
     setDragPreviewToken(tokens.find(token => token.id === tokenId) || availableTokens.find(token => token.id === tokenId))
     setDragPosition({ x: e.clientX, y: e.clientY })
+  }
+
+  const changeZoom = (delta, reset = false) => setZoom(z => reset ? 1 : Math.max(1, Math.min(4, z + delta)))
+
+  const toggleFullscreen = () => {
+    if (document.fullscreenElement) document.exitFullscreen?.()
+    else playRootRef.current?.requestFullscreen?.().catch(() => {})
+  }
+
+  useEffect(() => {
+    const sync = () => setIsFullscreen(Boolean(document.fullscreenElement))
+    document.addEventListener('fullscreenchange', sync)
+    return () => document.removeEventListener('fullscreenchange', sync)
+  }, [])
+
+  // Drag-to-pan on the zoomed map (scrollbars are hidden)
+  const startPan = (e) => {
+    const el = scrollRef.current
+    if (!el || zoom <= 1 || e.button > 0 || e.target.closest('button')) return
+    panRef.current = { x: e.clientX, y: e.clientY, left: el.scrollLeft, top: el.scrollTop }
+    const move = (ev) => {
+      const p = panRef.current
+      if (!p) return
+      el.scrollLeft = p.left - (ev.clientX - p.x)
+      el.scrollTop = p.top - (ev.clientY - p.y)
+    }
+    const up = () => {
+      panRef.current = null
+      window.removeEventListener('pointermove', move)
+      window.removeEventListener('pointerup', up)
+    }
+    window.addEventListener('pointermove', move)
+    window.addEventListener('pointerup', up)
   }
 
   useEffect(() => {
@@ -352,11 +391,7 @@ export default function LevelBuilder() {
       setDragTokenId(null)
       setDragPreviewToken(null)
     }
-    const moveDrag = (e) => {
-      if (!dragPreviewRef.current) return
-      dragPreviewRef.current.style.left = `${e.clientX}px`
-      dragPreviewRef.current.style.top = `${e.clientY}px`
-    }
+    const moveDrag = (e) => setDragPosition({ x: e.clientX, y: e.clientY })
     const cancelDrag = () => {
       setDragTokenId(null)
       setDragPreviewToken(null)
@@ -765,6 +800,7 @@ export default function LevelBuilder() {
   // previously this only updated local component state, so HP changes were
   // lost on reload and lore combatants kept reverting to their default/10.
   const adjustTokenHp = (id, delta) => {
+    if (!isDm) return
     setTokens(ts => ts.map(t => {
       if (t.id !== id) return t
       const nextHp = Math.max(0, Math.min(t.maxHp, (t.hp || 0) + delta))
@@ -1069,8 +1105,10 @@ export default function LevelBuilder() {
 
   // ── PLAY MODE ──
   if (mode === 'play') return (
-    <div className="level-play" style={{ height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+    <div ref={playRootRef} className="level-play" style={{ height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden', background: 'var(--bg, #111)' }}>
       <style>{`
+        .level-play-scroll { scrollbar-width: none; -ms-overflow-style: none; }
+        .level-play-scroll::-webkit-scrollbar { display: none; }
         .level-play-map, .level-play-map * { user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
         .level-play-content { min-height: 0; }
         .level-play-token-list { flex: 1; overflow-y: auto; padding: 8px; }
@@ -1175,14 +1213,21 @@ export default function LevelBuilder() {
 
       <div className="level-play-content" style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
         {/* Map area */}
-        <div className="level-play-map" style={{ flex: 1, overflow: 'auto', padding: 12, background: '#1a1a1a', display: 'flex', alignItems: 'flex-start', justifyContent: 'center' }}>
+        <div className="level-play-map" style={{ flex: 1, minWidth: 0, position: 'relative', overflow: 'hidden', padding: 12, background: '#1a1a1a' }}>
+          <div
+            ref={scrollRef}
+            className="level-play-scroll"
+            onPointerDown={startPan}
+            style={{ width: '100%', height: '100%', overflow: 'auto', cursor: zoom > 1 && !dragTokenId ? 'grab' : undefined }}
+          >
           <div
             ref={gridRef}
             style={{
               display: 'grid',
               gridTemplateColumns: `repeat(${GRID_W}, 1fr)`,
-              width: '100%',
-              maxWidth: `calc((100vh - 120px) * ${GRID_W / GRID_H})`,
+              width: `${zoom * 100}%`,
+              maxWidth: zoom > 1 ? 'none' : `calc((100vh - ${isFullscreen ? 70 : 120}px) * ${GRID_W / GRID_H})`,
+              margin: '0 auto',
               background: darkMode ? '#000' : '#fff',
               border: '3px solid #4a3f33',
               borderRadius: 4,
@@ -1254,14 +1299,24 @@ export default function LevelBuilder() {
               )
             }))}
           </div>
+          </div>
+          <div style={{ position: 'absolute', right: 18, bottom: 18, display: 'flex', gap: 4, opacity: 0.35, transition: 'opacity .15s', zIndex: 20 }} onMouseEnter={e => { e.currentTarget.style.opacity = 0.95 }} onMouseLeave={e => { e.currentTarget.style.opacity = 0.35 }}>
+            {[
+              { label: '−', title: 'Zoom out', onClick: () => changeZoom(-0.5), disabled: zoom <= 1 },
+              { label: `${Math.round(zoom * 100)}%`, title: 'Reset zoom', onClick: () => changeZoom(0, true), disabled: zoom === 1 },
+              { label: '+', title: 'Zoom in', onClick: () => changeZoom(0.5), disabled: zoom >= 4 },
+              { label: isFullscreen ? '⤡' : '⤢', title: isFullscreen ? 'Exit fullscreen' : 'Fullscreen', onClick: toggleFullscreen },
+            ].map(b => (
+              <button key={b.title} type="button" title={b.title} aria-label={b.title} disabled={b.disabled} onClick={b.onClick}
+                style={{ minWidth: 32, height: 32, padding: '0 8px', border: '1px solid rgba(255,255,255,0.35)', borderRadius: 6, background: 'rgba(0,0,0,0.6)', color: '#fff', fontSize: 13, cursor: 'pointer' }}>{b.label}</button>
+            ))}
+          </div>
         </div>
 
-        {/* Token sidebar */}
-        <div className="level-play-tokens" style={{ width: 220, flexShrink: 0, background: 'var(--surface)', borderLeft: '1px solid var(--border)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-          <div style={{ padding: '10px 12px', borderBottom: '1px solid var(--border)', fontSize: 11, fontWeight: 600, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-            Tokens — drag (hold on mobile) or tap, then tap map
-          </div>
-          <div className="level-play-token-list">
+        {/* Token sidebar (DM only) */}
+        {isDm && (
+        <div className="level-play-tokens" style={{ width: 240, flexShrink: 0, display: 'flex', flexDirection: 'column', background: 'var(--surface)', borderLeft: '1px solid var(--border)', overflow: 'hidden' }}>
+        <div className="level-play-token-list">
             {/* Section: Players */}
             {availableTokens.filter(t => t.type === 'player').length > 0 && (
               <>
@@ -1339,6 +1394,7 @@ export default function LevelBuilder() {
             </div>
           )}
         </div>
+        )}
       </div>
       {dragPreviewToken && createPortal(
         <div
@@ -1368,7 +1424,7 @@ export default function LevelBuilder() {
             : <span style={{ fontSize: Math.max(10, cellSize * 0.35), color: '#fff', fontWeight: 700, fontFamily: 'Cinzel, serif' }}>{dragPreviewToken.name?.[0]?.toUpperCase() || '?'}</span>
           }
         </div>,
-        document.body,
+        playRootRef.current || document.body,
       )}
     </div>
   )
