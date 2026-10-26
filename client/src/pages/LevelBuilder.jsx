@@ -247,6 +247,8 @@ function PeekingViewers({ viewers }) {
   )
 }
 
+const dragPreviewTransform = ({ x, y }) => `translate3d(${x}px, ${y}px, 0) translate(-50%, -50%) scale(1.08)`
+
 function Token({ token, cellSize, onDragStart, dragging }) {
   const initials = token.name?.[0]?.toUpperCase() || '?'
   return (
@@ -311,7 +313,7 @@ export default function LevelBuilder() {
   const [availableTokens, setAvailableTokens] = useState([]) // sidebar token pool
   const [dragTokenId, setDragTokenId] = useState(null)
   const [dragPreviewToken, setDragPreviewToken] = useState(null)
-  const [dragPosition, setDragPosition] = useState({ x: 0, y: 0 })
+  const dragPosRef = useRef({ x: 0, y: 0 })
   const [tapToPlaceTokenId, setTapToPlaceTokenId] = useState(null)
   const [cellSize, setCellSize] = useState(28)
   const gridRef = useRef(null)
@@ -333,7 +335,7 @@ export default function LevelBuilder() {
     e.stopPropagation?.()
     setDragTokenId(tokenId)
     setDragPreviewToken(tokens.find(token => token.id === tokenId) || availableTokens.find(token => token.id === tokenId))
-    setDragPosition({ x: e.clientX, y: e.clientY })
+    dragPosRef.current = { x: e.clientX, y: e.clientY }
   }
 
   const changeZoom = (delta, reset = false) => setZoom(z => reset ? 1 : Math.max(1, Math.min(4, z + delta)))
@@ -391,7 +393,12 @@ export default function LevelBuilder() {
       setDragTokenId(null)
       setDragPreviewToken(null)
     }
-    const moveDrag = (e) => setDragPosition({ x: e.clientX, y: e.clientY })
+    // Move the preview straight in the DOM: no React re-render of the whole grid per pointermove
+    const moveDrag = (e) => {
+      dragPosRef.current = { x: e.clientX, y: e.clientY }
+      const node = dragPreviewRef.current
+      if (node) node.style.transform = dragPreviewTransform(dragPosRef.current)
+    }
     const cancelDrag = () => {
       setDragTokenId(null)
       setDragPreviewToken(null)
@@ -1225,7 +1232,7 @@ export default function LevelBuilder() {
             ref={scrollRef}
             className="level-play-scroll"
             onPointerDown={startPan}
-            style={{ position: 'absolute', inset: 0, overflow: 'auto', cursor: zoom > 1 && !dragTokenId ? 'grab' : undefined }}
+            style={{ position: 'absolute', inset: 0, overflow: 'auto', cursor: zoom > 1 && !dragTokenId ? 'grab' : undefined, touchAction: dragTokenId ? 'none' : undefined }}
           >
           <div
             ref={gridRef}
@@ -1410,11 +1417,12 @@ export default function LevelBuilder() {
           aria-hidden="true"
           style={{
             position: 'fixed',
-            left: dragPosition.x,
-            top: dragPosition.y,
+            left: 0,
+            top: 0,
+            willChange: 'transform',
             width: Math.max(24, cellSize - 4),
             height: Math.max(24, cellSize - 4),
-            transform: 'translate(-50%, -50%) scale(1.08)',
+            transform: dragPreviewTransform(dragPosRef.current),
             borderRadius: '50%',
             overflow: 'hidden',
             background: dragPreviewToken.color || '#6366f1',
