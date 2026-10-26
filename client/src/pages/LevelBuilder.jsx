@@ -339,8 +339,8 @@ export default function LevelBuilder() {
   const changeZoom = (delta, reset = false) => setZoom(z => reset ? 1 : Math.max(1, Math.min(4, z + delta)))
 
   const toggleFullscreen = () => {
-    if (document.fullscreenElement) document.exitFullscreen?.()
-    else playRootRef.current?.requestFullscreen?.().catch(() => {})
+    if (document.fullscreenElement) Promise.resolve(document.exitFullscreen?.()).catch(() => {})
+    else Promise.resolve(playRootRef.current?.requestFullscreen?.()).catch(() => {})
   }
 
   useEffect(() => {
@@ -479,11 +479,16 @@ export default function LevelBuilder() {
   // Measure cell size from grid DOM
   useEffect(() => {
     if (!gridRef.current) return
+    let frame = 0
     const obs = new ResizeObserver(() => {
-      if (gridRef.current) setCellSize(gridRef.current.offsetWidth / GRID_W)
+      cancelAnimationFrame(frame)
+      frame = requestAnimationFrame(() => {
+        const width = gridRef.current?.offsetWidth
+        if (width) setCellSize(prev => Math.abs(prev - width / GRID_W) < 0.5 ? prev : width / GRID_W)
+      })
     })
     obs.observe(gridRef.current)
-    return () => obs.disconnect()
+    return () => { cancelAnimationFrame(frame); obs.disconnect() }
   }, [mode])
 
   // ── Real-time collaborative board ──
@@ -1105,7 +1110,7 @@ export default function LevelBuilder() {
 
   // ── PLAY MODE ──
   if (mode === 'play') return (
-    <div ref={playRootRef} className="level-play" style={{ height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden', background: 'var(--bg, #111)' }}>
+    <div ref={playRootRef} className="level-play" style={{ height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden', background: isFullscreen ? '#000' : 'var(--bg, #111)' }}>
       <style>{`
         .level-play-scroll { scrollbar-width: none; -ms-overflow-style: none; }
         .level-play-scroll::-webkit-scrollbar { display: none; }
@@ -1189,7 +1194,7 @@ export default function LevelBuilder() {
         }
       `}</style>
       {/* Play toolbar */}
-      <div className="level-play-toolbar" style={{ padding: '10px 16px', background: 'var(--surface)', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
+      {!isFullscreen && <div className="level-play-toolbar" style={{ padding: '10px 16px', background: 'var(--surface)', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
         <span style={{ fontFamily: 'Cinzel, serif', fontSize: 14, fontWeight: 600, flex: 1 }}>{selectedPlan?.title}</span>
         <PeekingViewers viewers={viewers} />
         {isDm && (
@@ -1209,16 +1214,16 @@ export default function LevelBuilder() {
         )}
         <button className="btn btn-ghost btn-sm" onClick={() => { setTokens([]); setMode('gallery') }}>← Back</button>
         {isDm && <button className="btn btn-primary btn-sm" onClick={() => openEditor(selectedPlan)}>Edit Map</button>}
-      </div>
+      </div>}
 
       <div className="level-play-content" style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
         {/* Map area */}
-        <div className="level-play-map" style={{ flex: 1, minWidth: 0, position: 'relative', overflow: 'hidden', padding: 12, background: '#1a1a1a' }}>
+        <div className="level-play-map" style={{ flex: 1, minWidth: 0, position: 'relative', overflow: 'hidden', padding: isFullscreen ? 0 : 12, background: isFullscreen ? '#000' : '#1a1a1a' }}>
           <div
             ref={scrollRef}
             className="level-play-scroll"
             onPointerDown={startPan}
-            style={{ width: '100%', height: '100%', overflow: 'auto', cursor: zoom > 1 && !dragTokenId ? 'grab' : undefined }}
+            style={{ width: '100%', height: '100%', overflow: 'auto', cursor: zoom > 1 && !dragTokenId ? 'grab' : undefined, ...(isFullscreen ? { display: 'flex' } : {}) }}
           >
           <div
             ref={gridRef}
@@ -1226,11 +1231,12 @@ export default function LevelBuilder() {
               display: 'grid',
               gridTemplateColumns: `repeat(${GRID_W}, 1fr)`,
               width: `${zoom * 100}%`,
-              maxWidth: zoom > 1 ? 'none' : `calc((100vh - ${isFullscreen ? 70 : 120}px) * ${GRID_W / GRID_H})`,
-              margin: '0 auto',
+              maxWidth: zoom > 1 ? 'none' : isFullscreen ? `calc(100vh * ${GRID_W / GRID_H})` : `calc((100vh - 120px) * ${GRID_W / GRID_H})`,
+              margin: isFullscreen ? 'auto' : '0 auto',
+              flexShrink: isFullscreen ? 0 : undefined,
               background: darkMode ? '#000' : '#fff',
-              border: '3px solid #4a3f33',
-              borderRadius: 4,
+              border: isFullscreen ? 'none' : '3px solid #4a3f33',
+              borderRadius: isFullscreen ? 0 : 4,
               overflow: 'hidden',
               position: 'relative',
               userSelect: 'none',
@@ -1313,8 +1319,8 @@ export default function LevelBuilder() {
           </div>
         </div>
 
-        {/* Token sidebar (DM only) */}
-        {isDm && (
+        {/* Token sidebar (DM only, hidden in fullscreen) */}
+        {isDm && !isFullscreen && (
         <div className="level-play-tokens" style={{ width: 240, flexShrink: 0, display: 'flex', flexDirection: 'column', background: 'var(--surface)', borderLeft: '1px solid var(--border)', overflow: 'hidden' }}>
         <div className="level-play-token-list">
             {/* Section: Players */}
