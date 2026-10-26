@@ -9,6 +9,10 @@ import { getSocket } from '../utils/socket'
 import { isPublicDemoPath } from '../utils/demoRuntime'
 import { SkeletonBlock } from '../components/Skeleton'
 import { TILES, OBJECT_TILES } from '../data/levelTiles'
+import { THEMES, DEFAULT_THEME, resolveThemeId, getThemeTiles } from '../data/levelThemes'
+// Note: module-level TILES / OBJECT_TILES above are the base (Medieval) set, used for
+// logic that doesn't depend on artwork. MapThumb and LevelBuilder shadow them with the
+// active theme's tiles (same ids, different art).
 
 // A3 landscape ratio ≈ 420/297
 const GRID_W = 32
@@ -136,7 +140,9 @@ function TileIconPlaceholder({ tile, style = {} }) {
       }} />
 }
 
-function MapThumb({ content }) {
+function MapThumb({ content, theme }) {
+  const { TILES, OBJECT_TILES } = getThemeTiles(theme)
+  const objectTile = id => OBJECT_TILES.find(tile => tile.id === id)
   const tintId = useId().replace(/:/g, '')
   const iconColors = [...new Set([...TILES, ...OBJECT_TILES].map(tile => tile.iconColor).filter(Boolean))]
   const grid = useMemo(() => {
@@ -322,6 +328,15 @@ export default function LevelBuilder() {
   const panRef = useRef(null)
   const [zoom, setZoom] = useState(1)
   const [isFullscreen, setIsFullscreen] = useState(false)
+  const [showTokens, setShowTokens] = useState(true)
+
+  // ── Tile theme ── (map grids store tile ids, so a theme only swaps the artwork)
+  const [editTheme, setEditTheme] = useState(DEFAULT_THEME)
+  const themeId = mode === 'editor'
+    ? editTheme
+    : resolveThemeId(plans.find(p => p._id === selectedPlanId)?.theme)
+  const { TILES, OBJECT_TILES } = getThemeTiles(themeId)
+  const objectTile = id => OBJECT_TILES.find(tile => tile.id === id)
   const dragPreviewRef = useRef(null)
   const remoteUpdateRef = useRef(false)
   const [viewers, setViewers] = useState([]) // who's currently looking at this board
@@ -602,6 +617,7 @@ export default function LevelBuilder() {
       setStairLinks(blankStairLinks())
       setDoorStates(blankDoorStates())
     }
+    setEditTheme(resolveThemeId(plan?.theme))
     setEditLayer('ground')
     setTool('wall')
     setLinkMode(false)
@@ -660,6 +676,7 @@ export default function LevelBuilder() {
         title,
         content: JSON.stringify({ ground: grid, objects: objectGrid, stairLinks }),
         doorStates,
+        theme: editTheme,
       }
       const plan = editPlanId
         ? await api(`/levels/${editPlanId}`, { method: 'PUT', body })
@@ -973,6 +990,18 @@ export default function LevelBuilder() {
       {/* Editor toolbar */}
       <div style={{ padding: '10px 16px', background: 'var(--surface)', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0, flexWrap: 'wrap' }}>
         <input className="input" placeholder="Map title" value={editTitle} onChange={e => setEditTitle(e.target.value)} style={{ width: 200 }} />
+        <select
+          className="input"
+          aria-label="Tile theme"
+          title="Tile theme"
+          value={editTheme}
+          onChange={e => setEditTheme(resolveThemeId(e.target.value))}
+          style={{ width: 190 }}
+        >
+          {THEMES.map(theme => (
+            <option key={theme.id} value={theme.id} disabled={!theme.available}>{theme.label}</option>
+          ))}
+        </select>
         {isDm && editPlanId && (
           <button
             type="button"
@@ -1125,6 +1154,9 @@ export default function LevelBuilder() {
         .level-play-scroll::-webkit-scrollbar { display: none; }
         .level-play-map, .level-play-map * { user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
         .level-play-content { min-height: 0; }
+        .level-play-controls { right: 18px; }
+        .level-play-controls[data-tokens-open="true"] { right: 258px; }
+        .level-play-tokens { border-left: 1px solid var(--border); overflow: hidden; }
         .level-play-token-list { flex: 1; overflow-y: auto; padding: 8px; }
         .level-play-token-heading { font-size: 10px; color: var(--text-3); margin-bottom: 4px; margin-top: 4px; text-transform: uppercase; letter-spacing: 0.05em; }
         .level-play-token-entry { margin-bottom: 4px; }
@@ -1191,7 +1223,8 @@ export default function LevelBuilder() {
           .level-play-content { flex-direction: column; }
           .level-play-map { min-height: 0; flex: 1 1 auto !important; padding: 0 !important; }
           .level-play-map > div { width: 100% !important; max-width: 100% !important; }
-          .level-play-tokens { width: 100% !important; height: 38%; min-height: 155px; max-height: 270px; flex: 0 0 38%; border-left: 0 !important; border-top: 1px solid var(--border); }
+          .level-play-tokens { top: auto !important; left: 0 !important; right: 0 !important; width: 100% !important; height: 38%; min-height: 155px; max-height: 270px; border-left: 0 !important; border-top: 1px solid var(--border); }
+          .level-play-controls[data-tokens-open="true"] { right: 18px; bottom: calc(38% + 10px); }
           .level-play-token-list { display: flex; flex: 1 1 auto; flex-direction: row; align-items: stretch; gap: 6px; overflow-x: auto; overflow-y: hidden; padding: 6px 8px; }
           .level-play-token-heading { display: none; }
           .level-play-token-entry { flex: 0 0 148px; margin: 0; }
@@ -1315,8 +1348,9 @@ export default function LevelBuilder() {
             }))}
           </div>
           </div>
-          <div style={{ position: 'absolute', right: 18, bottom: 18, display: 'flex', gap: 4, opacity: 0.35, transition: 'opacity .15s', zIndex: 20 }} onMouseEnter={e => { e.currentTarget.style.opacity = 0.95 }} onMouseLeave={e => { e.currentTarget.style.opacity = 0.35 }}>
+          <div className="level-play-controls" data-tokens-open={isDm && showTokens} style={{ position: 'absolute', bottom: 18, display: 'flex', gap: 4, opacity: 0.35, transition: 'opacity .15s', zIndex: 20 }} onMouseEnter={e => { e.currentTarget.style.opacity = 0.95 }} onMouseLeave={e => { e.currentTarget.style.opacity = 0.35 }}>
             {[
+              ...(isDm ? [{ label: '☰', title: showTokens ? 'Hide tokens panel' : 'Show tokens panel', onClick: () => setShowTokens(v => !v) }] : []),
               { label: '−', title: 'Zoom out', onClick: () => changeZoom(-0.5), disabled: zoom <= 1 },
               { label: `${Math.round(zoom * 100)}%`, title: 'Reset zoom', onClick: () => changeZoom(0, true), disabled: zoom === 1 },
               { label: '+', title: 'Zoom in', onClick: () => changeZoom(0.5), disabled: zoom >= 4 },
@@ -1326,11 +1360,9 @@ export default function LevelBuilder() {
                 style={{ minWidth: 32, height: 32, padding: '0 8px', border: '1px solid rgba(255,255,255,0.35)', borderRadius: 6, background: 'rgba(0,0,0,0.6)', color: '#fff', fontSize: 13, cursor: 'pointer' }}>{b.label}</button>
             ))}
           </div>
-        </div>
-
-        {/* Token sidebar (DM only, hidden in fullscreen) */}
-        {isDm && !isFullscreen && (
-        <div className="level-play-tokens" style={{ width: 240, flexShrink: 0, display: 'flex', flexDirection: 'column', background: 'var(--surface)', borderLeft: '1px solid var(--border)', overflow: 'hidden' }}>
+        {/* Token panel (DM only) — overlays the map so the map keeps the same size for everyone */}
+        {isDm && showTokens && (
+        <div className="level-play-tokens" style={{ position: 'absolute', top: 0, right: 0, bottom: 0, zIndex: 15, width: 240, display: 'flex', flexDirection: 'column', background: 'var(--surface)', borderLeft: '1px solid var(--border)', overflow: 'hidden' }}>
         <div className="level-play-token-list">
             {/* Section: Players */}
             {availableTokens.filter(t => t.type === 'player').length > 0 && (
@@ -1410,6 +1442,7 @@ export default function LevelBuilder() {
           )}
         </div>
         )}
+        </div>
       </div>
       {dragPreviewToken && createPortal(
         <div
@@ -1495,7 +1528,7 @@ export default function LevelBuilder() {
                 onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-3px)'; e.currentTarget.style.boxShadow = '0 8px 24px rgba(0,0,0,0.2)'; e.currentTarget.style.borderColor = 'var(--gold)' }}
                 onMouseLeave={e => { e.currentTarget.style.transform = ''; e.currentTarget.style.boxShadow = ''; e.currentTarget.style.borderColor = 'var(--border)' }}
               >
-                <MapThumb content={plan.content} />
+                <MapThumb content={plan.content} theme={plan.theme} />
                 <div style={{ padding: '10px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                   <span style={{ fontFamily: 'Cinzel, serif', fontSize: 13, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{plan.title}</span>
                   {isDm && (

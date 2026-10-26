@@ -128,6 +128,7 @@ let levelPlans = [{
   content: makeSampleMap(),
   tokens: DEMO_TOKENS.map(token => ({ ...token })),
   darkMode: true,
+  theme: 'medieval',
   doorStates: makeGrid(false),
   createdAt: '2026-10-15T00:00:00.000Z',
 }]
@@ -191,7 +192,7 @@ export function demoApi(path, options = {}) {
     return Promise.resolve(copy(levelPlans[planIndex]))
   }
   if (segments[0] === 'levels' && segments.length === 2 && method === 'POST' && segments[1] === DEMO_CAMPAIGN_ID) {
-    const plan = { _id: `demo-map-${Date.now()}`, ...body, tokens: [], darkMode: false }
+    const plan = { _id: `demo-map-${Date.now()}`, theme: 'medieval', ...body, tokens: [], darkMode: false }
     levelPlans = [...levelPlans, plan]
     return Promise.resolve(copy(plan))
   }
@@ -238,6 +239,7 @@ export function resetDemoApi() {
     content: makeSampleMap(),
     tokens: DEMO_TOKENS.map(token => ({ ...token })),
     darkMode: true,
+    theme: 'medieval',
     doorStates: makeGrid(false),
     createdAt: '2026-10-15T00:00:00.000Z',
   }]
