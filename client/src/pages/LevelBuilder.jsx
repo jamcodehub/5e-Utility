@@ -483,8 +483,10 @@ export default function LevelBuilder() {
     const obs = new ResizeObserver(() => {
       cancelAnimationFrame(frame)
       frame = requestAnimationFrame(() => {
-        const width = gridRef.current?.offsetWidth
-        if (width) setCellSize(prev => Math.abs(prev - width / GRID_W) < 0.5 ? prev : width / GRID_W)
+        const el = gridRef.current
+        if (!el || !el.offsetWidth || !el.offsetHeight) return
+        const size = Math.min(el.offsetWidth / GRID_W, el.offsetHeight / GRID_H)
+        setCellSize(prev => Math.abs(prev - size) < 0.5 ? prev : size)
       })
     })
     obs.observe(gridRef.current)
@@ -1180,7 +1182,7 @@ export default function LevelBuilder() {
           .level-play-toolbar { gap: 6px !important; padding: 8px !important; flex-wrap: wrap; overflow-x: hidden; }
           .level-play-toolbar > span:first-child { flex: 1 0 100%; }
           .level-play-content { flex-direction: column; }
-          .level-play-map { min-height: 0; flex: 1 1 auto !important; padding: 8px !important; }
+          .level-play-map { min-height: 0; flex: 1 1 auto !important; padding: 0 !important; }
           .level-play-map > div { width: 100% !important; max-width: 100% !important; }
           .level-play-tokens { width: 100% !important; height: 38%; min-height: 155px; max-height: 270px; flex: 0 0 38%; border-left: 0 !important; border-top: 1px solid var(--border); }
           .level-play-token-list { display: flex; flex: 1 1 auto; flex-direction: row; align-items: stretch; gap: 6px; overflow-x: auto; overflow-y: hidden; padding: 6px 8px; }
@@ -1218,25 +1220,24 @@ export default function LevelBuilder() {
 
       <div className="level-play-content" style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
         {/* Map area */}
-        <div className="level-play-map" style={{ flex: 1, minWidth: 0, position: 'relative', overflow: 'hidden', padding: isFullscreen ? 0 : 12, background: isFullscreen ? '#000' : '#1a1a1a' }}>
+        <div className="level-play-map" style={{ flex: 1, minWidth: 0, position: 'relative', overflow: 'hidden', padding: 0, background: '#000' }}>
           <div
             ref={scrollRef}
             className="level-play-scroll"
             onPointerDown={startPan}
-            style={{ width: '100%', height: '100%', overflow: 'auto', cursor: zoom > 1 && !dragTokenId ? 'grab' : undefined, ...(isFullscreen ? { display: 'flex' } : {}) }}
+            style={{ position: 'absolute', inset: 0, overflow: 'auto', cursor: zoom > 1 && !dragTokenId ? 'grab' : undefined }}
           >
           <div
             ref={gridRef}
             style={{
               display: 'grid',
               gridTemplateColumns: `repeat(${GRID_W}, 1fr)`,
+              gridTemplateRows: `repeat(${GRID_H}, 1fr)`,
               width: `${zoom * 100}%`,
-              maxWidth: zoom > 1 ? 'none' : isFullscreen ? `calc(100vh * ${GRID_W / GRID_H})` : `calc((100vh - 120px) * ${GRID_W / GRID_H})`,
-              margin: isFullscreen ? 'auto' : '0 auto',
-              flexShrink: isFullscreen ? 0 : undefined,
+              height: `${zoom * 100}%`,
               background: darkMode ? '#000' : '#fff',
-              border: isFullscreen ? 'none' : '3px solid #4a3f33',
-              borderRadius: isFullscreen ? 0 : 4,
+              border: 'none',
+              borderRadius: 0,
               overflow: 'hidden',
               position: 'relative',
               userSelect: 'none',
@@ -1265,7 +1266,8 @@ export default function LevelBuilder() {
                   onClick={event => handlePlayCellClick(event, r, c)}
                   title={visible && isDoor ? (doorOpen ? 'Click to close door' : 'Click to open door') : visible && isStair ? 'Click to use stairs' : undefined}
                   style={{
-                    aspectRatio: '1',
+                    minWidth: 0,
+                    minHeight: 0,
                     background: darkMode && !visible ? '#000' : tileColor(cellBase),
                     border: `0.5px solid ${darkMode && !visible ? 'transparent' : 'rgba(0,0,0,0.08)'}`,
                     position: 'relative',
