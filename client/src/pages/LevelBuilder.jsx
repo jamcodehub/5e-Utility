@@ -1348,9 +1348,9 @@ export default function LevelBuilder() {
             }))}
           </div>
           </div>
-          <div className="level-play-controls" data-tokens-open={isDm && showTokens} style={{ position: 'absolute', bottom: 18, display: 'flex', gap: 4, opacity: 0.35, transition: 'opacity .15s', zIndex: 20 }} onMouseEnter={e => { e.currentTarget.style.opacity = 0.95 }} onMouseLeave={e => { e.currentTarget.style.opacity = 0.35 }}>
+          <div className="level-play-controls" data-tokens-open={isDm && showTokens && !isFullscreen} style={{ position: 'absolute', bottom: 18, display: 'flex', gap: 4, opacity: 0.35, transition: 'opacity .15s', zIndex: 20 }} onMouseEnter={e => { e.currentTarget.style.opacity = 0.95 }} onMouseLeave={e => { e.currentTarget.style.opacity = 0.35 }}>
             {[
-              ...(isDm ? [{ label: '☰', title: showTokens ? 'Hide tokens panel' : 'Show tokens panel', onClick: () => setShowTokens(v => !v) }] : []),
+              ...(isDm && !isFullscreen ? [{ label: '☰', title: showTokens ? 'Hide tokens panel' : 'Show tokens panel', onClick: () => setShowTokens(v => !v) }] : []),
               { label: '−', title: 'Zoom out', onClick: () => changeZoom(-0.5), disabled: zoom <= 1 },
               { label: `${Math.round(zoom * 100)}%`, title: 'Reset zoom', onClick: () => changeZoom(0, true), disabled: zoom === 1 },
               { label: '+', title: 'Zoom in', onClick: () => changeZoom(0.5), disabled: zoom >= 4 },
@@ -1360,8 +1360,8 @@ export default function LevelBuilder() {
                 style={{ minWidth: 32, height: 32, padding: '0 8px', border: '1px solid rgba(255,255,255,0.35)', borderRadius: 6, background: 'rgba(0,0,0,0.6)', color: '#fff', fontSize: 13, cursor: 'pointer' }}>{b.label}</button>
             ))}
           </div>
-        {/* Token panel (DM only) — overlays the map so the map keeps the same size for everyone */}
-        {isDm && showTokens && (
+        {/* Token panel (DM only) — overlays the map so the map keeps the same size for everyone; hidden in fullscreen */}
+        {isDm && showTokens && !isFullscreen && (
         <div className="level-play-tokens" style={{ position: 'absolute', top: 0, right: 0, bottom: 0, zIndex: 15, width: 240, display: 'flex', flexDirection: 'column', background: 'var(--surface)', borderLeft: '1px solid var(--border)', overflow: 'hidden' }}>
         <div className="level-play-token-list">
             {/* Section: Players */}
