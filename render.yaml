@@ -10,8 +10,10 @@ services:
         sync: false        # set manually in Render dashboard
       - key: JWT_SECRET
         generateValue: true
+      # Site addresses allowed to call the API (comma-separated). The FIRST is
+      # used for links in emails and Stripe redirects. No trailing slash.
       - key: CLIENT_URL
-        value: https://5e-utility.netlify.app
+        value: https://www.5eutility.com,https://5eutility.com,https://5e-utility.netlify.app
       - key: PORT
         value: 10000       # Render default
       - key: NODE_ENV

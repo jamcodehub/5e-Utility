@@ -47,7 +47,7 @@ function DemoSidebar({ active }) {
           </Link>
         ))}
       </nav>
-      <Link to="/login" className="demo-sidebar-signin">Sign up to save your content</Link>
+      <Link to="/register" className="demo-sidebar-signin">Sign up to save your content</Link>
     </aside>
   )
 }
@@ -156,7 +156,7 @@ export default function PublicDemo() {
           {showSignupCta && (
             <div className="demo-interaction-prompt">
               <span>Your {activeFeature.label} is just a preview.</span>
-              <Link to="/login">Sign up to save your progress</Link>
+              <Link to="/register">Sign up to save your progress</Link>
             </div>
           )}
         </div>
@@ -170,7 +170,8 @@ export default function PublicDemo() {
           <Link to="/" className="demo-mobile-brand" aria-label="5eUtility home">
             <img src="https://res.cloudinary.com/crcbzpw6/image/upload/v1792054744/house-solid-full.svg" alt="" aria-hidden="true" align="center" className="demo-home-icon" />
           </Link>
-          <Link to="/login" className="demo-topbar-signin">
+          <Link to="/login" className="demo-topbar-login">Sign in</Link>
+          <Link to="/register" className="demo-topbar-signin">
             <img src={signInIconUrl} alt="" aria-hidden="true" />
             <span>Sign up</span>
           </Link>

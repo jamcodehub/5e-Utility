@@ -272,7 +272,7 @@ export default function Journal() {
             {/* Autosave indicator — no manual save button needed */}
             {saving && <span style={{ fontSize: 11, color: 'var(--text-3)' }}>Saving…</span>}
             {isPublicDemoPath() ? (
-              <Link to="/login" className="journal-demo-save-link">Sign in to save journal entries</Link>
+              <Link to="/register" className="journal-demo-save-link">Sign up to save journal entries</Link>
             ) : (
               !saving && activeId && <span style={{ fontSize: 11, color: 'var(--green)' }}>Saved</span>
             )}

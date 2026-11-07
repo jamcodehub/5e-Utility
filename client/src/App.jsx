@@ -217,6 +217,7 @@ function Guard() {
         <Route path="/" element={demoPage} />
         <Route path="/demo/:feature" element={demoPage} />
         <Route path="/login" element={<Auth />} />
+        <Route path="/register" element={<Auth />} />
         <Route path="/reset-password" element={<Auth />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

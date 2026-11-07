@@ -2,13 +2,14 @@ import { Server } from 'socket.io'
 import jwt from 'jsonwebtoken'
 import { LevelPlan, User } from './models/index.js'
 import { isMember } from './routes/campaigns.js'
+import { clientOrigins } from './lib/clientUrl.js'
 
 // Real-time collaborative Level Builder "Play mode" board — everyone viewing
 // the same map (DM + players) sees token moves live and the board persists
 // to the LevelPlan.tokens field so it survives reloads.
 export function attachRealtime(httpServer) {
   const io = new Server(httpServer, {
-    cors: { origin: process.env.CLIENT_URL || 'http://localhost:5173' },
+    cors: { origin: clientOrigins() },
   })
 
   io.use((socket, next) => {

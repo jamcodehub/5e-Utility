@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useLocation } from 'react-router-dom'
 import { api, useAuth, useAuthConfig } from '../context/AuthContext'
 import GoogleButton, { readGoogleCredential } from '../components/GoogleButton'
 
@@ -11,7 +12,10 @@ export default function Auth() {
   const { login, register, verifyTwoFactor, resendTwoFactor, confirmSignup, resendSignup, loginWithGoogle, forgotPassword, resetPassword } = useAuth()
   const config = useAuthConfig()
   const googleClientId = config?.googleClientId || FALLBACK_GOOGLE_CLIENT_ID || ''
-  const [mode, setMode] = useState('login')
+  // /register (where the demo's "Sign up" links go) opens the register form;
+  // /login opens sign-in for returning users.
+  const location = useLocation()
+  const [mode, setMode] = useState(location.pathname === '/register' ? 'register' : 'login')
   const [form, setForm] = useState({ username: '', email: '', password: '', phone: '', role: 'player' })
   const [googleSignup, setGoogleSignup] = useState(null) // { credential, email } once Google verified the account
   const [error, setError] = useState('')

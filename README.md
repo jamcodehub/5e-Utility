@@ -60,6 +60,7 @@ If neither option is configured, sign-up falls back to plain email + password.
 
 | Where | Variable | Purpose |
 | --- | --- | --- |
+| Render (API) | `CLIENT_URL` | Site address(es) allowed to call the API, comma-separated, e.g. `https://www.5eutility.com,https://5eutility.com`. The first one is used for links in emails and Stripe redirects. Use `https://` and no trailing slash. If the site says it can't reach the server, this is the first thing to check. |
 | Render (API) | `GOOGLE_CLIENT_ID` | Google Cloud OAuth **Web** client ID. The client fetches it from `/api/auth/config`, so no frontend variable is needed. |
 | Render (API) | `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM` | Outgoing email (password resets and email codes). The **Email code** option only appears in production once `SMTP_HOST` is set. A free tier at [Brevo](https://www.brevo.com) or [Resend](https://resend.com) works; verify your domain with them first. Use `SMTP_FROM` like `5e Utility <no-reply@5eutility.com>`. |
 | Netlify (optional) | `VITE_GOOGLE_CLIENT_ID` | Only used if the API can't be reached for config; same value as `GOOGLE_CLIENT_ID`. |

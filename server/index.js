@@ -19,6 +19,7 @@ import musicRoutes from './routes/music.js'
 import sessionsRoutes from './routes/sessions.js'
 import sharedRoutes from './routes/shared.js'
 import { attachRealtime } from './realtime.js'
+import { clientOrigins } from './lib/clientUrl.js'
 import { Character } from './models/index.js'
 
 dotenv.config()
@@ -41,7 +42,7 @@ const apiLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 600, standardHeade
 const feedbackLimiter = rateLimit({ windowMs: 60 * 60 * 1000, max: 10, standardHeaders: true, legacyHeaders: false, message: { error: 'Too many submissions, please try again later.' } })
 
 app.use('/api/payments/webhook', express.raw({ type: 'application/json', verify: (req, res, buf) => { req.rawBody = buf } }))
-app.use(cors({ origin: process.env.CLIENT_URL || 'http://localhost:5173' }))
+app.use(cors({ origin: clientOrigins() }))
 app.use(express.json({ limit: '1mb' }))
 app.use('/api', apiLimiter)
 

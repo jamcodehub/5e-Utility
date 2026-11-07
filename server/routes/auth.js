@@ -6,6 +6,7 @@ import { OAuth2Client } from 'google-auth-library'
 import nodemailer from 'nodemailer'
 import { User, PendingSignup } from '../models/index.js'
 import { emailDomainProblem } from '../lib/emailCheck.js'
+import { primaryClientUrl } from '../lib/clientUrl.js'
 
 const router = Router()
 
@@ -497,7 +498,7 @@ router.post('/forgot-password', async (req, res) => {
       user.resetPasswordExpires = new Date(Date.now() + 60 * 60 * 1000) // 1 hour
       await user.save()
 
-      const origin = process.env.CLIENT_URL || req.headers.origin || ''
+      const origin = process.env.CLIENT_URL ? primaryClientUrl() : (req.headers.origin || '')
       const resetUrl = `${origin}/reset-password?token=${token}&id=${user._id}`
       const transport = getMailer()
       if (!transport) {
