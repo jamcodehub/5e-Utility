@@ -11,5 +11,24 @@ services:
       - key: JWT_SECRET
         generateValue: true
       - key: CLIENT_URL
-        sync: https://5e-utility.netlify.app
+        value: https://5e-utility.netlify.app
+      - key: PORT
         value: 10000       # Render default
+      - key: NODE_ENV
+        value: production
+      # Google sign-up verification / two-factor (see README). If unset, the
+      # Google option is hidden.
+      - key: GOOGLE_CLIENT_ID
+        sync: false        # Google Cloud OAuth *Web* client ID (not the secret)
+      # Outgoing email: password resets and the "Email code" sign-up option
+      # (which stays hidden in production until SMTP_HOST is set).
+      - key: SMTP_HOST
+        sync: false
+      - key: SMTP_PORT
+        sync: false
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASS
+        sync: false
+      - key: SMTP_FROM
+        sync: false        # e.g. 5e Utility <no-reply@5eutility.com>

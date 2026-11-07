@@ -15,9 +15,29 @@ const UserSchema = new Schema({
   twoFactorEnabled:     { type: Boolean, default: false },
   twoFactorCode:        { type: String, default: '' },
   twoFactorCodeExpires: { type: Date },
+  // '' = legacy account (email OTP when twoFactorEnabled). 'google' = verified
+  // with a Google account at sign-up; 'email' = email confirmed by a code at
+  // sign-up. Either one doubles as the 2FA factor on new devices.
+  twoFactorMethod:      { type: String, enum: ['', 'google', 'email'], default: '' },
+  // Devices that already passed 2FA (sha256 of a per-browser id).
+  trustedDevices:       [{ _id: false, hash: String, label: String, lastUsedAt: Date, expiresAt: Date }],
   resetPasswordToken:   { type: String, default: '' },
   resetPasswordExpires: { type: Date },
 }, { timestamps: true })
+
+// A sign-up waiting for its emailed code. Kept apart from User so an
+// unconfirmed attempt never owns an email/username; it expires on its own.
+const PendingSignupSchema = new Schema({
+  email:         { type: String, required: true, unique: true, lowercase: true },
+  username:      { type: String, required: true, trim: true },
+  password:      { type: String, required: true }, // bcrypt hash
+  role:          { type: String, enum: ['dm', 'player'], default: 'player' },
+  codeHash:      { type: String, required: true }, // sha256 of the emailed code
+  codeExpiresAt: { type: Date, required: true },
+  attempts:      { type: Number, default: 0 },
+  lastSentAt:    { type: Date, default: Date.now },
+  expiresAt:     { type: Date, required: true, index: { expireAfterSeconds: 0 } },
+})
 
 const CampaignSchema = new Schema({
   owner:       { type: Schema.Types.ObjectId, ref: 'User', required: true },
@@ -205,6 +225,7 @@ const MusicSessionSchema = new Schema({
 }, { timestamps: true })
 
 export const User          = model('User', UserSchema)
+export const PendingSignup = model('PendingSignup', PendingSignupSchema)
 export const Campaign      = model('Campaign', CampaignSchema)
 export const Journal       = model('Journal', JournalSchema)
 export const Lore          = model('Lore', LoreSchema)

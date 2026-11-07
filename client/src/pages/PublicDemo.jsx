@@ -120,6 +120,11 @@ function DemoLanding({ onExplore }) {
           <button type="button" className="demo-hero-cta" onClick={onExplore}>Explore the demo <span aria-hidden="true">→</span></button>
         </div>
       </div>
+      <nav className="demo-legal-links" aria-label="Legal">
+        <Link to="/privacy">Privacy Policy</Link>
+        <span aria-hidden="true">·</span>
+        <Link to="/terms">Terms of Service</Link>
+      </nav>
     </section>
   )
 }

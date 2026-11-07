@@ -71,6 +71,8 @@ const Premium = lazy(loadPremium)
 const IdeaGenerator = lazy(loadIdeaGenerator)
 const RulesReference = lazy(loadRulesReference)
 const SharedSheet = lazy(() => import('./pages/SharedSheet'))
+const Privacy = lazy(() => import('./pages/legal/Privacy'))
+const Terms = lazy(() => import('./pages/legal/Terms'))
 const MusicPlayer = lazy(loadMusicPlayer)
 const LevelBuilder = lazy(loadLevelBuilder)
 const RoleplayAssistant = lazy(loadRoleplayAssistant)
@@ -259,6 +261,8 @@ export default function App() {
       <BrowserRouter>
         <Routes>
           <Route path="/s/:token" element={<Suspense fallback={null}><SharedSheet /></Suspense>} />
+          <Route path="/privacy" element={<Suspense fallback={null}><Privacy /></Suspense>} />
+          <Route path="/terms" element={<Suspense fallback={null}><Terms /></Suspense>} />
           <Route path="*" element={<AuthProvider><Guard /></AuthProvider>} />
         </Routes>
       </BrowserRouter>

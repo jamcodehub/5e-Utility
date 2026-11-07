@@ -322,6 +322,20 @@
 .demo-hero-shade {
   background: none;
 }
+.demo-legal-links {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 16px;
+  z-index: 1;
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  font-size: 11px;
+  color: var(--demo-muted);
+}
+.demo-legal-links a { color: inherit; text-decoration: none; }
+.demo-legal-links a:hover { color: var(--demo-gold-strong); text-decoration: underline; }
 
 .demo-hero-content {
   position: relative;

@@ -285,9 +285,16 @@ router.post('/:id/characters/:charId/share', auth, async (req, res) => {
   } catch { res.status(500).json({ error: 'Could not update sharing' }) }
 })
 
+// Requires the exact, case-sensitive character name as a confirmation
+// safeguard (unnamed sheets are shown as "Unnamed Hero" in the UI).
 router.delete('/:id/characters/:charId', auth, async (req, res) => {
   try {
-    const char = await Character.findOneAndDelete({ _id: req.params.charId, campaign: req.params.id, owner: req.userId })
+    const existing = await Character.findOne({ _id: req.params.charId, campaign: req.params.id, owner: req.userId })
+    if (!existing) return res.status(404).json({ error: 'Character not found' })
+    if (req.body?.confirmName !== (existing.name || 'Unnamed Hero')) {
+      return res.status(400).json({ error: 'Character name did not match.' })
+    }
+    const char = await Character.findOneAndDelete({ _id: existing._id })
     if (char?.isPrimary) {
       // Promote another remaining character (if any) so there's always a
       // primary for back-compat consumers.

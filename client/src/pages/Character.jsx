@@ -120,17 +120,41 @@ export default function Character() {
     setBuilder('custom')
   }
 
-  const deleteCharacter = async (c, e) => {
+  // Deleting requires typing the character's exact (case-sensitive) name.
+  const [deleteTarget, setDeleteTarget] = useState(null)
+  const [deleteInput, setDeleteInput] = useState('')
+  const [deleteError, setDeleteError] = useState('')
+  const [deleteWorking, setDeleteWorking] = useState(false)
+  const deleteTargetName = deleteTarget ? (deleteTarget.name || 'Unnamed Hero') : ''
+
+  const deleteCharacter = (c, e) => {
     e.stopPropagation()
     if (characters.length <= 1) { toast('You must have at least one character sheet.'); return }
-    if (!window.confirm(`Delete "${c.name || 'Unnamed Hero'}"? This cannot be undone.`)) return
+    setDeleteTarget(c)
+    setDeleteInput('')
+    setDeleteError('')
+  }
+
+  const closeDeleteModal = () => { if (!deleteWorking) setDeleteTarget(null) }
+
+  const confirmDeleteCharacter = async () => {
+    const c = deleteTarget
+    if (!c || deleteWorking) return
+    if (deleteInput !== deleteTargetName) { setDeleteError('Name did not match — check capitalisation.'); return }
+    setDeleteError('')
+    setDeleteWorking(true)
     try {
-      await api(`/campaigns/${activeCampaign._id}/characters/${c._id}`, { method: 'DELETE' })
+      await api(`/campaigns/${activeCampaign._id}/characters/${c._id}`, { method: 'DELETE', body: { confirmName: deleteInput } })
       const remaining = characters.filter(x => x._id !== c._id)
       setCharacters(remaining)
       if (activeCharId === c._id) selectCharacter(remaining[0])
+      setDeleteTarget(null)
       toast('Character deleted')
-    } catch (err) { toast(err.message || 'Could not delete character') }
+    } catch (err) {
+      setDeleteError(err.message || 'Could not delete character')
+    } finally {
+      setDeleteWorking(false)
+    }
   }
 
   // Persist a creator / level-up result onto the active sheet
@@ -486,6 +510,38 @@ export default function Character() {
         </div>
       )}
       <ToastContainer />
+      {deleteTarget && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.65)', zIndex: 1100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }} onClick={closeDeleteModal}>
+          <div className="card" role="dialog" aria-modal="true" aria-labelledby="delete-char-title" style={{ width: '100%', maxWidth: 380, padding: 22 }} onClick={e => e.stopPropagation()}>
+            <div id="delete-char-title" style={{ fontFamily: 'Cinzel, serif', fontSize: 16, fontWeight: 600, color: 'var(--red)', marginBottom: 10 }}>Delete Character</div>
+            <div style={{ fontSize: 13, color: 'var(--text-2)', marginBottom: 14, lineHeight: 1.6 }}>
+              This permanently deletes this character sheet. This cannot be undone.{' '}
+              Type <strong style={{ color: 'var(--text)' }}>{deleteTargetName}</strong> exactly to confirm.
+            </div>
+            <input
+              autoFocus
+              className="input"
+              placeholder={deleteTargetName}
+              value={deleteInput}
+              onChange={e => setDeleteInput(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter' && deleteInput === deleteTargetName) confirmDeleteCharacter(); if (e.key === 'Escape') closeDeleteModal() }}
+              style={{ marginBottom: 10 }}
+            />
+            {deleteError && <div style={{ fontSize: 12, color: 'var(--red)', marginBottom: 10 }}>{deleteError}</div>}
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button
+                className="btn btn-sm"
+                onClick={confirmDeleteCharacter}
+                disabled={deleteWorking || deleteInput !== deleteTargetName}
+                style={{ background: 'var(--red)', color: '#fff', border: 'none', flex: 1, opacity: deleteInput === deleteTargetName ? 1 : 0.4, cursor: deleteInput === deleteTargetName && !deleteWorking ? 'pointer' : 'not-allowed' }}
+              >
+                {deleteWorking ? 'Deleting…' : 'Delete Forever'}
+              </button>
+              <button className="btn btn-ghost btn-sm" onClick={closeDeleteModal} disabled={deleteWorking}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
       {builder === 'custom' && <CustomCharacterBuilder onClose={() => { setBuilder(null); setCreatorNew(false) }} onComplete={applyBuild} />}
       {showUpgrade && <UpgradeModal onClose={() => setShowUpgrade(false)} message={`Free accounts are limited to ${FREE_CHAR_LIMIT} characters per campaign. Upgrade to Premium for unlimited characters.`} />}
     </div>

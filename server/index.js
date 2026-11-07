@@ -5,7 +5,7 @@ import cors from 'cors'
 import dotenv from 'dotenv'
 import helmet from 'helmet'
 import { rateLimit } from 'express-rate-limit'
-import authRoutes from './routes/auth.js'
+import authRoutes, { authConfig } from './routes/auth.js'
 import campaignRoutes from './routes/campaigns.js'
 import journalRoutes from './routes/journal.js'
 import loreRoutes from './routes/lore.js'
@@ -47,6 +47,9 @@ app.use('/api', apiLimiter)
 
 app.get('/api/health', (_req, res) => res.json({ status: 'ok' }))
 
+// Registered before authLimiter so merely loading the sign-in page can't
+// burn the strict auth rate limit.
+app.get('/api/auth/config', authConfig)
 app.use('/api/auth',      authLimiter, authRoutes)
 app.use('/api/campaigns', campaignRoutes)
 app.use('/api/journal',   journalRoutes)
