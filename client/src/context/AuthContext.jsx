@@ -174,12 +174,6 @@ export function AuthProvider({ children }) {
   const resendSignup = (signupId) =>
     api('/auth/register/resend', { method: 'POST', body: { signupId } })
 
-  const setTwoFactor = async (enable) => {
-    const u = await api('/auth/2fa/toggle', { method: 'POST', body: { enable } })
-    setUser(p => storeUser({ ...p, ...u }))
-    return u
-  }
-
   // Settings: verify a Google account for this user; it becomes their 2FA.
   const linkGoogle = async (credential) => {
     const u = await api('/auth/2fa/setup', { method: 'POST', body: { credential, deviceId: getDeviceId() } })
@@ -210,7 +204,7 @@ export function AuthProvider({ children }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user, login, register, logout, loading, refreshUser, verifyTwoFactor, resendTwoFactor, confirmSignup, resendSignup, loginWithGoogle, setTwoFactor, linkGoogle, forgotPassword, resetPassword, isPremium: user?.isPremium || false }}>
+    <AuthContext.Provider value={{ user, login, register, logout, loading, refreshUser, verifyTwoFactor, resendTwoFactor, confirmSignup, resendSignup, loginWithGoogle, linkGoogle, forgotPassword, resetPassword, isPremium: user?.isPremium || false }}>
       {children}
     </AuthContext.Provider>
   )

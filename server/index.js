@@ -68,7 +68,7 @@ app.use('/api/sessions',  sessionsRoutes)
 app.use('/api/shared',    sharedRoutes)
 
 mongoose.connect(process.env.MONGO_URI).then(async () => {
-  console.log('MongoDB connected')
+  console.log(`MongoDB connected (database: ${mongoose.connection.name})`)
 
   // One-time self-heal: an older schema version had a UNIQUE index on
   // { campaign: 1, owner: 1 } in the characters collection. Multi-character

@@ -7,7 +7,7 @@ import GoogleButton from './GoogleButton'
 
 export default function SettingsModal({ onClose }) {
   const { theme, setTheme, lightMode, setLightMode } = useTheme()
-  const { logout, user, setTwoFactor, linkGoogle, isPremium } = useAuth()
+  const { logout, user, linkGoogle, isPremium } = useAuth()
   const authConfig = useAuthConfig()
   const googleClientId = authConfig?.googleClientId || import.meta.env.VITE_GOOGLE_CLIENT_ID || ''
   const { activeCampaign, leaveCampaign, deleteCampaign } = useCampaign()
@@ -46,18 +46,6 @@ export default function SettingsModal({ onClose }) {
     }
   }
 
-
-  const toggleTwoFactor = async () => {
-    setTwoFAError('')
-    setTwoFAWorking(true)
-    try {
-      await setTwoFactor(!user?.twoFactorEnabled)
-    } catch (err) {
-      setTwoFAError(err?.message || 'Could not update two-factor settings.')
-    } finally {
-      setTwoFAWorking(false)
-    }
-  }
 
   const googleAvailable = !!authConfig?.google
   const verifiedWithGoogle = user?.twoFactorMethod === 'google'
@@ -174,9 +162,6 @@ export default function SettingsModal({ onClose }) {
                       : `Verified with your email (${user.email}). We'll email you a code when you sign in on a new device.`}
                   </div>
                 </div>
-                {googleAvailable && !channelOpen && (
-                  <button type="button" className="btn btn-ghost btn-sm" onClick={() => setChannelOpen(true)}>{verifiedWithGoogle ? 'Change' : 'Use Google'}</button>
-                )}
               </div>
             </div>
           ) : (
@@ -184,19 +169,10 @@ export default function SettingsModal({ onClose }) {
               {googleAvailable && !channelOpen && (
                 <div style={{ padding: '10px 12px', borderRadius: 8, background: 'var(--surface2)', border: '1px solid var(--border)', marginBottom: 10 }}>
                   <div style={{ fontSize: 13, fontWeight: 500 }}>Secure your account</div>
-                  <div style={{ fontSize: 11, color: 'var(--text-3)', marginBottom: 8 }}>Verify your Google account. We'll then protect sign-ins from new devices automatically.</div>
+                  <div style={{ fontSize: 11, color: 'var(--text-3)', marginBottom: 8 }}>Verify the Google account that matches your email. We'll then protect sign-ins from new devices automatically. This can't be changed later.</div>
                   <button type="button" className="btn btn-primary btn-sm" onClick={() => setChannelOpen(true)}>Verify with Google</button>
                 </div>
               )}
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '10px 12px', borderRadius: 8, background: 'var(--surface2)', border: '1px solid var(--border)' }}>
-                <div>
-                  <div style={{ fontSize: 13, fontWeight: 500 }}>Email code on new devices</div>
-                  <div style={{ fontSize: 11, color: 'var(--text-3)' }}>Emails you a one-time code when you sign in on a device you haven't used before.</div>
-                </div>
-                <button type="button" onClick={toggleTwoFactor} disabled={twoFAWorking} className={`btn btn-sm ${user?.twoFactorEnabled ? 'btn-primary' : 'btn-ghost'}`}>
-                  {twoFAWorking ? '...' : user?.twoFactorEnabled ? 'On' : 'Off'}
-                </button>
-              </div>
             </>
           )}
 

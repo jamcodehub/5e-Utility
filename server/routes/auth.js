@@ -438,35 +438,25 @@ router.post('/2fa/resend', async (req, res) => {
   } catch (e) { sendError(res, e) }
 })
 
-// Authenticated: verify a Google account for this user (Settings) — for
-// accounts created before Google verification existed, or to switch to a
-// different Google account. It becomes the account's 2FA channel.
+// Authenticated: one-time upgrade for legacy accounts that have no verified
+// 2FA channel yet. The Google account must match the account's email, and a
+// verified channel can never be changed or switched off afterwards — so a
+// stolen session token can't swap in the thief's own Google account.
 router.post('/2fa/setup', authMiddleware, async (req, res) => {
   try {
     const user = await User.findById(req.userId)
     if (!user) return res.status(404).json({ error: 'User not found' })
+    if (user.twoFactorMethod) return res.status(400).json({ error: 'Two-factor is already set up and can’t be changed.' })
 
     const google = await readGoogle(asString(req.body.credential))
     if (!google) return res.status(400).json({ error: 'Google could not verify that account. Please try again.' })
+    if (google.email.toLowerCase() !== user.email) return res.status(400).json({ error: 'Use the Google account that matches your account email.' })
     if (await User.exists({ googleId: google.sub, _id: { $ne: user._id } }))
       return res.status(400).json({ error: 'That Google account is already linked to another account.' })
     user.googleId = google.sub
     user.twoFactorMethod = 'google'
     user.twoFactorEnabled = true
     trustDevice(user, cleanDeviceId(req.body.deviceId), req)
-    await user.save()
-    res.json(publicUser(user))
-  } catch (e) { sendError(res, e) }
-})
-
-// Switch the legacy email-code 2FA on/off. Accounts verified at sign-up (Google
-// or email code) have 2FA built in and can't turn it off.
-router.post('/2fa/toggle', authMiddleware, async (req, res) => {
-  try {
-    const user = await User.findById(req.userId)
-    if (!user) return res.status(404).json({ error: 'User not found' })
-    if (user.twoFactorMethod) return res.status(400).json({ error: 'Two-factor is built into your verified sign-up and can’t be turned off.' })
-    user.twoFactorEnabled = !!req.body.enable
     await user.save()
     res.json(publicUser(user))
   } catch (e) { sendError(res, e) }
