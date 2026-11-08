@@ -339,7 +339,7 @@ export default function RoleplayAssistant() {
 
   // Pre-fill form from character sheet; prefer saved context from localStorage
   const loadChar = useCallback(async () => {
-    if (!activeCampaign) return
+    if (!activeCampaign || activeCampaign.isPersonal) return
     setCharLoaded(false)
     try {
       const saved = isPublicDemoPath() ? null : localStorage.getItem(storageKey(activeCampaign._id))
@@ -367,8 +367,8 @@ export default function RoleplayAssistant() {
             lore: char.lore || '',
           }))
         }
-        setCharLoaded(true)
       }
+      setCharLoaded(true)
     } catch {
       setCharLoaded(true)
     }
@@ -481,6 +481,17 @@ export default function RoleplayAssistant() {
           <h2 style={{ fontSize: 20, marginBottom: 2 }}>Roleplay Assistant</h2>
         </div>
         <div style={{ color: 'var(--text-3)' }}>Select a campaign to use the Roleplay Assistant.</div>
+      </div>
+    )
+  }
+
+  if (activeCampaign.isPersonal) {
+    return (
+      <div className="page-content">
+        <div className="page-header-row" style={{ marginBottom: 16 }}>
+          <h2 style={{ fontSize: 20, marginBottom: 2 }}>Roleplay Assistant</h2>
+        </div>
+        <div style={{ color: 'var(--text-3)' }}>You need to join a campaign first.</div>
       </div>
     )
   }
