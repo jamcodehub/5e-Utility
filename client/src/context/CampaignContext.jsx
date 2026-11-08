@@ -54,14 +54,21 @@ export function CampaignProvider({ children }) {
     try {
       const data = await api('/campaigns')
       setCampaigns(data)
-      if (data.length && !activeCampaign) {
-        // Restore the campaign the user was last viewing instead of always
-        // defaulting to the most-recently-updated one — otherwise
-        // background activity in another campaign can silently switch them.
+      // Keep the current selection if it's still valid (e.g. a background
+      // reload shouldn't yank the user to a different campaign); otherwise
+      // restore whichever one they were last viewing, or fall back to the
+      // first available (which the server always provisions — at minimum
+      // the personal "My Journal" space — so this never leaves Journal/Lore
+      // stranded after the active campaign is deleted or left).
+      setActiveRaw(prev => {
+        if (prev && data.some(c => c._id === prev._id)) return prev
         const lastId = localStorage.getItem('activeCampaignId')
         const restored = lastId && data.find(c => c._id === lastId)
-        setActive(restored || data[0])
-      }
+        const next = restored || data[0] || null
+        if (next?._id) localStorage.setItem('activeCampaignId', next._id)
+        else localStorage.removeItem('activeCampaignId')
+        return next
+      })
     } catch (err) {
       setCampaignsError(err.message || 'Failed to load campaigns')
     } finally {
@@ -90,17 +97,19 @@ export function CampaignProvider({ children }) {
   }
 
   // Both require the caller to have already confirmed the exact campaign
-  // name client-side; confirmName is also re-checked server-side.
+  // name client-side; confirmName is also re-checked server-side. Reloading
+  // afterwards (rather than just filtering locally) means that leaving/
+  // deleting your last real campaign re-syncs with the server, which
+  // re-provisions the personal "My Journal" space so Journal/Lore keep
+  // working immediately instead of requiring a page refresh.
   const deleteCampaign = async (id, confirmName) => {
     await api(`/campaigns/${id}`, { method: 'DELETE', body: { confirmName } })
-    setCampaigns(p => p.filter(x => x._id !== id))
-    if (activeCampaign?._id === id) setActive(campaigns.find(x => x._id !== id) || null)
+    await load()
   }
 
   const leaveCampaign = async (id, confirmName) => {
     await api(`/campaigns/${id}/leave`, { method: 'POST', body: { confirmName } })
-    setCampaigns(p => p.filter(x => x._id !== id))
-    if (activeCampaign?._id === id) setActive(campaigns.find(x => x._id !== id) || null)
+    await load()
   }
 
   // Returns null on success, 'pending' if awaiting DM approval, error string on failure

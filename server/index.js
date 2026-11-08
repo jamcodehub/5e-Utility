@@ -20,6 +20,7 @@ import sessionsRoutes from './routes/sessions.js'
 import sharedRoutes from './routes/shared.js'
 import { attachRealtime } from './realtime.js'
 import { clientOrigins } from './lib/clientUrl.js'
+import { rejectOperatorKeys } from './lib/guards.js'
 import { Character } from './models/index.js'
 
 dotenv.config()
@@ -44,6 +45,7 @@ const feedbackLimiter = rateLimit({ windowMs: 60 * 60 * 1000, max: 10, standardH
 app.use('/api/payments/webhook', express.raw({ type: 'application/json', verify: (req, res, buf) => { req.rawBody = buf } }))
 app.use(cors({ origin: clientOrigins() }))
 app.use(express.json({ limit: '1mb' }))
+app.use('/api', rejectOperatorKeys)
 app.use('/api', apiLimiter)
 
 app.get('/api/health', (_req, res) => res.json({ status: 'ok' }))

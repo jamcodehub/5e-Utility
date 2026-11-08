@@ -4,7 +4,10 @@
 // 3. Returns the secure_url string to store in MongoDB
 import { api } from '../context/AuthContext'
 
+const MAX_UPLOAD_BYTES = 10 * 1024 * 1024
+
 export async function uploadToCloudinary(file, folder = 'lore-ledger') {
+  if (file.size > MAX_UPLOAD_BYTES) throw new Error('Image must be under 10 MB')
   // Get signed params from our server
   const sign = await api('/upload/sign', { method: 'POST', body: { folder } })
 
@@ -14,6 +17,7 @@ export async function uploadToCloudinary(file, folder = 'lore-ledger') {
   fd.append('timestamp', sign.timestamp)
   fd.append('signature', sign.signature)
   fd.append('folder', sign.folder)
+  fd.append('allowed_formats', sign.allowed_formats)
 
   const res = await fetch(
     `https://api.cloudinary.com/v1_1/${sign.cloud_name}/image/upload`,

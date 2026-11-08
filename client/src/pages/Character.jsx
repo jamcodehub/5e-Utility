@@ -90,7 +90,7 @@ export default function Character() {
   // Loads every character this player owns in the active campaign, then
   // selects the primary one (or the first) as the active sheet.
   const load = useCallback(async () => {
-    if (!activeCampaign) return
+    if (!activeCampaign || activeCampaign.isPersonal) return
     const list = await api(`/campaigns/${activeCampaign._id}/characters`)
     setCharacters(list)
     const rememberedId = recallLastChar(activeCampaign._id)
@@ -101,7 +101,7 @@ export default function Character() {
     setLoaded(true)
   }, [activeCampaign])
 
-  useEffect(() => { if (!activeCampaign) return; setLoaded(false); load() }, [activeCampaign, load])
+  useEffect(() => { if (!activeCampaign || activeCampaign.isPersonal) return; setLoaded(false); load() }, [activeCampaign, load])
 
   const selectCharacter = (c) => {
     setActiveCharId(c._id)
@@ -303,6 +303,14 @@ export default function Character() {
     <div className="page-content">
       <h2 style={{ fontSize: 22, marginBottom: 12 }}>My Characters</h2>
       <div style={{ color: 'var(--text-3)' }}>Select a campaign.</div>
+    </div>
+  )
+  // Characters belong to a real campaign — the auto-created personal "My
+  // Journal" space is for solo Journal/Lore only, not character sheets.
+  if (activeCampaign.isPersonal) return (
+    <div className="page-content">
+      <h2 style={{ fontSize: 22, marginBottom: 12 }}>My Characters</h2>
+      <div style={{ color: 'var(--text-3)' }}>You need to join a campaign first.</div>
     </div>
   )
   if (!loaded) return <SkeletonCharacterPage />

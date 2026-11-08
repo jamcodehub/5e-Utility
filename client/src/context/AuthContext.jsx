@@ -93,7 +93,7 @@ export const useAuthConfig = () => {
     if (!configRequest) {
       configRequest = api('/auth/config').catch(() => {
         configRequest = null
-        return { google: false, googleClientId: '', email: false, failed: true }
+        return { google: false, googleClientId: '', email: false, turnstileSiteKey: '', failed: true }
       })
     }
     configRequest.then(c => { if (!cancelled) setConfig(c) })
@@ -129,8 +129,8 @@ export function AuthProvider({ children }) {
     setUser(storeUser(data.user))
   }
 
-  const login = async (email, password) => {
-    const data = await api('/auth/login', { method: 'POST', body: { email, password, deviceId: getDeviceId() } })
+  const login = async (email, password, captchaToken) => {
+    const data = await api('/auth/login', { method: 'POST', body: { email, password, captchaToken, deviceId: getDeviceId() } })
     if (data.requires2FA) return data // { requires2FA, challengeToken, method, hint }
     authenticate(data)
     return data
@@ -158,8 +158,8 @@ export function AuthProvider({ children }) {
   //    sign-up ({ requires2FA, confirming, signupId }) to finish with
   //    confirmSignup(); 
   //  - otherwise it's plain email + password.
-  const register = async ({ username, email, password, role, phone = '', credential }) => {
-    const data = await api('/auth/register', { method: 'POST', body: { username, email, password, role, phone, credential, deviceId: getDeviceId() } })
+  const register = async ({ username, email, password, role, phone = '', credential, captchaToken }) => {
+    const data = await api('/auth/register', { method: 'POST', body: { username, email, password, role, phone, credential, captchaToken, deviceId: getDeviceId() } })
     if (data.requires2FA) return data
     authenticate(data)
     return data
@@ -187,8 +187,8 @@ export function AuthProvider({ children }) {
     return u
   }
 
-  const forgotPassword = async (email) => {
-    return api('/auth/forgot-password', { method: 'POST', body: { email } })
+  const forgotPassword = async (email, captchaToken) => {
+    return api('/auth/forgot-password', { method: 'POST', body: { email, captchaToken } })
   }
 
   const resetPassword = async (id, token, password) => {

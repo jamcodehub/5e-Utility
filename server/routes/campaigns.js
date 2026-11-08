@@ -15,6 +15,14 @@ export const auth = (req, res, next) => {
 
 const genCode = () => Array.from({ length: 6 }, () => '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ'[crypto.randomInt(36)]).join('')
 
+// Only these campaign fields are client-editable; membership, join code and
+// the personal flag are server-managed.
+const pickCampaignFields = (body = {}) => {
+  const out = {}
+  for (const k of ['name', 'description', 'setting', 'coverImage']) if (typeof body[k] === 'string') out[k] = body[k]
+  return out
+}
+
 // Fields the client must never set on a character.
 const stripServerFields = (body = {}) => {
   const { _id, __v, owner, campaign, isPrimary, shareToken, roleplaySessionCount, createdAt, updatedAt, ...safe } = body
@@ -45,7 +53,7 @@ router.post('/', auth, async (req, res) => {
     let joinCode
     do { joinCode = genCode() } while (await Campaign.findOne({ joinCode }))
 
-    const campaign = await Campaign.create({ ...req.body, owner: req.userId, joinCode })
+    const campaign = await Campaign.create({ ...pickCampaignFields(req.body), owner: req.userId, joinCode })
     res.json(campaign)
   } catch (e) { res.status(500).json({ error: e.message }) }
 })
@@ -153,11 +161,14 @@ router.delete('/:id/pending/:userId', auth, async (req, res) => {
 })
 
 router.put('/:id', auth, async (req, res) => {
-  const campaign = await Campaign.findOneAndUpdate(
-    { _id: req.params.id, owner: req.userId },
-    req.body, { new: true }
-  )
-  res.json(campaign)
+  try {
+    const campaign = await Campaign.findOneAndUpdate(
+      { _id: req.params.id, owner: req.userId },
+      pickCampaignFields(req.body), { new: true }
+    )
+    if (!campaign) return res.status(404).json({ error: 'Campaign not found' })
+    res.json(campaign)
+  } catch { res.status(500).json({ error: 'Failed to update campaign' }) }
 })
 
 // Member (not owner) leaves a campaign — requires typing the exact,

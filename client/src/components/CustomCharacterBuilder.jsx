@@ -18,6 +18,9 @@ const skillName = (id) => id.replace('skill-', '').replace(/-/g, ' ').replace(/\
 // always be typed in instead; nothing is restricted to the SRD list.
 export default function CustomCharacterBuilder({ onClose, onComplete, draftKey = 'custom_draft' }) {
   const { campaigns, activeCampaign } = useCampaign()
+  // Characters need a real campaign — the auto-created personal "My
+  // Journal" space is for solo Journal/Lore only.
+  const realCampaigns = campaigns.filter(c => !c.isPersonal)
   const draft = useRef(null)
   if (draft.current === null) {
     try { draft.current = JSON.parse(localStorage.getItem(draftKey)) || {} } catch { draft.current = {} }
@@ -25,7 +28,7 @@ export default function CustomCharacterBuilder({ onClose, onComplete, draftKey =
   const d = draft.current
   const [data, setData] = useState(null)
   const [step, setStep] = useState(d.step ?? 0)
-  const [campaignId, setCampaignId] = useState(d.campaignId ?? activeCampaign?._id ?? '')
+  const [campaignId, setCampaignId] = useState(d.campaignId ?? (!activeCampaign?.isPersonal ? activeCampaign?._id : '') ?? '')
   const [race, setRace] = useState(d.race ?? '')
   const [speed, setSpeed] = useState(d.speed ?? 30)
   const [languages, setLanguages] = useState(d.languages ?? '')
@@ -53,7 +56,7 @@ export default function CustomCharacterBuilder({ onClose, onComplete, draftKey =
 
   const stepName = STEPS[step]
   const valid = () => {
-    if (stepName === 'Campaign') return !!campaignId && campaigns.some(c => c._id === campaignId)
+    if (stepName === 'Campaign') return !!campaignId && realCampaigns.some(c => c._id === campaignId)
     if (stepName === 'Race') return !!race.trim()
     if (stepName === 'Class') return !!className.trim()
     if (stepName === 'Review') return !!name.trim()
@@ -97,9 +100,9 @@ export default function CustomCharacterBuilder({ onClose, onComplete, draftKey =
           {stepName === 'Campaign' && (
             <>
               <span style={label}>Which campaign is this character for?</span>
-              {campaigns.length === 0 && <div style={{ fontSize: 13, color: 'var(--text-2)' }}>You haven't joined a campaign yet.</div>}
+              {realCampaigns.length === 0 && <div style={{ fontSize: 13, color: 'var(--text-2)' }}>You need to join a campaign first.</div>}
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {campaigns.map(c => <span key={c._id} style={{ ...chip(campaignId === c._id), borderRadius: 8, fontSize: 13 }} onClick={() => setCampaignId(c._id)}>{c.name}</span>)}
+                {realCampaigns.map(c => <span key={c._id} style={{ ...chip(campaignId === c._id), borderRadius: 8, fontSize: 13 }} onClick={() => setCampaignId(c._id)}>{c.name}</span>)}
               </div>
             </>
           )}

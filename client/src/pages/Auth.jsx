@@ -1,6 +1,7 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useLocation } from 'react-router-dom'
 import { api, useAuth, useAuthConfig } from '../context/AuthContext'
+import Turnstile from '../components/Turnstile'
 import GoogleButton, { readGoogleCredential } from '../components/GoogleButton'
 
 const FALLBACK_GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID
@@ -12,6 +13,9 @@ export default function Auth() {
   const { login, register, verifyTwoFactor, resendTwoFactor, confirmSignup, resendSignup, loginWithGoogle, forgotPassword, resetPassword } = useAuth()
   const config = useAuthConfig()
   const googleClientId = config?.googleClientId || FALLBACK_GOOGLE_CLIENT_ID || ''
+  const turnstileKey = config?.turnstileSiteKey || ''
+  const [captchaToken, setCaptchaToken] = useState('')
+  const captchaRef = useRef(null)
   // /register (where the demo's "Sign up" links go) opens the register form;
   // /login opens sign-in for returning users.
   const location = useLocation()
@@ -23,7 +27,8 @@ export default function Auth() {
   const [serverStatus, setServerStatus] = useState('connecting')
 
   // Sign-up verification options the server offers: Google (instant) and/or an
-  // emailed code. With neither, sign-up is plain email + password.
+  // emailed code. Sign-up requires at least one — there is no unverified
+  // fallback, so MFA can't be bypassed by misconfiguring the server.
   const methods = [config?.google && 'google', config?.email && 'email'].filter(Boolean)
   const [pickedMethod, setPickedMethod] = useState('google')
   const method = methods.includes(pickedMethod) ? pickedMethod : methods[0] || ''
@@ -62,28 +67,32 @@ export default function Auth() {
   const submit = async (e) => {
     e.preventDefault(); setError(''); setLoading(true)
     try {
+      if (turnstileKey && !captchaToken) throw new Error('Please complete the human check.')
       if (mode === 'login') {
-        const result = await login(form.email, form.password)
+        const result = await login(form.email, form.password, captchaToken)
         if (result?.requires2FA) { setTwoFA(result); setCode(''); setNotice('') }
       } else {
         if (form.password.length < 8) throw new Error('Password must be at least 8 characters')
         if (method === 'google' && !googleSignup) throw new Error('Verify your Gmail account with Google first')
         const result = await register({
           username: form.username, email: form.email, password: form.password, role: form.role,
-          phone: form.phone, credential: method === 'google' ? googleSignup?.credential : undefined,
+          phone: form.phone, credential: method === 'google' ? googleSignup?.credential : undefined, captchaToken,
         })
         if (result?.requires2FA) { setTwoFA({ ...result, signup: true }); setCode(''); setNotice('') }
       }
     } catch (err) { setError(err.message) }
+    captchaRef.current?.reset()
     setLoading(false)
   }
 
   const submitForgot = async (e) => {
     e.preventDefault(); setError(''); setLoading(true)
     try {
-      await forgotPassword(forgotEmail.trim())
+      if (turnstileKey && !captchaToken) throw new Error('Please complete the human check.')
+      await forgotPassword(forgotEmail.trim(), captchaToken)
       setForgotSent(true)
     } catch (err) { setError(err.message) }
+    captchaRef.current?.reset()
     setLoading(false)
   }
 
@@ -158,6 +167,7 @@ export default function Auth() {
                 <label style={{ display: 'block', fontSize: 12, fontWeight: 500, color: 'var(--text-2)', marginBottom: 5 }}>Email</label>
                 <input className="input" type="email" placeholder="adventurer@realm.com" value={forgotEmail} onChange={e => setForgotEmail(e.target.value)} required autoFocus />
               </div>
+              <Turnstile ref={captchaRef} siteKey={turnstileKey} onToken={setCaptchaToken} />
               <button className="btn btn-primary" style={{ width: '100%', justifyContent: 'center' }} disabled={loading}>
                 {loading ? 'Sending...' : 'Send reset link'}
               </button>
@@ -366,10 +376,7 @@ return (
             </div>
           )}
           {mode === 'register' && config && !config.failed && methods.length === 0 && (
-            <div style={{ marginBottom: 12 }}>
-              <label style={labelStyle}>Phone <span style={{ color: 'var(--text-3)', fontWeight: 400 }}>(optional)</span></label>
-              <input className="input" type="tel" placeholder="+1 555 123 4567" value={form.phone} onChange={set('phone')} />
-            </div>
+            <div style={{ ...errorBox, marginBottom: 12 }}>Sign-up verification is not configured on this server. Please contact support.</div>
           )}
           <div style={{ marginBottom: 20 }}>
             <label style={{ display: 'block', fontSize: 12, fontWeight: 500, color: 'var(--text-2)', marginBottom: 5 }}>Password</label>
@@ -381,8 +388,9 @@ return (
               </div>
             )}
           </div>
+          <Turnstile ref={captchaRef} siteKey={turnstileKey} onToken={setCaptchaToken} />
           {(() => {
-            const blocked = mode === 'register' && (!config || config.failed || (method === 'google' && !googleSignup))
+            const blocked = mode === 'register' && (!config || config.failed || methods.length === 0 || (method === 'google' && !googleSignup))
             return (
               <button className="btn btn-primary" disabled={loading || blocked}
                 style={{ width: '100%', justifyContent: 'center', opacity: blocked ? 0.5 : 1, cursor: blocked ? 'not-allowed' : undefined }}>

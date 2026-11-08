@@ -7,6 +7,7 @@ import nodemailer from 'nodemailer'
 import { User, PendingSignup } from '../models/index.js'
 import { emailDomainProblem } from '../lib/emailCheck.js'
 import { primaryClientUrl } from '../lib/clientUrl.js'
+import { perEmailLimiter, requireCaptcha, captchaEnabled } from '../lib/guards.js'
 
 const router = Router()
 
@@ -69,8 +70,34 @@ const emailVerificationOn = () => !!process.env.SMTP_HOST || process.env.NODE_EN
 
 // Failed 2FA guesses per user; further guesses are refused until a new code
 // is requested.
-const otpAttempts = new Map()
+// Counts expire after 15 minutes and are NOT reset by resending a code or
+// logging in again, so cycling resend/verify can't grant unlimited guesses.
+const OTP_LOCK_MS = 15 * 60 * 1000
+const otpFails = new Map()
+const otpAttempts = {
+  get: (uid) => { const e = otpFails.get(uid); return e && e.until > Date.now() ? e.n : 0 },
+  set: (uid, n) => { otpFails.set(uid, { n, until: Date.now() + OTP_LOCK_MS }) },
+  delete: (uid) => { otpFails.delete(uid) },
+}
+setInterval(() => { const now = Date.now(); for (const [k, e] of [...otpFails]) if (e.until <= now) otpFails.delete(k) }, OTP_LOCK_MS).unref()
 const MAX_OTP_ATTEMPTS = 5
+
+// Cooldown + hourly cap on emailed 2FA codes per user (login and resend),
+// so neither can be used to email-bomb an account holder.
+const codeSends = new Map()
+const allowCodeSend = (uid) => {
+  const now = Date.now()
+  const recent = (codeSends.get(uid) || []).filter(t => now - t < 60 * 60 * 1000)
+  if (recent.length >= 6 || (recent.length && now - recent[recent.length - 1] < 30 * 1000)) { codeSends.set(uid, recent); return false }
+  recent.push(now)
+  codeSends.set(uid, recent)
+  return true
+}
+setInterval(() => { const now = Date.now(); for (const [k, t] of [...codeSends]) if (!t.some(x => now - x < 60 * 60 * 1000)) codeSends.delete(k) }, 60 * 60 * 1000).unref()
+
+const loginEmailLimiter = perEmailLimiter({ windowMs: 15 * 60 * 1000, max: 10, message: 'Too many attempts for this account, please try again later.' })
+const forgotEmailLimiter = perEmailLimiter({ windowMs: 60 * 60 * 1000, max: 3, message: 'Too many reset requests for this email, please try again later.' })
+const registerEmailLimiter = perEmailLimiter({ windowMs: 60 * 60 * 1000, max: 5, message: 'Too many sign-up attempts for this email, please try again later.' })
 const safeEqual = (a, b) => {
   const x = Buffer.from(a), y = Buffer.from(b)
   return x.length === y.length && crypto.timingSafeEqual(x, y)
@@ -201,14 +228,15 @@ const SIGNUP_EMAIL = { subject: 'Confirm your 5e Utility email', intro: 'Your co
 const TOO_MANY_CODES = 'Too many codes requested. Please try again later.'
 const WAIT_FOR_CODE = 'Please wait a few seconds before requesting another code.'
 
-// Sign-up has three paths:
+// Sign-up requires verification — there is no unverified fallback, so a
+// stolen/stuffed credential pair alone can never create an account:
 //  - Google: the account is verified instantly by a Google ID token.
 //  - Email code: the address is confirmed with an emailed code (/register/confirm)
-//    before the account exists. Needs SMTP in production.
-//  - Plain email + password, only when neither of the above is configured, so
-//    a fresh deploy keeps working.
+//    before the account exists. Needs SMTP configured.
+// If neither Google nor SMTP is configured on the server, registration is
+// refused outright rather than silently falling back to no verification.
 // Google and email-code accounts get automatic 2FA on new devices.
-router.post('/register', async (req, res) => {
+router.post('/register', registerEmailLimiter, requireCaptcha, async (req, res) => {
   try {
     const username = asString(req.body.username)?.trim()
     const password = asString(req.body.password)
@@ -261,8 +289,9 @@ router.post('/register', async (req, res) => {
       return res.json({ requires2FA: true, confirming: true, signupId: String(pending._id), method: 'email', hint: maskEmail(email) })
     }
 
-    const user = await User.create({ username, email, password: hashed, role, phone: asString(req.body.phone) || '' })
-    res.json({ token: sign(user._id), user: publicUser(user) })
+    // Neither Google nor SMTP is configured — refuse rather than create an
+    // unverified account, so MFA at sign-up can never be bypassed.
+    return res.status(503).json({ error: 'Sign-up verification is not configured on this server. Please contact support.' })
   } catch (e) {
     if (e?.code === 11000) return res.status(400).json({ error: 'Email or username already taken' })
     sendError(res, e)
@@ -330,12 +359,11 @@ router.post('/register/resend', async (req, res) => {
 // code emailed automatically; Google accounts just confirm with Google.
 const startChallenge = async (res, user) => {
   const method = effectiveMethod(user)
-  otpAttempts.delete(String(user._id))
-  if (method === 'email') await sendEmailCode(user)
+  if (method === 'email' && allowCodeSend(String(user._id))) await sendEmailCode(user)
   res.json({ requires2FA: true, challengeToken: signChallenge(user._id), method, hint: challengeHint(user) })
 }
 
-router.post('/login', async (req, res) => {
+router.post('/login', loginEmailLimiter, requireCaptcha, async (req, res) => {
   try {
     const email = asString(req.body.email)?.trim().toLowerCase()
     const password = asString(req.body.password)
@@ -404,8 +432,8 @@ router.post('/2fa/resend', async (req, res) => {
     if (!uid) return res.status(401).json({ error: 'Your sign-in expired. Please sign in again.' })
     const user = await User.findById(uid)
     if (!user || effectiveMethod(user) !== 'email') return res.status(400).json({ error: 'This account does not use an emailed code.' })
+    if (!allowCodeSend(String(user._id))) return res.status(429).json({ error: 'Please wait before requesting another code.' })
     await sendEmailCode(user)
-    otpAttempts.delete(uid)
     res.json({ ok: true, hint: challengeHint(user) })
   } catch (e) { sendError(res, e) }
 })
@@ -487,7 +515,7 @@ router.get('/me', authMiddleware, async (req, res) => {
 // Request a password reset link. Always responds with a generic success
 // message (even if the email doesn't exist) to avoid leaking which emails
 // are registered.
-router.post('/forgot-password', async (req, res) => {
+router.post('/forgot-password', forgotEmailLimiter, requireCaptcha, async (req, res) => {
   try {
     const email = asString(req.body.email)?.trim().toLowerCase()
     if (!email) return res.status(400).json({ error: 'Email required' })
@@ -550,6 +578,7 @@ export const authConfig = (_req, res) => {
     google: !!getGoogleClient(),
     googleClientId: process.env.GOOGLE_CLIENT_ID || '',
     email: emailVerificationOn(),
+    turnstileSiteKey: captchaEnabled() ? (process.env.TURNSTILE_SITE_KEY || '') : '',
   })
 }
 
