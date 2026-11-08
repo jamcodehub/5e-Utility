@@ -1508,7 +1508,7 @@ export default function LevelBuilder() {
       ) : plans.length === 0 ? (
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 16, color: 'var(--text-3)' }}>
           <div style={{ fontSize: 40, opacity: 0.3 }}>...</div>
-          <div style={{ fontSize: 14 }}>No maps yet. Create your first one above.</div>
+          <div style={{ fontSize: 14 }}>No maps yet. </div>
         </div>
       ) : (
         <div style={{ flex: 1, overflowY: 'auto', padding: 24 }}>
