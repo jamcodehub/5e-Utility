@@ -149,22 +149,10 @@ export default function SettingsModal({ onClose }) {
           }
         </div>
 
+        {/* Only shown to accounts that still need to verify; verified accounts have nothing to manage. */}
+        {!(verifiedWithGoogle || verifiedWithEmail) && (
         <div style={{ marginTop: 24, paddingTop: 24, borderTop: '1px solid var(--border)' }}>
           <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-2)', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 12 }}>Security</div>
-          {verifiedWithGoogle || verifiedWithEmail ? (
-            <div style={{ padding: '10px 12px', borderRadius: 8, background: 'var(--surface2)', border: '1px solid var(--border)' }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
-                <div>
-                  <div style={{ fontSize: 13, fontWeight: 500 }}>Two-factor authentication · On</div>
-                  <div style={{ fontSize: 11, color: 'var(--text-3)' }}>
-                    {verifiedWithGoogle
-                      ? `Verified with Google (${user.email}). You'll only be asked to confirm with Google on a new device.`
-                      : `Verified with your email (${user.email}). We'll email you a code when you sign in on a new device.`}
-                  </div>
-                </div>
-              </div>
-            </div>
-          ) : (
             <>
               {googleAvailable && !channelOpen && (
                 <div style={{ padding: '10px 12px', borderRadius: 8, background: 'var(--surface2)', border: '1px solid var(--border)', marginBottom: 10 }}>
@@ -174,7 +162,6 @@ export default function SettingsModal({ onClose }) {
                 </div>
               )}
             </>
-          )}
 
           {channelOpen && (
             <div style={{ marginTop: 10, padding: 12, borderRadius: 8, border: '1px solid var(--border)' }}>
@@ -186,6 +173,7 @@ export default function SettingsModal({ onClose }) {
           )}
           {twoFAError && <div style={{ fontSize: 12, color: 'var(--red)', marginTop: 8 }}>{twoFAError}</div>}
         </div>
+        )}
 
         {activeCampaign && !activeCampaign.isPersonal && (
           <div style={{ marginTop: 24, paddingTop: 24, borderTop: '1px solid var(--border)' }}>
