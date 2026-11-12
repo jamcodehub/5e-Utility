@@ -456,7 +456,7 @@ export default function Shell({ children }) {
     <div style={{ display: 'flex', height: '100vh', overflow: 'hidden' }}>
       <aside style={{ width: 232, flexShrink: 0, background: 'var(--surface)', borderRight: '1px solid var(--border)', display: 'flex', flexDirection: 'column' }}>
         <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <img src={logoUrl} alt="5e Utility" style={{ width: '100%', maxWidth: 160, height: 'auto', objectFit: 'contain', display: 'block', filter: 'var(--logo-filter, none)' }} />
+          <img src="https://res.cloudinary.com/crcbzpw6/image/upload/v1794483597/5E_UTILITY_Pure_Black_2000.png" alt="5e Utility" style={{ width: '100%', maxWidth: 160, height: 'auto', objectFit: 'contain', display: 'block', filter: 'var(--logo-filter, none)' }} />
         </div>
 
         <div style={{ padding: '12px 14px', borderBottom: '1px solid var(--border)' }}>
