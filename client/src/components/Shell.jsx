@@ -327,7 +327,7 @@ export default function Shell({ children }) {
             </button>
             {!isPremium && <button onClick={() => navigate('/premium')} style={{ background: 'none', border: 'none', color: 'var(--gold)', fontSize: 18, padding: 8, borderRadius: 10, cursor: 'pointer' }}>✦</button>}
             <button onClick={() => setShowSettings(true)} title="Settings" style={{ background: 'none', border: 'none', color: 'var(--text-3)', fontSize: 18, cursor: 'pointer', padding: 8, borderRadius: 10, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
-              <img src="https://res.cloudinary.com/crcbzpw6/image/upload/v1794044929/fantasy_5e_black_vector_2000.svg" alt="Settings" style={{ width: 18, height: 18 }} />
+              <img src="https://res.cloudinary.com/crcbzpw6/image/upload/v1791966298/ellipsis-solid-full.svg" alt="Settings" style={{ width: 18, height: 18 }} />
             </button>
           </div>
         </div>
