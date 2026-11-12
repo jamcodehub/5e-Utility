@@ -30,7 +30,7 @@ function DemoSidebar({ active }) {
   return (
     <aside className="demo-sidebar">
       <Link to="/" className="demo-brand" aria-label="5eUtility home">
-        <img src="https://res.cloudinary.com/crcbzpw6/image/upload/v1792054744/house-solid-full.svg" alt="" aria-hidden="true" className="demo-home-icon" />
+        <img src="https://res.cloudinary.com/crcbzpw6/image/upload/v1792054744/house-solid-full.svg" alt="" aria-hidden="true" className="demo-home-icon" width="100px" />
       </Link>
       <div className="demo-sidebar-label">EXPLORE THE DEMO</div>
       <nav className="demo-nav" aria-label="Demo pages">
@@ -115,7 +115,7 @@ function DemoLanding({ onExplore }) {
         <div className="demo-hero-shade" />
       </div>
       <div className="demo-hero-content">
-        <img className="demo-hero-logo" src={heroLogoUrl} alt="5e Utility" />
+        <img className="demo-hero-logo" src="https://res.cloudinary.com/crcbzpw6/image/upload/v1794483597/5E_UTILITY_Pure_Black_2000.png" alt="5e Utility" />
         <div className="demo-hero-actions">
           <button type="button" className="demo-hero-cta" onClick={onExplore}>Explore the demo <span aria-hidden="true">→</span></button>
         </div>
