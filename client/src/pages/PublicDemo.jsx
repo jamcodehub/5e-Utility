@@ -110,7 +110,7 @@ function DemoLanding({ onExplore }) {
     <section className="demo-hero">
       <div className="demo-hero-backdrop" aria-hidden="true">
         <video ref={videoRef} className="demo-hero-video" autoPlay muted loop playsInline preload="auto" aria-hidden="true" onLoadedMetadata={speedVideo} onPlay={speedVideo}>
-          <source src="https://res.cloudinary.com/crcbzpw6/video/upload/so_0.1/v1792053072/dithered-video.mp4" type="video/mp4" />
+          <source src="https://res.cloudinary.com/crcbzpw6/video/upload/v1794488176/White_Knight_Walk_Loop.mp4" type="video/mp4" />
         </video>
         <div className="demo-hero-shade" />
       </div>
