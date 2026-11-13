@@ -25,7 +25,7 @@ export const DEFAULT_THEME = 'medieval'
 export const THEMES = [
   { id: 'medieval', label: 'Medieval', available: true },
   { id: 'cartoon', label: 'Stylized Cartoon', available: true },
-  { id: 'scifi', label: 'Sci Fi (Coming Soon)', available: false },
+  { id: 'scifi', label: 'Sci Fi', available: true },
   { id: 'western', label: 'Western (Coming Soon)', available: false },
 ]
 
@@ -92,7 +92,55 @@ const CARTOON_ART = {
 
 // ── Coming soon (same shape as above; fill in when the packs are ready) ──
 const SCIFI_ART = {
+  'floor':              { imageUrl: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1794568718/c3_ground_01.png' },
+  'wall':               { imageUrl: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1794568727/c3_ground_19.png' },
+  'wood-wall':          { imageUrl: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1794568718/c3_ground_15.png' },
+  'door':               { imageUrl: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1794568718/c3_ground_15.png' },
+  'water':              { imageUrl: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1794568726/c1_ground_06.png' },
+  'grass':              { imageUrl: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1793015360/grass.png' },
+  'trap':               { imageUrl: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1794568714/c3_ground_06.png' },
+  'stairs':             { imageUrl: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1793015361/stairs_up.png' },
+  'stairs-down':        { imageUrl: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1793015372/stairs_down.png' },
+  'sand':               { imageUrl: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1793015368/sand.png' },
+  'rocky-dirt':         { imageUrl: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1794568715/c3_ground_11.png' },
+  'lava':               { imageUrl: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1793015354/lava.png' },
+  'snow':               { imageUrl: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1794568721/c1_ground_10.png' },
+  'mossy-cobblestone':  { imageUrl: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1794568729/c1_ground_17.png' },
+  'wood-planks':        { imageUrl: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1793015357/wood_planks.png' },
+  'chest':              { imageUrl: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1794568717/c1_ground_22.png' },
 
+  // Upper layer objects
+  'torch':            { imageUrl: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1794568760/c1_object_012.png' },
+  'campfire':         { imageUrl: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1794568752/c1_object_022.png' },
+  'brazier':          { imageUrl: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1794568772/c3_object_007.png' },
+  'magic-rune':       { imageUrl: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1794568771/c1_object_048.png' },
+  'cauldron':         { imageUrl: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1794568751/c1_object_032.png'},
+  'blue-crystal':     { imageUrl: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1794568762/c1_object_002.png' },
+  'tree':             { imageUrl: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1794568755/c1_object_008.png' },
+  'bush':             { imageUrl: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1794568741/c3_object_026.png' },
+  'yellow-flowers':   { imageUrl: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1794568746/c3_object_025.png' },
+  'thorny-brambles':  { imageUrl: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1794568758/c1_object_005.png' },
+  'rock-small':       { imageUrl: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1794568743/c3_object_024.png' },
+  'rock-medium':      { imageUrl: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1794568739/c3_object_027.png' },
+  'rock-large':       { imageUrl: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1794568739/c3_object_023.png' },
+  'table':            { imageUrl: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1794568768/c1_object_058.png' },
+  //'chair':            { imageUrl: ph('cartoon', 'chair') },
+  'bridge':           { imageUrl: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1794568745/c1_object_043.png' },
+  'treasure':         { imageUrl: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1794568739/c3_object_033.png' },
+  'well':             { imageUrl: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1794568733/c3_object_009.png'},
+  'signpost':         { imageUrl: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1794568753/c1_object_037.png' },
+  'evergreen-tree':   { imageUrl: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1794568761/c1_object_003.png' },
+  'locked-chest':     { imageUrl: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1794568763/c1_object_014.png' },
+  'tent':             { imageUrl: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1794568762/c1_object_017.png' },
+  'bookshelf':        { imageUrl: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1794568769/c3_object_016.png' },
+  'bed':              { imageUrl: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1794568771/c1_object_049.png' },
+  'barrel':           { imageUrl: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1794568773/c3_object_005.png' },
+  'bones':            { imageUrl: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1794568757/c1_object_039.png' },
+  'mushrooms':        { imageUrl: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1794568747/c3_object_019.png' },
+  'fallen-log':       { imageUrl: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1794568733/c3_object_021.png'},
+  //'pillar':           { imageUrl: ph('cartoon', 'pillar') },
+  'wooden-crate':     { imageUrl: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1794568736/c3_object_020.png' },
+  //'gravestone':       { imageUrl: ph('cartoon', 'gravestone') },
 }
 const WESTERN_ART = {
 

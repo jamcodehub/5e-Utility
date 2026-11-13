@@ -7,7 +7,7 @@ export const SITE_URL = 'https://www.5eutility.com'
 export const CONTACT_EMAIL = 'support@5eutility.com'
 export const LAST_UPDATED = '7 November 2026'
 
-const LOGO_URL = 'https://res.cloudinary.com/crcbzpw6/image/upload/v1786529766/lore-ledger/storyboard/sdniavu2yeigjupqxgou.png'
+const LOGO_URL = 'https://res.cloudinary.com/crcbzpw6/image/upload/v1794483597/5E_UTILITY_Pure_Black_2000.png'
 const linkStyle = { color: 'var(--gold)', textDecoration: 'underline' }
 const bodyText = { fontSize: 14, lineHeight: 1.75, color: 'var(--text-2)' }
 

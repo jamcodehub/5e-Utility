@@ -274,7 +274,7 @@ return (
       <div className="card" style={{ width: '100%', maxWidth: 380, padding: 32 }}>
         <div style={{ marginBottom: 32, textAlign: 'center', display: 'flex', justifyContent: 'center' }}>
           <img 
-            src="https://res.cloudinary.com/crcbzpw6/image/upload/v1786529766/lore-ledger/storyboard/sdniavu2yeigjupqxgou.png" 
+            src="https://res.cloudinary.com/crcbzpw6/image/upload/v1794483597/5E_UTILITY_Pure_Black_2000.png" 
             alt="5e Utility" 
             style={{ 
               height: '150px', 

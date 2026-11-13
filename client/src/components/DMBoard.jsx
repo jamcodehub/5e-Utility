@@ -6,13 +6,13 @@ import { useTheme } from "../context/ThemeContext";
 const P = (t) => `https://placehold.co/48x48/3b2a1a/e8d5a3?text=${t}`;
 export const ICONS = {
   // left tool bar
-  select: P("SEL"), text: P("TXT"), pen: P("DRAW"), box: P("BOX"), arrow: P("ARROW"), shapes: P("SHAPE"),
+  select: P("https://res.cloudinary.com/crcbzpw6/image/upload/v1794569910/feather-pointed-solid-full-4.svg"), text: P("https://res.cloudinary.com/crcbzpw6/image/upload/v1794570299/i-cursor-solid-full.svg"), pen: P("https://res.cloudinary.com/crcbzpw6/image/upload/v1794570332/pen-nib-solid-full.svg"), box: P("https://res.cloudinary.com/crcbzpw6/image/upload/v1794570353/square-regular-full.svg"), arrow: P("https://res.cloudinary.com/crcbzpw6/image/upload/v1794570443/arrow-right-long-solid-full.svg"), shapes: P("https://res.cloudinary.com/crcbzpw6/image/upload/v1794570543/shapes-solid-full.svg"),
   // shape picker
-  rect: P("RECT"), ellipse: P("OVAL"), diamond: P("DIAM"), triangle: P("TRI"), star: P("STAR"),
+  rect: P("https://res.cloudinary.com/crcbzpw6/image/upload/v1794570353/square-regular-full.svg"), ellipse: P("https://res.cloudinary.com/crcbzpw6/image/upload/v1794570762/circle-regular-full.svg"), star: P("https://res.cloudinary.com/crcbzpw6/image/upload/v1794570765/star-regular-full.svg"),
   // campaign icons / cards
-  npc: P("NPC"), location: P("LOC"), encounter: P("ENC"), loot: P("LOOT"), note: P("NOTE"), image: P("IMG"),
+  npc: P("https://res.cloudinary.com/crcbzpw6/image/upload/v1791791397/circle-user-solid-full.svg"), location: P("https://res.cloudinary.com/crcbzpw6/image/upload/v1794570914/location-dot-solid-full.svg"), encounter: P("https://res.cloudinary.com/crcbzpw6/image/upload/v1791791401/dragon-solid-full.svg"), loot: P("https://res.cloudinary.com/crcbzpw6/image/upload/v1791791414/ring-solid-full.svg"), note: P("https://res.cloudinary.com/crcbzpw6/image/upload/v1791791415/scroll-solid-full.svg"), image: P("https://res.cloudinary.com/crcbzpw6/image/upload/v1794571034/image-regular-full.svg"),
   // bottom bar
-  hand: P("HAND"), eraser: P("ERASE"), trash: P("BURN"), undo: P("UNDO"), redo: P("REDO"), copy: P("DUPE"),
+  hand: P("https://res.cloudinary.com/crcbzpw6/image/upload/v1794571079/hand-regular-full.svg"), eraser: P("https://res.cloudinary.com/crcbzpw6/image/upload/v1794571142/eraser-solid-full.svg"), trash: P("https://res.cloudinary.com/crcbzpw6/image/upload/v1794571210/fire-solid-full.svg"), undo: P("https://res.cloudinary.com/crcbzpw6/image/upload/v1794571148/arrow-rotate-left-solid-full.svg"), redo: P("https://res.cloudinary.com/crcbzpw6/image/upload/v1794571241/arrow-rotate-right-solid-full.svg"), copy: P("https://res.cloudinary.com/crcbzpw6/image/upload/v1794571158/copy-regular-full.svg"),
 };
 
 const TYPES = {
@@ -30,6 +30,9 @@ const SHAPES = {
   triangle: { label: "Triangle", el: <polygon points="50,2 99,98 1,98" /> },
   star: { label: "Star", el: <polygon points="50,2 61,36 98,36 68,58 79,94 50,72 21,94 32,58 2,36 39,36" /> },
 };
+
+// Feather-quill cursor, flipped vertically so the quill nib points up-left; the light outline keeps it visible on dark themes.
+const QUILL_CURSOR = `url("data:image/svg+xml,${encodeURIComponent(`<svg xmlns='http://www.w3.org/2000/svg' width='32' height='32' viewBox='0 0 640 640'><path transform='translate(0 640) scale(1 -1)' fill='#1f1f1f' stroke='#f4e8c8' stroke-width='28' stroke-linejoin='round' paint-order='stroke' d='M539.3 64.1C549.2 63.3 558.9 67.1 565.9 74.1C572.9 81.1 576.7 90.8 575.9 100.7C571.9 150 558.5 226.9 529.6 300.4C527.8 304.9 524.1 308.3 519.4 309.7L438.5 334C434.6 335.2 432 338.7 432 342.8C432 347.9 436.1 352 441.2 352L479.8 352C491.8 352 499.5 364.8 493.3 375.1C489.3 381.8 485 388.3 480.6 394.7C478.6 397.6 475.6 399.7 472.2 400.8L374.5 430C370.6 431.2 368 434.7 368 438.8C368 443.9 372.1 448 377.2 448L393.2 448C407.8 448 414.2 465.4 402 473.4C334 518.4 264.3 516.7 219.6 504.7C206.9 501.3 195.6 494.8 185.2 486.8L112 560C103.2 568.8 88.8 568.8 80 560C71.2 551.2 71.2 536.8 80 528L160 448L160.5 448.5C161.2 447.2 162.1 446 163.2 444.9L320 288C328.8 279.2 328.8 264.8 320 256C311.2 247.2 296.8 247.2 288 256L153.7 390.2C144.8 399.1 129.7 394.6 128.7 382C124.4 328.8 138 258.9 201.3 195.6C292.4 104.5 455.5 70.9 539.2 64.1Z'/></svg>`)}") 4 4, crosshair`;
 
 const uid = () => Math.random().toString(36).slice(2, 9);
 const EMPTY = { items: [], links: [], strokes: [], arrows: [] };
@@ -158,23 +161,30 @@ export default function DMBoard({ boardId, style }) {
     setFull(true);
   };
 
-  /* wheel: scroll/two-finger drag pans in any direction (incl. diagonal); pinch or ctrl/cmd+wheel zooms.
-     Listening on the whole board (not just the canvas) and cancelling every wheel/gesture stops the
-     browser zooming or scrolling the page when the pointer is over the toolbars. */
+  /* wheel: a mouse wheel zooms towards the cursor; a trackpad two-finger scroll pans (any direction);
+     pinch or ctrl/cmd+wheel always zooms. Mouse wheels send large, whole-number, vertical-only steps,
+     trackpads send streams of small or sideways deltas, so that tells them apart (a stream that has
+     started as a trackpad stays one so momentum scrolling doesn't flip into zooming).
+     Listening on the whole board and cancelling every wheel/gesture stops the browser zooming or
+     scrolling the page when the pointer is over the toolbars. */
   useEffect(() => {
     const el = root.current, canvas = ref.current;
+    let lastTrackpad = 0;
     const f = (e) => {
       e.preventDefault();
-      if (e.ctrlKey || e.metaKey) {
+      const now = performance.now();
+      const zoom = e.ctrlKey || e.metaKey;
+      const mouse = e.deltaMode !== 0 || (e.deltaX === 0 && Number.isInteger(e.deltaY) && Math.abs(e.deltaY) >= 50);
+      if (!zoom && !mouse) lastTrackpad = now;
+      if (zoom || (mouse && now - lastTrackpad > 120)) {
         const r = canvas.getBoundingClientRect(), mx = e.clientX - r.left, my = e.clientY - r.top;
+        const d = e.deltaMode === 1 ? e.deltaY * 16 : e.deltaY;
         setView((v) => {
-          const z = Math.min(4, Math.max(0.1, v.z * Math.exp(-Math.max(-30, Math.min(30, e.deltaY)) * 0.01)));
+          const z = Math.min(4, Math.max(0.1, v.z * Math.exp(-Math.max(-100, Math.min(100, d)) * (zoom ? 0.01 : 0.0015))));
           return { z, x: mx - ((mx - v.x) / v.z) * z, y: my - ((my - v.y) / v.z) * z };
         });
       } else {
-        const k = e.deltaMode === 1 ? 16 : 1; // line-based wheels report lines, not pixels
-        const dx = e.shiftKey && !e.deltaX ? e.deltaY : e.deltaX, dy = e.shiftKey && !e.deltaX ? 0 : e.deltaY;
-        setView((v) => ({ ...v, x: v.x - dx * k, y: v.y - dy * k }));
+        setView((v) => ({ ...v, x: v.x - e.deltaX, y: v.y - e.deltaY }));
       }
     };
     const block = (e) => e.preventDefault(); // Safari pinch gestures
@@ -345,11 +355,10 @@ export default function DMBoard({ boardId, style }) {
 
   const byId = Object.fromEntries(board.items.map((i) => [i.id, i]));
   const ctr = (i) => [i.x + W(i) / 2, i.y + H(i) / 2];
-  const gs = (() => { let g = 40; while (g * view.z < 16) g *= 2; return g * view.z; })();
-  const single = sel.length === 1 && byId[sel[0]];
+    const single = sel.length === 1 && byId[sel[0]];
   const pick = (t) => { setTool(t); setLinkFrom(null); setShowShapes(false); };
   const tb = (t, l, on, fn, dis) => (
-    <button key={l} className={on ? "on" : ""} disabled={dis} onClick={fn} title={l}><Ico s={ICONS[t]} />{l}</button>
+    <button key={l} className={on ? "on" : ""} disabled={dis} onClick={fn} title={l} aria-label={l}><Ico s={ICONS[t]} /></button>
   );
 
   return (
@@ -362,7 +371,7 @@ export default function DMBoard({ boardId, style }) {
       <style>{CSS}</style>
       <div
         ref={ref} className="dmb-canvas" data-canvas="1"
-        style={{ backgroundSize: `${gs}px ${gs}px, 300px 300px`, backgroundPosition: `${view.x}px ${view.y}px, ${view.x * 0.5}px ${view.y * 0.5}px`, cursor: tool === "hand" ? "grab" : tool === "select" ? "default" : "crosshair" }}
+        style={{ cursor: tool === "hand" ? "grab" : QUILL_CURSOR }}
         onPointerDownCapture={panDown} onPointerDown={down} onPointerMove={move} onPointerUp={up} onContextMenu={(e) => e.preventDefault()}
       >
         {/* world layer: pure DOM + SVG, re-rasterised at every zoom level so it stays sharp */}
@@ -444,7 +453,7 @@ export default function DMBoard({ boardId, style }) {
           <div className="dmb-pop-title">Shapes</div>
           <div className="dmb-pop-row">
             {Object.entries(SHAPES).map(([k, s]) => (
-              <button key={k} className={tool === "shape" && shapeKind === k ? "on" : ""} title={s.label} onClick={() => { setShapeKind(k); setTool("shape"); setShowShapes(false); }}><Ico s={ICONS[k]} />{s.label}</button>
+              <button key={k} className={tool === "shape" && shapeKind === k ? "on" : ""} title={s.label} aria-label={s.label} onClick={() => { setShapeKind(k); setTool("shape"); setShowShapes(false); }}><Ico s={ICONS[k]} /></button>
             ))}
           </div>
           <div className="dmb-pop-title">Icons &amp; cards</div>
@@ -477,24 +486,23 @@ export default function DMBoard({ boardId, style }) {
 const CSS = `
 @import url('https://fonts.googleapis.com/css2?family=IM+Fell+English:ital@0;1&family=MedievalSharp&display=swap');
 .dmb-root{
- --dmb-paper:#ecdcb0;--dmb-ink:#2b1d10;--dmb-edge:#5a3b1c;--dmb-shadow:rgba(60,35,10,.35);
+ --dmb-paper:#efe4c8;--dmb-ink:#2b1d10;--dmb-edge:#5a3b1c;--dmb-shadow:rgba(60,35,10,.18);
  --dmb-chrome:color-mix(in srgb,var(--gold,#9a7c3a) 14%,#33241a);--dmb-chrome-hi:color-mix(in srgb,var(--gold,#9a7c3a) 30%,#4a3320);
  --dmb-chrome-text:#e8d5a3;--dmb-rim:color-mix(in srgb,var(--gold,#9a7c3a) 55%,#d4af5a);
- --dmb-danger:#8a1c1c;--dmb-link:#6b2b14;--dmb-dot:rgba(90,60,20,.3);--dmb-vig:rgba(80,45,10,.55);
+ --dmb-danger:#8a1c1c;--dmb-link:#6b2b14;--dmb-stain:rgba(150,105,45,.16);--dmb-vig:rgba(120,85,40,.22);
  --dmb-card-img:#f4e8c8;--dmb-card-mix:100%;
- --dmb-noise:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='300' height='300'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.02 .03' numOctaves='5' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 .55  0 0 0 0 .38  0 0 0 0 .15  0 0 0 .35 0'/></filter><rect width='300' height='300' filter='url(%23n)'/></svg>");
  position:relative;width:100%;height:100%;min-height:480px;outline:0;touch-action:none;overscroll-behavior:contain;overflow:hidden;border-radius:8px;background:var(--dmb-chrome);user-select:none}
 .dmb-root[data-mode=dark]{
  --dmb-paper:color-mix(in srgb,var(--surface,#1a1c1e) 88%,var(--gold,#c8a060));--dmb-ink:var(--text,#e8e4dc);--dmb-edge:var(--border-strong,#3e4248);--dmb-shadow:rgba(0,0,0,.5);
  --dmb-chrome:var(--surface2,#222528);--dmb-chrome-hi:var(--border,#2e3135);--dmb-chrome-text:var(--text,#e8e4dc);--dmb-rim:var(--gold,#c8a060);
- --dmb-danger:var(--red,#e05050);--dmb-link:var(--gold,#c8a060);--dmb-dot:rgba(255,255,255,.1);--dmb-vig:rgba(0,0,0,.6);
+ --dmb-danger:var(--red,#e05050);--dmb-link:var(--gold,#c8a060);--dmb-stain:rgba(255,235,190,.05);--dmb-vig:rgba(0,0,0,.3);
  --dmb-card-img:var(--surface,#1a1c1e);--dmb-card-mix:16%;
- --dmb-noise:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='300' height='300'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.02 .03' numOctaves='5' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 .8  0 0 0 0 .7  0 0 0 0 .5  0 0 0 .1 0'/></filter><rect width='300' height='300' filter='url(%23n)'/></svg>")}
+}
 .dmb-root.full{position:fixed;inset:0;z-index:9999;border-radius:0}
 .dmb-canvas{position:absolute;inset:0;overflow:hidden;touch-action:none;font-family:'IM Fell English',Georgia,serif;color:var(--dmb-ink);text-rendering:geometricPrecision;
- background-color:var(--dmb-paper);background-image:radial-gradient(circle,var(--dmb-dot) 1px,transparent 1.6px),var(--dmb-noise);
- box-shadow:inset 0 0 120px var(--dmb-vig),inset 0 14px 18px -10px var(--dmb-vig),inset 0 -14px 18px -10px var(--dmb-vig)}
-.dmb-card{position:absolute;box-sizing:border-box;border:2px solid var(--dmb-edge);border-radius:4px 10px 5px 9px;padding:8px;box-shadow:3px 4px 0 var(--dmb-shadow);cursor:grab;pointer-events:auto;display:flex;flex-direction:column;overflow:visible;
+ background-color:var(--dmb-paper);
+ box-shadow:inset 0 0 90px var(--dmb-vig)}
+.dmb-card{position:absolute;box-sizing:border-box;border:1px solid color-mix(in srgb,var(--dmb-edge) 55%,transparent);border-radius:8px;padding:8px;box-shadow:0 2px 8px var(--dmb-shadow);cursor:grab;pointer-events:auto;display:flex;flex-direction:column;overflow:visible;
  background:color-mix(in srgb,var(--tint,var(--dmb-paper)) var(--dmb-card-mix),var(--surface,var(--dmb-paper)))}
 .dmb-root[data-mode=light] .dmb-card{background:var(--tint,var(--dmb-card-img))}
 .dmb-card.txt,.dmb-card.shp{background:none!important;border:1px dashed transparent;box-shadow:none}
@@ -519,7 +527,7 @@ const CSS = `
 .dmb-hit{fill:none;stroke:transparent;stroke-width:16;pointer-events:stroke;cursor:pointer}
 .dmb-sel-arrow .dmb-link{stroke:var(--dmb-danger);stroke-width:3.5}
 .dmb-marq{fill:color-mix(in srgb,var(--dmb-danger) 10%,transparent);stroke:var(--dmb-danger);stroke-width:1.5;stroke-dasharray:5 4}
-.dmb-bar,.dmb-tl,.dmb-zoom,.dmb-tools,.dmb-pop{position:absolute;display:flex;gap:4px;align-items:center;background:var(--dmb-chrome);border:2px solid var(--dmb-rim);border-radius:10px;padding:5px 7px;box-shadow:0 4px 14px rgba(0,0,0,.45)}
+.dmb-bar,.dmb-tl,.dmb-zoom,.dmb-tools,.dmb-pop{position:absolute;display:flex;gap:4px;align-items:center;background:var(--dmb-chrome);border:1px solid color-mix(in srgb,var(--dmb-rim) 60%,transparent);border-radius:10px;padding:5px 7px;box-shadow:0 2px 10px rgba(0,0,0,.25)}
 .dmb-bar{left:50%;bottom:14px;transform:translateX(-50%);max-width:calc(100% - 24px);overflow-x:auto}
 .dmb-tl{left:12px;top:12px}
 .dmb-tools{left:12px;top:84px;flex-direction:column;border-radius:34px;padding:8px 5px;max-height:calc(100% - 270px);overflow-y:auto}
@@ -528,7 +536,7 @@ const CSS = `
 .dmb-pop-title{color:var(--dmb-chrome-text);opacity:.75;font:12px 'MedievalSharp',serif;text-transform:uppercase;letter-spacing:.08em}
 .dmb-zoom{left:12px;bottom:84px;color:var(--dmb-chrome-text);font:13px 'MedievalSharp',serif}
 .dmb-zoom span{min-width:46px;text-align:center}
-.dmb-root button{display:flex;flex-direction:column;align-items:center;gap:2px;min-width:48px;background:none;border:1px solid transparent;border-radius:6px;color:var(--dmb-chrome-text);font:12px 'MedievalSharp',serif;padding:4px 6px;cursor:pointer}
+.dmb-root button{display:flex;flex-direction:column;align-items:center;gap:2px;min-width:40px;background:none;border:1px solid transparent;border-radius:6px;color:var(--dmb-chrome-text);font:12px 'MedievalSharp',serif;padding:4px 6px;cursor:pointer}
 .dmb-root button.on,.dmb-root button:hover:not(:disabled){background:var(--dmb-chrome-hi);border-color:var(--dmb-rim)}
 .dmb-root button:disabled{opacity:.35;cursor:default}
 .dmb-bar img,.dmb-tl img,.dmb-tools img,.dmb-pop img{width:24px;height:24px}
