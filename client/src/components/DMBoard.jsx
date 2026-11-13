@@ -158,19 +158,32 @@ export default function DMBoard({ boardId, style }) {
     setFull(true);
   };
 
-  /* wheel: pinch/ctrl = fine zoom, plain wheel = zoom (non-passive so the page doesn't scroll) */
+  /* wheel: scroll/two-finger drag pans in any direction (incl. diagonal); pinch or ctrl/cmd+wheel zooms.
+     Listening on the whole board (not just the canvas) and cancelling every wheel/gesture stops the
+     browser zooming or scrolling the page when the pointer is over the toolbars. */
   useEffect(() => {
-    const el = ref.current;
+    const el = root.current, canvas = ref.current;
     const f = (e) => {
       e.preventDefault();
-      const r = el.getBoundingClientRect(), mx = e.clientX - r.left, my = e.clientY - r.top;
-      setView((v) => {
-        const z = Math.min(4, Math.max(0.1, v.z * Math.exp(-e.deltaY * (e.ctrlKey ? 0.01 : 0.0015))));
-        return { z, x: mx - ((mx - v.x) / v.z) * z, y: my - ((my - v.y) / v.z) * z };
-      });
+      if (e.ctrlKey || e.metaKey) {
+        const r = canvas.getBoundingClientRect(), mx = e.clientX - r.left, my = e.clientY - r.top;
+        setView((v) => {
+          const z = Math.min(4, Math.max(0.1, v.z * Math.exp(-Math.max(-30, Math.min(30, e.deltaY)) * 0.01)));
+          return { z, x: mx - ((mx - v.x) / v.z) * z, y: my - ((my - v.y) / v.z) * z };
+        });
+      } else {
+        const k = e.deltaMode === 1 ? 16 : 1; // line-based wheels report lines, not pixels
+        const dx = e.shiftKey && !e.deltaX ? e.deltaY : e.deltaX, dy = e.shiftKey && !e.deltaX ? 0 : e.deltaY;
+        setView((v) => ({ ...v, x: v.x - dx * k, y: v.y - dy * k }));
+      }
     };
+    const block = (e) => e.preventDefault(); // Safari pinch gestures
     el.addEventListener("wheel", f, { passive: false });
-    return () => el.removeEventListener("wheel", f);
+    ["gesturestart", "gesturechange", "gestureend"].forEach((t) => el.addEventListener(t, block));
+    return () => {
+      el.removeEventListener("wheel", f);
+      ["gesturestart", "gesturechange", "gestureend"].forEach((t) => el.removeEventListener(t, block));
+    };
   }, []);
 
   /* history */
@@ -233,6 +246,13 @@ export default function DMBoard({ boardId, style }) {
   };
 
   /* canvas gestures */
+  // Right/middle button drags pan from anywhere, including over cards (capture runs before card handlers).
+  const panDown = (e) => {
+    if (e.button !== 2 && e.button !== 1) return;
+    e.preventDefault(); e.stopPropagation();
+    root.current.focus(); ref.current.setPointerCapture(e.pointerId);
+    drag.current = { k: "pan", sx: e.clientX, sy: e.clientY, ox: view.x, oy: view.y };
+  };
   const down = (e) => {
     if (!e.target.dataset.canvas) return;
     root.current.focus(); ref.current.setPointerCapture(e.pointerId);
@@ -343,7 +363,7 @@ export default function DMBoard({ boardId, style }) {
       <div
         ref={ref} className="dmb-canvas" data-canvas="1"
         style={{ backgroundSize: `${gs}px ${gs}px, 300px 300px`, backgroundPosition: `${view.x}px ${view.y}px, ${view.x * 0.5}px ${view.y * 0.5}px`, cursor: tool === "hand" ? "grab" : tool === "select" ? "default" : "crosshair" }}
-        onPointerDown={down} onPointerMove={move} onPointerUp={up}
+        onPointerDownCapture={panDown} onPointerDown={down} onPointerMove={move} onPointerUp={up} onContextMenu={(e) => e.preventDefault()}
       >
         {/* world layer: pure DOM + SVG, re-rasterised at every zoom level so it stays sharp */}
         <div style={{ position: "absolute", left: 0, top: 0, transform: `translate(${view.x}px,${view.y}px) scale(${view.z})`, transformOrigin: "0 0", pointerEvents: "none" }}>
@@ -383,7 +403,7 @@ export default function DMBoard({ boardId, style }) {
                 )}
                 {T && (
                   <div className="dmb-head">
-                    <Ico s={ICONS[it.type]} />
+                    {it.type !== "note" && <Ico s={ICONS[it.type]} />}
                     <input value={it.title || ""} onFocus={snap} onPointerDown={(e) => e.stopPropagation()} onChange={(e) => patch(it.id, { title: e.target.value })} />
                   </div>
                 )}
@@ -463,7 +483,7 @@ const CSS = `
  --dmb-danger:#8a1c1c;--dmb-link:#6b2b14;--dmb-dot:rgba(90,60,20,.3);--dmb-vig:rgba(80,45,10,.55);
  --dmb-card-img:#f4e8c8;--dmb-card-mix:100%;
  --dmb-noise:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='300' height='300'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.02 .03' numOctaves='5' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 .55  0 0 0 0 .38  0 0 0 0 .15  0 0 0 .35 0'/></filter><rect width='300' height='300' filter='url(%23n)'/></svg>");
- position:relative;width:100%;height:100%;min-height:480px;outline:0;overflow:hidden;border-radius:8px;background:var(--dmb-chrome);user-select:none}
+ position:relative;width:100%;height:100%;min-height:480px;outline:0;touch-action:none;overscroll-behavior:contain;overflow:hidden;border-radius:8px;background:var(--dmb-chrome);user-select:none}
 .dmb-root[data-mode=dark]{
  --dmb-paper:color-mix(in srgb,var(--surface,#1a1c1e) 88%,var(--gold,#c8a060));--dmb-ink:var(--text,#e8e4dc);--dmb-edge:var(--border-strong,#3e4248);--dmb-shadow:rgba(0,0,0,.5);
  --dmb-chrome:var(--surface2,#222528);--dmb-chrome-hi:var(--border,#2e3135);--dmb-chrome-text:var(--text,#e8e4dc);--dmb-rim:var(--gold,#c8a060);
