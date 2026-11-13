@@ -3,16 +3,15 @@ import { api } from "../context/AuthContext";
 import { useTheme } from "../context/ThemeContext";
 
 /* ---------- ASSETS: swap these placeholder URLs for your own icons ---------- */
-const P = (t) => `https://placehold.co/48x48/3b2a1a/e8d5a3?text=${t}`;
 export const ICONS = {
   // left tool bar
-  select: P("https://res.cloudinary.com/crcbzpw6/image/upload/v1794569910/feather-pointed-solid-full-4.svg"), text: P("https://res.cloudinary.com/crcbzpw6/image/upload/v1794570299/i-cursor-solid-full.svg"), pen: P("https://res.cloudinary.com/crcbzpw6/image/upload/v1794570332/pen-nib-solid-full.svg"), box: P("https://res.cloudinary.com/crcbzpw6/image/upload/v1794570353/square-regular-full.svg"), arrow: P("https://res.cloudinary.com/crcbzpw6/image/upload/v1794570443/arrow-right-long-solid-full.svg"), shapes: P("https://res.cloudinary.com/crcbzpw6/image/upload/v1794570543/shapes-solid-full.svg"),
+  select: "https://res.cloudinary.com/crcbzpw6/image/upload/v1794569910/feather-pointed-solid-full-4.svg", text: "https://res.cloudinary.com/crcbzpw6/image/upload/v1794570299/i-cursor-solid-full.svg", pen: "https://res.cloudinary.com/crcbzpw6/image/upload/v1794570332/pen-nib-solid-full.svg", box: "https://res.cloudinary.com/crcbzpw6/image/upload/v1794570353/square-regular-full.svg", arrow: "https://res.cloudinary.com/crcbzpw6/image/upload/v1794570443/arrow-right-long-solid-full.svg", shapes: "https://res.cloudinary.com/crcbzpw6/image/upload/v1794570543/shapes-solid-full.svg",
   // shape picker
-  rect: P("https://res.cloudinary.com/crcbzpw6/image/upload/v1794570353/square-regular-full.svg"), ellipse: P("https://res.cloudinary.com/crcbzpw6/image/upload/v1794570762/circle-regular-full.svg"), star: P("https://res.cloudinary.com/crcbzpw6/image/upload/v1794570765/star-regular-full.svg"),
+  rect: "https://res.cloudinary.com/crcbzpw6/image/upload/v1794570353/square-regular-full.svg", ellipse: "https://res.cloudinary.com/crcbzpw6/image/upload/v1794570762/circle-regular-full.svg", star: "https://res.cloudinary.com/crcbzpw6/image/upload/v1794570765/star-regular-full.svg",
   // campaign icons / cards
-  npc: P("https://res.cloudinary.com/crcbzpw6/image/upload/v1791791397/circle-user-solid-full.svg"), location: P("https://res.cloudinary.com/crcbzpw6/image/upload/v1794570914/location-dot-solid-full.svg"), encounter: P("https://res.cloudinary.com/crcbzpw6/image/upload/v1791791401/dragon-solid-full.svg"), loot: P("https://res.cloudinary.com/crcbzpw6/image/upload/v1791791414/ring-solid-full.svg"), note: P("https://res.cloudinary.com/crcbzpw6/image/upload/v1791791415/scroll-solid-full.svg"), image: P("https://res.cloudinary.com/crcbzpw6/image/upload/v1794571034/image-regular-full.svg"),
+  npc: "https://res.cloudinary.com/crcbzpw6/image/upload/v1791791397/circle-user-solid-full.svg", location: "https://res.cloudinary.com/crcbzpw6/image/upload/v1794570914/location-dot-solid-full.svg", encounter: "https://res.cloudinary.com/crcbzpw6/image/upload/v1791791401/dragon-solid-full.svg", loot: "https://res.cloudinary.com/crcbzpw6/image/upload/v1791791414/ring-solid-full.svg", note: "https://res.cloudinary.com/crcbzpw6/image/upload/v1791791415/scroll-solid-full.svg", image: "https://res.cloudinary.com/crcbzpw6/image/upload/v1794571034/image-regular-full.svg",
   // bottom bar
-  hand: P("https://res.cloudinary.com/crcbzpw6/image/upload/v1794571079/hand-regular-full.svg"), eraser: P("https://res.cloudinary.com/crcbzpw6/image/upload/v1794571142/eraser-solid-full.svg"), trash: P("https://res.cloudinary.com/crcbzpw6/image/upload/v1794571210/fire-solid-full.svg"), undo: P("https://res.cloudinary.com/crcbzpw6/image/upload/v1794571148/arrow-rotate-left-solid-full.svg"), redo: P("https://res.cloudinary.com/crcbzpw6/image/upload/v1794571241/arrow-rotate-right-solid-full.svg"), copy: P("https://res.cloudinary.com/crcbzpw6/image/upload/v1794571158/copy-regular-full.svg"),
+  hand: "https://res.cloudinary.com/crcbzpw6/image/upload/v1794571079/hand-regular-full.svg", eraser: "https://res.cloudinary.com/crcbzpw6/image/upload/v1794571142/eraser-solid-full.svg", trash: "https://res.cloudinary.com/crcbzpw6/image/upload/v1794571210/fire-solid-full.svg", undo: "https://res.cloudinary.com/crcbzpw6/image/upload/v1794571148/arrow-rotate-left-solid-full.svg", redo: "https://res.cloudinary.com/crcbzpw6/image/upload/v1794571241/arrow-rotate-right-solid-full.svg", copy: "https://res.cloudinary.com/crcbzpw6/image/upload/v1794571158/copy-regular-full.svg",
 };
 
 const TYPES = {
@@ -487,14 +486,14 @@ const CSS = `
 @import url('https://fonts.googleapis.com/css2?family=IM+Fell+English:ital@0;1&family=MedievalSharp&display=swap');
 .dmb-root{
  --dmb-paper:#efe4c8;--dmb-ink:#2b1d10;--dmb-edge:#5a3b1c;--dmb-shadow:rgba(60,35,10,.18);
- --dmb-chrome:color-mix(in srgb,var(--gold,#9a7c3a) 14%,#33241a);--dmb-chrome-hi:color-mix(in srgb,var(--gold,#9a7c3a) 30%,#4a3320);
- --dmb-chrome-text:#e8d5a3;--dmb-rim:color-mix(in srgb,var(--gold,#9a7c3a) 55%,#d4af5a);
+ --dmb-chrome:#f6edd5;--dmb-chrome-hi:#e6d6ae;--dmb-icon-filter:brightness(0);
+ --dmb-chrome-text:#2b1d10;--dmb-rim:color-mix(in srgb,var(--gold,#9a7c3a) 70%,#8a6a2a);
  --dmb-danger:#8a1c1c;--dmb-link:#6b2b14;--dmb-stain:rgba(150,105,45,.16);--dmb-vig:rgba(120,85,40,.22);
  --dmb-card-img:#f4e8c8;--dmb-card-mix:100%;
  position:relative;width:100%;height:100%;min-height:480px;outline:0;touch-action:none;overscroll-behavior:contain;overflow:hidden;border-radius:8px;background:var(--dmb-chrome);user-select:none}
 .dmb-root[data-mode=dark]{
  --dmb-paper:color-mix(in srgb,var(--surface,#1a1c1e) 88%,var(--gold,#c8a060));--dmb-ink:var(--text,#e8e4dc);--dmb-edge:var(--border-strong,#3e4248);--dmb-shadow:rgba(0,0,0,.5);
- --dmb-chrome:var(--surface2,#222528);--dmb-chrome-hi:var(--border,#2e3135);--dmb-chrome-text:var(--text,#e8e4dc);--dmb-rim:var(--gold,#c8a060);
+ --dmb-icon-filter:brightness(0) invert(1);--dmb-chrome:var(--surface2,#222528);--dmb-chrome-hi:var(--border,#2e3135);--dmb-chrome-text:var(--text,#e8e4dc);--dmb-rim:var(--gold,#c8a060);
  --dmb-danger:var(--red,#e05050);--dmb-link:var(--gold,#c8a060);--dmb-stain:rgba(255,235,190,.05);--dmb-vig:rgba(0,0,0,.3);
  --dmb-card-img:var(--surface,#1a1c1e);--dmb-card-mix:16%;
 }
@@ -539,7 +538,8 @@ const CSS = `
 .dmb-root button{display:flex;flex-direction:column;align-items:center;gap:2px;min-width:40px;background:none;border:1px solid transparent;border-radius:6px;color:var(--dmb-chrome-text);font:12px 'MedievalSharp',serif;padding:4px 6px;cursor:pointer}
 .dmb-root button.on,.dmb-root button:hover:not(:disabled){background:var(--dmb-chrome-hi);border-color:var(--dmb-rim)}
 .dmb-root button:disabled{opacity:.35;cursor:default}
-.dmb-bar img,.dmb-tl img,.dmb-tools img,.dmb-pop img{width:24px;height:24px}
+.dmb-bar img,.dmb-tl img,.dmb-tools img,.dmb-pop img{width:22px;height:22px;filter:var(--dmb-icon-filter)}
+.dmb-head img{filter:var(--dmb-icon-filter);border:0!important;border-radius:0!important}
 .dmb-root .dmb-fs{position:absolute;right:12px;top:12px;flex-direction:row;background:var(--dmb-rim);color:#1d1208;border:2px solid var(--dmb-chrome);font-size:15px;padding:8px 14px;box-shadow:0 4px 14px rgba(0,0,0,.45)}
 .dmb-root .dmb-fs:hover{background:color-mix(in srgb,var(--dmb-rim) 82%,#fff);border-color:var(--dmb-chrome)}
 .dmb-sep{width:1px;align-self:stretch;background:var(--dmb-rim);opacity:.5;margin:0 4px}
