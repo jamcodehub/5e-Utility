@@ -1,6 +1,51 @@
 import { useState, useEffect, useRef } from 'react'
 import { useTheme } from '../context/ThemeContext'
 
+// ---- True 3D icosahedron (d20) built from 20 CSS-transformed triangles ----
+const DIE = 92 // edge length in px
+const PHI = (1 + Math.sqrt(5)) / 2
+const VERTS = [[-1, PHI, 0], [1, PHI, 0], [-1, -PHI, 0], [1, -PHI, 0], [0, -1, PHI], [0, 1, PHI], [0, -1, -PHI], [0, 1, -PHI], [PHI, 0, -1], [PHI, 0, 1], [-PHI, 0, -1], [-PHI, 0, 1]]
+const TRIS = [[0, 11, 5], [0, 5, 1], [0, 1, 7], [0, 7, 10], [0, 10, 11], [1, 5, 9], [5, 11, 4], [11, 10, 2], [10, 7, 6], [7, 1, 8], [3, 9, 4], [3, 4, 2], [3, 2, 6], [3, 6, 8], [3, 8, 9], [4, 9, 5], [2, 4, 11], [6, 2, 10], [8, 6, 7], [9, 8, 1]]
+const norm = v => { const l = Math.hypot(...v); return v.map(x => x / l) }
+const cross = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]]
+const FACES = (() => {
+  const k = DIE / 2
+  const faces = TRIS.map(t => {
+    const pts = t.map(i => VERTS[i].map(x => x * k))
+    const c = [0, 1, 2].map(a => (pts[0][a] + pts[1][a] + pts[2][a]) / 3)
+    const n = norm(c)
+    const v = norm([c[0] - pts[0][0], c[1] - pts[0][1], c[2] - pts[0][2]]) // points from apex to centre, i.e. down the face
+    const u = cross(v, n)
+    return { c, n, u, v, num: 0 }
+  })
+  // Opposite faces sum to 21, like a real die.
+  let next = 1
+  faces.forEach((f, i) => {
+    if (f.num) return
+    const j = faces.findIndex((g, x) => x !== i && g.n[0] * f.n[0] + g.n[1] * f.n[1] + g.n[2] * f.n[2] < -0.99)
+    f.num = next; faces[j].num = 21 - next; next += 1
+  })
+  return faces
+})()
+const faceMatrix = f => `matrix3d(${[...f.u, 0, ...f.v, 0, ...f.n, 0, ...f.c, 1].join(',')})`
+// Rotation that brings a face to the front, upright.
+const restTransform = num => {
+  const f = FACES.find(x => x.num === num)
+  return `matrix3d(${[f.u[0], f.v[0], f.n[0], 0, f.u[1], f.v[1], f.n[1], 0, f.u[2], f.v[2], f.n[2], 0, 0, 0, 0, 1].join(',')})`
+}
+const randomSpin = () => {
+  const a = norm([Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5])
+  return `rotate3d(${a.join(',')},${Math.floor(Math.random() * 360)}deg)`
+}
+const FACE_R = DIE / Math.sqrt(3)
+const FACE_CLIP = `polygon(50% ${50 - (FACE_R / DIE) * 100}%, 100% ${50 + (FACE_R / DIE) * 50}%, 0% ${50 + (FACE_R / DIE) * 50}%)`
+
+const STREAK_KEY = 'll_dice_streaks'
+const loadStreaks = () => {
+  try { const v = JSON.parse(localStorage.getItem(STREAK_KEY)); if (v && typeof v === 'object') return v } catch { /* ignore */ }
+  return {}
+}
+
 export default function Dice() {
   const { theme } = useTheme()
   const isClassic = theme === 'light' || theme === 'classic'
@@ -11,6 +56,9 @@ export default function Dice() {
   const [showConfetti, setShowConfetti] = useState(false)
   const [showRain, setShowRain] = useState(false)
   const [sink, setSink] = useState(false)
+  const dieRef = useRef(null)
+  const run = useRef({ value: null, count: 0 })
+  const [best, setBest] = useState(loadStreaks)
   const [d20Transform, setD20Transform] = useState('translate(0px, -400px) rotate(0deg)')
   const [d20Transition, setD20Transition] = useState('transform 0ms')
 
@@ -37,10 +85,16 @@ export default function Dice() {
     // real pixel dimensions — using % transforms was relative to the die's
     // own tiny size (58px), which is why it barely moved before.
     const rect = boardRef.current?.getBoundingClientRect()
-    const dieSize = 58
+    const dieSize = DIE
     const maxX = rect ? (rect.width - dieSize) / 2 - 6 : 300
     const maxY = rect ? (rect.height - dieSize) / 2 - 6 : 200
 
+    const finalValue = Math.floor(Math.random() * 20) + 1
+
+    // Tumble through random orientations and settle with the rolled face toward the viewer.
+    const die = dieRef.current
+    const restNow = die.style.transform || 'none'
+    const restNext = restTransform(finalValue)
     // reset d20 position to outside tray (top center)
     setD20Transition('transform 0ms')
     setD20Transform(`translate(0px, ${-(maxY + 220)}px) rotate(0deg)`)
@@ -49,8 +103,14 @@ export default function Dice() {
     const angle = Math.random() * Math.PI * 2
     const tx = Math.round(Math.cos(angle) * maxX)
     const ty = Math.round(Math.sin(angle) * maxY)
-    const rot = Math.floor(Math.random() * 1080) + 360
+    const rot = 0
     const duration = Math.floor(Math.random() * 500) + 550 // fast, forceful throw
+
+    die.animate(
+      [{ transform: restNow }, ...Array.from({ length: 5 }, () => ({ transform: randomSpin() })), { transform: restNext }],
+      { duration: duration + 150, easing: 'cubic-bezier(.3,.6,.4,1)' },
+    )
+    die.style.transform = restNext
 
     // animate from outside straight into the wall with a forceful throw
     setTimeout(() => {
@@ -68,11 +128,19 @@ export default function Dice() {
 
     // finalize after the throw animation completes
     setTimeout(() => {
-      const finalValue = Math.floor(Math.random() * 20) + 1
       setDisplayValue(finalValue)
       setResult(finalValue)
       if (finalValue === 20) setShowConfetti(true)
       if (finalValue === 1) { setSink(true); setShowRain(true) }
+      const r = run.current
+      r.count = r.value === finalValue ? r.count + 1 : 1
+      r.value = finalValue
+      setBest(prev => {
+        if ((prev[finalValue] || 0) >= r.count) return prev
+        const next = { ...prev, [finalValue]: r.count }
+        try { localStorage.setItem(STREAK_KEY, JSON.stringify(next)) } catch { /* ignore */ }
+        return next
+      })
       setRolling(false)
     }, duration + 180)
   }
@@ -84,10 +152,11 @@ export default function Dice() {
           .board-shell { width: 100%; height: 100%; background: rgba(255,255,255,0.02); border: 2px solid rgba(255,255,255,0.07); border-radius: 32px; position: relative; overflow: hidden; display:flex; align-items:center; justify-content:center; box-shadow: inset 0 12px 34px rgba(0,0,0,0.28); }
           .board-shell::before { content: ''; position: absolute; inset: 0; background: linear-gradient(180deg, rgba(255,255,255,0.02), transparent 26%, transparent 74%, rgba(255,255,255,0.01)); pointer-events:none; }
           .d20-spot { position: absolute; inset: 0; display:flex; align-items:center; justify-content:center; pointer-events:none; }
-          .d20 { display:flex; align-items:center; justify-content:center; width:58px; height:58px; }
-          .d20 svg { width:100%; height:100%; }
-          .d20.rolling svg { animation: roll-spin 1100ms linear infinite; }
-          @keyframes roll-spin { from { transform: rotate(0deg); } to { transform: rotate(720deg); } }
+          .d20 { display:flex; align-items:center; justify-content:center; width:${DIE}px; height:${DIE}px; perspective:700px; }
+          .die3d { position:relative; width:100%; height:100%; transform-style:preserve-3d; filter: drop-shadow(0 14px 10px rgba(0,0,0,0.35)); }
+          .die-face { position:absolute; left:0; top:0; width:100%; height:100%; clip-path:${FACE_CLIP}; backface-visibility:hidden; display:flex; align-items:center; justify-content:center; font-family: Cinzel, serif; font-weight:700; font-size:${Math.round(DIE * 0.3)}px; padding-top:${Math.round(DIE * 0.1)}px; box-sizing:border-box; }
+          .streaks { position:absolute; top:12px; right:16px; z-index:2; max-width:55%; text-align:right; font-size:11px; letter-spacing:.04em; color:var(--text-3); opacity:.8; pointer-events:auto; cursor:default; }
+          .streaks b { color:var(--text-2); font-weight:600; }
           .dice-controls { display:flex; justify-content:stretch; align-items:stretch; gap:20px; width:100%; max-width:1280px; margin:0 auto; }
           .dice-btn { border:none; border-radius:22px; padding:32px 24px; font-family: 'Cinzel, serif'; font-size:26px; font-weight:700; line-height:1; transition: transform .08s ease, filter .12s ease, opacity .12s ease, box-shadow .08s ease; white-space: nowrap; flex:1 1 0; text-align:center; }
           .dice-roll-btn {
@@ -115,21 +184,31 @@ export default function Dice() {
         `}</style>
 
         <div className="board-shell" ref={boardRef}>
+          <div className="streaks" title={`Best consecutive repeats of each number\n${Array.from({ length: 20 }, (_, i) => `${i + 1}: ${best[i + 1] || 0}`).join('  ')}`}>
+            {(() => {
+              const top = Object.entries(best).filter(([, n]) => n >= 2).sort((x, y) => y[1] - x[1] || x[0] - y[0]).slice(0, 6)
+              return top.length
+                ? <>Best streaks: {top.map(([v, n], i) => <span key={v}>{i > 0 && ' · '}<b>{v}</b>×{n}</span>)}</>
+                : 'Best streaks: none yet'
+            })()}
+          </div>
           <div className="d20-spot">
-            <div className={`d20 ${rolling ? 'rolling' : ''}`} style={{ transform: d20Transform, transition: d20Transition }}>
-              <svg viewBox="0 0 100 100" style={{ display: 'block' }}>
-                <g transform="translate(50,50) scale(0.9)">
-                  <path d="M0,-42 L34,-13 L20,35 L-20,35 L-34,-13 Z" fill="none" stroke={isClassic ? '#111111' : '#ffffff'} strokeWidth="4" />
-                  <g stroke={isClassic ? '#111111' : '#ffffff'} strokeWidth="2" fill="none">
-                    <path d="M0,-42 L0,35" />
-                    <path d="M34,-13 L-34,-13" />
-                    <path d="M20,35 L-20,35" />
-                    <path d="M0,-42 L20,35" />
-                    <path d="M0,-42 L-20,35" />
-                  </g>
-                  <text x="0" y="8" textAnchor="middle" fontFamily="Cinzel, serif" fontSize="28" fontWeight="700" fill={isClassic ? '#111111' : '#ffffff'} stroke={isClassic ? '#ffffff' : '#000000'} strokeWidth="3" paintOrder="stroke">{rolling ? '' : (result || '?')}</text>
-                </g>
-              </svg>
+            <div className="d20" style={{ transform: d20Transform, transition: d20Transition }}>
+              <div className="die3d" ref={dieRef} style={{ transform: restTransform(20) }}>
+                {FACES.map((f, i) => (
+                  <div
+                    key={i}
+                    className="die-face"
+                    style={{
+                      transform: `${faceMatrix(f)} scale(1.012)`,
+                      background: isClassic ? `hsl(0 0% ${9 + ((i * 7) % 5) * 4}%)` : 'var(--gold)',
+                      color: isClassic ? '#ffffff' : '#2a1a00',
+                      filter: `brightness(${(0.82 + 0.18 * ((i * 7) % 5) / 4).toFixed(3)})`,
+                      textDecoration: f.num === 6 || f.num === 9 ? 'underline' : 'none',
+                    }}
+                  >{f.num}</div>
+                ))}
+              </div>
             </div>
           </div>
 
