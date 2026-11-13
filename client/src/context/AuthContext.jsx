@@ -11,11 +11,12 @@ export function DemoAuthProvider({ children }) {
     username: 'Game Master',
     email: '',
     role: 'dm',
+    roles: ['dm'],
     isPremium: true,
   }
 
   return (
-    <AuthContext.Provider value={{ user, isPremium: true, loading: false }}>
+    <AuthContext.Provider value={{ user, isPremium: true, loading: false, switchRole: async () => {} }}>
       {children}
     </AuthContext.Provider>
   )
@@ -56,6 +57,7 @@ const storeUser = (user) => {
     phone: user.phone || '',
     isPremium: !!user.isPremium,
     role: user.role || 'player',
+    roles: user.roles?.length ? user.roles : [user.role || 'player'],
     twoFactorEnabled: !!user.twoFactorEnabled,
     twoFactorMethod: user.twoFactorMethod || '',
     twoFactorVerified: !!user.twoFactorVerified,
@@ -197,6 +199,13 @@ export function AuthProvider({ children }) {
     setUser(null)
   }
 
+  // Switches between the player and DM identities. Resolves once the server
+  // has confirmed, so callers never render role-specific pages optimistically.
+  const switchRole = async (role) => {
+    const u = await api('/auth/role', { method: 'POST', body: { role } })
+    setUser(p => storeUser({ ...p, ...u }))
+  }
+
   // Call this after successful Stripe payment to refresh user premium status
   const refreshUser = async () => {
     const u = await api('/auth/me')
@@ -204,7 +213,7 @@ export function AuthProvider({ children }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user, login, register, logout, loading, refreshUser, verifyTwoFactor, resendTwoFactor, confirmSignup, resendSignup, loginWithGoogle, linkGoogle, forgotPassword, resetPassword, isPremium: user?.isPremium || false }}>
+    <AuthContext.Provider value={{ user, login, register, logout, loading, refreshUser, switchRole, verifyTwoFactor, resendTwoFactor, confirmSignup, resendSignup, loginWithGoogle, linkGoogle, forgotPassword, resetPassword, isPremium: user?.isPremium || false }}>
       {children}
     </AuthContext.Provider>
   )

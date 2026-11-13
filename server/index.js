@@ -10,6 +10,7 @@ import campaignRoutes from './routes/campaigns.js'
 import journalRoutes from './routes/journal.js'
 import loreRoutes from './routes/lore.js'
 import storyboardRoutes from './routes/storyboard.js'
+import dmboardRoutes from './routes/dmboard.js'
 import paymentRoutes from './routes/payments.js'
 import feedbackRoutes from './routes/feedback.js'
 import levelRoutes from './routes/levels.js'
@@ -23,7 +24,7 @@ import { clientOrigins } from './lib/clientUrl.js'
 import { rejectOperatorKeys } from './lib/guards.js'
 import { Character } from './models/index.js'
 
-dotenv.config()
+dotenv.config({ quiet: true })
 
 const app = express()
 app.set('trust proxy', 1) // Required for Render — lets express-rate-limit read the real client IP
@@ -44,7 +45,10 @@ const feedbackLimiter = rateLimit({ windowMs: 60 * 60 * 1000, max: 10, standardH
 
 app.use('/api/payments/webhook', express.raw({ type: 'application/json', verify: (req, res, buf) => { req.rawBody = buf } }))
 app.use(cors({ origin: clientOrigins() }))
+app.use('/api/dmboard', express.json({ limit: '8mb' }))
 app.use(express.json({ limit: '1mb' }))
+// Express 5 leaves req.body undefined for body-less requests; routes expect an object.
+app.use((req, _res, next) => { req.body ??= {}; next() })
 app.use('/api', rejectOperatorKeys)
 app.use('/api', apiLimiter)
 
@@ -58,6 +62,7 @@ app.use('/api/campaigns', campaignRoutes)
 app.use('/api/journal',   journalRoutes)
 app.use('/api/lore',      loreRoutes)
 app.use('/api/storyboard', storyboardRoutes)
+app.use('/api/dmboard', dmboardRoutes)
 app.use('/api/payments',  paymentRoutes)
 app.use('/api/feedback',  feedbackLimiter, feedbackRoutes)
 app.use('/api/levels',    levelRoutes)

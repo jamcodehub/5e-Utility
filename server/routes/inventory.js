@@ -41,7 +41,7 @@ router.put('/:campaignId', auth, async (req, res) => {
     const inv = await Inventory.findOneAndUpdate(
       { campaign: req.params.campaignId, owner: req.userId },
       { $set: safeUpdates },
-      { new: true, upsert: true, runValidators: true }
+      { returnDocument: 'after', upsert: true, runValidators: true }
     )
     res.json(inv)
   } catch (e) { res.status(500).json({ error: e.message }) }

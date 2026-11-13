@@ -186,9 +186,13 @@ const NAV_PLAYER = [
   { to: '/dice',       label: 'Dice',       iconUrl: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1791790757/01_fantasy_01_d20_gem.png' },
 ]
 
+// Placeholder: replace with the DM Board icon URL.
+const DM_BOARD_ICON = 'https://placehold.co/32x32/9a7c3a/ffffff.png?text=DM'
+
 const NAV_DM = [
   { to: '/campaign-guide', label: 'Campaign',   iconUrl: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1791790757/01_fantasy_04_castle.png' },
   { to: '/session-planner', label: 'Sessions',  iconUrl: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1791790758/01_fantasy_15_feather.png' },
+  { to: '/dm-board',   label: 'DM Board', iconUrl: DM_BOARD_ICON },
   { to: '/storyboard', label: 'Storyboard',     iconUrl: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1791791388/book-solid-full.svg' },
   { to: '/lore',       label: 'Lore',           iconUrl: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1791791415/scroll-solid-full.svg' },
   { to: '/inventory',  label: 'ShopItems',      iconUrl: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1791792290/coins-solid-full.svg' },
@@ -264,6 +268,7 @@ export default function Shell({ children }) {
   }, [activeCampaign?._id, campaigns, navigate, setActive, user?._id, user?.id])
 
   useEffect(() => {
+    setPendingMembers([])
     if (!isDM || !activeCampaign) return
     api(`/campaigns/${activeCampaign._id}/pending`).then(setPendingMembers).catch(() => {})
   }, [isDM, activeCampaign?._id])

@@ -28,6 +28,7 @@ Features
 ### Dungeon Master pages
 
 - **Sessions** — Create and organize session plans, including encounters, NPCs, pacing, hooks, and table notes.
+- **DM Board** — Privately map campaign ideas with notes, images, links, and ink. Boards autosave per campaign and are accessible only to its DM owner; edits in another tab or device can cause a save conflict. The save limit is 8 MB per board, including images.
 - **Campaign Guide** — Keep campaign details, NPCs, and quests organized, with character-specific information to support tailored sessions.
 - **Lore** — Store campaign reference entries for important people, places, and other details.
 - **Storyboard** — Present campaign scenes as an illustrated, book-style sequence.
@@ -40,7 +41,8 @@ Features
 - **Dice** — Roll an animated d20.
 - **Rules** — Search a quick-reference guide to common 5e rules and conditions.
 - **Music** — Organize and play campaign music sessions and cues.
-- **Themes** — Personalize the app’s appearance.
+- **Themes** — Personalize the app’s appearance; the DM Board follows the chosen theme, including dark and light.
+- **Player / DM mode** — Switch the same account between player and DM in Settings. Each mode shows its own tools and campaigns (joined as a player, or run as a DM); nothing is deleted when switching.
 - **Premium** — View the available premium upgrade and plan information.
 
 ## Built for the whole campaign

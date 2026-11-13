@@ -18,6 +18,8 @@ services:
         value: 10000       # Render default
       - key: NODE_ENV
         value: production
+      - key: NODE_VERSION
+        value: 22
       # Google sign-up verification / two-factor (see README). If unset, the
       # Google option is hidden.
       - key: GOOGLE_CLIENT_ID

@@ -6,6 +6,8 @@ const UserSchema = new Schema({
   email:            { type: String, required: true, unique: true, lowercase: true },
   password:         { type: String },
   role:             { type: String, enum: ['dm', 'player'], default: 'player' },
+  // Every identity this account has used. `role` is the one currently active.
+  roles:            [{ type: String, enum: ['dm', 'player'] }],
   phone:            { type: String, default: '' },
   googleId:         { type: String, default: '', index: true, sparse: true },
   avatar:           { type: String, default: '' },
@@ -77,6 +79,12 @@ const StoryCardSchema = new Schema({
   prompt:      String,
   imageUrl:    String,
   day:         Number,
+}, { timestamps: true })
+
+const DMBoardSchema = new Schema({
+  campaign: { type: Schema.Types.ObjectId, ref: 'Campaign', required: true, unique: true },
+  board: { type: Schema.Types.Mixed, required: true },
+  version: { type: Number, required: true },
 }, { timestamps: true })
 
 const CharacterSchema = new Schema({
@@ -230,6 +238,7 @@ export const Campaign      = model('Campaign', CampaignSchema)
 export const Journal       = model('Journal', JournalSchema)
 export const Lore          = model('Lore', LoreSchema)
 export const StoryCard     = model('StoryCard', StoryCardSchema)
+export const DMBoard       = model('DMBoard', DMBoardSchema)
 export const Character     = model('Character', CharacterSchema)
 export const LevelPlan     = model('LevelPlan', LevelPlanSchema)
 export const Inventory     = model('Inventory', InventorySchema)

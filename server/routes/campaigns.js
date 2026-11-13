@@ -1,7 +1,7 @@
 import { Router } from 'express'
 import crypto from 'crypto'
 import jwt from 'jsonwebtoken'
-import { Campaign, Character, User, CampaignGuide } from '../models/index.js'
+import { Campaign, Character, User, CampaignGuide, DMBoard } from '../models/index.js'
 
 const router = Router()
 
@@ -30,9 +30,13 @@ const stripServerFields = (body = {}) => {
 }
 
 router.get('/', auth, async (req, res) => {
-  let campaigns = await Campaign.find({
-    $or: [{ owner: req.userId }, { members: req.userId }]
-  }).sort({ updatedAt: -1 })
+  // Accounts can switch between DM and player, so each identity only sees its
+  // own campaigns: the ones it runs as a DM, or the ones it joined as a player.
+  const user = await User.findById(req.userId).select('role')
+  const mine = user?.role === 'dm'
+    ? [{ owner: req.userId }]
+    : [{ members: req.userId }, { owner: req.userId, isPersonal: true }]
+  let campaigns = await Campaign.find({ $or: mine }).sort({ updatedAt: -1 })
 
   // Give every user a personal solo space (Journal/Lore) even without joining a DM's campaign.
   if (!campaigns.length) {
@@ -164,7 +168,7 @@ router.put('/:id', auth, async (req, res) => {
   try {
     const campaign = await Campaign.findOneAndUpdate(
       { _id: req.params.id, owner: req.userId },
-      pickCampaignFields(req.body), { new: true }
+      pickCampaignFields(req.body), { returnDocument: 'after' }
     )
     if (!campaign) return res.status(404).json({ error: 'Campaign not found' })
     res.json(campaign)
@@ -203,6 +207,7 @@ router.delete('/:id', auth, async (req, res) => {
     return res.status(400).json({ error: 'Campaign name did not match.' })
   }
   await campaign.deleteOne()
+  await DMBoard.deleteOne({ campaign: campaign._id })
   res.json({ ok: true })
 })
 
@@ -278,7 +283,7 @@ router.put('/:id/characters/:charId', auth, async (req, res) => {
       : { _id: req.params.charId, campaign: req.params.id, owner: req.userId }
     // The DM may only touch HP (combat tracker); full edits remain owner-only.
     const body = isDm ? { hp: req.body.hp } : stripServerFields(req.body)
-    const char = await Character.findOneAndUpdate(filter, body, { new: true })
+    const char = await Character.findOneAndUpdate(filter, body, { returnDocument: 'after' })
     if (!char) return res.status(404).json({ error: 'Character not found' })
     res.json(char)
   } catch (e) { res.status(500).json({ error: e.message }) }
@@ -369,7 +374,7 @@ router.put('/:id/guide', auth, async (req, res) => {
     const guide = await CampaignGuide.findOneAndUpdate(
       { campaign: req.params.id },
       { ...req.body, campaign: req.params.id },
-      { upsert: true, new: true }
+      { upsert: true, returnDocument: 'after' }
     )
     res.json(guide)
   } catch { res.status(500).json({ error: 'Failed to save guide' }) }

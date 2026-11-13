@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect } from 'react'
+import { createContext, useContext, useState, useEffect, useRef } from 'react'
 import { api, useAuth } from './AuthContext'
 
 const CampaignContext = createContext(null)
@@ -37,6 +37,10 @@ export function CampaignProvider({ children }) {
   const [activeCampaign, setActiveRaw] = useState(null)
   const [campaignsLoading, setCampaignsLoading] = useState(true)
   const [campaignsError, setCampaignsError] = useState('')
+  // The role the current campaign list was fetched for. The list differs per
+  // role, so until it matches the user's role it must not be exposed.
+  const [loadedRole, setLoadedRole] = useState(null)
+  const loadSeq = useRef(0)
 
   const setActive = (c) => {
     setActiveRaw(c)
@@ -49,10 +53,13 @@ export function CampaignProvider({ children }) {
       setCampaignsLoading(false)
       return
     }
+    const seq = ++loadSeq.current
+    const role = user.role
     setCampaignsLoading(true)
     setCampaignsError('')
     try {
       const data = await api('/campaigns')
+      if (seq !== loadSeq.current) return
       setCampaigns(data)
       // Keep the current selection if it's still valid (e.g. a background
       // reload shouldn't yank the user to a different campaign); otherwise
@@ -69,14 +76,17 @@ export function CampaignProvider({ children }) {
         else localStorage.removeItem('activeCampaignId')
         return next
       })
+      setLoadedRole(role)
     } catch (err) {
+      if (seq !== loadSeq.current) return
       setCampaignsError(err.message || 'Failed to load campaigns')
+      setLoadedRole(role)
     } finally {
-      setCampaignsLoading(false)
+      if (seq === loadSeq.current) setCampaignsLoading(false)
     }
   }
 
-  useEffect(() => { load() }, [user?.id || user?._id])
+  useEffect(() => { load() }, [user?.id || user?._id, user?.role])
 
   // Returns null on success, error string on failure
   const createCampaign = async (body) => {
@@ -126,8 +136,9 @@ export function CampaignProvider({ children }) {
     }
   }
 
+  const stale = loadedRole !== user?.role
   return (
-    <CampaignContext.Provider value={{ campaigns, activeCampaign, campaignsLoading, campaignsError, setActive, createCampaign, updateCampaign, deleteCampaign, leaveCampaign, joinCampaign, reload: load }}>
+    <CampaignContext.Provider value={{ campaigns: stale ? [] : campaigns, activeCampaign: stale ? null : activeCampaign, campaignsLoading: campaignsLoading || stale, campaignsError, setActive, createCampaign, updateCampaign, deleteCampaign, leaveCampaign, joinCampaign, reload: load }}>
       {children}
     </CampaignContext.Provider>
   )

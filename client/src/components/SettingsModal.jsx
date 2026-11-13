@@ -7,7 +7,7 @@ import GoogleButton from './GoogleButton'
 
 export default function SettingsModal({ onClose }) {
   const { theme, setTheme, lightMode, setLightMode } = useTheme()
-  const { logout, user, linkGoogle, isPremium } = useAuth()
+  const { logout, user, linkGoogle, isPremium, switchRole } = useAuth()
   const authConfig = useAuthConfig()
   const googleClientId = authConfig?.googleClientId || import.meta.env.VITE_GOOGLE_CLIENT_ID || ''
   const { activeCampaign, leaveCampaign, deleteCampaign } = useCampaign()
@@ -25,6 +25,23 @@ export default function SettingsModal({ onClose }) {
   const [confirmInput, setConfirmInput] = useState('')
   const [confirmError, setConfirmError] = useState('')
   const [confirmWorking, setConfirmWorking] = useState(false)
+  const [roleWorking, setRoleWorking] = useState(false)
+  const [roleError, setRoleError] = useState('')
+
+  const changeRole = async (role) => {
+    if (role === user?.role || roleWorking) return
+    setRoleError('')
+    setRoleWorking(true)
+    try {
+      await switchRole(role)
+      onClose()
+      navigate('/', { replace: true })
+    } catch (err) {
+      setRoleError(err?.message || 'Could not switch role. Please try again.')
+    } finally {
+      setRoleWorking(false)
+    }
+  }
 
   const isOwner = activeCampaign && String(activeCampaign.owner) === String(user?._id || user?.id)
 
@@ -120,6 +137,31 @@ export default function SettingsModal({ onClose }) {
               Lighter variant <span style={{ color: 'var(--text-3)' }}></span>
             </label>
           )}
+        </div>
+
+        <div style={{ height: 1, background: 'var(--border)', marginBottom: 24 }} />
+
+        {/* Player / DM mode */}
+        <div style={{ marginBottom: 24 }}>
+          <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-2)', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 10 }}>Mode</div>
+          <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
+            {[{ v: 'player', label: 'Player' }, { v: 'dm', label: 'Dungeon Master' }].map(opt => {
+              const active = user?.role === opt.v
+              return (
+                <button type="button" key={opt.v} onClick={() => changeRole(opt.v)} disabled={roleWorking} aria-pressed={active} style={{
+                  flex: 1, padding: '8px 12px', borderRadius: 8, cursor: active ? 'default' : 'pointer',
+                  border: `1px solid ${active ? 'var(--gold)' : 'var(--border)'}`,
+                  background: active ? 'var(--gold-bg)' : 'transparent',
+                  color: active ? 'var(--gold)' : 'var(--text-2)', fontSize: 13, fontWeight: active ? 600 : 400,
+                }}>{opt.label}</button>
+              )
+            })}
+          </div>
+          <div style={{ fontSize: 11, color: 'var(--text-3)', lineHeight: 1.5 }}>
+            {user?.roles?.length > 1 ? 'Your account is both a player and a DM. ' : ''}
+            Switching changes your tools and shows the campaigns you {user?.role === 'dm' ? 'joined as a player' : 'run as a DM'}. Nothing is deleted.
+          </div>
+          {roleError && <div style={{ fontSize: 12, color: 'var(--red)', marginTop: 8 }}>{roleError}</div>}
         </div>
 
         <div style={{ height: 1, background: 'var(--border)', marginBottom: 24 }} />

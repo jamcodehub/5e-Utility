@@ -42,7 +42,7 @@ router.put('/:id', auth, async (req, res) => {
   if (ALLOWED_THEMES.includes(req.body.theme)) updates.theme = req.body.theme
   if (typeof req.body.darkMode === 'boolean') updates.darkMode = req.body.darkMode
   if (Array.isArray(req.body.doorStates)) updates.doorStates = req.body.doorStates
-  const plan = await LevelPlan.findOneAndUpdate({ _id: req.params.id, owner: req.userId }, updates, { new: true })
+  const plan = await LevelPlan.findOneAndUpdate({ _id: req.params.id, owner: req.userId }, updates, { returnDocument: 'after' })
   res.json(plan)
 })
 

@@ -47,7 +47,7 @@ router.put('/:id', auth, async (req, res) => {
   if (typeof req.body.content === 'string') updates.content = req.body.content
   if (req.body.day !== undefined) updates.day = req.body.day
   if (req.body.session !== undefined) updates.session = req.body.session
-  const entry = await Journal.findOneAndUpdate({ _id: req.params.id, author: req.userId }, updates, { new: true })
+  const entry = await Journal.findOneAndUpdate({ _id: req.params.id, author: req.userId }, updates, { returnDocument: 'after' })
   res.json(entry)
 })
 

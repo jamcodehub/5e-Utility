@@ -4,6 +4,7 @@ import { CampaignProvider, DemoCampaignProvider } from './context/CampaignContex
 import { ThemeProvider } from './context/ThemeContext'
 import { MusicProvider } from './context/MusicContext'
 import Shell from './components/Shell'
+import DMBoard from './components/DMBoard'
 import Auth from './pages/Auth'
 import PublicDemo from './pages/PublicDemo'
 import SessionPlanner from './pages/SessionPlanner'
@@ -157,6 +158,18 @@ function PageLoader() {
   return <SkeletonPage />
 }
 
+function DMBoardPage() {
+  const { activeCampaign, campaignsLoading, campaignsError } = useCampaign()
+  const { user } = useAuth()
+  if (campaignsLoading) return <SkeletonPage />
+  if (campaignsError) return <div className="page-content" role="alert">{campaignsError}</div>
+  if (!activeCampaign) return <div className="page-content">Select a campaign to open its DM board.</div>
+  if (String(activeCampaign.owner) !== String(user.id || user._id)) {
+    return <div className="page-content">Only the campaign's DM can open its board.</div>
+  }
+  return <DMBoard key={activeCampaign._id} boardId={activeCampaign._id} />
+}
+
 function Guard() {
   const { user, loading } = useAuth()
 
@@ -229,12 +242,13 @@ function Guard() {
     <CampaignProvider>
       <MusicProvider>
         <Shell>
-          <Suspense fallback={<PageLoader />}>
+          <Suspense key={user.role} fallback={<PageLoader />}>
             <Routes>
               <Route path="/"           element={<Navigate to={homePath} replace />} />
               <Route path="/journal"    element={<Journal />} />
               <Route path="/session-planner" element={<SessionPlanner />} />
               <Route path="/storyboard" element={<Storyboard />} />
+              <Route path="/dm-board" element={user.role === 'dm' ? <DMBoardPage /> : <Navigate to={homePath} replace />} />
               <Route path="/lore"       element={<Lore />} />
               <Route path="/character"  element={<Character />} />
               <Route path="/inventory"  element={<Inventory />} />

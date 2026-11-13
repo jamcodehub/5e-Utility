@@ -186,6 +186,7 @@ const publicUser = (user) => ({
   id: user._id, username: user.username, email: user.email,
   phone: user.phone || '', isPremium: user.isPremium,
   role: user.role || 'player',
+  roles: [...new Set([...(user.roles || []), user.role || 'player'])],
   twoFactorEnabled: user.twoFactorEnabled || false,
   twoFactorMethod: effectiveMethod(user),
   // true when 2FA came from a verified sign-up (Google or email code) and so
@@ -284,7 +285,7 @@ router.post('/register', registerEmailLimiter, requireCaptcha, async (req, res) 
       const pending = await PendingSignup.findOneAndUpdate({ email }, {
         username, password: hashed, role, codeHash: hashCode(code), codeExpiresAt: new Date(now + CODE_TTL_MS),
         attempts: 0, lastSentAt: new Date(now), expiresAt: new Date(now + HOUR_MS),
-      }, { upsert: true, new: true, setDefaultsOnInsert: true })
+      }, { upsert: true, returnDocument: 'after', setDefaultsOnInsert: true })
       try { await sendCodeEmail(email, code, SIGNUP_EMAIL) } catch (e) { await pending.deleteOne(); throw e }
       return res.json({ requires2FA: true, confirming: true, signupId: String(pending._id), method: 'email', hint: maskEmail(email) })
     }
@@ -314,7 +315,7 @@ router.post('/register/confirm', async (req, res) => {
 
     // Reserve a guess atomically so parallel requests can't exceed the limit.
     const pending = await PendingSignup.findOneAndUpdate(
-      { _id: signupId, attempts: { $lt: MAX_OTP_ATTEMPTS } }, { $inc: { attempts: 1 } }, { new: true })
+      { _id: signupId, attempts: { $lt: MAX_OTP_ATTEMPTS } }, { $inc: { attempts: 1 } }, { returnDocument: 'after' })
     if (!pending) return res.status(429).json({ error: 'Too many incorrect codes. Request a new code.' })
     if (pending.codeExpiresAt < new Date() || !safeEqual(pending.codeHash, hashCode(code)))
       return res.status(401).json({ error: 'Invalid or expired code' })
@@ -500,6 +501,21 @@ router.get('/me', authMiddleware, async (req, res) => {
     if (!user) return res.status(401).json({ error: 'Invalid token' })
     res.json(publicUser(user))
   } catch (e) { res.status(401).json({ error: 'Invalid token' }) }
+})
+
+// Switch the active identity between player and DM. Both identities are kept
+// on the account; every role-based check reads `role`, so only that changes.
+router.post('/role', authMiddleware, async (req, res) => {
+  try {
+    const role = req.body?.role
+    if (role !== 'dm' && role !== 'player') return res.status(400).json({ error: 'Role must be dm or player.' })
+    const user = await User.findById(req.userId)
+    if (!user) return res.status(401).json({ error: 'Invalid token' })
+    user.roles = [...new Set([...(user.roles || []), user.role || 'player', role])]
+    user.role = role
+    await user.save()
+    res.json(publicUser(user))
+  } catch (e) { sendError(res, e) }
 })
 
 // Request a password reset link. Always responds with a generic success
