@@ -1,3 +1,4 @@
+import { useDebouncedSave } from '../hooks/useDebouncedSave'
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { api, useAuth } from '../context/AuthContext'
 import { useCampaign } from '../context/CampaignContext'
@@ -224,7 +225,7 @@ export default function Character() {
     }
   }
 
-  const hpSaveTimer = useRef(null)
+  const { schedule: scheduleHpSave } = useDebouncedSave(400)
   const adjustHp = (delta) => {
     setForm(p => {
       const max = p.hp?.max ?? 10
@@ -232,14 +233,14 @@ export default function Character() {
       const next = Math.max(0, Math.min(max, current + delta))
       const nextForm = { ...p, hp: { current: next, max } }
       if (activeCampaign && activeCharIdRef.current) {
-        clearTimeout(hpSaveTimer.current)
-        hpSaveTimer.current = setTimeout(async () => {
+        const campaignId = activeCampaign._id, charId = activeCharIdRef.current
+        scheduleHpSave(async () => {
           try {
-            const updated = await api(`/campaigns/${activeCampaign._id}/characters/${activeCharIdRef.current}`, { method: 'PUT', body: nextForm })
+            const updated = await api(`/campaigns/${campaignId}/characters/${charId}`, { method: 'PUT', body: nextForm })
             setChar(updated)
             setCharacters(p => p.map(c => c._id === updated._id ? updated : c))
           } catch { toast('Could not save HP change') }
-        }, 400)
+        })
       }
       return nextForm
     })
@@ -270,20 +271,20 @@ export default function Character() {
   // after typing stops, so nothing is lost if the user navigates away or the
   // browser closes without clicking Save.
   const [autosaveStatus, setAutosaveStatus] = useState('') // '' | 'saving' | 'saved'
-  const textSaveTimer = useRef(null)
+  const { schedule: scheduleText, flush: flushText } = useDebouncedSave(800)
   const scheduleTextAutosave = useCallback((nextForm) => {
     if (!activeCampaign || !activeCharIdRef.current) return
-    clearTimeout(textSaveTimer.current)
+    const campaignId = activeCampaign._id, charId = activeCharIdRef.current
     setAutosaveStatus('saving')
-    textSaveTimer.current = setTimeout(async () => {
+    scheduleText(async () => {
       try {
-        const updated = await api(`/campaigns/${activeCampaign._id}/characters/${activeCharIdRef.current}`, { method: 'PUT', body: nextForm })
+        const updated = await api(`/campaigns/${campaignId}/characters/${charId}`, { method: 'PUT', body: nextForm })
         setChar(updated)
         setCharacters(p => p.map(c => c._id === updated._id ? updated : c))
         setAutosaveStatus('saved')
       } catch { setAutosaveStatus(''); toast('Could not autosave') }
-    }, 800)
-  }, [activeCampaign])
+    })
+  }, [activeCampaign, scheduleText])
 
   const setTextField = (field) => (e) => {
     const value = e.target.value
@@ -294,8 +295,8 @@ export default function Character() {
     })
   }
 
-  // Flush pending autosave on unmount
-  useEffect(() => () => { if (textSaveTimer.current) clearTimeout(textSaveTimer.current) }, [])
+  // Save pending text before the campaign changes (the hook also flushes on unmount).
+  useEffect(() => flushText, [activeCampaign?._id, flushText])
 
   const F = form
 

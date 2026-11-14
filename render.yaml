@@ -26,6 +26,10 @@ services:
         sync: false        # Google Cloud OAuth *Web* client ID (not the secret)
       # Outgoing email: password resets and the "Email code" sign-up option
       # (which stays hidden in production until SMTP_HOST is set).
+      # AI worldbuilding assistant + storyboard images (Google Gemini free tier). Without a
+      # key the AI buttons report that AI isn't configured. Optional: GEMINI_MODEL, GEMINI_IMAGE_MODEL.
+      - key: GEMINI_API_KEY
+        sync: false
       - key: SMTP_HOST
         sync: false
       - key: SMTP_PORT

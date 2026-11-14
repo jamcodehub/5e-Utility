@@ -6,6 +6,7 @@ import { useTheme } from '../context/ThemeContext'
 import { getSocket } from '../utils/socket'
 import { useState, useEffect, useRef } from 'react'
 import SettingsModal from './SettingsModal'
+import CharacterOverview from './CharacterSidebar'
 import { CloudinaryImage } from '@cloudinary/url-gen'
 import { quality, format } from '@cloudinary/url-gen/actions/delivery'
 import { auto as autoQuality } from '@cloudinary/url-gen/qualifiers/quality'
@@ -220,6 +221,36 @@ export default function Shell({ children }) {
   const isDM = user?.role === 'dm'
   const darkMode = theme !== 'light' && (!lightMode || theme === 'dark')
   const NAV = isDM ? NAV_DM : NAV_PLAYER
+  const location = useLocation()
+
+  // Players get a persistent right-hand character overview they can slide open on any page.
+  const [charOpen, setCharOpen] = useState(() => localStorage.getItem('charSidebarOpen') === '1')
+  useEffect(() => { localStorage.setItem('charSidebarOpen', charOpen ? '1' : '0') }, [charOpen])
+  const showCharSidebar = !isDM && !!activeCampaign && !activeCampaign.isPersonal && location.pathname !== '/character'
+  const SIDEBAR_W = isMobile ? 'min(320px, 88vw)' : '320px'
+  const EASE = 'cubic-bezier(.4,0,.2,1)'
+  const charToggle = showCharSidebar && (
+    <button
+      onClick={() => setCharOpen(o => !o)} aria-expanded={charOpen} title={charOpen ? 'Hide my character' : 'Show my character'}
+      style={{
+        position: 'fixed', top: isMobile ? 120 : '42%', right: charOpen ? SIDEBAR_W : 0, zIndex: 60, transition: `right .32s ${EASE}`,
+        display: 'flex', alignItems: 'center', gap: 6, padding: '7px 10px', cursor: 'pointer', fontSize: 12, fontWeight: 600,
+        background: 'var(--gold-bg)', color: 'var(--gold)', border: '1px solid var(--gold-border)', borderRight: 'none', borderRadius: '10px 0 0 10px',
+      }}
+    >{charOpen ? '›' : '‹'} Hero</button>
+  )
+  const charPanel = showCharSidebar && (isMobile ? (
+    <aside aria-hidden={!charOpen} style={{
+      position: 'fixed', top: 52, bottom: 72, right: 0, width: SIDEBAR_W, zIndex: 55, background: 'var(--surface)', borderLeft: '1px solid var(--border)',
+      overflowY: 'auto', transform: charOpen ? 'none' : 'translateX(100%)', visibility: charOpen ? 'visible' : 'hidden',
+      transition: `transform .32s ${EASE}, visibility .32s`, boxShadow: charOpen ? '-8px 0 24px rgba(0,0,0,.25)' : 'none',
+    }}><CharacterOverview campaignId={activeCampaign._id} refreshKey={location.pathname} /></aside>
+  ) : (
+    <aside aria-hidden={!charOpen} style={{
+      width: charOpen ? 320 : 0, flexShrink: 0, overflow: 'hidden', background: 'var(--surface)', borderLeft: charOpen ? '1px solid var(--border)' : '0 solid transparent',
+      transition: `width .32s ${EASE}`,
+    }}><div style={{ width: 320, height: '100%', overflowY: 'auto' }}><CharacterOverview campaignId={activeCampaign._id} refreshKey={location.pathname} /></div></aside>
+  ))
 
   const [creating, setCreating] = useState(false)
   const [newName, setNewName]   = useState('')
@@ -416,6 +447,7 @@ export default function Shell({ children }) {
         )}
 
         <main style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column', paddingBottom: '72px' }}>{children}</main>
+        {charToggle}{charPanel}
 
         {/* Persistent mini play/pause/skip — sits just above the bottom nav */}
         <div style={{
@@ -573,7 +605,8 @@ export default function Shell({ children }) {
         </div>
       </aside>
 
-      <main style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>{children}</main>
+      <main style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column', minWidth: 0 }}>{children}</main>
+      {charPanel}{charToggle}
       {showSettings && <SettingsModal onClose={() => setShowSettings(false)} />}
     </div>
   )

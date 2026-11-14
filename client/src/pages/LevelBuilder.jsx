@@ -1,3 +1,4 @@
+import { useDebouncedSave } from '../hooks/useDebouncedSave'
 import { useState, useEffect, useCallback, useMemo, useRef, useId } from 'react'
 import { createPortal } from 'react-dom'
 import { useSearchParams } from 'react-router-dom'
@@ -689,6 +690,26 @@ export default function LevelBuilder() {
     } catch (e) { toast(e.message || 'Failed to save') }
   }
 
+  // Autosave an existing map 1.5s after any edit (tiles, doors, stairs, theme or title).
+  // The first run for a map just records what was loaded, so opening a map saves nothing.
+  const { schedule: scheduleMapSave, flush: flushMapSave } = useDebouncedSave(1500)
+  const mapBaseline = useRef({ id: null, snap: '' })
+  useEffect(() => {
+    if (mode !== 'editor' || !editPlanId) { mapBaseline.current = { id: null, snap: '' }; return }
+    const snap = JSON.stringify([grid, objectGrid, stairLinks, doorStates, editTheme, editTitle])
+    if (mapBaseline.current.id !== editPlanId) { mapBaseline.current = { id: editPlanId, snap }; return }
+    if (mapBaseline.current.snap === snap) return
+    const id = editPlanId, title = editTitle.trim()
+    const body = { content: JSON.stringify({ ground: grid, objects: objectGrid, stairLinks }), doorStates, theme: editTheme, ...(title ? { title } : {}) }
+    scheduleMapSave(async () => {
+      try {
+        const plan = await api(`/levels/${id}`, { method: 'PUT', body })
+        setPlans(p => p.map(x => x._id === plan._id ? plan : x))
+        if (mapBaseline.current.id === id) mapBaseline.current.snap = snap
+      } catch (e) { toastRef.current(e.message || 'Could not autosave the map') }
+    })
+  }, [grid, objectGrid, stairLinks, doorStates, editTheme, editTitle, mode, editPlanId]) // eslint-disable-line react-hooks/exhaustive-deps
+
   const deleteMap = async (id, e) => {
     e.stopPropagation()
     if (!window.confirm('Delete this map?')) return
@@ -1018,7 +1039,7 @@ export default function LevelBuilder() {
           </button>
         )}
         <div style={{ display: 'flex', gap: 8, flexShrink: 0, marginLeft: 'auto' }}>
-          <button className="btn btn-ghost btn-sm" onClick={() => setMode('gallery')}>✕ Cancel</button>
+          <button className="btn btn-ghost btn-sm" onClick={() => { flushMapSave(); setMode('gallery') }}>{editPlanId ? '← Back' : '✕ Cancel'}</button>
           <button className="btn btn-ghost btn-sm" onClick={() => window.print()}>Print</button>
           <button className="btn btn-primary btn-sm" onClick={saveMap}>Save & Close</button>
         </div>

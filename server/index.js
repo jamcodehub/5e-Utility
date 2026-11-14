@@ -11,6 +11,7 @@ import journalRoutes from './routes/journal.js'
 import loreRoutes from './routes/lore.js'
 import storyboardRoutes from './routes/storyboard.js'
 import dmboardRoutes from './routes/dmboard.js'
+import aiRoutes from './routes/ai.js'
 import paymentRoutes from './routes/payments.js'
 import feedbackRoutes from './routes/feedback.js'
 import levelRoutes from './routes/levels.js'
@@ -22,7 +23,7 @@ import sharedRoutes from './routes/shared.js'
 import { attachRealtime } from './realtime.js'
 import { clientOrigins } from './lib/clientUrl.js'
 import { rejectOperatorKeys } from './lib/guards.js'
-import { Character } from './models/index.js'
+import { Character, DMBoard } from './models/index.js'
 
 dotenv.config({ quiet: true })
 
@@ -63,6 +64,7 @@ app.use('/api/journal',   journalRoutes)
 app.use('/api/lore',      loreRoutes)
 app.use('/api/storyboard', storyboardRoutes)
 app.use('/api/dmboard', dmboardRoutes)
+app.use('/api/ai', aiRoutes)
 app.use('/api/payments',  paymentRoutes)
 app.use('/api/feedback',  feedbackLimiter, feedbackRoutes)
 app.use('/api/levels',    levelRoutes)
@@ -91,6 +93,17 @@ mongoose.connect(process.env.MONGO_URI).then(async () => {
       console.log('Dropped stale unique index campaign_1_owner_1 on characters collection')
     }
   } catch (e) { console.error('Index self-heal check failed:', e.message) }
+
+  // A board used to be one-per-campaign (unique index on campaign). Campaigns can now
+  // hold many boards, so drop the old unique index and let Mongoose rebuild it.
+  try {
+    const stale = (await DMBoard.collection.indexes()).find(i => i.name === 'campaign_1' && i.unique)
+    if (stale) {
+      await DMBoard.collection.dropIndex('campaign_1')
+      await DMBoard.createIndexes()
+      console.log('Dropped stale unique index campaign_1 on dmboards collection')
+    }
+  } catch (e) { if (e.codeName !== 'NamespaceNotFound') console.error('DM board index self-heal check failed:', e.message) }
 
   const httpServer = createServer(app)
   attachRealtime(httpServer)

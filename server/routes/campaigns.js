@@ -1,7 +1,7 @@
 import { Router } from 'express'
 import crypto from 'crypto'
 import jwt from 'jsonwebtoken'
-import { Campaign, Character, User, CampaignGuide, DMBoard } from '../models/index.js'
+import { Campaign, Character, User, CampaignGuide, DMBoard, DMBoardFolder } from '../models/index.js'
 
 const router = Router()
 
@@ -207,7 +207,8 @@ router.delete('/:id', auth, async (req, res) => {
     return res.status(400).json({ error: 'Campaign name did not match.' })
   }
   await campaign.deleteOne()
-  await DMBoard.deleteOne({ campaign: campaign._id })
+  await DMBoard.deleteMany({ campaign: campaign._id })
+  await DMBoardFolder.deleteMany({ campaign: campaign._id })
   res.json({ ok: true })
 })
 

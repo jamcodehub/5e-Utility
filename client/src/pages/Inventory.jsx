@@ -1,3 +1,4 @@
+import { useDebouncedSave } from '../hooks/useDebouncedSave'
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { api } from '../context/AuthContext'
 import { useAuth } from '../context/AuthContext'
@@ -61,7 +62,7 @@ export function InventoryPanel({ toast, isDM = false }) {
   const [newItemForm, setNewItemForm] = useState(newItem())
   const [editingCurrency, setEditingCurrency] = useState(false)
   const [currencyDraft, setCurrencyDraft] = useState({ pp: 0, gp: 0, ep: 0, sp: 0, cp: 0 })
-  const saveTimer = useRef(null)
+  const { schedule: scheduleSave, flush: flushSave } = useDebouncedSave(600)
 
   const load = useCallback(async () => {
     if (!activeCampaign) return
@@ -71,13 +72,15 @@ export function InventoryPanel({ toast, isDM = false }) {
 
   useEffect(() => { setLoaded(false); load() }, [load])
 
+  useEffect(() => flushSave, [activeCampaign?._id, flushSave])
+
   const persist = useCallback((next) => {
-    clearTimeout(saveTimer.current)
-    saveTimer.current = setTimeout(async () => {
-      try { await api(`/inventory/${activeCampaign._id}`, { method: 'PUT', body: { currency: next.currency, items: next.items } }) }
+    const campaignId = activeCampaign._id
+    scheduleSave(async () => {
+      try { await api(`/inventory/${campaignId}`, { method: 'PUT', body: { currency: next.currency, items: next.items } }) }
       catch { toast('Could not save') }
-    }, 600)
-  }, [activeCampaign])
+    })
+  }, [activeCampaign, scheduleSave])
 
   const adjustCurrency = (key, delta) => {
     const next = { ...inv, currency: { ...inv.currency, [key]: Math.max(0, (inv.currency[key] || 0) + delta) } }

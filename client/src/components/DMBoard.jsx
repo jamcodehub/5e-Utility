@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { api } from "../context/AuthContext";
+import { useNavigate } from "react-router-dom";
 import { useTheme } from "../context/ThemeContext";
 
 /* ---------- ASSETS: swap these placeholder URLs for your own icons ---------- */
@@ -43,11 +44,6 @@ const smooth = (p) => {
   const l = p[p.length - 1];
   return d + `L${l[0]},${l[1]}`;
 };
-const nearArrow = (x, y, a, r) => {
-  const dx = a.x2 - a.x1, dy = a.y2 - a.y1;
-  const t = Math.max(0, Math.min(1, ((x - a.x1) * dx + (y - a.y1) * dy) / (dx * dx + dy * dy || 1)));
-  return Math.hypot(x - (a.x1 + t * dx), y - (a.y1 + t * dy)) < r;
-};
 const Ico = ({ s }) => <img src={s} alt="" onError={(e) => (e.currentTarget.style.display = "none")} />;
 
 // Downscale uploads so synced boards stay light; returns {src,w,h}
@@ -71,7 +67,21 @@ const readImage = (file) => new Promise((res, reject) => {
   r.readAsDataURL(file);
 });
 
-export default function DMBoard({ boardId, style }) {
+const rad = (d) => (d * Math.PI) / 180;
+const rot2 = (x, y, d) => { const c = Math.cos(rad(d)), s = Math.sin(rad(d)); return [x * c - y * s, x * s + y * c]; };
+const ctr = (i) => [i.x + W(i) / 2, i.y + H(i) / 2];
+const segDist = (px, py, ax, ay, bx, by) => {
+  const dx = bx - ax, dy = by - ay;
+  const t = Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / (dx * dx + dy * dy || 1)));
+  return Math.hypot(px - (ax + t * dx), py - (ay + t * dy));
+};
+const inItem = (i, x, y, pad) => {
+  const [cx, cy] = ctr(i), [lx, ly] = rot2(x - cx, y - cy, -(i.rot || 0));
+  return Math.abs(lx) <= W(i) / 2 + pad && Math.abs(ly) <= H(i) / 2 + pad;
+};
+const HANDLES = [[-1, -1], [1, -1], [-1, 1], [1, 1]];
+
+function BoardCanvas({ campaignId, boardId, style, topRight, children }) {
   const { theme, lightMode } = useTheme();
   const dark = theme !== "light" && (!lightMode || theme === "dark");
   const [board, setBoard] = useState(EMPTY);
@@ -80,16 +90,17 @@ export default function DMBoard({ boardId, style }) {
   const [shapeKind, setShapeKind] = useState("rect");
   const [showShapes, setShowShapes] = useState(false);
   const [sel, setSel] = useState([]);
+  const [editing, setEditing] = useState(null); // item whose text is being edited
   const [linkFrom, setLinkFrom] = useState(null);
   const [marq, setMarq] = useState(null);
   const [status, setStatus] = useState({ kind: "loading", message: "Unrolling your board…" });
   const [imageError, setImageError] = useState("");
   const [full, setFull] = useState(false);
-  const [fresh, setFresh] = useState(null); // newly placed item, focused for typing
-  const root = useRef(null), ref = useRef(null), file = useRef(null), drag = useRef(null);
+  const root = useRef(null), ref = useRef(null), file = useRef(null), drag = useRef(null), lastTap = useRef({ id: null, t: 0 });
   const persistence = useRef(null);
   const bref = useRef(board); bref.current = board;
   const hist = useRef({ past: [], future: [] });
+  const api_ = `/dmboard/${campaignId}/boards/${boardId}`;
 
   useEffect(() => {
     const state = { active: true, ready: false, pending: null, saving: false, failed: false, version: 0, timer: null };
@@ -102,7 +113,7 @@ export default function DMBoard({ boardId, style }) {
       state.saving = true;
       report("saving", "Saving…");
       try {
-        const result = await api(`/dmboard/${boardId}`, { method: "PUT", body: { board: snapshot, version: state.version } });
+        const result = await api(api_, { method: "PUT", body: { board: snapshot, version: state.version } });
         state.version = result.version;
         if (state.pending === snapshot) state.pending = null;
         state.saving = false;
@@ -115,7 +126,7 @@ export default function DMBoard({ boardId, style }) {
         report(error.status === 409 ? "conflict" : "error", `${message} Your changes are not saved.`);
       }
     };
-    api(`/dmboard/${boardId}`).then(({ board: saved, version }) => {
+    api(api_).then(({ board: saved, version }) => {
       if (!state.active) return;
       const loaded = { ...EMPTY, ...saved };
       state.version = version;
@@ -127,14 +138,17 @@ export default function DMBoard({ boardId, style }) {
     const beforeUnload = (event) => {
       if (state.pending || state.saving) { event.preventDefault(); event.returnValue = ""; }
     };
+    const flush = () => state.save();
     window.addEventListener("beforeunload", beforeUnload);
+    window.addEventListener("pagehide", flush);
     return () => {
       state.active = false;
       window.removeEventListener("beforeunload", beforeUnload);
+      window.removeEventListener("pagehide", flush);
       clearTimeout(state.timer);
       state.save();
     };
-  }, [boardId]);
+  }, [api_]);
   useEffect(() => {
     const state = persistence.current;
     if (!state?.ready) return;
@@ -143,7 +157,7 @@ export default function DMBoard({ boardId, style }) {
     clearTimeout(state.timer);
     if (!state.failed) {
       setStatus({ kind: "saving", message: "Unsaved changes…" });
-      state.timer = setTimeout(state.save, 2000);
+      state.timer = setTimeout(state.save, 1000);
     }
   }, [board]);
 
@@ -170,9 +184,10 @@ export default function DMBoard({ boardId, style }) {
     const el = root.current, canvas = ref.current;
     let lastTrackpad = 0;
     const f = (e) => {
+      const zoom = e.ctrlKey || e.metaKey;
+      if (!zoom && e.target.closest?.(".dmb-panel")) return; // let the boards list scroll
       e.preventDefault();
       const now = performance.now();
-      const zoom = e.ctrlKey || e.metaKey;
       const mouse = e.deltaMode !== 0 || (e.deltaX === 0 && Number.isInteger(e.deltaY) && Math.abs(e.deltaY) >= 50);
       if (!zoom && !mouse) lastTrackpad = now;
       if (zoom || (mouse && now - lastTrackpad > 120)) {
@@ -194,6 +209,14 @@ export default function DMBoard({ boardId, style }) {
       ["gesturestart", "gesturechange", "gestureend"].forEach((t) => el.removeEventListener(t, block));
     };
   }, []);
+
+  /* focus the text field of the item being edited */
+  useEffect(() => {
+    if (!editing) return;
+    const card = root.current?.querySelector(`[data-id="${editing}"]`);
+    const el = card && (card.querySelector("textarea") || card.querySelector("input"));
+    if (el) { el.focus(); el.setSelectionRange?.(el.value.length, el.value.length); }
+  }, [editing]);
 
   /* history */
   const snap = () => { const h = hist.current; h.past.push(bref.current); if (h.past.length > 100) h.past.shift(); h.future = []; };
@@ -218,7 +241,7 @@ export default function DMBoard({ boardId, style }) {
     else { const c = centre(); x = c.x - w / 2 + Math.random() * 40; y = c.y - h / 2 + Math.random() * 40; }
     setBoard((b) => ({ ...b, items: [...b.items, { ...it, id, x, y, w, h }] }));
     setSel([id]); setTool("select"); setShowShapes(false);
-    setFresh(it.type === "image" ? null : id);
+    setEditing(it.type === "image" ? null : id);
   };
   const addImage = async (f) => {
     if (!f || !f.type.startsWith("image/")) return;
@@ -232,29 +255,97 @@ export default function DMBoard({ boardId, style }) {
       ...b,
       items: b.items.filter((i) => !sel.includes(i.id)),
       arrows: b.arrows.filter((a) => !sel.includes(a.id)),
+      strokes: b.strokes.filter((s) => !sel.includes(s.id)),
       links: b.links.filter((l) => !sel.includes(l.from) && !sel.includes(l.to)),
     }));
-    setSel([]);
+    setSel([]); setEditing(null);
   };
   const dupe = () => {
-    const picked = bref.current.items.filter((i) => sel.includes(i.id));
-    if (!picked.length) return;
+    const b = bref.current;
+    const items = b.items.filter((i) => sel.includes(i.id)), arrows = b.arrows.filter((a) => sel.includes(a.id)), strokes = b.strokes.filter((s) => sel.includes(s.id));
+    if (!items.length && !arrows.length && !strokes.length) return;
     snap();
-    const m = {}, copies = picked.map((i) => ({ ...i, id: (m[i.id] = uid()), x: i.x + 30, y: i.y + 30 }));
-    setBoard((b) => ({ ...b, items: [...b.items, ...copies], links: [...b.links, ...b.links.filter((l) => m[l.from] && m[l.to]).map((l) => ({ id: uid(), from: m[l.from], to: m[l.to] }))] }));
-    setSel(copies.map((c) => c.id));
+    const m = {}, o = 30;
+    const itemCopies = items.map((i) => ({ ...i, id: (m[i.id] = uid()), x: i.x + o, y: i.y + o }));
+    const arrowCopies = arrows.map((a) => ({ ...a, id: uid(), x1: a.x1 + o, y1: a.y1 + o, x2: a.x2 + o, y2: a.y2 + o }));
+    const strokeCopies = strokes.map((s) => ({ ...s, id: uid(), pts: s.pts.map(([x, y]) => [x + o, y + o]) }));
+    setBoard((c) => ({
+      ...c,
+      items: [...c.items, ...itemCopies], arrows: [...c.arrows, ...arrowCopies], strokes: [...c.strokes, ...strokeCopies],
+      links: [...c.links, ...c.links.filter((l) => m[l.from] && m[l.to]).map((l) => ({ id: uid(), from: m[l.from], to: m[l.to] }))],
+    }));
+    setSel([...itemCopies, ...arrowCopies, ...strokeCopies].map((c) => c.id));
   };
   const zoomBy = (f) => { const r = ref.current.getBoundingClientRect(), mx = r.width / 2, my = r.height / 2; setView((v) => { const z = Math.min(4, Math.max(0.1, v.z * f)); return { z, x: mx - ((mx - v.x) / v.z) * z, y: my - ((my - v.y) / v.z) * z }; }); };
   const fit = () => {
-    const its = bref.current.items, r = ref.current.getBoundingClientRect();
-    if (!its.length) return setView({ x: 0, y: 0, z: 1 });
-    const x1 = Math.min(...its.map((i) => i.x)), y1 = Math.min(...its.map((i) => i.y));
-    const x2 = Math.max(...its.map((i) => i.x + W(i))), y2 = Math.max(...its.map((i) => i.y + H(i)));
-    const z = Math.min(2, Math.max(0.1, Math.min((r.width - 120) / (x2 - x1), (r.height - 200) / (y2 - y1))));
-    setView({ z, x: (r.width - (x2 - x1) * z) / 2 - x1 * z, y: (r.height - (y2 - y1) * z) / 2 - y1 * z });
+    const b = bref.current, r = ref.current.getBoundingClientRect();
+    // Bounds of everything on the board: cards (rotated corners included), arrows and ink.
+    const xs = [], ys = [];
+    b.items.forEach((i) => {
+      const [cx, cy] = ctr(i);
+      [[-1, -1], [1, -1], [-1, 1], [1, 1]].forEach(([sx, sy]) => {
+        const [dx, dy] = rot2((sx * W(i)) / 2, (sy * H(i)) / 2, i.rot || 0);
+        xs.push(cx + dx); ys.push(cy + dy);
+      });
+    });
+    b.arrows.forEach((a) => { xs.push(a.x1, a.x2); ys.push(a.y1, a.y2); });
+    b.strokes.forEach((s) => s.pts.forEach(([x, y]) => { xs.push(x); ys.push(y); }));
+    if (!xs.length) return setView({ x: 0, y: 0, z: 1 });
+    const x1 = Math.min(...xs), y1 = Math.min(...ys), x2 = Math.max(...xs), y2 = Math.max(...ys);
+    const w = Math.max(x2 - x1, 1), h = Math.max(y2 - y1, 1);
+    const z = Math.min(2, Math.max(0.1, Math.min((r.width - 160) / w, (r.height - 200) / h)));
+    setView({ z, x: (r.width - w * z) / 2 - x1 * z, y: (r.height - h * z) / 2 - y1 * z });
+  };
+
+  /* eraser: removes anything under the pointer (cards, ink, arrows and the links between cards) */
+  const eraseAt = (p) => {
+    const r = 12 / view.z;
+    setBoard((b) => {
+      const dead = new Set(b.items.filter((i) => inItem(i, p.x, p.y, r * 0.5)).map((i) => i.id));
+      const strokes = b.strokes.filter((s) => !s.pts.some((q, k) => Math.hypot(q[0] - p.x, q[1] - p.y) < r || (k && segDist(p.x, p.y, s.pts[k - 1][0], s.pts[k - 1][1], q[0], q[1]) < r)));
+      const arrows = b.arrows.filter((a) => segDist(p.x, p.y, a.x1, a.y1, a.x2, a.y2) >= r);
+      const byId = Object.fromEntries(b.items.map((i) => [i.id, i]));
+      const links = b.links.filter((l) => {
+        if (dead.has(l.from) || dead.has(l.to)) return false;
+        const a = byId[l.from], c = byId[l.to];
+        if (!a || !c) return true;
+        const [x1, y1] = ctr(a), [x2, y2] = ctr(c), mx = (x1 + x2) / 2, my = (y1 + y2) / 2 - 20;
+        return segDist(p.x, p.y, x1, y1, mx, my) >= r && segDist(p.x, p.y, mx, my, x2, y2) >= r;
+      });
+      if (!dead.size && strokes.length === b.strokes.length && arrows.length === b.arrows.length && links.length === b.links.length) return b;
+      return { ...b, items: b.items.filter((i) => !dead.has(i.id)), strokes, arrows, links };
+    });
+  };
+  const startErase = (e) => {
+    snap(); ref.current.setPointerCapture(e.pointerId);
+    drag.current = { k: "erase" };
+    eraseAt(world(e));
+  };
+
+  /* moving a selection: cards, arrows and ink move together */
+  const startMove = (ids, e) => {
+    const b = bref.current, p = world(e), s = { items: {}, arrows: {}, strokes: {} };
+    b.items.forEach((i) => ids.includes(i.id) && (s.items[i.id] = { x: i.x, y: i.y }));
+    b.arrows.forEach((a) => ids.includes(a.id) && (s.arrows[a.id] = { ...a }));
+    b.strokes.forEach((st) => ids.includes(st.id) && (s.strokes[st.id] = st.pts));
+    snap();
+    drag.current = { k: "move", s, x: p.x, y: p.y };
+    ref.current.setPointerCapture(e.pointerId);
   };
 
   /* canvas gestures */
+  const beginTool = (e) => {
+    root.current.focus(); ref.current.setPointerCapture(e.pointerId);
+    setShowShapes(false); setEditing(null);
+    const p = world(e);
+    if (e.button === 1 || tool === "hand") drag.current = { k: "pan", sx: e.clientX, sy: e.clientY, ox: view.x, oy: view.y };
+    else if (tool === "pen") { snap(); const id = uid(); drag.current = { k: "pen", id }; setBoard((b) => ({ ...b, strokes: [...b.strokes, { id, pts: [[p.x, p.y]], c: INK }] })); }
+    else if (tool === "eraser") startErase(e);
+    else if (tool === "text") drag.current = { k: "text", x: p.x, y: p.y }; // placed on release so the new field keeps focus
+    else if (tool === "box" || tool === "shape") { drag.current = { k: "make", x: p.x, y: p.y }; setMarq({ x1: p.x, y1: p.y, x2: p.x, y2: p.y }); }
+    else if (tool === "arrow") { snap(); const id = uid(); drag.current = { k: "arrow", id }; setBoard((b) => ({ ...b, arrows: [...b.arrows, { id, x1: p.x, y1: p.y, x2: p.x, y2: p.y }] })); }
+    else { if (!e.shiftKey) setSel([]); setLinkFrom(null); drag.current = { k: "marq", x: p.x, y: p.y, base: e.shiftKey ? sel : [] }; setMarq({ x1: p.x, y1: p.y, x2: p.x, y2: p.y }); }
+  };
   // Right/middle button drags pan from anywhere, including over cards (capture runs before card handlers).
   const panDown = (e) => {
     if (e.button !== 2 && e.button !== 1) return;
@@ -262,40 +353,47 @@ export default function DMBoard({ boardId, style }) {
     root.current.focus(); ref.current.setPointerCapture(e.pointerId);
     drag.current = { k: "pan", sx: e.clientX, sy: e.clientY, ox: view.x, oy: view.y };
   };
-  const down = (e) => {
-    if (!e.target.dataset.canvas) return;
-    root.current.focus(); ref.current.setPointerCapture(e.pointerId);
-    setShowShapes(false);
-    const p = world(e);
-    if (e.button === 1 || tool === "hand") drag.current = { k: "pan", sx: e.clientX, sy: e.clientY, ox: view.x, oy: view.y };
-    else if (tool === "pen") { snap(); const id = uid(); drag.current = { k: "pen", id }; setBoard((b) => ({ ...b, strokes: [...b.strokes, { id, pts: [[p.x, p.y]], c: INK }] })); }
-    else if (tool === "eraser") { snap(); drag.current = { k: "erase" }; }
-    else if (tool === "text") drag.current = { k: "text", x: p.x, y: p.y }; // placed on release so the new field keeps focus
-    else if (tool === "box" || tool === "shape") { drag.current = { k: "make", x: p.x, y: p.y }; setMarq({ x1: p.x, y1: p.y, x2: p.x, y2: p.y }); }
-    else if (tool === "arrow") { snap(); const id = uid(); drag.current = { k: "arrow", id }; setBoard((b) => ({ ...b, arrows: [...b.arrows, { id, x1: p.x, y1: p.y, x2: p.x, y2: p.y }] })); }
-    else { if (!e.shiftKey) setSel([]); setLinkFrom(null); drag.current = { k: "marq", x: p.x, y: p.y, base: e.shiftKey ? sel : [] }; setMarq({ x1: p.x, y1: p.y, x2: p.x, y2: p.y }); }
-  };
+  const down = (e) => { if (e.target.dataset.canvas) beginTool(e); };
   const move = (e) => {
     const p = world(e), d = drag.current;
     if (!d) return;
     if (d.k === "pan") setView((v) => ({ ...v, x: d.ox + e.clientX - d.sx, y: d.oy + e.clientY - d.sy }));
     if (d.k === "pen") setBoard((b) => ({ ...b, strokes: b.strokes.map((s) => (s.id === d.id ? { ...s, pts: [...s.pts, [p.x, p.y]] } : s)) }));
     if (d.k === "arrow") setBoard((b) => ({ ...b, arrows: b.arrows.map((a) => (a.id === d.id ? { ...a, x2: p.x, y2: p.y } : a)) }));
-    if (d.k === "erase") {
-      const r = 14 / view.z;
+    if (d.k === "erase") eraseAt(p);
+    if (d.k === "move") {
+      const dx = p.x - d.x, dy = p.y - d.y;
       setBoard((b) => ({
         ...b,
-        strokes: b.strokes.filter((s) => !s.pts.some(([x, y]) => Math.hypot(x - p.x, y - p.y) < r)),
-        arrows: b.arrows.filter((a) => !nearArrow(p.x, p.y, a, r)),
+        items: b.items.map((i) => (d.s.items[i.id] ? { ...i, x: d.s.items[i.id].x + dx, y: d.s.items[i.id].y + dy } : i)),
+        arrows: b.arrows.map((a) => { const o = d.s.arrows[a.id]; return o ? { ...a, x1: o.x1 + dx, y1: o.y1 + dy, x2: o.x2 + dx, y2: o.y2 + dy } : a; }),
+        strokes: b.strokes.map((s) => { const o = d.s.strokes[s.id]; return o ? { ...s, pts: o.map(([x, y]) => [x + dx, y + dy]) } : s; }),
       }));
     }
-    if (d.k === "item") setBoard((b) => ({ ...b, items: b.items.map((i) => (d.s[i.id] ? { ...i, x: d.s[i.id].x + p.x - d.x, y: d.s[i.id].y + p.y - d.y } : i)) }));
-    if (d.k === "size") patch(d.id, { w: Math.max(120, d.w + p.x - d.x), h: Math.max(80, d.h + p.y - d.y) });
+    if (d.k === "size") {
+      // Work in the card's own (rotated) frame so the opposite corner stays put.
+      const [lx, ly] = rot2(p.x - d.ox, p.y - d.oy, -d.rot);
+      const w = Math.max(60, d.sx * lx), h = Math.max(40, d.sy * ly);
+      const [ox, oy] = rot2((d.sx * w) / 2, (d.sy * h) / 2, d.rot);
+      const cx = d.ox + ox, cy = d.oy + oy;
+      patch(d.id, { w, h, x: cx - w / 2, y: cy - h / 2, ...(d.fs ? { fs: Math.max(8, Math.round(d.fs * (h / d.h))) } : {}) });
+    }
+    if (d.k === "rot") {
+      let deg = d.r0 + ((Math.atan2(p.y - d.cy, p.x - d.cx) - d.a0) * 180) / Math.PI;
+      if (e.shiftKey) deg = Math.round(deg / 15) * 15;
+      patch(d.id, { rot: Math.round(deg * 10) / 10 });
+    }
     if (d.k === "make") setMarq({ x1: d.x, y1: d.y, x2: p.x, y2: p.y });
     if (d.k === "marq") {
       const m = { x1: d.x, y1: d.y, x2: p.x, y2: p.y }; setMarq(m);
       const [ax, bx] = [Math.min(m.x1, m.x2), Math.max(m.x1, m.x2)], [ay, by] = [Math.min(m.y1, m.y2), Math.max(m.y1, m.y2)];
-      setSel([...new Set([...d.base, ...bref.current.items.filter((i) => i.x < bx && i.x + W(i) > ax && i.y < by && i.y + H(i) > ay).map((i) => i.id)])]);
+      const b = bref.current;
+      const ids = [
+        ...b.items.filter((i) => i.x < bx && i.x + W(i) > ax && i.y < by && i.y + H(i) > ay).map((i) => i.id),
+        ...b.arrows.filter((a) => Math.max(a.x1, a.x2) > ax && Math.min(a.x1, a.x2) < bx && Math.max(a.y1, a.y2) > ay && Math.min(a.y1, a.y2) < by).map((a) => a.id),
+        ...b.strokes.filter((s) => s.pts.some(([x, y]) => x > ax && x < bx && y > ay && y < by)).map((s) => s.id),
+      ];
+      setSel([...new Set([...d.base, ...ids])]);
     }
   };
   const up = (e) => {
@@ -313,52 +411,69 @@ export default function DMBoard({ boardId, style }) {
   };
 
   const cardDown = (e, it) => {
+    if (e.button !== 0) return;
     e.stopPropagation(); root.current.focus();
+    if (editing === it.id) return; // typing inside the card
+    if (tool === "eraser") return startErase(e);
     if (tool === "arrow") {
       if (!linkFrom) setLinkFrom(it.id);
       else if (linkFrom !== it.id) { snap(); setBoard((b) => ({ ...b, links: [...b.links, { id: uid(), from: linkFrom, to: it.id }] })); setLinkFrom(null); }
       return;
     }
-    if (tool !== "select") return;
+    if (tool !== "select") return beginTool(e);
+    // A second tap/click on the same card edits its text; one drag moves it.
+    const now = Date.now(), again = lastTap.current.id === it.id && now - lastTap.current.t < 400;
+    lastTap.current = { id: it.id, t: now };
+    if (again && it.type !== "image") { setSel([it.id]); setEditing(it.id); return; }
+    setEditing(null);
     let ids = sel.includes(it.id) ? sel : [it.id];
     if (e.shiftKey) ids = sel.includes(it.id) ? sel.filter((x) => x !== it.id) : [...sel, it.id];
     setSel(ids);
     if (!ids.includes(it.id)) return;
-    snap();
-    const p = world(e), s = {};
-    bref.current.items.forEach((i) => ids.includes(i.id) && (s[i.id] = { x: i.x, y: i.y }));
-    drag.current = { k: "item", s, x: p.x, y: p.y };
+    startMove(ids, e);
+  };
+  const shapeDown = (e, id) => {
+    if (e.button !== 0) return;
+    e.stopPropagation(); root.current.focus(); setEditing(null);
+    if (tool === "eraser") return startErase(e);
+    if (tool !== "select") return;
+    let ids = sel.includes(id) ? sel : [id];
+    if (e.shiftKey) ids = sel.includes(id) ? sel.filter((x) => x !== id) : [...sel, id];
+    setSel(ids);
+    if (ids.includes(id)) startMove(ids, e);
+  };
+  const handleDown = (e, it, sx, sy) => {
+    e.stopPropagation(); snap();
+    const rot = it.rot || 0, [cx, cy] = ctr(it), [ox, oy] = rot2((-sx * W(it)) / 2, (-sy * H(it)) / 2, rot);
+    drag.current = { k: "size", id: it.id, sx, sy, rot, ox: cx + ox, oy: cy + oy, h: H(it), fs: it.type === "text" ? it.fs || 26 : it.type === "shape" ? it.fs || 17 : 0 };
     ref.current.setPointerCapture(e.pointerId);
   };
-  const arrowDown = (e, a) => {
-    if (tool !== "select") return;
-    e.stopPropagation(); root.current.focus();
-    setSel(e.shiftKey ? (sel.includes(a.id) ? sel.filter((x) => x !== a.id) : [...sel, a.id]) : [a.id]);
-  };
-  const sizeDown = (e, it) => {
-    e.stopPropagation(); snap(); const p = world(e);
-    drag.current = { k: "size", id: it.id, w: W(it), h: H(it), x: p.x, y: p.y };
+  const rotDown = (e, it) => {
+    e.stopPropagation(); snap();
+    const p = world(e), [cx, cy] = ctr(it);
+    drag.current = { k: "rot", id: it.id, cx, cy, a0: Math.atan2(p.y - cy, p.x - cx), r0: it.rot || 0 };
     ref.current.setPointerCapture(e.pointerId);
   };
 
   const key = (e) => {
-    if (/INPUT|TEXTAREA/.test(e.target.tagName)) return;
+    if (/INPUT|TEXTAREA/.test(e.target.tagName)) { if (e.key === "Escape") { e.target.blur(); setEditing(null); } return; }
     const m = e.ctrlKey || e.metaKey;
     if (e.key === "Delete" || e.key === "Backspace") del();
     else if (m && e.key === "z") { e.preventDefault(); e.shiftKey ? redo() : undo(); }
     else if (m && e.key === "y") { e.preventDefault(); redo(); }
     else if (m && e.key === "d") { e.preventDefault(); dupe(); }
-    else if (m && e.key === "a") { e.preventDefault(); setSel(bref.current.items.map((i) => i.id)); }
-    else if (e.key === "Escape") { setSel([]); setLinkFrom(null); setTool("select"); setShowShapes(false); }
+    else if (m && e.key === "a") { e.preventDefault(); const b = bref.current; setSel([...b.items, ...b.arrows, ...b.strokes].map((i) => i.id)); }
+    else if (e.key === "Escape") { setSel([]); setLinkFrom(null); setTool("select"); setShowShapes(false); setEditing(null); }
   };
 
   const byId = Object.fromEntries(board.items.map((i) => [i.id, i]));
-  const ctr = (i) => [i.x + W(i) / 2, i.y + H(i) / 2];
-    const single = sel.length === 1 && byId[sel[0]];
-  const pick = (t) => { setTool(t); setLinkFrom(null); setShowShapes(false); };
+  const single = sel.length === 1 && byId[sel[0]];
+  const pick = (t) => { setTool(t); setLinkFrom(null); setShowShapes(false); setEditing(null); };
   const tb = (t, l, on, fn, dis) => (
     <button key={l} className={on ? "on" : ""} disabled={dis} onClick={fn} title={l} aria-label={l}><Ico s={ICONS[t]} /></button>
   );
+  const hitStyle = { pointerEvents: tool === "select" || tool === "eraser" ? "stroke" : "none" };
+  const hasSel = sel.length > 0;
 
   return (
     <div
@@ -366,12 +481,13 @@ export default function DMBoard({ boardId, style }) {
       onPaste={(e) => [...e.clipboardData.files].forEach(addImage)}
       onDragOver={(e) => e.preventDefault()}
       onDrop={(e) => { e.preventDefault(); [...e.dataTransfer.files].forEach(addImage); }}
+      onContextMenu={(e) => e.preventDefault()}
     >
       <style>{CSS}</style>
       <div
         ref={ref} className="dmb-canvas" data-canvas="1"
         style={{ cursor: tool === "hand" ? "grab" : QUILL_CURSOR }}
-        onPointerDownCapture={panDown} onPointerDown={down} onPointerMove={move} onPointerUp={up} onContextMenu={(e) => e.preventDefault()}
+        onPointerDownCapture={panDown} onPointerDown={down} onPointerMove={move} onPointerUp={up}
       >
         {/* world layer: pure DOM + SVG, re-rasterised at every zoom level so it stays sharp */}
         <div style={{ position: "absolute", left: 0, top: 0, transform: `translate(${view.x}px,${view.y}px) scale(${view.z})`, transformOrigin: "0 0", pointerEvents: "none" }}>
@@ -385,24 +501,37 @@ export default function DMBoard({ boardId, style }) {
             {board.arrows.map((a) => {
               const d = `M${a.x1},${a.y1}L${a.x2},${a.y2}`;
               return (
-                <g key={a.id} className={sel.includes(a.id) ? "dmb-sel-arrow" : ""}>
+                <g key={a.id}>
+                  {sel.includes(a.id) && <path d={d} className="dmb-halo" />}
                   <path d={d} className="dmb-link" markerEnd="url(#dmb-arr)" />
-                  <path d={d} className="dmb-hit" style={{ pointerEvents: tool === "select" ? "stroke" : "none" }} onPointerDown={(e) => arrowDown(e, a)} />
+                  <path d={d} className="dmb-hit" style={hitStyle} onPointerDown={(e) => shapeDown(e, a.id)} />
                 </g>
               );
             })}
-            {board.strokes.map((s) => <path key={s.id} d={smooth(s.pts)} className="dmb-ink" style={{ stroke: s.c === INK || s.c === "#1d1208" ? "var(--dmb-ink)" : s.c }} />)}
+            {board.strokes.map((s) => {
+              const d = smooth(s.pts);
+              return (
+                <g key={s.id}>
+                  {sel.includes(s.id) && <path d={d} className="dmb-halo" />}
+                  <path d={d} className="dmb-ink" style={{ stroke: s.c === INK || s.c === "#1d1208" ? "var(--dmb-line)" : s.c }} />
+                  <path d={d} className="dmb-hit" style={hitStyle} onPointerDown={(e) => shapeDown(e, s.id)} />
+                </g>
+              );
+            })}
             {marq && <rect x={Math.min(marq.x1, marq.x2)} y={Math.min(marq.y1, marq.y2)} width={Math.abs(marq.x2 - marq.x1)} height={Math.abs(marq.y2 - marq.y1)} className="dmb-marq" vectorEffect="non-scaling-stroke" />}
           </svg>
           {board.items.map((it) => {
-            const on = sel.includes(it.id), T = TYPES[it.type];
+            const on = sel.includes(it.id), T = TYPES[it.type], ed = editing === it.id;
             const kind = it.type === "image" ? "img" : it.type === "text" ? "txt" : it.type === "shape" ? "shp" : "";
             return (
               <div
-                key={it.id}
-                className={`dmb-card ${kind}${on ? " sel" : ""}${linkFrom === it.id ? " linking" : ""}`}
-                style={{ left: it.x, top: it.y, width: W(it), height: H(it), "--tint": T ? T.tint : undefined }}
+                key={it.id} data-id={it.id}
+                className={`dmb-card ${kind}${on ? " sel" : ""}${ed ? " edit" : ""}${linkFrom === it.id ? " linking" : ""}`}
+                style={{ left: it.x, top: it.y, width: W(it), height: H(it), transform: it.rot ? `rotate(${it.rot}deg)` : undefined, "--tint": T ? T.tint : undefined }}
                 onPointerDown={(e) => cardDown(e, it)}
+                onMouseDown={(e) => { if (!e.target.matches?.("textarea,input")) e.preventDefault(); }}
+                onFocus={(e) => { if (e.target.matches?.("textarea,input")) setEditing(it.id); }}
+                onBlur={(e) => { if (!e.currentTarget.contains(e.relatedTarget)) setEditing((cur) => (cur === it.id ? null : cur)); }}
               >
                 {it.type === "shape" && (
                   <svg className="dmb-shape" viewBox="0 0 100 100" preserveAspectRatio="none">
@@ -412,13 +541,20 @@ export default function DMBoard({ boardId, style }) {
                 {T && (
                   <div className="dmb-head">
                     {it.type !== "note" && <Ico s={ICONS[it.type]} />}
-                    <input value={it.title || ""} onFocus={snap} onPointerDown={(e) => e.stopPropagation()} onChange={(e) => patch(it.id, { title: e.target.value })} />
+                    <input value={it.title || ""} tabIndex={-1} onFocus={snap} onChange={(e) => patch(it.id, { title: e.target.value })} />
                   </div>
                 )}
                 {it.type === "image"
                   ? <img src={it.src} alt="" draggable={false} className="dmb-pic" />
-                  : <textarea autoFocus={it.id === fresh} placeholder={it.type === "text" ? "Write in ink…" : it.type === "shape" ? "Label…" : "Scribble here…"} value={it.text || ""} onFocus={snap} onPointerDown={(e) => e.stopPropagation()} onChange={(e) => patch(it.id, { text: e.target.value })} />}
-                {single && single.id === it.id && <span className="dmb-size" onPointerDown={(e) => sizeDown(e, it)} />}
+                  : <textarea tabIndex={-1} style={it.fs ? { fontSize: it.fs } : undefined} placeholder={it.type === "text" ? "Write in ink…" : it.type === "shape" ? "Label…" : "Scribble here…"} value={it.text || ""} onFocus={snap} onChange={(e) => patch(it.id, { text: e.target.value })} />}
+                {single && single.id === it.id && !ed && (
+                  <>
+                    {HANDLES.map(([sx, sy]) => (
+                      <span key={`${sx}${sy}`} className="dmb-h" style={{ left: sx < 0 ? -6 : "calc(100% - 6px)", top: sy < 0 ? -6 : "calc(100% - 6px)", cursor: sx * sy > 0 ? "nwse-resize" : "nesw-resize" }} onPointerDown={(e) => handleDown(e, it, sx, sy)} />
+                    ))}
+                    <span className="dmb-rot" onPointerDown={(e) => rotDown(e, it)} />
+                  </>
+                )}
               </div>
             );
           })}
@@ -426,7 +562,10 @@ export default function DMBoard({ boardId, style }) {
       </div>
 
       <div className="dmb-tl">{tb("undo", "Undo", 0, undo)}{tb("redo", "Redo", 0, redo)}</div>
-      <button className="dmb-fs" onClick={toggleFull}>{full ? "✕ Exit fullscreen" : "⤢ Fullscreen"}</button>
+      <div className="dmb-top">
+        {topRight}
+        <button className="dmb-fs" onClick={toggleFull}>{full ? "✕ Exit fullscreen" : "⤢ Fullscreen"}</button>
+      </div>
       <div className={`dmb-status ${status.kind}`} role={status.kind.includes("error") || status.kind === "conflict" ? "alert" : "status"}>
         {status.message}
         {status.kind === "error" && <button onClick={() => { persistence.current.failed = false; persistence.current.save(); }}>Retry save</button>}
@@ -443,6 +582,7 @@ export default function DMBoard({ boardId, style }) {
         {tb("select", "Select", tool === "select", () => pick("select"))}
         {tb("text", "Text", tool === "text", () => pick("text"))}
         {tb("pen", "Draw", tool === "pen", () => pick("pen"))}
+        {tb("eraser", "Erase", tool === "eraser", () => pick("eraser"))}
         {tb("box", "Box", tool === "box", () => pick("box"))}
         {tb("arrow", "Arrow", tool === "arrow", () => pick("arrow"))}
         {tb("shapes", "Shapes", tool === "shape" || showShapes, () => setShowShapes((v) => !v))}
@@ -465,10 +605,9 @@ export default function DMBoard({ boardId, style }) {
 
       <div className="dmb-bar">
         {tb("hand", "Pan", tool === "hand", () => pick("hand"))}
-        {tb("eraser", "Erase", tool === "eraser", () => pick("eraser"))}
         <span className="dmb-sep" />
-        {tb("copy", "Dupe", 0, dupe, !sel.some((id) => byId[id]))}
-        {tb("trash", "Burn", 0, del, !sel.length)}
+        {tb("copy", "Dupe", 0, dupe, !hasSel)}
+        {tb("trash", "Burn", 0, del, !hasSel)}
       </div>
       <input ref={file} type="file" accept="image/*" multiple hidden onChange={(e) => { [...e.target.files].forEach(addImage); e.target.value = ""; }} />
 
@@ -478,30 +617,173 @@ export default function DMBoard({ boardId, style }) {
         <button onClick={() => zoomBy(1.25)}>+</button>
         <button onClick={fit}>Fit</button>
       </div>
+      {children}
     </div>
+  );
+}
+
+/* ---------- boards & folders (slide-out menu) ---------- */
+// `renaming` and `error` live in the parent: the board canvas is re-created when the active board
+// changes, and this panel (rendered inside it) must not lose them.
+function BoardsPanel({ campaignId, list, setList, activeId, setActiveId, open, onClose, renaming, setRenaming, error, setError }) {
+  const navigate = useNavigate();
+  const base = `/dmboard/${campaignId}`;
+  const atLimit = list.limit != null && list.boards.length >= list.limit;
+  const run = async (fn) => { setError(""); try { await fn(); } catch (e) { setError(e.message); } };
+
+  const addBoard = (folder = null) => run(async () => {
+    const b = await api(`${base}/boards`, { method: "POST", body: { name: "Untitled board", folder } });
+    setList((l) => ({ ...l, boards: [...l.boards, b] }));
+    setActiveId(b._id);
+    setRenaming({ kind: "board", id: b._id, value: b.name });
+  });
+  const addFolder = () => run(async () => {
+    const f = await api(`${base}/folders`, { method: "POST", body: { name: "New folder" } });
+    setList((l) => ({ ...l, folders: [...l.folders, f] }));
+    setRenaming({ kind: "folder", id: f._id, value: f.name });
+  });
+  const commitRename = () => {
+    const r = renaming; setRenaming(null);
+    if (!r || !r.value.trim()) return;
+    run(async () => {
+      if (r.kind === "board") {
+        const b = await api(`${base}/boards/${r.id}`, { method: "PATCH", body: { name: r.value } });
+        setList((l) => ({ ...l, boards: l.boards.map((x) => (x._id === b._id ? { ...x, name: b.name } : x)) }));
+      } else {
+        const f = await api(`${base}/folders/${r.id}`, { method: "PATCH", body: { name: r.value } });
+        setList((l) => ({ ...l, folders: l.folders.map((x) => (x._id === f._id ? f : x)) }));
+      }
+    });
+  };
+  const moveBoard = (id, folder) => run(async () => {
+    const b = await api(`${base}/boards/${id}`, { method: "PATCH", body: { folder } });
+    setList((l) => ({ ...l, boards: l.boards.map((x) => (x._id === b._id ? { ...x, folder: b.folder } : x)) }));
+  });
+  const removeBoard = (b) => {
+    if (!window.confirm(`Delete "${b.name}"? This can't be undone.`)) return;
+    run(async () => {
+      const rest = list.boards.filter((x) => x._id !== b._id);
+      if (activeId === b._id && rest.length) { setActiveId(rest[0]._id); await new Promise((r) => setTimeout(r, 300)); }
+      await api(`${base}/boards/${b._id}`, { method: "DELETE" });
+      setList((l) => ({ ...l, boards: l.boards.filter((x) => x._id !== b._id) }));
+    });
+  };
+  const removeFolder = (f) => {
+    if (!window.confirm(`Delete the folder "${f.name}"? Its boards move to the top level.`)) return;
+    run(async () => {
+      await api(`${base}/folders/${f._id}`, { method: "DELETE" });
+      setList((l) => ({ ...l, folders: l.folders.filter((x) => x._id !== f._id), boards: l.boards.map((x) => (x.folder === f._id ? { ...x, folder: null } : x)) }));
+    });
+  };
+
+  const nameField = (kind, id, text) => (renaming && renaming.kind === kind && renaming.id === id
+    ? <input className="dmb-rename" autoFocus value={renaming.value} onChange={(e) => setRenaming({ ...renaming, value: e.target.value })} onFocus={(e) => e.target.select()} onBlur={commitRename} onKeyDown={(e) => { if (e.key === "Enter") e.currentTarget.blur(); if (e.key === "Escape") setRenaming(null); }} />
+    : text);
+  const row = (b) => (
+    <div key={b._id} className={"dmb-row" + (b._id === activeId ? " on" : "")}>
+      <span className="dmb-row-name" onClick={() => setActiveId(b._id)} onDoubleClick={() => setRenaming({ kind: "board", id: b._id, value: b.name })}>{nameField("board", b._id, b.name)}</span>
+      {list.folders.length > 0 && (
+        <select title="Move to folder" value={b.folder || ""} onChange={(e) => moveBoard(b._id, e.target.value || null)}>
+          <option value="">No folder</option>
+          {list.folders.map((f) => <option key={f._id} value={f._id}>{f.name}</option>)}
+        </select>
+      )}
+      <button title="Rename" aria-label="Rename" onClick={() => setRenaming({ kind: "board", id: b._id, value: b.name })}>✎</button>
+      <button title="Delete" aria-label="Delete" disabled={list.boards.length <= 1} onClick={() => removeBoard(b)}>✕</button>
+    </div>
+  );
+
+  return (
+    <aside className={"dmb-panel" + (open ? " open" : "")} aria-hidden={!open}>
+      <div className="dmb-panel-head">
+        <strong>Boards</strong>
+        <button onClick={onClose} aria-label="Close boards menu">✕</button>
+      </div>
+      <div className="dmb-panel-actions">
+        <button disabled={atLimit} onClick={() => addBoard(null)}>+ Board</button>
+        <button disabled={!list.premium} onClick={addFolder}>+ Folder</button>
+      </div>
+      {!list.premium && (
+        <div className="dmb-note">
+          Free DMs get one board and no folders.{" "}
+          <a href="/premium" onClick={(e) => { e.preventDefault(); navigate("/premium"); }}>Upgrade for unlimited</a>
+        </div>
+      )}
+      {error && <div className="dmb-note err" role="alert">{error}</div>}
+      <div className="dmb-panel-list">
+        {list.boards.filter((b) => !b.folder).map(row)}
+        {list.folders.map((f) => (
+          <div key={f._id} className="dmb-folder">
+            <div className="dmb-folder-head">
+              <span className="dmb-row-name" onDoubleClick={() => setRenaming({ kind: "folder", id: f._id, value: f.name })}>📁 {nameField("folder", f._id, f.name)}</span>
+              <button title="New board in folder" aria-label="New board in folder" disabled={atLimit} onClick={() => addBoard(f._id)}>＋</button>
+              <button title="Rename folder" aria-label="Rename folder" onClick={() => setRenaming({ kind: "folder", id: f._id, value: f.name })}>✎</button>
+              <button title="Delete folder" aria-label="Delete folder" onClick={() => removeFolder(f)}>✕</button>
+            </div>
+            {list.boards.filter((b) => b.folder === f._id).map(row)}
+          </div>
+        ))}
+      </div>
+    </aside>
+  );
+}
+
+export default function DMBoard({ campaignId, style }) {
+  const [list, setList] = useState(null);
+  const [error, setError] = useState("");
+  const [activeId, setActiveIdRaw] = useState(null);
+  const [panel, setPanel] = useState(false);
+  const [renaming, setRenaming] = useState(null); // { kind: "board" | "folder", id, value }
+  const [panelError, setPanelError] = useState("");
+  const storeKey = `dmboard:active:${campaignId}`;
+  const setActiveId = (id) => { setActiveIdRaw(id); try { localStorage.setItem(storeKey, id); } catch { /* ignore */ } };
+
+  useEffect(() => {
+    let off = false;
+    setList(null); setError(""); setActiveIdRaw(null);
+    api(`/dmboard/${campaignId}`).then((data) => {
+      if (off) return;
+      let saved = null;
+      try { saved = localStorage.getItem(storeKey); } catch { /* ignore */ }
+      setList(data);
+      setActiveIdRaw((data.boards.find((b) => b._id === saved) || data.boards[0] || {})._id || null);
+    }).catch((e) => { if (!off) setError(e.message); });
+    return () => { off = true; };
+  }, [campaignId, storeKey]);
+
+  if (error) return <div className="page-content" role="alert">Could not load boards: {error}</div>;
+  if (!list || !activeId) return <div className="page-content">Unrolling your boards…</div>;
+  const active = list.boards.find((b) => b._id === activeId);
+  return (
+    <BoardCanvas
+      key={activeId} campaignId={campaignId} boardId={activeId} style={style}
+      topRight={<button className="dmb-fs dmb-menu-btn" onClick={() => setPanel((v) => !v)} aria-expanded={panel}>☰ {active ? active.name : "Boards"}</button>}
+    >
+      <BoardsPanel campaignId={campaignId} list={list} setList={setList} activeId={activeId} setActiveId={setActiveId} open={panel} onClose={() => setPanel(false)} renaming={renaming} setRenaming={setRenaming} error={panelError} setError={setPanelError} />
+    </BoardCanvas>
   );
 }
 
 const CSS = `
 @import url('https://fonts.googleapis.com/css2?family=IM+Fell+English:ital@0;1&family=MedievalSharp&display=swap');
 .dmb-root{
- --dmb-paper:#efe4c8;--dmb-ink:#2b1d10;--dmb-edge:#5a3b1c;--dmb-shadow:rgba(60,35,10,.18);
+ --dmb-paper:#efe4c8;--dmb-ink:#2b1d10;--dmb-line:#000;--dmb-edge:#5a3b1c;--dmb-shadow:rgba(60,35,10,.18);
  --dmb-chrome:#f6edd5;--dmb-chrome-hi:#e6d6ae;--dmb-icon-filter:brightness(0);
  --dmb-chrome-text:#2b1d10;--dmb-rim:color-mix(in srgb,var(--gold,#9a7c3a) 70%,#8a6a2a);
- --dmb-danger:#8a1c1c;--dmb-link:#6b2b14;--dmb-stain:rgba(150,105,45,.16);--dmb-vig:rgba(120,85,40,.22);
+ --dmb-danger:#8a1c1c;--dmb-vig:rgba(120,85,40,.22);
  --dmb-card-img:#f4e8c8;--dmb-card-mix:100%;
- position:relative;width:100%;height:100%;min-height:480px;outline:0;touch-action:none;overscroll-behavior:contain;overflow:hidden;border-radius:8px;background:var(--dmb-chrome);user-select:none}
+ position:relative;width:100%;height:100%;min-height:480px;outline:0;overflow:hidden;border-radius:8px;background:var(--dmb-chrome);
+ touch-action:none;overscroll-behavior:contain;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent}
+.dmb-root *{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
 .dmb-root[data-mode=dark]{
- --dmb-paper:color-mix(in srgb,var(--surface,#1a1c1e) 88%,var(--gold,#c8a060));--dmb-ink:var(--text,#e8e4dc);--dmb-edge:var(--border-strong,#3e4248);--dmb-shadow:rgba(0,0,0,.5);
+ --dmb-paper:color-mix(in srgb,var(--surface,#1a1c1e) 88%,var(--gold,#c8a060));--dmb-ink:var(--text,#e8e4dc);--dmb-line:#fff;--dmb-edge:var(--border-strong,#3e4248);--dmb-shadow:rgba(0,0,0,.5);
  --dmb-icon-filter:brightness(0) invert(1);--dmb-chrome:var(--surface2,#222528);--dmb-chrome-hi:var(--border,#2e3135);--dmb-chrome-text:var(--text,#e8e4dc);--dmb-rim:var(--gold,#c8a060);
- --dmb-danger:var(--red,#e05050);--dmb-link:var(--gold,#c8a060);--dmb-stain:rgba(255,235,190,.05);--dmb-vig:rgba(0,0,0,.3);
- --dmb-card-img:var(--surface,#1a1c1e);--dmb-card-mix:16%;
-}
+ --dmb-danger:var(--red,#e05050);--dmb-vig:rgba(0,0,0,.3);
+ --dmb-card-img:var(--surface,#1a1c1e);--dmb-card-mix:16%}
 .dmb-root.full{position:fixed;inset:0;z-index:9999;border-radius:0}
 .dmb-canvas{position:absolute;inset:0;overflow:hidden;touch-action:none;font-family:'IM Fell English',Georgia,serif;color:var(--dmb-ink);text-rendering:geometricPrecision;
- background-color:var(--dmb-paper);
- box-shadow:inset 0 0 90px var(--dmb-vig)}
-.dmb-card{position:absolute;box-sizing:border-box;border:1px solid color-mix(in srgb,var(--dmb-edge) 55%,transparent);border-radius:8px;padding:8px;box-shadow:0 2px 8px var(--dmb-shadow);cursor:grab;pointer-events:auto;display:flex;flex-direction:column;overflow:visible;
+ background-color:var(--dmb-paper);box-shadow:inset 0 0 90px var(--dmb-vig)}
+.dmb-card{position:absolute;box-sizing:border-box;border:1.5px solid var(--dmb-line);border-radius:8px;padding:8px;box-shadow:0 2px 8px var(--dmb-shadow);cursor:grab;pointer-events:auto;display:flex;flex-direction:column;overflow:visible;
  background:color-mix(in srgb,var(--tint,var(--dmb-paper)) var(--dmb-card-mix),var(--surface,var(--dmb-paper)))}
 .dmb-root[data-mode=light] .dmb-card{background:var(--tint,var(--dmb-card-img))}
 .dmb-card.txt,.dmb-card.shp{background:none!important;border:1px dashed transparent;box-shadow:none}
@@ -509,42 +791,64 @@ const CSS = `
 .dmb-card.shp{padding:0}
 .dmb-card.shp textarea{position:relative;text-align:center;padding:14% 18%;box-sizing:border-box;font-size:17px;font-style:normal}
 .dmb-shape{position:absolute;inset:0;width:100%;height:100%;overflow:visible;pointer-events:none}
-.dmb-shape *{fill:color-mix(in srgb,var(--dmb-ink) 8%,transparent);stroke:color-mix(in srgb,var(--dmb-ink) 70%,transparent);stroke-width:2.5;vector-effect:non-scaling-stroke;stroke-linejoin:round}
+.dmb-shape *{fill:color-mix(in srgb,var(--dmb-line) 6%,transparent);stroke:var(--dmb-line);stroke-width:2;vector-effect:non-scaling-stroke;stroke-linejoin:round}
 .dmb-card.img{padding:6px;background:var(--dmb-card-img)!important}
 .dmb-pic{width:100%;height:100%;object-fit:contain;pointer-events:none}
-.dmb-card.sel{outline:2px dashed var(--dmb-danger);outline-offset:3px}
-.dmb-card.linking{outline:2px solid var(--dmb-rim);outline-offset:3px}
-.dmb-head{display:flex;align-items:center;gap:6px;border-bottom:1px solid color-mix(in srgb,var(--dmb-edge) 50%,transparent);padding-bottom:4px;margin-bottom:4px}
-.dmb-head img{width:28px;height:28px;border-radius:50%;border:1px solid var(--dmb-edge)}
-.dmb-card input,.dmb-card textarea{background:transparent;border:0;outline:0;width:100%;color:var(--dmb-ink);font:inherit;resize:none;user-select:text}
+.dmb-card.sel{outline:1.5px dashed var(--dmb-line);outline-offset:5px}
+.dmb-card.linking{outline:2px solid var(--dmb-rim);outline-offset:5px}
+.dmb-head{display:flex;align-items:center;gap:6px;border-bottom:1px solid color-mix(in srgb,var(--dmb-line) 45%,transparent);padding-bottom:4px;margin-bottom:4px}
+.dmb-head img{width:24px;height:24px;filter:var(--dmb-icon-filter);border:0;border-radius:0}
+.dmb-card input,.dmb-card textarea{background:transparent;border:0;outline:0;width:100%;color:var(--dmb-ink);font:inherit;resize:none;pointer-events:none}
 .dmb-card input{font-family:'MedievalSharp',serif;font-size:16px}
 .dmb-card textarea{flex:1;min-height:0;font-size:15px;font-style:italic;line-height:1.3}
-.dmb-size{position:absolute;right:-8px;bottom:-8px;width:14px;height:14px;background:var(--dmb-danger);border:2px solid var(--dmb-paper);border-radius:3px;cursor:nwse-resize}
+.dmb-card.edit{cursor:text}
+.dmb-card.edit input,.dmb-card.edit textarea{pointer-events:auto;user-select:text;-webkit-user-select:text}
+.dmb-h{position:absolute;width:11px;height:11px;box-sizing:border-box;background:var(--dmb-paper);border:1.5px solid var(--dmb-line);border-radius:2px;z-index:2}
+.dmb-rot{position:absolute;left:50%;top:-30px;width:13px;height:13px;margin-left:-6.5px;box-sizing:border-box;border-radius:50%;background:var(--dmb-paper);border:1.5px solid var(--dmb-line);cursor:grab;z-index:2}
+.dmb-rot::after{content:'';position:absolute;left:50%;top:100%;width:0;height:17px;border-left:1.5px solid var(--dmb-line)}
 .dmb-ink{fill:none;stroke-width:3;stroke-linecap:round;stroke-linejoin:round}
-.dmb-link{fill:none;stroke:var(--dmb-link);stroke-width:2.5;stroke-dasharray:7 5;stroke-linecap:round}
-.dmb-head-fill{fill:var(--dmb-link)}
-.dmb-hit{fill:none;stroke:transparent;stroke-width:16;pointer-events:stroke;cursor:pointer}
-.dmb-sel-arrow .dmb-link{stroke:var(--dmb-danger);stroke-width:3.5}
-.dmb-marq{fill:color-mix(in srgb,var(--dmb-danger) 10%,transparent);stroke:var(--dmb-danger);stroke-width:1.5;stroke-dasharray:5 4}
-.dmb-bar,.dmb-tl,.dmb-zoom,.dmb-tools,.dmb-pop{position:absolute;display:flex;gap:4px;align-items:center;background:var(--dmb-chrome);border:1px solid color-mix(in srgb,var(--dmb-rim) 60%,transparent);border-radius:10px;padding:5px 7px;box-shadow:0 2px 10px rgba(0,0,0,.25)}
+.dmb-link{fill:none;stroke:var(--dmb-line);stroke-width:2;stroke-dasharray:7 5;stroke-linecap:round}
+.dmb-head-fill{fill:var(--dmb-line)}
+.dmb-halo{fill:none;stroke:var(--dmb-line);stroke-opacity:.22;stroke-width:12;stroke-linecap:round;stroke-linejoin:round}
+.dmb-hit{fill:none;stroke:transparent;stroke-width:16;stroke-linecap:round;stroke-linejoin:round;cursor:pointer}
+.dmb-marq{fill:color-mix(in srgb,var(--dmb-line) 8%,transparent);stroke:var(--dmb-line);stroke-width:1.2;stroke-dasharray:5 4}
+.dmb-bar,.dmb-tl,.dmb-zoom,.dmb-tools,.dmb-pop{position:absolute;display:flex;gap:2px;align-items:center;background:var(--dmb-chrome);border:1px solid color-mix(in srgb,var(--dmb-rim) 60%,transparent);border-radius:10px;padding:4px;box-shadow:0 2px 10px rgba(0,0,0,.25)}
 .dmb-bar{left:50%;bottom:14px;transform:translateX(-50%);max-width:calc(100% - 24px);overflow-x:auto}
 .dmb-tl{left:12px;top:12px}
-.dmb-tools{left:12px;top:84px;flex-direction:column;border-radius:34px;padding:8px 5px;max-height:calc(100% - 270px);overflow-y:auto}
-.dmb-pop{left:86px;top:84px;flex-direction:column;align-items:stretch;padding:10px;max-width:calc(100% - 100px);z-index:2}
-.dmb-pop-row{display:flex;flex-wrap:wrap;gap:4px}
+.dmb-tools{left:12px;top:64px;flex-direction:column;border-radius:20px;padding:5px 4px;max-height:calc(100% - 240px);overflow-y:auto}
+.dmb-pop{left:62px;top:64px;flex-direction:column;align-items:stretch;padding:8px;max-width:calc(100% - 80px);z-index:2}
+.dmb-pop-row{display:flex;flex-wrap:wrap;gap:2px}
 .dmb-pop-title{color:var(--dmb-chrome-text);opacity:.75;font:12px 'MedievalSharp',serif;text-transform:uppercase;letter-spacing:.08em}
-.dmb-zoom{left:12px;bottom:84px;color:var(--dmb-chrome-text);font:13px 'MedievalSharp',serif}
+.dmb-zoom{left:12px;bottom:70px;color:var(--dmb-chrome-text);font:13px 'MedievalSharp',serif}
 .dmb-zoom span{min-width:46px;text-align:center}
-.dmb-root button{display:flex;flex-direction:column;align-items:center;gap:2px;min-width:40px;background:none;border:1px solid transparent;border-radius:6px;color:var(--dmb-chrome-text);font:12px 'MedievalSharp',serif;padding:4px 6px;cursor:pointer}
+.dmb-root button{display:flex;align-items:center;justify-content:center;width:32px;height:32px;padding:0;background:none;border:1px solid transparent;border-radius:7px;color:var(--dmb-chrome-text);font:12px 'MedievalSharp',serif;cursor:pointer}
+.dmb-zoom button,.dmb-status button,.dmb-panel button{width:auto;min-width:28px;height:28px;padding:0 7px}
 .dmb-root button.on,.dmb-root button:hover:not(:disabled){background:var(--dmb-chrome-hi);border-color:var(--dmb-rim)}
 .dmb-root button:disabled{opacity:.35;cursor:default}
-.dmb-bar img,.dmb-tl img,.dmb-tools img,.dmb-pop img{width:22px;height:22px;filter:var(--dmb-icon-filter)}
-.dmb-head img{filter:var(--dmb-icon-filter);border:0!important;border-radius:0!important}
-.dmb-root .dmb-fs{position:absolute;right:12px;top:12px;flex-direction:row;background:var(--dmb-rim);color:#1d1208;border:2px solid var(--dmb-chrome);font-size:15px;padding:8px 14px;box-shadow:0 4px 14px rgba(0,0,0,.45)}
+.dmb-bar img,.dmb-tl img,.dmb-tools img,.dmb-pop img{width:20px;height:20px;filter:var(--dmb-icon-filter)}
+.dmb-top{position:absolute;right:12px;top:12px;display:flex;gap:8px;max-width:calc(100% - 100px)}
+.dmb-root .dmb-fs{width:auto;height:auto;padding:7px 12px;background:var(--dmb-rim);color:#1d1208;border:1px solid var(--dmb-chrome);font-size:14px;box-shadow:0 2px 10px rgba(0,0,0,.25);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
 .dmb-root .dmb-fs:hover{background:color-mix(in srgb,var(--dmb-rim) 82%,#fff);border-color:var(--dmb-chrome)}
-.dmb-sep{width:1px;align-self:stretch;background:var(--dmb-rim);opacity:.5;margin:0 4px}
-.dmb-status{position:absolute;top:76px;right:12px;max-width:min(360px,calc(100% - 24px));padding:7px 10px;border:1px solid var(--dmb-rim);border-radius:6px;background:var(--dmb-chrome);color:var(--dmb-chrome-text);font:14px 'IM Fell English',Georgia,serif}
+.dmb-sep{width:1px;align-self:stretch;background:var(--dmb-rim);opacity:.5;margin:0 3px}
+.dmb-status{position:absolute;top:56px;right:12px;max-width:min(360px,calc(100% - 24px));padding:6px 10px;border:1px solid var(--dmb-rim);border-radius:6px;background:var(--dmb-chrome);color:var(--dmb-chrome-text);font:14px 'IM Fell English',Georgia,serif}
 .dmb-status.error,.dmb-status.conflict,.dmb-status.load-error{border-color:var(--dmb-danger)}
 .dmb-status button{display:inline-flex;margin-left:8px;text-decoration:underline}
 .dmb-overlay{position:absolute;inset:0;display:grid;place-content:center;padding:24px;text-align:center;background:color-mix(in srgb,var(--dmb-chrome) 90%,transparent);color:var(--dmb-chrome-text);font:20px 'IM Fell English',Georgia,serif;z-index:3}
+.dmb-panel{position:absolute;top:0;right:0;bottom:0;width:min(290px,100%);z-index:6;display:flex;flex-direction:column;gap:8px;padding:12px;box-sizing:border-box;background:var(--dmb-chrome);color:var(--dmb-chrome-text);border-left:1px solid var(--dmb-rim);box-shadow:-6px 0 18px rgba(0,0,0,.25);font:14px 'IM Fell English',Georgia,serif;transform:translateX(105%);transition:transform .22s ease;visibility:hidden}
+.dmb-panel.open{transform:none;visibility:visible}
+.dmb-panel-head{display:flex;align-items:center;justify-content:space-between;font-family:'MedievalSharp',serif;font-size:16px}
+.dmb-panel-actions{display:flex;gap:6px}
+.dmb-panel-actions button{border-color:var(--dmb-rim)}
+.dmb-note{font-size:12px;line-height:1.4;opacity:.85}
+.dmb-note.err{color:var(--dmb-danger);opacity:1}
+.dmb-note a{color:inherit;text-decoration:underline}
+.dmb-panel-list{flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:3px;user-select:none}
+.dmb-row,.dmb-folder-head{display:flex;align-items:center;gap:2px;padding:2px 4px;border-radius:6px;border:1px solid transparent}
+.dmb-row.on{background:var(--dmb-chrome-hi);border-color:var(--dmb-rim)}
+.dmb-row-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer;padding:3px 2px}
+.dmb-folder{margin-top:6px}
+.dmb-folder-head{font-family:'MedievalSharp',serif;opacity:.9}
+.dmb-folder .dmb-row{margin-left:14px}
+.dmb-panel select{max-width:84px;background:transparent;color:inherit;border:1px solid color-mix(in srgb,var(--dmb-rim) 50%,transparent);border-radius:5px;font-size:11px;height:24px}
+.dmb-panel .dmb-rename{width:100%;box-sizing:border-box;background:transparent;color:inherit;border:1px solid var(--dmb-rim);border-radius:4px;padding:2px 4px;font:inherit;user-select:text;-webkit-user-select:text}
 `;

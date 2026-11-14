@@ -167,7 +167,7 @@ function DMBoardPage() {
   if (String(activeCampaign.owner) !== String(user.id || user._id)) {
     return <div className="page-content">Only the campaign's DM can open its board.</div>
   }
-  return <DMBoard key={activeCampaign._id} boardId={activeCampaign._id} />
+  return <DMBoard key={activeCampaign._id} campaignId={activeCampaign._id} />
 }
 
 function Guard() {

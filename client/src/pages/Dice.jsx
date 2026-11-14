@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useTheme } from '../context/ThemeContext'
 
 // ---- True 3D icosahedron (d20) built from 20 CSS-transformed triangles ----
-const DIE = 92 // edge length in px
+const DIE = 60 // edge length in px (the die is about 1.9x this across)
 const PHI = (1 + Math.sqrt(5)) / 2
 const VERTS = [[-1, PHI, 0], [1, PHI, 0], [-1, -PHI, 0], [1, -PHI, 0], [0, -1, PHI], [0, 1, PHI], [0, -1, -PHI], [0, 1, -PHI], [PHI, 0, -1], [PHI, 0, 1], [-PHI, 0, -1], [-PHI, 0, 1]]
 const TRIS = [[0, 11, 5], [0, 5, 1], [0, 1, 7], [0, 7, 10], [0, 10, 11], [1, 5, 9], [5, 11, 4], [11, 10, 2], [10, 7, 6], [7, 1, 8], [3, 9, 4], [3, 4, 2], [3, 2, 6], [3, 6, 8], [3, 8, 9], [4, 9, 5], [2, 4, 11], [6, 2, 10], [8, 6, 7], [9, 8, 1]]
@@ -47,8 +47,10 @@ const loadStreaks = () => {
 }
 
 export default function Dice() {
-  const { theme } = useTheme()
+  const { theme, lightMode } = useTheme()
   const isClassic = theme === 'light' || theme === 'classic'
+  // Same rule the shell uses: dark UI gets a light die, light UI gets a dark one, both tinted by the theme accent.
+  const darkUI = theme !== 'light' && (!lightMode || theme === 'dark')
   const boardRef = useRef(null)
   const [rolling, setRolling] = useState(false)
   const [result, setResult] = useState(null)
@@ -57,6 +59,7 @@ export default function Dice() {
   const [showRain, setShowRain] = useState(false)
   const [sink, setSink] = useState(false)
   const dieRef = useRef(null)
+  const d20Ref = useRef(null)
   const run = useRef({ value: null, count: 0 })
   const [best, setBest] = useState(loadStreaks)
   const [d20Transform, setD20Transform] = useState('translate(0px, -400px) rotate(0deg)')
@@ -85,7 +88,7 @@ export default function Dice() {
     // real pixel dimensions — using % transforms was relative to the die's
     // own tiny size (58px), which is why it barely moved before.
     const rect = boardRef.current?.getBoundingClientRect()
-    const dieSize = DIE
+    const dieSize = DIE * 1.9
     const maxX = rect ? (rect.width - dieSize) / 2 - 6 : 300
     const maxY = rect ? (rect.height - dieSize) / 2 - 6 : 200
 
@@ -95,15 +98,11 @@ export default function Dice() {
     const die = dieRef.current
     const restNow = die.style.transform || 'none'
     const restNext = restTransform(finalValue)
-    // reset d20 position to outside tray (top center)
-    setD20Transition('transform 0ms')
-    setD20Transform(`translate(0px, ${-(maxY + 220)}px) rotate(0deg)`)
 
     // Pick a random direction and slam all the way to a wall/corner every time.
     const angle = Math.random() * Math.PI * 2
     const tx = Math.round(Math.cos(angle) * maxX)
     const ty = Math.round(Math.sin(angle) * maxY)
-    const rot = 0
     const duration = Math.floor(Math.random() * 500) + 550 // fast, forceful throw
 
     die.animate(
@@ -112,11 +111,19 @@ export default function Dice() {
     )
     die.style.transform = restNext
 
-    // animate from outside straight into the wall with a forceful throw
-    setTimeout(() => {
-      setD20Transition(`transform ${duration}ms cubic-bezier(.35,.8,.2,1)`)
-      setD20Transform(`translate(${tx}px, ${ty}px) rotate(${rot}deg)`)
-    }, 50)
+    // The die drops in from above the tray, hits the wall, then rebounds and settles with two small hops.
+    const bx = -Math.sign(tx || 1) * Math.min(46, Math.abs(tx)), by = -Math.sign(ty || 1) * Math.min(34, Math.abs(ty))
+    const at = (k, hop = 0) => `translate(${tx + bx * k}px, ${ty + by * k - hop}px)`
+    setD20Transition('transform 0ms')
+    setD20Transform(at(1.2))
+    d20Ref.current.animate([
+      { transform: `translate(0px, ${-(maxY + 220)}px)`, offset: 0, easing: 'cubic-bezier(.4,0,.9,.6)' },
+      { transform: at(0), offset: 0.5, easing: 'cubic-bezier(.2,.6,.4,1)' },
+      { transform: at(0.6, 46), offset: 0.68, easing: 'ease-in' },
+      { transform: at(1), offset: 0.8, easing: 'cubic-bezier(.2,.6,.4,1)' },
+      { transform: at(1.12, 16), offset: 0.9, easing: 'ease-in' },
+      { transform: at(1.2), offset: 1 },
+    ], { duration: duration + 150 })
 
     // flicker display while throwing
     let count = 0
@@ -154,7 +161,7 @@ export default function Dice() {
           .d20-spot { position: absolute; inset: 0; display:flex; align-items:center; justify-content:center; pointer-events:none; }
           .d20 { display:flex; align-items:center; justify-content:center; width:${DIE}px; height:${DIE}px; perspective:700px; }
           .die3d { position:relative; width:100%; height:100%; transform-style:preserve-3d; filter: drop-shadow(0 14px 10px rgba(0,0,0,0.35)); }
-          .die-face { position:absolute; left:0; top:0; width:100%; height:100%; clip-path:${FACE_CLIP}; backface-visibility:hidden; display:flex; align-items:center; justify-content:center; font-family: Cinzel, serif; font-weight:700; font-size:${Math.round(DIE * 0.3)}px; padding-top:${Math.round(DIE * 0.1)}px; box-sizing:border-box; }
+          .die-face { position:absolute; left:0; top:0; width:100%; height:100%; clip-path:${FACE_CLIP}; backface-visibility:hidden; display:flex; align-items:center; justify-content:center; font-family: Cinzel, serif; font-weight:700; font-size:${Math.round(DIE * 0.34)}px; padding-top:${Math.round(DIE * 0.1)}px; box-sizing:border-box; }
           .streaks { position:absolute; top:12px; right:16px; z-index:2; max-width:55%; text-align:right; font-size:11px; letter-spacing:.04em; color:var(--text-3); opacity:.8; pointer-events:auto; cursor:default; }
           .streaks b { color:var(--text-2); font-weight:600; }
           .dice-controls { display:flex; justify-content:stretch; align-items:stretch; gap:20px; width:100%; max-width:1280px; margin:0 auto; }
@@ -193,7 +200,7 @@ export default function Dice() {
             })()}
           </div>
           <div className="d20-spot">
-            <div className="d20" style={{ transform: d20Transform, transition: d20Transition }}>
+            <div className="d20" ref={d20Ref} style={{ transform: d20Transform, transition: d20Transition }}>
               <div className="die3d" ref={dieRef} style={{ transform: restTransform(20) }}>
                 {FACES.map((f, i) => (
                   <div
@@ -201,10 +208,11 @@ export default function Dice() {
                     className="die-face"
                     style={{
                       transform: `${faceMatrix(f)} scale(1.012)`,
-                      background: isClassic ? `hsl(0 0% ${9 + ((i * 7) % 5) * 4}%)` : 'var(--gold)',
-                      color: isClassic ? '#ffffff' : '#2a1a00',
-                      filter: `brightness(${(0.82 + 0.18 * ((i * 7) % 5) / 4).toFixed(3)})`,
-                      textDecoration: f.num === 6 || f.num === 9 ? 'underline' : 'none',
+                      background: darkUI
+                        ? `color-mix(in srgb, var(--gold) ${16 + ((i * 7) % 5) * 5}%, #f4f1e8)`
+                        : `color-mix(in srgb, var(--gold) ${34 + ((i * 7) % 5) * 7}%, #14110c)`,
+                      color: darkUI ? 'color-mix(in srgb, var(--gold) 35%, #120f08)' : 'color-mix(in srgb, var(--gold) 20%, #f8f3e6)',
+                                            textDecoration: f.num === 6 || f.num === 9 ? 'underline' : 'none',
                     }}
                   >{f.num}</div>
                 ))}

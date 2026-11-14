@@ -1,6 +1,8 @@
+import { useDebouncedSave } from '../hooks/useDebouncedSave'
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { Navigate } from 'react-router-dom'
 import UpgradeModal from '../components/UpgradeModal'
+import WorldAssistant from '../components/WorldAssistant'
 import { api, useAuth } from '../context/AuthContext'
 import { useCampaign } from '../context/CampaignContext'
 import { useToast } from '../hooks/useToast'
@@ -30,7 +32,15 @@ export default function SessionPlanner() {
   const [renamingId, setRenamingId] = useState(null)
   const [titleDraft, setTitleDraft] = useState('')
   const renameCancelled = useRef(false)
-  const saveTimer = useRef(null)
+  const { schedule: scheduleSave, flush: flushSave } = useDebouncedSave(800)
+  const [assistantOpen, setAssistantOpen] = useState(() => localStorage.getItem('worldbuildOpen') === '1')
+  const [isNarrow, setIsNarrow] = useState(() => window.innerWidth <= 768)
+  useEffect(() => { localStorage.setItem('worldbuildOpen', assistantOpen ? '1' : '0') }, [assistantOpen])
+  useEffect(() => {
+    const f = () => setIsNarrow(window.innerWidth <= 768)
+    window.addEventListener('resize', f)
+    return () => window.removeEventListener('resize', f)
+  }, [])
 
   const active = entries.find(e => e._id === activeId)
   const entryNum = e => e.session ?? '?'
@@ -68,11 +78,11 @@ export default function SessionPlanner() {
       .finally(() => {
         if (!cancelled) setEntriesLoading(false)
       })
-    return () => { cancelled = true }
-  }, [activeCampaign, entriesReload])
+    return () => { cancelled = true; flushSave() }
+  }, [activeCampaign, entriesReload, flushSave])
 
   const selectEntry = (e) => {
-    if (saveTimer.current) { clearTimeout(saveTimer.current); saveTimer.current = null }
+    flushSave()
     setActiveId(e._id)
     setContent(e.content)
   }
@@ -91,16 +101,9 @@ export default function SessionPlanner() {
   const handleContentChange = (e) => {
     const text = e.target.value
     setContent(text)
-    if (saveTimer.current) clearTimeout(saveTimer.current)
-    saveTimer.current = setTimeout(() => autosave(activeId, text), 800)
+    const id = activeId
+    scheduleSave(() => autosave(id, text))
   }
-
-  // Flush on unmount / tab close so nothing typed just before navigating away is lost.
-  useEffect(() => {
-    const flush = () => { if (saveTimer.current) { clearTimeout(saveTimer.current) } }
-    window.addEventListener('beforeunload', flush)
-    return () => { flush(); window.removeEventListener('beforeunload', flush) }
-  }, [])
 
   const startRename = (e, entry) => {
     e.stopPropagation()
@@ -162,7 +165,7 @@ export default function SessionPlanner() {
   const sorted = [...entries].sort((a, b) => (b.session ?? 0) - (a.session ?? 0))
 
   return (
-    <div className="journal-layout" style={{ display: 'flex', height: '100%', overflow: 'hidden' }}>
+    <div className="journal-layout" style={{ display: 'flex', height: '100%', overflow: 'hidden', position: 'relative' }}>
       {/* Sidebar list */}
       <div className="journal-day-list" style={{ width: 180, flexShrink: 0, borderRight: '1px solid var(--border)', overflowY: 'auto', background: 'var(--surface)' }}>
         <div style={{ padding: '14px 14px 8px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -293,6 +296,29 @@ export default function SessionPlanner() {
           )}
         </div>
       </div>
+
+      {/* Right-hand world-building coach (slides in/out) */}
+      <button
+        onClick={() => setAssistantOpen(o => !o)} aria-expanded={assistantOpen} title={assistantOpen ? 'Hide the world-building coach' : 'Open the world-building coach'}
+        style={{
+          position: 'absolute', top: 70, right: assistantOpen ? 'min(340px, 100%)' : 0, zIndex: 5,
+          transition: 'right .3s cubic-bezier(.4,0,.2,1)', display: 'flex', alignItems: 'center', gap: 6,
+          padding: '7px 10px', border: '1px solid var(--gold-border)', borderRight: assistantOpen ? '1px solid var(--gold-border)' : 'none',
+          borderRadius: '10px 0 0 10px', background: 'var(--gold-bg)', color: 'var(--gold)', cursor: 'pointer', fontSize: 12, fontWeight: 600,
+        }}
+      >✦ {assistantOpen ? 'Hide' : 'Coach'}</button>
+      <aside
+        aria-hidden={!assistantOpen}
+        style={{
+          width: 'min(340px, 100%)', flexShrink: 0, background: 'var(--surface)', borderLeft: '1px solid var(--border)',
+          ...(isNarrow
+            ? { position: 'absolute', top: 0, right: 0, bottom: 0, zIndex: 4, transform: assistantOpen ? 'none' : 'translateX(100%)', transition: 'transform .3s cubic-bezier(.4,0,.2,1)', boxShadow: assistantOpen ? '-8px 0 24px rgba(0,0,0,.25)' : 'none' }
+            : { marginRight: assistantOpen ? 0 : 'calc(-1 * min(340px, 100%))', transition: 'margin-right .3s cubic-bezier(.4,0,.2,1)' }),
+          visibility: assistantOpen ? 'visible' : 'hidden', transitionProperty: isNarrow ? 'transform, visibility' : 'margin-right, visibility',
+        }}
+      >
+        {activeCampaign && !activeCampaign.isPersonal && <WorldAssistant campaignId={activeCampaign._id} />}
+      </aside>
 
       <ToastContainer />
       {showUpgrade && <UpgradeModal onClose={() => setShowUpgrade(false)} />}

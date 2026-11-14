@@ -1,6 +1,7 @@
+import { useDebouncedSave } from '../hooks/useDebouncedSave'
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { createPortal } from 'react-dom'
-import { api } from '../context/AuthContext'
+import { api, useAuth } from '../context/AuthContext'
 import { useCampaign } from '../context/CampaignContext'
 import { useToast } from '../hooks/useToast'
 import { uploadToCloudinary } from '../utils/uploadToCloudinary'
@@ -149,6 +150,9 @@ export default function Storyboard() {
   const { activeCampaign } = useCampaign()
   const { toast, ToastContainer } = useToast()
   const [cards, setCards] = useState([])
+  const { user } = useAuth()
+  const isDM = user?.role === 'dm'
+  const [generating, setGenerating] = useState(false)
   const toastRef = useRef(toast)
   toastRef.current = toast
   const [currentPage, setCurrentPage] = useState(-1)
@@ -170,6 +174,22 @@ export default function Storyboard() {
   const [newImage, setNewImage] = useState(null)
   const [saving, setSaving] = useState(false)
   const [editCard, setEditCard] = useState(null)
+  const { schedule: scheduleEditSave, flush: flushEditSave } = useDebouncedSave(1000)
+  const editUserChange = useRef(false)
+  const editField = (fn) => { editUserChange.current = true; setEditCard(fn) }
+  // Autosave an existing scene 1s after typing stops.
+  useEffect(() => {
+    if (!editUserChange.current) return
+    editUserChange.current = false
+    if (!editCard || !editCard.title.trim()) return
+    const card = editCard
+    scheduleEditSave(async () => {
+      try {
+        const updated = await api(`/storyboard/${card._id}`, { method: 'PUT', body: { title: card.title, description: card.description, imageUrl: card.imageUrl } })
+        setCards(p => p.map(c => c._id === updated._id ? updated : c))
+      } catch (err) { toast(err.message || 'Could not autosave') }
+    })
+  }, [editCard]) // eslint-disable-line react-hooks/exhaustive-deps
   const [editSaving, setEditSaving] = useState(false)
 
   const load = useCallback(async () => {
@@ -246,11 +266,24 @@ export default function Storyboard() {
     setImageUploading(false)
   }
 
+  // DM only: paints the scene with Gemini, using every campaign character's avatar as a reference.
+  const generateImage = async (title, description, onUrl) => {
+    if (isPublicDemoPath()) { toast('Image generation is available after signing in.'); return }
+    setGenerating(true)
+    try {
+      const { image, usedAvatars } = await api('/ai/storyboard-image', { method: 'POST', body: { campaignId: activeCampaign._id, prompt: `${title || ''}. ${description || ''}`.trim() } })
+      const blob = await (await fetch(image)).blob()
+      onUrl(await uploadToCloudinary(new File([blob], 'scene.png', { type: blob.type }), 'lore-ledger/storyboard'))
+      toast(usedAvatars ? `Image generated from ${usedAvatars} character avatar${usedAvatars > 1 ? 's' : ''}` : 'Image generated (no character avatars to use yet)')
+    } catch (err) { toast(err.message || 'Could not generate an image') }
+    setGenerating(false)
+  }
+
   const handleEditImagePick = async (e) => {
     const file = e.target.files[0]; if (!file) return
     if (isPublicDemoPath()) { toast('Image uploads are available after signing in.'); e.target.value = ''; return }
     setEditImgUploading(true)
-    try { const url = await uploadToCloudinary(file, 'lore-ledger/storyboard'); setEditCard(p => ({ ...p, imageUrl: url })) }
+    try { const url = await uploadToCloudinary(file, 'lore-ledger/storyboard'); editField(p => ({ ...p, imageUrl: url })) }
     catch (err) { toast(err.message || 'Upload failed') }
     setEditImgUploading(false)
   }
@@ -270,6 +303,7 @@ export default function Storyboard() {
 
   const saveEdit = async () => {
     if (!editCard) return
+    flushEditSave()
     setEditSaving(true)
     try {
       const updated = await api(`/storyboard/${editCard._id}`, { method: 'PUT', body: { title: editCard.title, description: editCard.description, imageUrl: editCard.imageUrl } })
@@ -320,6 +354,7 @@ export default function Storyboard() {
                 {imageUploading ? 'Uploading…' : newImage ? 'Image selected ✓' : 'Upload image'}
                 {!imageUploading && <input type="file" accept="image/*" style={{ display: 'none' }} onChange={handleImagePick} />}
               </label>
+              {isDM && <button type="button" disabled={generating || (!newTitle.trim() && !(newDesc || '').trim())} onClick={() => generateImage(newTitle, newDesc, setNewImage)} title="Paint this scene with AI, using your campaign characters' avatars" style={{ background: 'var(--surface)', border: '1px solid var(--gold-border)', borderRadius: 6, padding: '5px 10px', fontSize: 12, color: 'var(--gold)', cursor: generating ? 'wait' : 'pointer' }}>{generating ? 'Generating…' : '✦ Generate'}</button>}
               {newImage && <button onClick={() => setNewImage(null)} style={{ background: 'none', border: 'none', color: 'var(--text-3)', cursor: 'pointer', fontSize: 12 }}>✕ Remove</button>}
             </div>
           </div>
@@ -420,13 +455,14 @@ export default function Storyboard() {
             <div style={{ fontFamily: 'Cinzel, serif', fontSize: 16, fontWeight: 600, color: 'var(--gold)', marginBottom: 16 }}>Edit Scene</div>
             
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              <input className="input" placeholder="Title" value={editCard.title} onChange={e => setEditCard(p => ({ ...p, title: e.target.value }))} />
-              <textarea className="input" rows={4} placeholder="Description" value={editCard.description || ''} onChange={e => setEditCard(p => ({ ...p, description: e.target.value }))} style={{ resize: 'vertical' }} />
+              <input className="input" placeholder="Title" value={editCard.title} onChange={e => editField(p => ({ ...p, title: e.target.value }))} />
+              <textarea className="input" rows={4} placeholder="Description" value={editCard.description || ''} onChange={e => editField(p => ({ ...p, description: e.target.value }))} style={{ resize: 'vertical' }} />
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <label style={{ cursor: editImgUploading ? 'wait' : 'pointer', background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 6, padding: '5px 10px', fontSize: 12, color: 'var(--text-2)', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
                   {editImgUploading ? 'Uploading…' : 'Replace image'}
                   {!editImgUploading && <input type="file" accept="image/*" style={{ display: 'none' }} onChange={handleEditImagePick} />}
                 </label>
+                {isDM && <button type="button" disabled={generating || (!editCard.title.trim() && !(editCard.description || '').trim())} onClick={() => generateImage(editCard.title, editCard.description, (url) => editField(p => ({ ...p, imageUrl: url })))} title="Paint this scene with AI, using your campaign characters' avatars" style={{ background: 'var(--surface)', border: '1px solid var(--gold-border)', borderRadius: 6, padding: '5px 10px', fontSize: 12, color: 'var(--gold)', cursor: generating ? 'wait' : 'pointer' }}>{generating ? 'Generating…' : '✦ Generate'}</button>}
                 {editCard.imageUrl && <span style={{ fontSize: 11, color: 'var(--green)' }}>Image set ✓</span>}
               </div>
             </div>
@@ -448,7 +484,7 @@ export default function Storyboard() {
               
               <div style={{ flex: 1 }} />
               
-              <button className="btn btn-ghost" onClick={() => setEditCard(null)}>Cancel</button>
+              <button className="btn btn-ghost" onClick={() => { flushEditSave(); setEditCard(null) }}>Cancel</button>
               <button className="btn btn-primary" onClick={saveEdit} disabled={editSaving}>{editSaving ? 'Saving...' : 'Save'}</button>
             </div>
           </div>

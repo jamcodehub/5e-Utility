@@ -1,3 +1,5 @@
+import RuleTip from './RuleTip'
+import { skillTip } from '../utils/ruleTips'
 import { useMemo, useState } from 'react'
 import { ABILITIES, ABILITY_NAMES, abilityMod, fmtMod, featuresThrough, proficiencyBonus } from '../utils/rules5e'
 import { findAllDice, parseDice, signed } from '../utils/dice'
@@ -220,7 +222,7 @@ export default function CharacterActions({ char, srd, roller, onPatch }) {
         <div style={grid}>
           {[...srd.core.skills].sort((a, b) => a.name.localeCompare(b.name)).map(s => (
             <RollButton key={s.id} prof={skillProf(s)} title={`${ABILITY_NAMES[s.ability]}${expertise(s) ? ' · expertise' : skillProf(s) ? ' · proficient' : ''}`} onClick={() => roller.rollCheck(`${s.name} check`, skillMod(s))}>
-              <span>{expertise(s) ? '◆ ' : skillProf(s) ? '● ' : ''}{s.name} <span style={{ color: 'var(--text-3)', fontSize: 10 }}>{s.ability.toUpperCase()}</span></span>
+              <RuleTip tip={skillTip(srd.core, s)} style={{ cursor: 'pointer' }}>{expertise(s) ? '◆ ' : skillProf(s) ? '● ' : ''}{s.name} <span style={{ color: 'var(--text-3)', fontSize: 10 }}>{s.ability.toUpperCase()}</span></RuleTip>
               <strong style={{ color: 'var(--gold)' }}>{fmtMod(skillMod(s))}</strong>
             </RollButton>
           ))}

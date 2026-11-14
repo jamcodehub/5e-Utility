@@ -1,3 +1,4 @@
+import { useDebouncedSave } from '../hooks/useDebouncedSave'
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { Link, Navigate } from 'react-router-dom'
 import UpgradeModal from '../components/UpgradeModal'
@@ -32,7 +33,7 @@ export default function Journal() {
   const [renamingId, setRenamingId] = useState(null)
   const [titleDraft, setTitleDraft] = useState('')
   const renameCancelled = useRef(false)
-  const saveTimer = useRef(null)
+  const { schedule: scheduleSave, flush: flushSave } = useDebouncedSave(800)
 
   const active = entries.find(e => e._id === activeId)
   const entryNum = e => e.day ?? '?'
@@ -72,15 +73,12 @@ export default function Journal() {
       .finally(() => {
         if (!cancelled) setEntriesLoading(false)
       })
-    return () => { cancelled = true }
-  }, [activeCampaign, entriesReload])
+    return () => { cancelled = true; flushSave() }
+  }, [activeCampaign, entriesReload, flushSave])
 
   const selectEntry = (e) => {
     // Flush any pending save for the current entry before switching
-    if (saveTimer.current) {
-      clearTimeout(saveTimer.current)
-      saveTimer.current = null
-    }
+    flushSave()
     setActiveId(e._id)
     setContent(e.content)
     setHasEditedContent(false)
@@ -106,16 +104,9 @@ export default function Journal() {
     const text = e.target.value
     setContent(text)
     setHasEditedContent(true)
-    if (saveTimer.current) clearTimeout(saveTimer.current)
-    saveTimer.current = setTimeout(() => autosave(activeId, text), 800)
+    const id = activeId
+    scheduleSave(() => autosave(id, text))
   }
-
-  // Flush on unmount / tab close so nothing typed just before navigating away is lost.
-  useEffect(() => {
-    const flush = () => { if (saveTimer.current) clearTimeout(saveTimer.current) }
-    window.addEventListener('beforeunload', flush)
-    return () => { flush(); window.removeEventListener('beforeunload', flush) }
-  }, [])
 
   const startRename = (e, entry) => {
     e.stopPropagation()

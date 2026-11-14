@@ -42,10 +42,15 @@ export function CampaignProvider({ children }) {
   const [loadedRole, setLoadedRole] = useState(null)
   const loadSeq = useRef(0)
 
+  // The last campaign is remembered separately for each mode, so switching between
+  // player and DM returns to the campaign you were last using in that mode.
+  const roleKey = (role) => `activeCampaignId:${role || 'player'}`
+
   const setActive = (c) => {
     setActiveRaw(c)
-    if (c?._id) localStorage.setItem('activeCampaignId', c._id)
-    else localStorage.removeItem('activeCampaignId')
+    const key = roleKey(user?.role)
+    if (c?._id) localStorage.setItem(key, c._id)
+    else localStorage.removeItem(key)
   }
 
   const load = async () => {
@@ -69,11 +74,11 @@ export function CampaignProvider({ children }) {
       // stranded after the active campaign is deleted or left).
       setActiveRaw(prev => {
         if (prev && data.some(c => c._id === prev._id)) return prev
-        const lastId = localStorage.getItem('activeCampaignId')
+        const lastId = localStorage.getItem(roleKey(role))
         const restored = lastId && data.find(c => c._id === lastId)
         const next = restored || data[0] || null
-        if (next?._id) localStorage.setItem('activeCampaignId', next._id)
-        else localStorage.removeItem('activeCampaignId')
+        if (next?._id) localStorage.setItem(roleKey(role), next._id)
+        else localStorage.removeItem(roleKey(role))
         return next
       })
       setLoadedRole(role)

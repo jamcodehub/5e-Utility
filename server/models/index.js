@@ -82,9 +82,16 @@ const StoryCardSchema = new Schema({
 }, { timestamps: true })
 
 const DMBoardSchema = new Schema({
-  campaign: { type: Schema.Types.ObjectId, ref: 'Campaign', required: true, unique: true },
+  campaign: { type: Schema.Types.ObjectId, ref: 'Campaign', required: true, index: true },
+  name: { type: String, default: 'Main board', trim: true, maxlength: 80 },
+  folder: { type: Schema.Types.ObjectId, ref: 'DMBoardFolder', default: null },
   board: { type: Schema.Types.Mixed, required: true },
   version: { type: Number, required: true },
+}, { timestamps: true })
+
+const DMBoardFolderSchema = new Schema({
+  campaign: { type: Schema.Types.ObjectId, ref: 'Campaign', required: true, index: true },
+  name: { type: String, required: true, trim: true, maxlength: 80 },
 }, { timestamps: true })
 
 const CharacterSchema = new Schema({
@@ -239,6 +246,7 @@ export const Journal       = model('Journal', JournalSchema)
 export const Lore          = model('Lore', LoreSchema)
 export const StoryCard     = model('StoryCard', StoryCardSchema)
 export const DMBoard       = model('DMBoard', DMBoardSchema)
+export const DMBoardFolder = model('DMBoardFolder', DMBoardFolderSchema)
 export const Character     = model('Character', CharacterSchema)
 export const LevelPlan     = model('LevelPlan', LevelPlanSchema)
 export const Inventory     = model('Inventory', InventorySchema)

@@ -1,3 +1,4 @@
+import { useDebouncedSave } from '../hooks/useDebouncedSave'
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { api, useAuth } from '../context/AuthContext'
 import { useCampaign } from '../context/CampaignContext'
@@ -7,6 +8,43 @@ import { SkeletonCampaignGuideContent } from '../components/Skeleton'
 const nanoid = () => Math.random().toString(36).slice(2, 9)
 const emptyGuide = () => ({ story: '', currentArc: '', lastSession: '', worldNotes: '', npcs: [], quests: [] })
 
+// Maps a screen point to a character index inside a textarea. Browsers don't expose this
+// for textareas, so a hidden copy with identical text layout is measured instead.
+function indexAtPoint(ta, x, y) {
+  const cs = getComputedStyle(ta), box = ta.getBoundingClientRect()
+  const mirror = document.createElement('div')
+  ;['fontFamily', 'fontSize', 'fontWeight', 'fontStyle', 'letterSpacing', 'lineHeight', 'textTransform', 'wordSpacing', 'textIndent', 'tabSize',
+    'paddingTop', 'paddingRight', 'paddingBottom', 'paddingLeft', 'borderTopWidth', 'borderRightWidth', 'borderBottomWidth', 'borderLeftWidth', 'boxSizing',
+  ].forEach(k => { mirror.style[k] = cs[k] })
+  Object.assign(mirror.style, {
+    position: 'fixed', left: `${box.left}px`, top: `${box.top}px`, width: `${box.width}px`, height: `${box.height}px`,
+    overflow: 'hidden', visibility: 'hidden', pointerEvents: 'none', whiteSpace: 'pre-wrap', overflowWrap: 'break-word', wordBreak: 'normal',
+  })
+  const text = ta.value
+  mirror.textContent = text
+  document.body.appendChild(mirror)
+  mirror.scrollTop = ta.scrollTop
+  try {
+    const node = mirror.firstChild
+    if (!node) return 0
+    const range = document.createRange()
+    let best = text.length, bestDist = Infinity, lineHit = false
+    for (let i = 0; i < text.length; i++) {
+      range.setStart(node, i); range.setEnd(node, i + 1)
+      const r = range.getClientRects()[0]
+      if (!r) continue
+      if (y < r.top || y > r.bottom) { if (lineHit && y < r.top) break; continue }
+      lineHit = true
+      // Nearest character edge on the line under the pointer.
+      const before = Math.abs(x - r.left), after = Math.abs(x - r.right)
+      if (before < bestDist) { bestDist = before; best = i }
+      if (after < bestDist && text[i] !== '\n') { bestDist = after; best = i + 1 }
+    }
+    if (!lineHit) best = y < box.top + parseFloat(cs.paddingTop) ? 0 : text.length
+    return best
+  } finally { mirror.remove() }
+}
+
 // ─── DropTextarea ─────────────────────────────────────────────────────────────
 // Desktop: drag a player avatar onto this → inserts their name at drop position.
 // Mobile:  tap an avatar to select it, then tap this field → inserts name at cursor.
@@ -14,13 +52,14 @@ function DropTextarea({ value, onChange, activePlayer, onInserted, style = {}, r
   const [over, setOver] = useState(false)
   const ref = useRef(null)
 
-  const insert = (name, el) => {
+  const insert = (name, el, at) => {
     const ta = el || ref.current
     if (!ta) return
-    const pos = ta.selectionStart ?? value.length
-    const before = value.slice(0, pos)
+    const pos = at ?? ta.selectionStart ?? value.length
+    const before = value.slice(0, pos), after = value.slice(pos)
     const sep = before && !/\s$/.test(before) ? ' ' : ''
-    const next = before + sep + name + value.slice(pos)
+    const tail = after && !/^[\s.,;:!?)]/.test(after) ? ' ' : ''
+    const next = before + sep + name + tail + after
     onChange({ target: { value: next } })
     requestAnimationFrame(() => {
       ta.focus()
@@ -41,7 +80,7 @@ function DropTextarea({ value, onChange, activePlayer, onInserted, style = {}, r
         placeholder={activePlayer ? `Tap to insert "${activePlayer.name}", or type…` : placeholder}
         onDragOver={e => { e.preventDefault(); setOver(true) }}
         onDragLeave={() => setOver(false)}
-        onDrop={e => { e.preventDefault(); setOver(false); const n = e.dataTransfer.getData('text/plain'); if (n) insert(n, e.target) }}
+        onDrop={e => { e.preventDefault(); setOver(false); const n = e.dataTransfer.getData('text/plain'); if (n) insert(n, e.target, indexAtPoint(e.target, e.clientX, e.clientY)) }}
         onClick={e => { if (activePlayer) insert(activePlayer.name, e.target) }}
         style={{
           width: '100%', resize: 'none', fontSize: 12, lineHeight: 1.55, boxSizing: 'border-box',
@@ -205,6 +244,11 @@ export default function CampaignGuide() {
   const [mobileTab, setMobileTab] = useState('story')
   const [isMobile, setIsMobile]   = useState(window.innerWidth <= 768)
   const didDrag = useRef(false)
+  const loadedFor = useRef(null)   // campaign id the guide in state belongs to
+  const guideRef = useRef(guide)
+  guideRef.current = guide
+  const loadSeq = useRef(0)
+  const { schedule: scheduleSave, flush: flushSave } = useDebouncedSave(1500)
 
   useEffect(() => {
     const fn = () => setIsMobile(window.innerWidth <= 768)
@@ -217,21 +261,42 @@ export default function CampaignGuide() {
       setGuideLoading(false)
       return
     }
+    const seq = ++loadSeq.current
+    const campaignId = activeCampaign._id
+    loadedFor.current = null   // nothing may be saved until this campaign's guide is loaded
     setGuideLoading(true)
     try {
       const [guideData, memberData] = await Promise.all([
         api(`/campaigns/${activeCampaign._id}/guide`).catch(() => ({})),
         api(`/campaigns/${activeCampaign._id}/members/characters`).catch(() => []),
       ])
+      if (seq !== loadSeq.current) return
       setGuide({ ...emptyGuide(), ...guideData })
       setMembers(memberData || [])
       setDirty(false)
+      loadedFor.current = campaignId
     } finally {
-      setGuideLoading(false)
+      if (seq === loadSeq.current) setGuideLoading(false)
     }
   }, [activeCampaign?._id, isDM])
 
+  // Save anything pending for the campaign being left before loading the next one.
+  useEffect(() => flushSave, [activeCampaign?._id, flushSave])
   useEffect(() => { load() }, [load])
+
+  // Autosave 1.5s after typing stops, always to the campaign the edit was made in.
+  useEffect(() => {
+    if (!dirty || !activeCampaign || loadedFor.current !== activeCampaign._id) return
+    const campaignId = activeCampaign._id, snapshot = guide
+    scheduleSave(async () => {
+      setSaving(true)
+      try {
+        await api(`/campaigns/${campaignId}/guide`, { method: 'PUT', body: snapshot })
+        if (guideRef.current === snapshot) setDirty(false)
+      } catch (_e) { toast('Could not autosave the guide — check your connection') }
+      setSaving(false)
+    })
+  }, [guide, dirty]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const upd = f => e => { setGuide(g => ({ ...g, [f]: e.target.value })); setDirty(true) }
   const clearPlayer = () => setActive(null)
@@ -244,6 +309,8 @@ export default function CampaignGuide() {
   const rmQuest  = id      => { setGuide(g => ({ ...g, quests: g.quests.filter(q => q.id !== id) })); setDirty(true) }
 
   const save = async () => {
+    if (loadedFor.current !== activeCampaign._id) return
+    flushSave()
     setSaving(true)
     try {
       await api(`/campaigns/${activeCampaign._id}/guide`, { method: 'PUT', body: guide })
