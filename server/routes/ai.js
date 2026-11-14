@@ -16,12 +16,14 @@ const callGemini = async (models, body) => {
   const key = (process.env.GEMINI_API_KEY || '').trim()
   if (!key) throw Object.assign(new Error('The AI features are not configured on this server (GEMINI_API_KEY is missing).'), { status: 503 })
   let last
+  const deadline = Date.now() + 55000
   for (const model of [...new Set(models)]) {
+    if (Date.now() > deadline) break
     const res = await fetch(`${GEMINI}/${model}:generateContent`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key },
       body: JSON.stringify(typeof body === 'function' ? body(model) : body),
-      signal: AbortSignal.timeout(60000),
+      signal: AbortSignal.timeout(25000),
     }).catch(e => ({ ok: false, status: 504, json: async () => ({ error: { message: e.message } }) }))
     const data = await res.json().catch(() => ({}))
     if (res.ok) return data
@@ -30,7 +32,7 @@ const callGemini = async (models, body) => {
     last = Object.assign(new Error(
       res.status === 429 ? `Google's free AI quota for ${model} is used up or not available on this key. ${detail}`
         : `The AI service said: ${detail}`), { status: res.status === 429 ? 429 : 502 })
-    if (res.status !== 404) break // only an unknown model is worth retrying with the next name
+    if (![404, 500, 503, 504].includes(res.status)) break // unknown model, overload or timeout: try the next model name
   }
   throw last
 }
@@ -97,7 +99,7 @@ router.post('/worldbuild', auth, limiter(60, 'You have reached the hourly limit 
       systemInstruction: { parts: [{ text: `${COACH_PROMPT}\n\nCampaign "${req.campaign.name}"${notes ? `, notes the DM has written:\n${notes}` : ' (no notes written yet)'}` }] },
       contents: messages.map(m => ({ role: m.role, parts: [{ text: m.text }] })),
       // 2.5 models "think" before answering; spending the budget on that would leave no reply.
-      generationConfig: { temperature: 0.8, maxOutputTokens: 2048, ...(/2\.5/.test(model) ? { thinkingConfig: { thinkingBudget: 0 } } : {}) },
+      generationConfig: { temperature: 0.8, maxOutputTokens: 400, ...(/2\.5/.test(model) ? { thinkingConfig: { thinkingBudget: 0 } } : {}) },
     }))
     const reply = clip((data.candidates?.[0]?.content?.parts || []).map(p => p.text || '').join(''), 900)
     if (!reply) {
@@ -136,7 +138,7 @@ const pollinationsImage = async (prompt) => {
   return `data:${type.split(';')[0]};base64,${buf.toString('base64')}`
 }
 
-router.post('/storyboard-image', auth, limiter(12, 'You have reached the hourly image limit. Please try again later.'), requireDM, async (req, res) => {
+router.post('/storyboard-image', auth, limiter(20, 'You have reached the hourly image limit. Please try again later.'), requireDM, async (req, res) => {
   try {
     const prompt = clip(req.body.prompt, 800)
     if (!prompt) return res.status(400).json({ error: 'Describe the scene first (add a title or description).' })
@@ -147,7 +149,7 @@ router.post('/storyboard-image', auth, limiter(12, 'You have reached the hourly 
 
     const text = `Paint a single wide fantasy storyboard illustration (painterly, cinematic lighting, no text or captions) of this scene: ${prompt}`
       + (loaded.length ? `\nThe reference images are the player characters (${loaded.map(c => c.name).join(', ')}). Show them in the scene and keep each one's look recognisable.` : '')
-    let image, source = 'gemini'
+    let images, source = 'gemini'
     try {
       const data = await callGemini(IMAGE_MODELS(), {
         contents: [{ parts: [{ text }, ...loaded.map(c => ({ inlineData: c.image }))] }],
@@ -155,16 +157,21 @@ router.post('/storyboard-image', auth, limiter(12, 'You have reached the hourly 
       })
       const part = (data.candidates?.[0]?.content?.parts || []).find(p => p.inlineData?.data)
       if (!part) throw Object.assign(new Error(`no image returned (${data.promptFeedback?.blockReason || data.candidates?.[0]?.finishReason || 'unknown'})`), { status: 502 })
-      image = `data:${part.inlineData.mimeType || 'image/png'};base64,${part.inlineData.data}`
+      images = [`data:${part.inlineData.mimeType || 'image/png'};base64,${part.inlineData.data}`]
     } catch (e) {
       if (e.status === 503) throw e // not configured: say so rather than silently using another service
       console.error('Gemini image failed, using the free fallback:', e.message)
       const cast = characters.map(c => [c.name, c.appearancePrompt || [c.race, c.class].filter(Boolean).join(' ')].filter(Boolean).join(': ')).filter(Boolean).join('; ')
       const fallback = `Wide fantasy storyboard illustration, painterly, cinematic lighting, no text. Scene: ${prompt}.${cast ? ` Characters: ${cast}.` : ''}`
-      try { image = await pollinationsImage(fallback); source = 'free' }
-      catch (e2) { console.error('Free image fallback failed:', e2.message); throw Object.assign(new Error(`Image generation is unavailable right now. ${e.message}`), { status: 502 }) }
+      try {
+        // Four different takes in parallel so the DM can choose.
+        const results = await Promise.allSettled([0, 1, 2, 3].map(() => pollinationsImage(fallback)))
+        images = results.filter(r => r.status === 'fulfilled').map(r => r.value)
+        if (!images.length) throw new Error(results[0].reason?.message || 'no images')
+        source = 'free'
+      } catch (e2) { console.error('Free image fallback failed:', e2.message); throw Object.assign(new Error(`Image generation is unavailable right now. ${e.message}`), { status: 502 }) }
     }
-    res.json({ image, source, usedAvatars: source === 'gemini' ? loaded.length : 0 })
+    res.json({ images, source, usedAvatars: source === 'gemini' ? loaded.length : 0 })
   } catch (e) { fail(res, e) }
 })
 

@@ -3,6 +3,7 @@ import { AuthProvider, DemoAuthProvider, useAuth } from './context/AuthContext'
 import { CampaignProvider, DemoCampaignProvider } from './context/CampaignContext'
 import { ThemeProvider } from './context/ThemeContext'
 import { MusicProvider } from './context/MusicContext'
+import { WorldAssistantProvider } from './context/WorldAssistantContext'
 import Shell from './components/Shell'
 import DMBoard from './components/DMBoard'
 import Auth from './pages/Auth'
@@ -241,6 +242,7 @@ function Guard() {
   return (
     <CampaignProvider>
       <MusicProvider>
+        <WorldAssistantProvider>
         <Shell>
           <Suspense key={user.role} fallback={<PageLoader />}>
             <Routes>
@@ -265,6 +267,7 @@ function Guard() {
             </Routes>
           </Suspense>
         </Shell>
+        </WorldAssistantProvider>
       </MusicProvider>
     </CampaignProvider>
   )

@@ -4,6 +4,7 @@ import { createPortal } from 'react-dom'
 import { api, useAuth } from '../context/AuthContext'
 import { useCampaign } from '../context/CampaignContext'
 import { useToast } from '../hooks/useToast'
+import ImageGenModal from '../components/ImageGenModal'
 import { uploadToCloudinary } from '../utils/uploadToCloudinary'
 import { isPublicDemoPath } from '../utils/demoRuntime'
 import { CloudinaryImage } from '@cloudinary/url-gen'
@@ -152,7 +153,7 @@ export default function Storyboard() {
   const [cards, setCards] = useState([])
   const { user } = useAuth()
   const isDM = user?.role === 'dm'
-  const [generating, setGenerating] = useState(false)
+  const [genFor, setGenFor] = useState(null) // { title, description, onUse } while the image picker is open
   const toastRef = useRef(toast)
   toastRef.current = toast
   const [currentPage, setCurrentPage] = useState(-1)
@@ -266,19 +267,6 @@ export default function Storyboard() {
     setImageUploading(false)
   }
 
-  // DM only: paints the scene with Gemini, using every campaign character's avatar as a reference.
-  const generateImage = async (title, description, onUrl) => {
-    if (isPublicDemoPath()) { toast('Image generation is available after signing in.'); return }
-    setGenerating(true)
-    try {
-      const { image, usedAvatars, source } = await api('/ai/storyboard-image', { method: 'POST', body: { campaignId: activeCampaign._id, prompt: `${title || ''}. ${description || ''}`.trim() } })
-      const blob = await (await fetch(image)).blob()
-      onUrl(await uploadToCloudinary(new File([blob], 'scene.png', { type: blob.type }), 'lore-ledger/storyboard'))
-      toast(source === 'free' ? 'Image generated with the free service (it describes your characters in words instead of using their avatars)' : usedAvatars ? `Image generated from ${usedAvatars} character avatar${usedAvatars > 1 ? 's' : ''}` : 'Image generated (no character avatars to use yet)')
-    } catch (err) { toast(err.message || 'Could not generate an image') }
-    setGenerating(false)
-  }
-
   const handleEditImagePick = async (e) => {
     const file = e.target.files[0]; if (!file) return
     if (isPublicDemoPath()) { toast('Image uploads are available after signing in.'); e.target.value = ''; return }
@@ -354,7 +342,7 @@ export default function Storyboard() {
                 {imageUploading ? 'Uploading…' : newImage ? 'Image selected ✓' : 'Upload image'}
                 {!imageUploading && <input type="file" accept="image/*" style={{ display: 'none' }} onChange={handleImagePick} />}
               </label>
-              {isDM && <button type="button" disabled={generating || (!newTitle.trim() && !(newDesc || '').trim())} onClick={() => generateImage(newTitle, newDesc, setNewImage)} title="Paint this scene with AI, using your campaign characters' avatars" style={{ background: 'var(--surface)', border: '1px solid var(--gold-border)', borderRadius: 6, padding: '5px 10px', fontSize: 12, color: 'var(--gold)', cursor: generating ? 'wait' : 'pointer' }}>{generating ? 'Generating…' : '✦ Generate'}</button>}
+              {isDM && <button type="button" disabled={(!newTitle.trim() && !(newDesc || '').trim())} onClick={() => setGenFor({ title: newTitle, description: newDesc, onUse: setNewImage })} title="Paint this scene with AI, using your campaign characters' avatars" style={{ background: 'var(--surface)', border: '1px solid var(--gold-border)', borderRadius: 6, padding: '5px 10px', fontSize: 12, color: 'var(--gold)', cursor: 'pointer' }}>✦ Generate</button>}
               {newImage && <button onClick={() => setNewImage(null)} style={{ background: 'none', border: 'none', color: 'var(--text-3)', cursor: 'pointer', fontSize: 12 }}>✕ Remove</button>}
             </div>
           </div>
@@ -462,7 +450,7 @@ export default function Storyboard() {
                   {editImgUploading ? 'Uploading…' : 'Replace image'}
                   {!editImgUploading && <input type="file" accept="image/*" style={{ display: 'none' }} onChange={handleEditImagePick} />}
                 </label>
-                {isDM && <button type="button" disabled={generating || (!editCard.title.trim() && !(editCard.description || '').trim())} onClick={() => generateImage(editCard.title, editCard.description, (url) => editField(p => ({ ...p, imageUrl: url })))} title="Paint this scene with AI, using your campaign characters' avatars" style={{ background: 'var(--surface)', border: '1px solid var(--gold-border)', borderRadius: 6, padding: '5px 10px', fontSize: 12, color: 'var(--gold)', cursor: generating ? 'wait' : 'pointer' }}>{generating ? 'Generating…' : '✦ Generate'}</button>}
+                {isDM && <button type="button" disabled={(!editCard.title.trim() && !(editCard.description || '').trim())} onClick={() => setGenFor({ title: editCard.title, description: editCard.description, onUse: (url) => editField(p => ({ ...p, imageUrl: url })) })} title="Paint this scene with AI, using your campaign characters' avatars" style={{ background: 'var(--surface)', border: '1px solid var(--gold-border)', borderRadius: 6, padding: '5px 10px', fontSize: 12, color: 'var(--gold)', cursor: 'pointer' }}>✦ Generate</button>}
                 {editCard.imageUrl && <span style={{ fontSize: 11, color: 'var(--green)' }}>Image set ✓</span>}
               </div>
             </div>
@@ -490,6 +478,7 @@ export default function Storyboard() {
           </div>
         </div>
       )}
+      {genFor && <ImageGenModal campaignId={activeCampaign._id} title={genFor.title} description={genFor.description} onClose={() => setGenFor(null)} onUse={(url) => { genFor.onUse(url); setGenFor(null); toast('Image added') }} />}
       <ToastContainer />
       {createPortal(<div className="storyboard-print-book">
         <section className="storyboard-print-page storyboard-print-cover">

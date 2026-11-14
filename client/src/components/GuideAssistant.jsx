@@ -1,11 +1,13 @@
 import { useState, useEffect } from 'react'
 import WorldAssistant from './WorldAssistant'
+import { useWorldAssistant } from '../context/WorldAssistantContext'
 
 const EASE = 'cubic-bezier(.4,0,.2,1)'
 
 // Slide-out world-building guide for a flex-row parent with position: relative.
 // Renders the toggle tab and the right-hand panel; the panel pushes the page on desktop and overlays it on phones.
 export default function GuideAssistant({ campaignId }) {
+  const { busy, unread } = useWorldAssistant(campaignId)
   const [open, setOpen] = useState(() => localStorage.getItem('worldbuildOpen') === '1')
   const [narrow, setNarrow] = useState(() => window.innerWidth <= 768)
   useEffect(() => { localStorage.setItem('worldbuildOpen', open ? '1' : '0') }, [open])
@@ -24,7 +26,7 @@ export default function GuideAssistant({ campaignId }) {
           display: 'flex', alignItems: 'center', gap: 6, padding: '7px 10px', border: '1px solid var(--gold-border)', borderRight: open ? '1px solid var(--gold-border)' : 'none',
           borderRadius: '10px 0 0 10px', background: 'var(--gold-bg)', color: 'var(--gold)', cursor: 'pointer', fontSize: 12, fontWeight: 600,
         }}
-      >✦ {open ? 'Hide' : 'Guide'}</button>
+      >✦ {open ? 'Hide' : 'Guide'}{!open && busy ? ' …' : ''}{!open && unread && !busy ? ' ●' : ''}</button>
       <aside
         aria-hidden={!open}
         style={{

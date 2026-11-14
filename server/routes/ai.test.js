@@ -59,6 +59,6 @@ test('AI routes are DM-only, keep the coach prompt, and only fetch Cloudinary av
   assert.equal(img.status, 200)
   assert.equal(img.body.usedAvatars, 1)
   assert.deepEqual(fetched, ['https://res.cloudinary.com/x/mira.png'], 'non-Cloudinary avatar URLs are never fetched')
-  assert.match(img.body.image, /^data:image\/png;base64,/)
+  assert.match(img.body.images[0], /^data:image\/png;base64,/)
   assert.equal((await post(dm, '/storyboard-image', { campaignId, prompt: '  ' })).status, 400)
 })
