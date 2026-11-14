@@ -74,9 +74,11 @@ export function CampaignProvider({ children }) {
       // stranded after the active campaign is deleted or left).
       setActiveRaw(prev => {
         if (prev && data.some(c => c._id === prev._id)) return prev
-        const lastId = localStorage.getItem(roleKey(role))
+        // Falls back to the old single-key value for people who selected a campaign before per-mode memory existed.
+        const lastId = localStorage.getItem(roleKey(role)) || localStorage.getItem('activeCampaignId')
         const restored = lastId && data.find(c => c._id === lastId)
-        const next = restored || data[0] || null
+        // Prefer a real campaign over the personal "My Journal" space, which the UI shows as "no campaign selected".
+        const next = restored || data.find(c => !c.isPersonal) || data[0] || null
         if (next?._id) localStorage.setItem(roleKey(role), next._id)
         else localStorage.removeItem(roleKey(role))
         return next

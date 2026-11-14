@@ -1,3 +1,4 @@
+import GuideAssistant from '../components/GuideAssistant'
 import { useDebouncedSave } from '../hooks/useDebouncedSave'
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { api, useAuth } from '../context/AuthContext'
@@ -478,7 +479,8 @@ export default function CampaignGuide() {
   )
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden', paddingTop: 16 }}>
+    <div style={{ display: 'flex', height: '100%', overflow: 'hidden', position: 'relative' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0, height: '100%', overflow: 'hidden', paddingTop: 16 }}>
 
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', padding: '0 24px', marginBottom: 10, flexShrink: 0, gap: 12 }}>
         <div>
@@ -520,6 +522,8 @@ export default function CampaignGuide() {
 
       {charModal && <CharModal player={charModal} onClose={() => setCharModal(null)} />}
       <ToastContainer />
+    </div>
+    <GuideAssistant campaignId={activeCampaign._id} />
     </div>
   )
 }

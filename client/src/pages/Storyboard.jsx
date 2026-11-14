@@ -271,10 +271,10 @@ export default function Storyboard() {
     if (isPublicDemoPath()) { toast('Image generation is available after signing in.'); return }
     setGenerating(true)
     try {
-      const { image, usedAvatars } = await api('/ai/storyboard-image', { method: 'POST', body: { campaignId: activeCampaign._id, prompt: `${title || ''}. ${description || ''}`.trim() } })
+      const { image, usedAvatars, source } = await api('/ai/storyboard-image', { method: 'POST', body: { campaignId: activeCampaign._id, prompt: `${title || ''}. ${description || ''}`.trim() } })
       const blob = await (await fetch(image)).blob()
       onUrl(await uploadToCloudinary(new File([blob], 'scene.png', { type: blob.type }), 'lore-ledger/storyboard'))
-      toast(usedAvatars ? `Image generated from ${usedAvatars} character avatar${usedAvatars > 1 ? 's' : ''}` : 'Image generated (no character avatars to use yet)')
+      toast(source === 'free' ? 'Image generated with the free service (it describes your characters in words instead of using their avatars)' : usedAvatars ? `Image generated from ${usedAvatars} character avatar${usedAvatars > 1 ? 's' : ''}` : 'Image generated (no character avatars to use yet)')
     } catch (err) { toast(err.message || 'Could not generate an image') }
     setGenerating(false)
   }
