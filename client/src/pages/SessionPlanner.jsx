@@ -1,6 +1,8 @@
+import { useDebouncedSave } from '../hooks/useDebouncedSave'
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { Navigate } from 'react-router-dom'
 import UpgradeModal from '../components/UpgradeModal'
+import GuideAssistant from '../components/GuideAssistant'
 import { api, useAuth } from '../context/AuthContext'
 import { useCampaign } from '../context/CampaignContext'
 import { useToast } from '../hooks/useToast'
@@ -30,7 +32,7 @@ export default function SessionPlanner() {
   const [renamingId, setRenamingId] = useState(null)
   const [titleDraft, setTitleDraft] = useState('')
   const renameCancelled = useRef(false)
-  const saveTimer = useRef(null)
+  const { schedule: scheduleSave, flush: flushSave } = useDebouncedSave(800)
 
   const active = entries.find(e => e._id === activeId)
   const entryNum = e => e.session ?? '?'
@@ -68,11 +70,11 @@ export default function SessionPlanner() {
       .finally(() => {
         if (!cancelled) setEntriesLoading(false)
       })
-    return () => { cancelled = true }
-  }, [activeCampaign, entriesReload])
+    return () => { cancelled = true; flushSave() }
+  }, [activeCampaign, entriesReload, flushSave])
 
   const selectEntry = (e) => {
-    if (saveTimer.current) { clearTimeout(saveTimer.current); saveTimer.current = null }
+    flushSave()
     setActiveId(e._id)
     setContent(e.content)
   }
@@ -91,16 +93,9 @@ export default function SessionPlanner() {
   const handleContentChange = (e) => {
     const text = e.target.value
     setContent(text)
-    if (saveTimer.current) clearTimeout(saveTimer.current)
-    saveTimer.current = setTimeout(() => autosave(activeId, text), 800)
+    const id = activeId
+    scheduleSave(() => autosave(id, text))
   }
-
-  // Flush on unmount / tab close so nothing typed just before navigating away is lost.
-  useEffect(() => {
-    const flush = () => { if (saveTimer.current) { clearTimeout(saveTimer.current) } }
-    window.addEventListener('beforeunload', flush)
-    return () => { flush(); window.removeEventListener('beforeunload', flush) }
-  }, [])
 
   const startRename = (e, entry) => {
     e.stopPropagation()
@@ -162,7 +157,7 @@ export default function SessionPlanner() {
   const sorted = [...entries].sort((a, b) => (b.session ?? 0) - (a.session ?? 0))
 
   return (
-    <div className="journal-layout" style={{ display: 'flex', height: '100%', overflow: 'hidden' }}>
+    <div className="journal-layout" style={{ display: 'flex', height: '100%', overflow: 'hidden', position: 'relative' }}>
       {/* Sidebar list */}
       <div className="journal-day-list" style={{ width: 180, flexShrink: 0, borderRight: '1px solid var(--border)', overflowY: 'auto', background: 'var(--surface)' }}>
         <div style={{ padding: '14px 14px 8px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -181,7 +176,7 @@ export default function SessionPlanner() {
               borderLeft: `2px solid ${activeId === e._id ? 'var(--gold)' : 'transparent'}`,
             }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6 }}>
-              {renamingId === e._id ? (
+              {renamingId === e._id && e._id !== activeId ? (
                 <input
                   autoFocus
                   className="input"
@@ -198,8 +193,8 @@ export default function SessionPlanner() {
               ) : (
                 <span
                   onMouseDown={(ev) => ev.stopPropagation()}
-                  onClick={(ev) => startRename(ev, e)}
-                  title="Click to rename"
+                  onClick={renamingId === e._id ? undefined : (ev) => startRename(ev, e)}
+                  title={renamingId === e._id ? undefined : 'Click to rename'}
                   style={{ fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', cursor: 'text', flex: 1 }}
                 >{entryTitle(e)}</span>
               )}
@@ -293,6 +288,8 @@ export default function SessionPlanner() {
           )}
         </div>
       </div>
+
+      {activeCampaign && !activeCampaign.isPersonal && <GuideAssistant campaignId={activeCampaign._id} />}
 
       <ToastContainer />
       {showUpgrade && <UpgradeModal onClose={() => setShowUpgrade(false)} />}

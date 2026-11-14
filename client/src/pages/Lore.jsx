@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useDebouncedSave } from '../hooks/useDebouncedSave'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { api } from '../context/AuthContext'
 import { useCampaign } from '../context/CampaignContext'
 import { useToast } from '../hooks/useToast'
@@ -36,6 +37,12 @@ export default function Lore() {
   const [adding, setAdding] = useState(false)
   const [form, setForm] = useState({ title: '', tag: 'npc', content: '', hp: '', maxHp: '' })
   const [editing, setEditing] = useState(null)
+  const { schedule: scheduleSave, flush: flushSave } = useDebouncedSave(1000)
+  const editingRef = useRef(null)
+  editingRef.current = editing
+  const inflight = useRef(null)
+  const userEdit = useRef(false)
+  const editForm = (fn) => { userEdit.current = true; setForm(fn) }
 
   const load = useCallback(async () => {
     if (!activeCampaign) {
@@ -55,23 +62,50 @@ export default function Lore() {
 
   useEffect(() => { load() }, [load])
 
+  const buildBody = (f) => {
+    const body = { title: f.title, tag: f.tag, content: f.content }
+    if (HP_TAGS.includes(f.tag) && f.maxHp) {
+      body.maxHp = parseInt(f.maxHp) || 0
+      body.hp    = parseInt(f.hp) || body.maxHp
+    }
+    return body
+  }
+
+  // Writes the form to the server: updates the entry being edited, or creates it the
+  // first time a titled new entry is typed (it then becomes the entry being edited).
+  const persist = async (f, campaignId) => {
+    if (inflight.current) await inflight.current.catch(() => {})
+    const body = buildBody(f), id = editingRef.current
+    const run = (async () => {
+      if (id) {
+        const updated = await api(`/lore/${id}`, { method: 'PUT', body })
+        setLore(p => p.map(l => l._id === id ? updated : l))
+      } else {
+        const entry = await api(`/lore/${campaignId}`, { method: 'POST', body })
+        editingRef.current = entry._id
+        setEditing(entry._id)
+        setLore(p => [entry, ...p])
+      }
+    })()
+    inflight.current = run
+    try { await run } finally { if (inflight.current === run) inflight.current = null }
+  }
+
+  // Autosave 1s after typing stops.
+  useEffect(() => {
+    if (!userEdit.current) return
+    userEdit.current = false
+    if (!adding || !form.title.trim() || !activeCampaign) return
+    const snapshot = form, campaignId = activeCampaign._id
+    scheduleSave(() => persist(snapshot, campaignId).catch(() => toast('Could not autosave')))
+  }, [form]) // eslint-disable-line react-hooks/exhaustive-deps
+
   const save = async () => {
     if (!form.title.trim()) return
     try {
-      const body = { title: form.title, tag: form.tag, content: form.content }
-      if (HP_TAGS.includes(form.tag) && form.maxHp) {
-        body.maxHp = parseInt(form.maxHp) || 0
-        body.hp    = parseInt(form.hp) || body.maxHp
-      }
-      if (editing) {
-        const updated = await api(`/lore/${editing}`, { method: 'PUT', body })
-        setLore(p => p.map(l => l._id === editing ? updated : l))
-        toast('Entry updated')
-      } else {
-        const entry = await api(`/lore/${activeCampaign._id}`, { method: 'POST', body })
-        setLore(p => [entry, ...p])
-        toast('Entry added')
-      }
+      await flushSave()
+      await persist(form, activeCampaign._id)
+      toast(editingRef.current ? 'Entry saved' : 'Entry added')
       setAdding(false); setEditing(null); setForm({ title: '', tag: 'npc', content: '', hp: '', maxHp: '' })
     } catch { toast('Failed to save') }
   }
@@ -130,8 +164,8 @@ export default function Lore() {
       {adding && (
         <div className="card" style={{ padding: 18, marginBottom: 20 }}>
           <div style={{ display: 'flex', gap: 10, marginBottom: 10, flexWrap: 'wrap' }}>
-            <input className="input" placeholder="Title" value={form.title} onChange={e => setForm(p => ({ ...p, title: e.target.value }))} style={{ flex: 1, minWidth: 160 }} />
-            <select className="input" style={{ width: 130 }} value={form.tag} onChange={e => setForm(p => ({ ...p, tag: e.target.value }))}>
+            <input className="input" placeholder="Title" value={form.title} onChange={e => editForm(p => ({ ...p, title: e.target.value }))} style={{ flex: 1, minWidth: 160 }} />
+            <select className="input" style={{ width: 130 }} value={form.tag} onChange={e => editForm(p => ({ ...p, tag: e.target.value }))}>
               {TAGS.map(t => <option key={t} value={t}>{t.charAt(0).toUpperCase() + t.slice(1)}</option>)}
             </select>
           </div>
@@ -140,21 +174,21 @@ export default function Lore() {
               <div style={{ flex: 1 }}>
                 <label style={{ fontSize: 11, color: 'var(--text-3)', display: 'block', marginBottom: 4 }}>Max HP</label>
                 <input className="input" type="number" placeholder="e.g. 45" value={form.maxHp}
-                  onChange={e => setForm(p => ({ ...p, maxHp: e.target.value, hp: e.target.value }))} />
+                  onChange={e => editForm(p => ({ ...p, maxHp: e.target.value, hp: e.target.value }))} />
               </div>
               <div style={{ flex: 1 }}>
                 <label style={{ fontSize: 11, color: 'var(--text-3)', display: 'block', marginBottom: 4 }}>Current HP</label>
                 <input className="input" type="number" placeholder="Defaults to max" value={form.hp}
-                  onChange={e => setForm(p => ({ ...p, hp: e.target.value }))} />
+                  onChange={e => editForm(p => ({ ...p, hp: e.target.value }))} />
               </div>
             </div>
           )}
           <textarea className="input" rows={3} placeholder="Description..." value={form.content}
-            onChange={e => setForm(p => ({ ...p, content: e.target.value }))}
+            onChange={e => editForm(p => ({ ...p, content: e.target.value }))}
             style={{ resize: 'vertical', marginBottom: 10 }} />
           <div style={{ display: 'flex', gap: 8 }}>
             <button className="btn btn-primary btn-sm" onClick={save}>Save</button>
-            <button className="btn btn-ghost btn-sm" onClick={() => { setAdding(false); setEditing(null) }}>Cancel</button>
+            <button className="btn btn-ghost btn-sm" onClick={() => { flushSave(); setAdding(false); setEditing(null) }}>Cancel</button>
           </div>
         </div>
       )}

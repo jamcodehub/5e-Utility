@@ -1,6 +1,7 @@
 import { Router } from 'express'
+import crypto from 'crypto'
 import jwt from 'jsonwebtoken'
-import { Campaign, Character, User, CampaignGuide } from '../models/index.js'
+import { Campaign, Character, User, CampaignGuide, DMBoard, DMBoardFolder } from '../models/index.js'
 
 const router = Router()
 
@@ -12,12 +13,30 @@ export const auth = (req, res, next) => {
   } catch { res.status(401).json({ error: 'Unauthorized' }) }
 }
 
-const genCode = () => Math.random().toString(36).slice(2, 8).toUpperCase()
+const genCode = () => Array.from({ length: 6 }, () => '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ'[crypto.randomInt(36)]).join('')
+
+// Only these campaign fields are client-editable; membership, join code and
+// the personal flag are server-managed.
+const pickCampaignFields = (body = {}) => {
+  const out = {}
+  for (const k of ['name', 'description', 'setting', 'coverImage']) if (typeof body[k] === 'string') out[k] = body[k]
+  return out
+}
+
+// Fields the client must never set on a character.
+const stripServerFields = (body = {}) => {
+  const { _id, __v, owner, campaign, isPrimary, shareToken, roleplaySessionCount, createdAt, updatedAt, ...safe } = body
+  return safe
+}
 
 router.get('/', auth, async (req, res) => {
-  let campaigns = await Campaign.find({
-    $or: [{ owner: req.userId }, { members: req.userId }]
-  }).sort({ updatedAt: -1 })
+  // Accounts can switch between DM and player, so each identity only sees its
+  // own campaigns: the ones it runs as a DM, or the ones it joined as a player.
+  const user = await User.findById(req.userId).select('role')
+  const mine = user?.role === 'dm'
+    ? [{ owner: req.userId }]
+    : [{ members: req.userId }, { owner: req.userId, isPersonal: true }]
+  let campaigns = await Campaign.find({ $or: mine }).sort({ updatedAt: -1 })
 
   // Give every user a personal solo space (Journal/Lore) even without joining a DM's campaign.
   if (!campaigns.length) {
@@ -38,7 +57,7 @@ router.post('/', auth, async (req, res) => {
     let joinCode
     do { joinCode = genCode() } while (await Campaign.findOne({ joinCode }))
 
-    const campaign = await Campaign.create({ ...req.body, owner: req.userId, joinCode })
+    const campaign = await Campaign.create({ ...pickCampaignFields(req.body), owner: req.userId, joinCode })
     res.json(campaign)
   } catch (e) { res.status(500).json({ error: e.message }) }
 })
@@ -146,11 +165,14 @@ router.delete('/:id/pending/:userId', auth, async (req, res) => {
 })
 
 router.put('/:id', auth, async (req, res) => {
-  const campaign = await Campaign.findOneAndUpdate(
-    { _id: req.params.id, owner: req.userId },
-    req.body, { new: true }
-  )
-  res.json(campaign)
+  try {
+    const campaign = await Campaign.findOneAndUpdate(
+      { _id: req.params.id, owner: req.userId },
+      pickCampaignFields(req.body), { returnDocument: 'after' }
+    )
+    if (!campaign) return res.status(404).json({ error: 'Campaign not found' })
+    res.json(campaign)
+  } catch { res.status(500).json({ error: 'Failed to update campaign' }) }
 })
 
 // Member (not owner) leaves a campaign — requires typing the exact,
@@ -185,6 +207,8 @@ router.delete('/:id', auth, async (req, res) => {
     return res.status(400).json({ error: 'Campaign name did not match.' })
   }
   await campaign.deleteOne()
+  await DMBoard.deleteMany({ campaign: campaign._id })
+  await DMBoardFolder.deleteMany({ campaign: campaign._id })
   res.json({ ok: true })
 })
 
@@ -213,15 +237,17 @@ router.get('/:id/character', auth, async (req, res) => {
 
 router.put('/:id/character', auth, async (req, res) => {
   try {
+    if (!await isMember(req.params.id, req.userId)) return res.status(403).json({ error: 'Not a campaign member' })
+    const body = stripServerFields(req.body)
     let primary = await ensurePrimary(req.params.id, req.userId)
     if (primary) {
-      Object.assign(primary, req.body)
+      Object.assign(primary, body)
       await primary.save()
       return res.json(primary)
     }
     // No characters at all yet for this campaign — creating the first one
     // is always within the free 2-per-campaign limit.
-    const char = await Character.create({ ...req.body, campaign: req.params.id, owner: req.userId, isPrimary: true })
+    const char = await Character.create({ ...body, campaign: req.params.id, owner: req.userId, isPrimary: true })
     res.json(char)
   } catch (e) { res.status(500).json({ error: e.message }) }
 })
@@ -236,12 +262,13 @@ router.get('/:id/characters', auth, async (req, res) => {
 
 router.post('/:id/characters', auth, async (req, res) => {
   try {
+    if (!await isMember(req.params.id, req.userId)) return res.status(403).json({ error: 'Not a campaign member' })
     const user = await User.findById(req.userId)
     const count = await Character.countDocuments({ campaign: req.params.id, owner: req.userId })
     if (!user.isPremium && count >= 2) {
       return res.status(403).json({ error: 'Free accounts are limited to 2 characters per campaign. Upgrade to Premium for unlimited characters.' })
     }
-    const char = await Character.create({ ...req.body, campaign: req.params.id, owner: req.userId, isPrimary: count === 0 })
+    const char = await Character.create({ ...stripServerFields(req.body), campaign: req.params.id, owner: req.userId, isPrimary: count === 0 })
     res.json(char)
   } catch (e) { res.status(500).json({ error: e.message }) }
 })
@@ -256,16 +283,35 @@ router.put('/:id/characters/:charId', auth, async (req, res) => {
       ? { _id: req.params.charId, campaign: req.params.id }
       : { _id: req.params.charId, campaign: req.params.id, owner: req.userId }
     // The DM may only touch HP (combat tracker); full edits remain owner-only.
-    const body = isDm ? { hp: req.body.hp } : req.body
-    const char = await Character.findOneAndUpdate(filter, body, { new: true })
+    const body = isDm ? { hp: req.body.hp } : stripServerFields(req.body)
+    const char = await Character.findOneAndUpdate(filter, body, { returnDocument: 'after' })
     if (!char) return res.status(404).json({ error: 'Character not found' })
     res.json(char)
   } catch (e) { res.status(500).json({ error: e.message }) }
 })
 
+// Turn the read-only share link for a character on or off (owner only).
+router.post('/:id/characters/:charId/share', auth, async (req, res) => {
+  try {
+    const char = await Character.findOne({ _id: req.params.charId, campaign: req.params.id, owner: req.userId })
+    if (!char) return res.status(404).json({ error: 'Character not found' })
+    if (req.body.enabled) char.shareToken = char.shareToken || crypto.randomBytes(16).toString('hex')
+    else char.shareToken = undefined
+    await char.save()
+    res.json({ shareToken: char.shareToken || null })
+  } catch { res.status(500).json({ error: 'Could not update sharing' }) }
+})
+
+// Requires the exact, case-sensitive character name as a confirmation
+// safeguard (unnamed sheets are shown as "Unnamed Hero" in the UI).
 router.delete('/:id/characters/:charId', auth, async (req, res) => {
   try {
-    const char = await Character.findOneAndDelete({ _id: req.params.charId, campaign: req.params.id, owner: req.userId })
+    const existing = await Character.findOne({ _id: req.params.charId, campaign: req.params.id, owner: req.userId })
+    if (!existing) return res.status(404).json({ error: 'Character not found' })
+    if (req.body?.confirmName !== (existing.name || 'Unnamed Hero')) {
+      return res.status(400).json({ error: 'Character name did not match.' })
+    }
+    const char = await Character.findOneAndDelete({ _id: existing._id })
     if (char?.isPrimary) {
       // Promote another remaining character (if any) so there's always a
       // primary for back-compat consumers.
@@ -329,7 +375,7 @@ router.put('/:id/guide', auth, async (req, res) => {
     const guide = await CampaignGuide.findOneAndUpdate(
       { campaign: req.params.id },
       { ...req.body, campaign: req.params.id },
-      { upsert: true, new: true }
+      { upsert: true, returnDocument: 'after' }
     )
     res.json(guide)
   } catch { res.status(500).json({ error: 'Failed to save guide' }) }

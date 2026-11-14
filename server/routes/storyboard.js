@@ -32,7 +32,7 @@ router.put('/:id', auth, async (req, res) => {
     // a client smuggle in `campaign` and move the card into a different
     // campaign they may not even belong to.
     const { campaign, _id, ...safeUpdates } = req.body
-    res.json(await StoryCard.findByIdAndUpdate(req.params.id, { $set: safeUpdates }, { new: true }))
+    res.json(await StoryCard.findByIdAndUpdate(req.params.id, { $set: safeUpdates }, { returnDocument: 'after' }))
   } catch { res.status(500).json({ error: 'Failed to update' }) }
 })
 

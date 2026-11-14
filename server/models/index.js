@@ -6,6 +6,8 @@ const UserSchema = new Schema({
   email:            { type: String, required: true, unique: true, lowercase: true },
   password:         { type: String },
   role:             { type: String, enum: ['dm', 'player'], default: 'player' },
+  // Every identity this account has used. `role` is the one currently active.
+  roles:            [{ type: String, enum: ['dm', 'player'] }],
   phone:            { type: String, default: '' },
   googleId:         { type: String, default: '', index: true, sparse: true },
   avatar:           { type: String, default: '' },
@@ -15,9 +17,29 @@ const UserSchema = new Schema({
   twoFactorEnabled:     { type: Boolean, default: false },
   twoFactorCode:        { type: String, default: '' },
   twoFactorCodeExpires: { type: Date },
+  // '' = legacy account (email OTP when twoFactorEnabled). 'google' = verified
+  // with a Google account at sign-up; 'email' = email confirmed by a code at
+  // sign-up. Either one doubles as the 2FA factor on new devices.
+  twoFactorMethod:      { type: String, enum: ['', 'google', 'email'], default: '' },
+  // Devices that already passed 2FA (sha256 of a per-browser id).
+  trustedDevices:       [{ _id: false, hash: String, label: String, lastUsedAt: Date, expiresAt: Date }],
   resetPasswordToken:   { type: String, default: '' },
   resetPasswordExpires: { type: Date },
 }, { timestamps: true })
+
+// A sign-up waiting for its emailed code. Kept apart from User so an
+// unconfirmed attempt never owns an email/username; it expires on its own.
+const PendingSignupSchema = new Schema({
+  email:         { type: String, required: true, unique: true, lowercase: true },
+  username:      { type: String, required: true, trim: true },
+  password:      { type: String, required: true }, // bcrypt hash
+  role:          { type: String, enum: ['dm', 'player'], default: 'player' },
+  codeHash:      { type: String, required: true }, // sha256 of the emailed code
+  codeExpiresAt: { type: Date, required: true },
+  attempts:      { type: Number, default: 0 },
+  lastSentAt:    { type: Date, default: Date.now },
+  expiresAt:     { type: Date, required: true, index: { expireAfterSeconds: 0 } },
+})
 
 const CampaignSchema = new Schema({
   owner:       { type: Schema.Types.ObjectId, ref: 'User', required: true },
@@ -59,6 +81,19 @@ const StoryCardSchema = new Schema({
   day:         Number,
 }, { timestamps: true })
 
+const DMBoardSchema = new Schema({
+  campaign: { type: Schema.Types.ObjectId, ref: 'Campaign', required: true, index: true },
+  name: { type: String, default: 'Main board', trim: true, maxlength: 80 },
+  folder: { type: Schema.Types.ObjectId, ref: 'DMBoardFolder', default: null },
+  board: { type: Schema.Types.Mixed, required: true },
+  version: { type: Number, required: true },
+}, { timestamps: true })
+
+const DMBoardFolderSchema = new Schema({
+  campaign: { type: Schema.Types.ObjectId, ref: 'Campaign', required: true, index: true },
+  name: { type: String, required: true, trim: true, maxlength: 80 },
+}, { timestamps: true })
+
 const CharacterSchema = new Schema({
   campaign:     { type: Schema.Types.ObjectId, ref: 'Campaign', required: true },
   owner:        { type: Schema.Types.ObjectId, ref: 'User', required: true },
@@ -85,6 +120,41 @@ const CharacterSchema = new Schema({
   goals:        { type: String, default: '' },
   lore:         { type: String, default: '' },
   roleplaySessionCount: { type: Number, default: 0 },
+  // Optional SRD 5.1 build data, written by the guided creator / level-up.
+  // Sheets without it keep working exactly as before.
+  srd: {
+    raceId: String, subraceId: String, classId: String, subclassId: String, backgroundId: String,
+    abilityMethod: String,
+    custom: { type: Boolean, default: false },
+    skills: [String],
+    expertise: [String],
+    languages: [String],
+    features: [String],
+    equipment: [{ _id: false, id: String, qty: { type: Number, default: 1 }, equipped: Boolean, attuned: Boolean, custom: Boolean, name: String, weight: Number, note: String }],
+    hpRolls: [Number],
+    hitDiceUsed: { type: Number, default: 0 },
+    featureUsed: { type: Map, of: Number, default: {} },
+    feats: [String],
+    asiLog: [{ _id: false, level: Number, increases: [String] }],
+  },
+  // Table-play state: HP extras, conditions, death saves, coin, companions, sharing.
+  combat: {
+    tempHp: { type: Number, default: 0 },
+    conditions: [String],
+    exhaustion: { type: Number, default: 0 },
+    inspiration: { type: Boolean, default: false },
+    concentrating: { type: String, default: '' },
+    deathSaves: { successes: { type: Number, default: 0 }, failures: { type: Number, default: 0 } },
+  },
+  currency: { cp: { type: Number, default: 0 }, sp: { type: Number, default: 0 }, ep: { type: Number, default: 0 }, gp: { type: Number, default: 0 }, pp: { type: Number, default: 0 } },
+  companions: [{ _id: false, id: String, name: String, hp: { current: Number, max: Number }, ac: Number, notes: String }],
+  shareToken: { type: String, index: true, sparse: true },
+  spells: {
+    cantrips: [String],
+    known: [String],
+    prepared: [String],
+    slotsUsed: { type: Map, of: Number, default: {} },
+  },
 }, { timestamps: true })
 
 // Non-unique index (kept for query performance) — players may now have
@@ -100,6 +170,8 @@ const LevelPlanSchema = new Schema({
   // Live token positions for the collaborative Play mode board — persisted
   // so the board survives reloads and stays in sync across everyone viewing it.
   tokens:   { type: Schema.Types.Mixed, default: [] },
+  darkMode: { type: Boolean, default: false },
+  doorStates: { type: Schema.Types.Mixed, default: [] },
 }, { timestamps: true })
 
 const InventorySchema = new Schema({
@@ -168,10 +240,13 @@ const MusicSessionSchema = new Schema({
 }, { timestamps: true })
 
 export const User          = model('User', UserSchema)
+export const PendingSignup = model('PendingSignup', PendingSignupSchema)
 export const Campaign      = model('Campaign', CampaignSchema)
 export const Journal       = model('Journal', JournalSchema)
 export const Lore          = model('Lore', LoreSchema)
 export const StoryCard     = model('StoryCard', StoryCardSchema)
+export const DMBoard       = model('DMBoard', DMBoardSchema)
+export const DMBoardFolder = model('DMBoardFolder', DMBoardFolderSchema)
 export const Character     = model('Character', CharacterSchema)
 export const LevelPlan     = model('LevelPlan', LevelPlanSchema)
 export const Inventory     = model('Inventory', InventorySchema)

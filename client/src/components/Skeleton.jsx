@@ -158,6 +158,56 @@ export function SkeletonIdeaGeneratorContent() {
   )
 }
 
+export function SkeletonRoleplayPage() {
+  return (
+    <div
+      className="roleplay-page"
+      role="status"
+      aria-label="Loading Roleplay Assistant"
+      style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden', padding: '20px 24px 0' }}
+    >
+      <div className="roleplay-header" style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 16, flexShrink: 0 }}>
+        <h2 style={{ fontSize: 20, margin: 0 }}>Roleplay Assistant</h2>
+        <SkeletonBlock width={100} height={14} />
+      </div>
+      <div className="roleplay-form-layout" style={{ display: 'flex', gap: 16, flex: 1, overflow: 'hidden', paddingBottom: 20 }}>
+        <div className="roleplay-form-column" style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 12, paddingRight: 4 }}>
+          <div className="card" style={{ padding: '14px 16px', flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <SkeletonBlock width={140} height={13} />
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+              {Array.from({ length: 4 }).map((_, i) => (
+                <div key={i} style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  <SkeletonBlock width="38%" height={10} />
+                  <SkeletonBlock height={36} radius={8} />
+                </div>
+              ))}
+            </div>
+          </div>
+          <div className="card" style={{ padding: '14px 16px', flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <SkeletonBlock width={120} height={13} />
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <SkeletonBlock width={`${30 + i * 5}%`} height={10} />
+                <SkeletonBlock height={64} radius={8} />
+              </div>
+            ))}
+          </div>
+        </div>
+        <div className="roleplay-generate-column" style={{ width: 240, flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <div className="card" style={{ padding: '18px 16px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <SkeletonBlock width={110} height={13} />
+            {Array.from({ length: 6 }).map((_, i) => (
+              <SkeletonBlock key={i} width={i % 2 ? '72%' : '88%'} height={14} />
+            ))}
+            <SkeletonBlock height={38} radius={8} style={{ marginTop: 4 }} />
+          </div>
+          <SkeletonBlock height={70} radius={12} />
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export function SkeletonRulesPage() {
   return (
     <div className="page-content">

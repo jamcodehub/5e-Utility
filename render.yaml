@@ -10,6 +10,33 @@ services:
         sync: false        # set manually in Render dashboard
       - key: JWT_SECRET
         generateValue: true
+      # Site addresses allowed to call the API (comma-separated). The FIRST is
+      # used for links in emails and Stripe redirects. No trailing slash.
       - key: CLIENT_URL
-        sync: https://5e-utility.netlify.app
+        value: https://www.5eutility.com,https://5eutility.com,https://5e-utility.netlify.app
+      - key: PORT
         value: 10000       # Render default
+      - key: NODE_ENV
+        value: production
+      - key: NODE_VERSION
+        value: 22
+      # Google sign-up verification / two-factor (see README). If unset, the
+      # Google option is hidden.
+      - key: GOOGLE_CLIENT_ID
+        sync: false        # Google Cloud OAuth *Web* client ID (not the secret)
+      # Outgoing email: password resets and the "Email code" sign-up option
+      # (which stays hidden in production until SMTP_HOST is set).
+      # AI worldbuilding assistant + storyboard images (Google Gemini free tier). Without a
+      # key the AI buttons report that AI isn't configured. Optional: GEMINI_MODEL, GEMINI_IMAGE_MODEL.
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: SMTP_HOST
+        sync: false
+      - key: SMTP_PORT
+        sync: false
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASS
+        sync: false
+      - key: SMTP_FROM
+        sync: false        # e.g. 5e Utility <no-reply@5eutility.com>

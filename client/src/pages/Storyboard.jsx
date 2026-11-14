@@ -1,12 +1,17 @@
+import { useDebouncedSave } from '../hooks/useDebouncedSave'
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { api } from '../context/AuthContext'
+import { createPortal } from 'react-dom'
+import { api, useAuth } from '../context/AuthContext'
 import { useCampaign } from '../context/CampaignContext'
 import { useToast } from '../hooks/useToast'
+import ImageGenModal from '../components/ImageGenModal'
 import { uploadToCloudinary } from '../utils/uploadToCloudinary'
+import { isPublicDemoPath } from '../utils/demoRuntime'
 import { CloudinaryImage } from '@cloudinary/url-gen'
 import { quality, format } from '@cloudinary/url-gen/actions/delivery'
 import { auto as autoQuality } from '@cloudinary/url-gen/qualifiers/quality'
 import { auto as autoFormat } from '@cloudinary/url-gen/qualifiers/format'
+import './Storyboard.css'
 
 const CLOUD_NAME = 'crcbzpw6'
 
@@ -101,7 +106,7 @@ function BookSpread({ card, index, onEdit, isMobile }) {
           <div style={{ position: 'absolute', top: 8, right: 12, fontFamily: 'Cinzel, serif', fontSize: 9, color: 'var(--sb-page-meta)', letterSpacing: '0.1em' }}>{index * 2 + 2}</div>
           <button onClick={onEdit} style={{ position: 'absolute', top: 10, right: 36, background: 'rgba(0,0,0,0.08)', border: '1px solid rgba(0,0,0,0.15)', color: 'var(--sb-page-meta)', borderRadius: 6, padding: '2px 8px', fontSize: 10, cursor: 'pointer', fontFamily: 'Cinzel, serif', zIndex: 2 }}>Edit</button>
           <h2 style={{ fontFamily: 'Cinzel, serif', fontSize: 15, color: 'var(--sb-page-title)', lineHeight: 1.3, margin: '0 0 10px 0', textAlign: 'center', position: 'relative', zIndex: 1 }}>{card.title}</h2>
-          <div style={{ flex: 1, overflow: 'auto' }}>
+          <div data-story-text style={{ flex: 1, overflow: 'auto', minHeight: 0, overscrollBehavior: 'contain' }}>
             <p style={{ fontFamily: 'Georgia, serif', fontSize: 12.5, color: 'var(--sb-page-body)', lineHeight: 1.85, margin: 0, textAlign: 'justify', hyphens: 'auto', position: 'relative', zIndex: 1 }}>{card.description}</p>
           </div>
           {card.createdAt && (
@@ -127,7 +132,7 @@ function BookSpread({ card, index, onEdit, isMobile }) {
         <div style={{ position: 'absolute', top: 14, right: 18, fontFamily: 'Cinzel, serif', fontSize: 10, color: 'var(--sb-page-meta)', letterSpacing: '0.1em' }}>{index * 2 + 2}</div>
         <button onClick={onEdit} style={{ position: 'absolute', top: 32, right: 18, background: 'rgba(0,0,0,0.08)', border: '1px solid rgba(0,0,0,0.15)', color: 'var(--sb-page-meta)', borderRadius: 6, padding: '3px 9px', fontSize: 11, cursor: 'pointer', fontFamily: 'Cinzel, serif', zIndex: 2 }}>Edit</button>
         <h2 style={{ fontFamily: 'Cinzel, serif', fontSize: 17, color: 'var(--sb-page-title)', lineHeight: 1.4, margin: '0 0 20px 0', textAlign: 'center', position: 'relative', zIndex: 1, paddingRight: 44 }}>{card.title}</h2>
-        <div style={{ flex: 1, overflow: 'auto', display: 'flex', justifyContent: 'center' }}>
+        <div data-story-text style={{ flex: 1, minHeight: 0, overflow: 'auto', display: 'flex', justifyContent: 'center', overscrollBehavior: 'contain' }}>
           <p style={{ fontFamily: 'Georgia, serif', fontSize: 13.5, color: 'var(--sb-page-body)', lineHeight: 2, margin: 0, maxWidth: 320, width: '100%', textAlign: 'justify', hyphens: 'auto', position: 'relative', zIndex: 1 }}>{card.description}</p>
         </div>
         {card.createdAt && (
@@ -146,7 +151,11 @@ export default function Storyboard() {
   const { activeCampaign } = useCampaign()
   const { toast, ToastContainer } = useToast()
   const [cards, setCards] = useState([])
-  const [cardsLoading, setCardsLoading] = useState(true)
+  const { user } = useAuth()
+  const isDM = user?.role === 'dm'
+  const [genFor, setGenFor] = useState(null) // { title, description, onUse } while the image picker is open
+  const toastRef = useRef(toast)
+  toastRef.current = toast
   const [currentPage, setCurrentPage] = useState(-1)
   const bookRef = useRef(null)
   const [showForm, setShowForm] = useState(false)
@@ -166,23 +175,35 @@ export default function Storyboard() {
   const [newImage, setNewImage] = useState(null)
   const [saving, setSaving] = useState(false)
   const [editCard, setEditCard] = useState(null)
+  const { schedule: scheduleEditSave, flush: flushEditSave } = useDebouncedSave(1000)
+  const editUserChange = useRef(false)
+  const editField = (fn) => { editUserChange.current = true; setEditCard(fn) }
+  // Autosave an existing scene 1s after typing stops.
+  useEffect(() => {
+    if (!editUserChange.current) return
+    editUserChange.current = false
+    if (!editCard || !editCard.title.trim()) return
+    const card = editCard
+    scheduleEditSave(async () => {
+      try {
+        const updated = await api(`/storyboard/${card._id}`, { method: 'PUT', body: { title: card.title, description: card.description, imageUrl: card.imageUrl } })
+        setCards(p => p.map(c => c._id === updated._id ? updated : c))
+      } catch (err) { toast(err.message || 'Could not autosave') }
+    })
+  }, [editCard]) // eslint-disable-line react-hooks/exhaustive-deps
   const [editSaving, setEditSaving] = useState(false)
 
   const load = useCallback(async () => {
     if (!activeCampaign) {
       setCards([])
-      setCardsLoading(false)
       return
     }
-    setCardsLoading(true)
     try {
       setCards(await api(`/storyboard/${activeCampaign._id}`))
-    } finally {
-      setCardsLoading(false)
-    }
+    } catch (err) { toastRef.current(err.message || 'Failed to load storyboard') }
   }, [activeCampaign])
 
-  useEffect(() => { load() }, [load])
+  useEffect(() => { setCards([]); load() }, [load])
 
   const goTo = useCallback((dir) => {
     const next = currentPage + dir
@@ -194,6 +215,11 @@ export default function Storyboard() {
   useEffect(() => {
     const el = scrollRef.current; if (!el) return
     const onWheel = (e) => {
+      if (e.target instanceof Element && e.target.closest('[data-story-text]')) {
+        scrollAccum.current = 0
+        e.stopPropagation()
+        return
+      }
       e.preventDefault()
       scrollAccum.current += e.deltaY
       if (scrollAccum.current > THRESHOLD) { scrollAccum.current = 0; goTo(1) }
@@ -215,9 +241,9 @@ export default function Storyboard() {
       if (dx > dy && dx > 8) { locked = true; e.preventDefault() }
     }
     const onEnd = (e) => {
-      const diff = startX - e.changedTouches[0].clientX
+      const diff = e.changedTouches[0].clientX - startX
       const dy = Math.abs(e.changedTouches[0].clientY - startY)
-      if (Math.abs(diff) > 44 && Math.abs(diff) > dy) goTo(diff > 0 ? 1 : -1)
+      if (Math.abs(diff) > 44 && Math.abs(diff) > dy) goTo(diff < 0 ? 1 : -1)
     }
     el.addEventListener('touchstart', onStart, { passive: true })
     el.addEventListener('touchmove', onMove, { passive: false })
@@ -234,6 +260,7 @@ export default function Storyboard() {
 
   const handleImagePick = async (e) => {
     const file = e.target.files[0]; if (!file) return
+    if (isPublicDemoPath()) { toast('Image uploads are available after signing in.'); e.target.value = ''; return }
     setImageUploading(true)
     try { const url = await uploadToCloudinary(file, 'lore-ledger/storyboard'); setNewImage(url) }
     catch (err) { toast(err.message || 'Upload failed') }
@@ -242,8 +269,9 @@ export default function Storyboard() {
 
   const handleEditImagePick = async (e) => {
     const file = e.target.files[0]; if (!file) return
+    if (isPublicDemoPath()) { toast('Image uploads are available after signing in.'); e.target.value = ''; return }
     setEditImgUploading(true)
-    try { const url = await uploadToCloudinary(file, 'lore-ledger/storyboard'); setEditCard(p => ({ ...p, imageUrl: url })) }
+    try { const url = await uploadToCloudinary(file, 'lore-ledger/storyboard'); editField(p => ({ ...p, imageUrl: url })) }
     catch (err) { toast(err.message || 'Upload failed') }
     setEditImgUploading(false)
   }
@@ -263,6 +291,7 @@ export default function Storyboard() {
 
   const saveEdit = async () => {
     if (!editCard) return
+    flushEditSave()
     setEditSaving(true)
     try {
       const updated = await api(`/storyboard/${editCard._id}`, { method: 'PUT', body: { title: editCard.title, description: editCard.description, imageUrl: editCard.imageUrl } })
@@ -293,6 +322,9 @@ export default function Storyboard() {
           {onCover ? activeCampaign.name : `Scene ${currentPage + 1} / ${cards.length}`}
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
+          <button type="button" onClick={() => window.print()} style={{ background: 'var(--sb-bar-border)', border: 'none', color: 'var(--sb-accent)', padding: '6px 14px', borderRadius: 6, fontFamily: 'Cinzel, serif', fontSize: 11, cursor: 'pointer', letterSpacing: '0.05em' }}>
+            Print Book
+          </button>
           <button onClick={() => setShowForm(f => !f)} style={{ background: showForm ? 'var(--sb-accent)' : 'var(--sb-bar-border)', border: 'none', color: showForm ? 'var(--sb-outer)' : 'var(--sb-accent)', padding: '6px 14px', borderRadius: 6, fontFamily: 'Cinzel, serif', fontSize: 11, cursor: 'pointer', letterSpacing: '0.05em' }}>
             {showForm ? '✕ Close' : '+ Add Scene'}
           </button>
@@ -310,6 +342,7 @@ export default function Storyboard() {
                 {imageUploading ? 'Uploading…' : newImage ? 'Image selected ✓' : 'Upload image'}
                 {!imageUploading && <input type="file" accept="image/*" style={{ display: 'none' }} onChange={handleImagePick} />}
               </label>
+              {isDM && <button type="button" disabled={(!newTitle.trim() && !(newDesc || '').trim())} onClick={() => setGenFor({ title: newTitle, description: newDesc, onUse: setNewImage })} title="Paint this scene with AI, using your campaign characters' avatars" style={{ background: 'var(--surface)', border: '1px solid var(--gold-border)', borderRadius: 6, padding: '5px 10px', fontSize: 12, color: 'var(--gold)', cursor: 'pointer' }}>✦ Generate</button>}
               {newImage && <button onClick={() => setNewImage(null)} style={{ background: 'none', border: 'none', color: 'var(--text-3)', cursor: 'pointer', fontSize: 12 }}>✕ Remove</button>}
             </div>
           </div>
@@ -319,8 +352,8 @@ export default function Storyboard() {
         </div>
       )}
 
-      {/* Keep the canvas blank during the backend fetch; the toolbar stays visible. */}
-      {!cardsLoading && <div
+      {/* Keep the book frame mounted while scenes load so the dots stay below it. */}
+      <div
         ref={scrollRef}
         style={{
           flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -393,7 +426,7 @@ export default function Storyboard() {
             SWIPE TO OPEN
           </div>
         )}
-      </div>}
+      </div>
 
       {/* Dots */}
       <div style={{ padding: '6px 0 10px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5, background: 'var(--sb-outer)', flexShrink: 0 }}>
@@ -410,13 +443,14 @@ export default function Storyboard() {
             <div style={{ fontFamily: 'Cinzel, serif', fontSize: 16, fontWeight: 600, color: 'var(--gold)', marginBottom: 16 }}>Edit Scene</div>
             
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              <input className="input" placeholder="Title" value={editCard.title} onChange={e => setEditCard(p => ({ ...p, title: e.target.value }))} />
-              <textarea className="input" rows={4} placeholder="Description" value={editCard.description || ''} onChange={e => setEditCard(p => ({ ...p, description: e.target.value }))} style={{ resize: 'vertical' }} />
+              <input className="input" placeholder="Title" value={editCard.title} onChange={e => editField(p => ({ ...p, title: e.target.value }))} />
+              <textarea className="input" rows={4} placeholder="Description" value={editCard.description || ''} onChange={e => editField(p => ({ ...p, description: e.target.value }))} style={{ resize: 'vertical' }} />
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <label style={{ cursor: editImgUploading ? 'wait' : 'pointer', background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 6, padding: '5px 10px', fontSize: 12, color: 'var(--text-2)', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
                   {editImgUploading ? 'Uploading…' : 'Replace image'}
                   {!editImgUploading && <input type="file" accept="image/*" style={{ display: 'none' }} onChange={handleEditImagePick} />}
                 </label>
+                {isDM && <button type="button" disabled={(!editCard.title.trim() && !(editCard.description || '').trim())} onClick={() => setGenFor({ title: editCard.title, description: editCard.description, onUse: (url) => editField(p => ({ ...p, imageUrl: url })) })} title="Paint this scene with AI, using your campaign characters' avatars" style={{ background: 'var(--surface)', border: '1px solid var(--gold-border)', borderRadius: 6, padding: '5px 10px', fontSize: 12, color: 'var(--gold)', cursor: 'pointer' }}>✦ Generate</button>}
                 {editCard.imageUrl && <span style={{ fontSize: 11, color: 'var(--green)' }}>Image set ✓</span>}
               </div>
             </div>
@@ -438,13 +472,44 @@ export default function Storyboard() {
               
               <div style={{ flex: 1 }} />
               
-              <button className="btn btn-ghost" onClick={() => setEditCard(null)}>Cancel</button>
+              <button className="btn btn-ghost" onClick={() => { flushEditSave(); setEditCard(null) }}>Cancel</button>
               <button className="btn btn-primary" onClick={saveEdit} disabled={editSaving}>{editSaving ? 'Saving...' : 'Save'}</button>
             </div>
           </div>
         </div>
       )}
+      {genFor && <ImageGenModal campaignId={activeCampaign._id} title={genFor.title} description={genFor.description} onClose={() => setGenFor(null)} onUse={(url) => { genFor.onUse(url); setGenFor(null); toast('Image added') }} />}
       <ToastContainer />
+      {createPortal(<div className="storyboard-print-book">
+        <section className="storyboard-print-page storyboard-print-cover">
+          <div className="storyboard-print-cover-spine" />
+          <div className="storyboard-print-cover-face">
+            <div className="storyboard-print-cover-frame">
+              <h1>{activeCampaign.name || 'Your Campaign'}</h1>
+              <p>CHRONICLE</p>
+            </div>
+          </div>
+        </section>
+        {cards.map((card, index) => (
+          <article className="storyboard-print-page storyboard-print-scene" key={`print-${card._id}`}>
+            <div className="storyboard-print-scene-image">
+              {card.imageUrl
+                ? <img src={getOptimisedUrl(card.imageUrl)} alt="" />
+                : <span>No image</span>}
+            </div>
+            <div className="storyboard-print-scene-copy">
+              <span className="storyboard-print-page-number">{String(index + 1).padStart(2, '0')}</span>
+              <h2>{card.title || `Scene ${index + 1}`}</h2>
+              <p>{card.description}</p>
+              {card.createdAt && (
+                <time dateTime={card.createdAt}>
+                  {new Date(card.createdAt).toLocaleDateString('en-AU', { day: 'numeric', month: 'long', year: 'numeric' })}
+                </time>
+              )}
+            </div>
+          </article>
+        ))}
+      </div>, document.body)}
     </div>
   )
 }

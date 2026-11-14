@@ -3,8 +3,10 @@ import { useAuth, api } from '../context/AuthContext'
 import { useCampaign } from '../context/CampaignContext'
 import { useMusic, MOODS } from '../context/MusicContext'
 import { useTheme } from '../context/ThemeContext'
+import { getSocket } from '../utils/socket'
 import { useState, useEffect, useRef } from 'react'
 import SettingsModal from './SettingsModal'
+import CharacterOverview from './CharacterSidebar'
 import { CloudinaryImage } from '@cloudinary/url-gen'
 import { quality, format } from '@cloudinary/url-gen/actions/delivery'
 import { auto as autoQuality } from '@cloudinary/url-gen/qualifiers/quality'
@@ -179,8 +181,8 @@ const NAV_PLAYER = [
   { to: '/storyboard', label: 'Storyboard', iconUrl: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1791791388/book-solid-full.svg' },
   { to: '/lore',       label: 'Lore',       iconUrl: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1791791415/scroll-solid-full.svg' },
   { to: '/character',  label: 'Character',  iconUrl: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1791791397/circle-user-solid-full.svg' },
-  { to: '/inventory',  label: 'Inventory',  iconUrl: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1791791414/ring-solid-full.svg' },
   { to: '/roleplay',   label: 'Roleplay',   iconUrl: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1791792735/comment-solid-full.svg' },
+  { to: '/rules',      label: 'Rules',      iconUrl: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1791793208/gavel-solid-full.svg' },
   { to: '/levels',     label: 'Battle Map', iconUrl: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1791792887/map-solid-full.svg' },
   { to: '/dice',       label: 'Dice',       iconUrl: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1791790757/01_fantasy_01_d20_gem.png' },
 ]
@@ -188,6 +190,7 @@ const NAV_PLAYER = [
 const NAV_DM = [
   { to: '/campaign-guide', label: 'Campaign',   iconUrl: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1791790757/01_fantasy_04_castle.png' },
   { to: '/session-planner', label: 'Sessions',  iconUrl: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1791790758/01_fantasy_15_feather.png' },
+  { to: '/dm-board',   label: 'DM Board', iconUrl: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1791791420/superpowers-brands-solid-full.svg' },
   { to: '/storyboard', label: 'Storyboard',     iconUrl: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1791791388/book-solid-full.svg' },
   { to: '/lore',       label: 'Lore',           iconUrl: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1791791415/scroll-solid-full.svg' },
   { to: '/inventory',  label: 'ShopItems',      iconUrl: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1791792290/coins-solid-full.svg' },
@@ -218,6 +221,36 @@ export default function Shell({ children }) {
   const isDM = user?.role === 'dm'
   const darkMode = theme !== 'light' && (!lightMode || theme === 'dark')
   const NAV = isDM ? NAV_DM : NAV_PLAYER
+  const location = useLocation()
+
+  // Players get a persistent right-hand character overview they can slide open on any page.
+  const [charOpen, setCharOpen] = useState(() => localStorage.getItem('charSidebarOpen') === '1')
+  useEffect(() => { localStorage.setItem('charSidebarOpen', charOpen ? '1' : '0') }, [charOpen])
+  const showCharSidebar = !isDM && !!activeCampaign && !activeCampaign.isPersonal && location.pathname !== '/character'
+  const SIDEBAR_W = isMobile ? 'min(320px, 88vw)' : '320px'
+  const EASE = 'cubic-bezier(.4,0,.2,1)'
+  const charToggle = showCharSidebar && (
+    <button
+      onClick={() => setCharOpen(o => !o)} aria-expanded={charOpen} title={charOpen ? 'Hide my character' : 'Show my character'}
+      style={{
+        position: 'fixed', top: isMobile ? 120 : '42%', right: charOpen ? SIDEBAR_W : 0, zIndex: 60, transition: `right .32s ${EASE}`,
+        display: 'flex', alignItems: 'center', gap: 6, padding: '7px 10px', cursor: 'pointer', fontSize: 12, fontWeight: 600,
+        background: 'var(--gold-bg)', color: 'var(--gold)', border: '1px solid var(--gold-border)', borderRight: 'none', borderRadius: '10px 0 0 10px',
+      }}
+    >{charOpen ? '›' : '‹'} Hero</button>
+  )
+  const charPanel = showCharSidebar && (isMobile ? (
+    <aside aria-hidden={!charOpen} style={{
+      position: 'fixed', top: 52, bottom: 72, right: 0, width: SIDEBAR_W, zIndex: 55, background: 'var(--surface)', borderLeft: '1px solid var(--border)',
+      overflowY: 'auto', transform: charOpen ? 'none' : 'translateX(100%)', visibility: charOpen ? 'visible' : 'hidden',
+      transition: `transform .32s ${EASE}, visibility .32s`, boxShadow: charOpen ? '-8px 0 24px rgba(0,0,0,.25)' : 'none',
+    }}><CharacterOverview campaignId={activeCampaign._id} refreshKey={location.pathname} /></aside>
+  ) : (
+    <aside aria-hidden={!charOpen} style={{
+      width: charOpen ? 320 : 0, flexShrink: 0, overflow: 'hidden', background: 'var(--surface)', borderLeft: charOpen ? '1px solid var(--border)' : '0 solid transparent',
+      transition: `width .32s ${EASE}`,
+    }}><div style={{ width: 320, height: '100%', overflowY: 'auto' }}><CharacterOverview campaignId={activeCampaign._id} refreshKey={location.pathname} /></div></aside>
+  ))
 
   const [creating, setCreating] = useState(false)
   const [newName, setNewName]   = useState('')
@@ -244,6 +277,26 @@ export default function Shell({ children }) {
   const [pendingMembers, setPendingMembers] = useState([])
 
   useEffect(() => {
+    if (!user) return
+    const memberCampaigns = campaigns.filter(campaign => !campaign.isPersonal)
+    if (!memberCampaigns.length) return
+    const socket = getSocket()
+    const onShowMap = ({ campaignId, planId } = {}) => {
+      const campaign = memberCampaigns.find(item => item._id === campaignId)
+      if (!campaign || typeof planId !== 'string') return
+      if (activeCampaign?._id !== campaign._id) setActive(campaign)
+      navigate(`/levels?map=${encodeURIComponent(planId)}`)
+    }
+    socket.on('level:show', onShowMap)
+    memberCampaigns.forEach(campaign => socket.emit('campaign:join', campaign._id))
+    return () => {
+      socket.off('level:show', onShowMap)
+      memberCampaigns.forEach(campaign => socket.emit('campaign:leave', campaign._id))
+    }
+  }, [activeCampaign?._id, campaigns, navigate, setActive, user?._id, user?.id])
+
+  useEffect(() => {
+    setPendingMembers([])
     if (!isDM || !activeCampaign) return
     api(`/campaigns/${activeCampaign._id}/pending`).then(setPendingMembers).catch(() => {})
   }, [isDM, activeCampaign?._id])
@@ -394,6 +447,7 @@ export default function Shell({ children }) {
         )}
 
         <main style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column', paddingBottom: '72px' }}>{children}</main>
+        {charToggle}{charPanel}
 
         {/* Persistent mini play/pause/skip — sits just above the bottom nav */}
         <div style={{
@@ -436,7 +490,7 @@ export default function Shell({ children }) {
     <div style={{ display: 'flex', height: '100vh', overflow: 'hidden' }}>
       <aside style={{ width: 232, flexShrink: 0, background: 'var(--surface)', borderRight: '1px solid var(--border)', display: 'flex', flexDirection: 'column' }}>
         <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <img src={logoUrl} alt="5e Utility" style={{ width: '100%', maxWidth: 160, height: 'auto', objectFit: 'contain', display: 'block', filter: 'var(--logo-filter, none)' }} />
+          <img src="https://res.cloudinary.com/crcbzpw6/image/upload/v1794483597/5E_UTILITY_Pure_Black_2000.png" alt="5e Utility" style={{ width: '100%', maxWidth: 160, height: 'auto', objectFit: 'contain', display: 'block', filter: 'var(--logo-filter, none)' }} />
         </div>
 
         <div style={{ padding: '12px 14px', borderBottom: '1px solid var(--border)' }}>
@@ -545,13 +599,14 @@ export default function Shell({ children }) {
               <div style={{ fontSize: 11, color: 'var(--text-3)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user?.email}</div>
             </div>
             <button onClick={() => setShowSettings(true)} title="Settings" aria-label="Settings" style={{ background: 'none', border: 'none', color: 'var(--text-3)', cursor: 'pointer', padding: 4, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <img src="https://res.cloudinary.com/crcbzpw6/image/upload/v1791966298/ellipsis-solid-full.svg" alt="" aria-hidden="true" style={{ width: 16, height: 16, objectFit: 'contain', filter: darkMode ? 'brightness(0) invert(1)' : 'none' }} />
+              <img src="https://res.cloudinary.com/crcbzpw6/image/upload/v1791966298/ellipsis-solid-full.svg" alt="" aria-hidden="true" style={{ width: 16, height: 16, objectFit: 'contain', filter: 'var(--logo-filter, none)' }} />
             </button>
           </div>
         </div>
       </aside>
 
-      <main style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>{children}</main>
+      <main style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column', minWidth: 0 }}>{children}</main>
+      {charPanel}{charToggle}
       {showSettings && <SettingsModal onClose={() => setShowSettings(false)} />}
     </div>
   )

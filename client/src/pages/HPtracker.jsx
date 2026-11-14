@@ -139,7 +139,19 @@ function CombatantCard({ c, onChange, onRemove }) {
   )
 }
 
+function useMobile() {
+  const [m, setM] = useState(() => window.matchMedia('(max-width: 768px)').matches)
+  useEffect(() => {
+    const q = window.matchMedia('(max-width: 768px)')
+    const f = () => setM(q.matches)
+    q.addEventListener('change', f)
+    return () => q.removeEventListener('change', f)
+  }, [])
+  return m
+}
+
 export default function HpTracker() {
+  const mobile = useMobile()
   const { activeCampaign } = useCampaign()
   const { user } = useAuth()
   const { toast, ToastContainer } = useToast()
@@ -261,9 +273,9 @@ export default function HpTracker() {
   )
 
   return (
-    <div style={{ display: 'flex', height: '100%', overflow: 'hidden' }}>
+    <div style={mobile ? { display: 'flex', flexDirection: 'column', height: '100%', overflowY: 'auto' } : { display: 'flex', height: '100%', overflow: 'hidden' }}>
       {/* Main tracker */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+      <div style={mobile ? { display: 'flex', flexDirection: 'column', flexShrink: 0 } : { flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
         {/* Header */}
         <div style={{ padding: '14px 20px', borderBottom: '1px solid var(--border)', background: 'var(--surface)', display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>
           <div style={{ flex: 1 }}>
@@ -277,7 +289,7 @@ export default function HpTracker() {
         </div>
 
         {/* Combatant grid */}
-        <div style={{ flex: 1, overflowY: 'auto', padding: 16 }}>
+        <div style={mobile ? { padding: 16 } : { flex: 1, overflowY: 'auto', padding: 16 }}>
           {dataLoading ? (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 12 }}>
               {Array.from({ length: 4 }).map((_, i) => <SkeletonBlock key={i} height={156} radius={10} />)}
@@ -297,10 +309,12 @@ export default function HpTracker() {
       </div>
 
       {/* Right sidebar — add combatants */}
-      <div style={{ width: 260, flexShrink: 0, borderLeft: '1px solid var(--border)', background: 'var(--surface)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+      <div style={mobile
+        ? { flexShrink: 0, borderTop: '1px solid var(--border)', background: 'var(--surface)', display: 'flex', flexDirection: 'column' }
+        : { width: 260, flexShrink: 0, borderLeft: '1px solid var(--border)', background: 'var(--surface)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
 
         {/* Lore entries */}
-        <div style={{ flex: 1, overflowY: 'auto', padding: 12 }}>
+        <div style={mobile ? { padding: 12 } : { flex: 1, overflowY: 'auto', padding: 12 }}>
           <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>
             Add from Lore
           </div>

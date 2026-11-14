@@ -1,12 +1,15 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useTheme, THEMES } from '../context/ThemeContext'
-import { api, useAuth } from '../context/AuthContext'
+import { api, useAuth, useAuthConfig } from '../context/AuthContext'
 import { useCampaign } from '../context/CampaignContext'
+import GoogleButton from './GoogleButton'
 
 export default function SettingsModal({ onClose }) {
   const { theme, setTheme, lightMode, setLightMode } = useTheme()
-  const { logout, user, setTwoFactor, isPremium } = useAuth()
+  const { logout, user, linkGoogle, isPremium, switchRole } = useAuth()
+  const authConfig = useAuthConfig()
+  const googleClientId = authConfig?.googleClientId || import.meta.env.VITE_GOOGLE_CLIENT_ID || ''
   const { activeCampaign, leaveCampaign, deleteCampaign } = useCampaign()
   const navigate = useNavigate()
   const [feedbackType, setFeedbackType] = useState('general')
@@ -14,13 +17,31 @@ export default function SettingsModal({ onClose }) {
   const [sending, setSending] = useState(false)
   const [sent, setSent] = useState(false)
   const [error, setError] = useState('')
-  const [phone, setPhone] = useState(user?.phone || '')
   const [twoFAWorking, setTwoFAWorking] = useState(false)
   const [twoFAError, setTwoFAError] = useState('')
+  // "Verify / change Google account" flow
+  const [channelOpen, setChannelOpen] = useState(false)
   const [confirmAction, setConfirmAction] = useState(null) // 'leave' | 'delete' | null
   const [confirmInput, setConfirmInput] = useState('')
   const [confirmError, setConfirmError] = useState('')
   const [confirmWorking, setConfirmWorking] = useState(false)
+  const [roleWorking, setRoleWorking] = useState(false)
+  const [roleError, setRoleError] = useState('')
+
+  const changeRole = async (role) => {
+    if (role === user?.role || roleWorking) return
+    setRoleError('')
+    setRoleWorking(true)
+    try {
+      await switchRole(role)
+      onClose()
+      navigate('/', { replace: true })
+    } catch (err) {
+      setRoleError(err?.message || 'Could not switch role. Please try again.')
+    } finally {
+      setRoleWorking(false)
+    }
+  }
 
   const isOwner = activeCampaign && String(activeCampaign.owner) === String(user?._id || user?.id)
 
@@ -43,13 +64,20 @@ export default function SettingsModal({ onClose }) {
   }
 
 
-  const toggleTwoFactor = async () => {
+  const googleAvailable = !!authConfig?.google
+  const verifiedWithGoogle = user?.twoFactorMethod === 'google'
+  const verifiedWithEmail = !!user?.twoFactorVerified && user?.twoFactorMethod === 'email'
+
+  const closeChannelSetup = () => { setChannelOpen(false); setTwoFAError('') }
+
+  const linkGoogleAccount = async (credential) => {
     setTwoFAError('')
     setTwoFAWorking(true)
     try {
-      await setTwoFactor(!user?.twoFactorEnabled, phone)
+      await linkGoogle(credential)
+      closeChannelSetup()
     } catch (err) {
-      setTwoFAError(err?.message || 'Could not update two-factor settings.')
+      setTwoFAError(err?.message || 'Could not link that Google account.')
     } finally {
       setTwoFAWorking(false)
     }
@@ -113,6 +141,31 @@ export default function SettingsModal({ onClose }) {
 
         <div style={{ height: 1, background: 'var(--border)', marginBottom: 24 }} />
 
+        {/* Player / DM mode */}
+        <div style={{ marginBottom: 24 }}>
+          <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-2)', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 10 }}>Mode</div>
+          <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
+            {[{ v: 'player', label: 'Player' }, { v: 'dm', label: 'Dungeon Master' }].map(opt => {
+              const active = user?.role === opt.v
+              return (
+                <button type="button" key={opt.v} onClick={() => changeRole(opt.v)} disabled={roleWorking} aria-pressed={active} style={{
+                  flex: 1, padding: '8px 12px', borderRadius: 8, cursor: active ? 'default' : 'pointer',
+                  border: `1px solid ${active ? 'var(--gold)' : 'var(--border)'}`,
+                  background: active ? 'var(--gold-bg)' : 'transparent',
+                  color: active ? 'var(--gold)' : 'var(--text-2)', fontSize: 13, fontWeight: active ? 600 : 400,
+                }}>{opt.label}</button>
+              )
+            })}
+          </div>
+          <div style={{ fontSize: 11, color: 'var(--text-3)', lineHeight: 1.5 }}>
+            {user?.roles?.length > 1 ? 'Your account is both a player and a DM. ' : ''}
+            Switching changes your tools and shows the campaigns you {user?.role === 'dm' ? 'joined as a player' : 'run as a DM'}. Nothing is deleted.
+          </div>
+          {roleError && <div style={{ fontSize: 12, color: 'var(--red)', marginTop: 8 }}>{roleError}</div>}
+        </div>
+
+        <div style={{ height: 1, background: 'var(--border)', marginBottom: 24 }} />
+
         {/* Feedback */}
         <div>
           <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-2)', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 12 }}>Send Feedback</div>
@@ -138,23 +191,31 @@ export default function SettingsModal({ onClose }) {
           }
         </div>
 
+        {/* Only shown to accounts that still need to verify; verified accounts have nothing to manage. */}
+        {!(verifiedWithGoogle || verifiedWithEmail) && (
         <div style={{ marginTop: 24, paddingTop: 24, borderTop: '1px solid var(--border)' }}>
           <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-2)', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 12 }}>Security</div>
-          <div style={{ marginBottom: 10 }}>
-            <label style={{ display: 'block', fontSize: 12, color: 'var(--text-2)', marginBottom: 5 }}>Phone number <span style={{ color: 'var(--text-3)' }}>(for future SMS 2FA)</span></label>
-            <input className="input" type="tel" placeholder="+1 555 123 4567" value={phone} onChange={e => setPhone(e.target.value)} />
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '10px 12px', borderRadius: 8, background: 'var(--surface2)', border: '1px solid var(--border)' }}>
-            <div>
-              <div style={{ fontSize: 13, fontWeight: 500 }}>Two-factor authentication</div>
-              <div style={{ fontSize: 11, color: 'var(--text-3)' }}>Sends a one-time code to your email at sign-in.</div>
+            <>
+              {googleAvailable && !channelOpen && (
+                <div style={{ padding: '10px 12px', borderRadius: 8, background: 'var(--surface2)', border: '1px solid var(--border)', marginBottom: 10 }}>
+                  <div style={{ fontSize: 13, fontWeight: 500 }}>Secure your account</div>
+                  <div style={{ fontSize: 11, color: 'var(--text-3)', marginBottom: 8 }}>Verify the Google account that matches your email. We'll then protect sign-ins from new devices automatically. This can't be changed later.</div>
+                  <button type="button" className="btn btn-primary btn-sm" onClick={() => setChannelOpen(true)}>Verify with Google</button>
+                </div>
+              )}
+            </>
+
+          {channelOpen && (
+            <div style={{ marginTop: 10, padding: 12, borderRadius: 8, border: '1px solid var(--border)' }}>
+              <GoogleButton clientId={googleClientId} onCredential={linkGoogleAccount} text="continue_with" width={280} />
+              <div style={{ marginTop: 10 }}>
+                <button type="button" onClick={closeChannelSetup} style={{ background: 'none', border: 'none', color: 'var(--text-3)', fontSize: 12, cursor: 'pointer', padding: 0 }}>Cancel</button>
+              </div>
             </div>
-            <button type="button" onClick={toggleTwoFactor} disabled={twoFAWorking} className={`btn btn-sm ${user?.twoFactorEnabled ? 'btn-primary' : 'btn-ghost'}`}>
-              {twoFAWorking ? '...' : user?.twoFactorEnabled ? 'On' : 'Off'}
-            </button>
-          </div>
+          )}
           {twoFAError && <div style={{ fontSize: 12, color: 'var(--red)', marginTop: 8 }}>{twoFAError}</div>}
         </div>
+        )}
 
         {activeCampaign && !activeCampaign.isPersonal && (
           <div style={{ marginTop: 24, paddingTop: 24, borderTop: '1px solid var(--border)' }}>
@@ -180,7 +241,7 @@ export default function SettingsModal({ onClose }) {
 
         <div style={{ marginTop: 24, paddingTop: 24, borderTop: '1px solid var(--border)' }}>
           <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-2)', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 10 }}>Account</div>
-          <button type="button" onClick={() => { logout(); onClose() }} style={{ width: '100%', padding: '10px 14px', borderRadius: 10, border: '1px solid var(--red)', background: 'transparent', color: 'var(--red)', fontWeight: 600, cursor: 'pointer' }}>
+          <button type="button" onClick={() => { logout(); onClose(); navigate('/login', { replace: true }) }} style={{ width: '100%', padding: '10px 14px', borderRadius: 10, border: '1px solid var(--red)', background: 'transparent', color: 'var(--red)', fontWeight: 600, cursor: 'pointer' }}>
             Logout
           </button>
         </div>

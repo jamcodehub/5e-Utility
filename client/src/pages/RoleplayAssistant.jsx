@@ -2,6 +2,8 @@ import { useState, useEffect, useCallback } from 'react'
 import { api, useAuth } from '../context/AuthContext'
 import { useCampaign } from '../context/CampaignContext'
 import { useToast } from '../hooks/useToast'
+import { SkeletonRoleplayPage } from '../components/Skeleton'
+import { isPublicDemoPath } from '../utils/demoRuntime'
 import UpgradeModal from '../components/UpgradeModal'
 
 // ─── Template engine ────────────────────────────────────────────────────────
@@ -307,20 +309,40 @@ export default function RoleplayAssistant() {
   const [step, setStep]               = useState('context')
   const [ctx, setCtx]                 = useState(emptyCtx())
   const [dmGuide, setDmGuide]         = useState({})
-  const [checklist, setChecklist]     = useState(null)
-  const [checklistLevel, setChecklistLevel] = useState(null)   // level when last generated
+  // Every generated session plan is kept as a tab: { id, label, checklist, checklistLevel, checked }
+  const [plans, setPlans]             = useState([])
+  const [activePlanId, setActivePlanId] = useState(null)
   const [sessionCount, setSessionCount] = useState(0)
   const [loading, setLoading]         = useState(false)
-  const [checked, setChecked]         = useState({})
+  const activePlan     = plans.find(p => p.id === activePlanId) || plans[plans.length - 1] || null
+  const checklist      = activePlan?.checklist || null
+  const checklistLevel = activePlan?.checklistLevel ?? null   // level when last generated
+  const checked        = activePlan?.checked || {}
+  const [renamingId, setRenamingId] = useState(null)
+  const [renameValue, setRenameValue] = useState('')
+  const startRename = (p) => { setRenamingId(p.id); setRenameValue(p.label) }
+  const commitRename = () => {
+    const v = renameValue.trim()
+    if (renamingId && v) updatePlan(renamingId, { label: v.slice(0, 60) })
+    setRenamingId(null)
+  }
+  const renameInput = (
+    <input className="input" autoFocus value={renameValue} maxLength={60}
+      onChange={e => setRenameValue(e.target.value)} onBlur={commitRename} onClick={e => e.stopPropagation()}
+      onKeyDown={e => { if (e.key === 'Enter') commitRename(); if (e.key === 'Escape') setRenamingId(null) }}
+      style={{ padding: '2px 6px', fontSize: 13, width: 140 }} />
+  )
+  const updatePlan = (id, patch) => setPlans(ps => ps.map(p => p.id === id ? { ...p, ...patch } : p))
   const [charLoaded, setCharLoaded]   = useState(false)
   const [showUpgrade, setShowUpgrade] = useState(false)
   const [planLoaded, setPlanLoaded]   = useState(false)
 
   // Pre-fill form from character sheet; prefer saved context from localStorage
   const loadChar = useCallback(async () => {
-    if (!activeCampaign) return
+    if (!activeCampaign || activeCampaign.isPersonal) return
+    setCharLoaded(false)
     try {
-      const saved = localStorage.getItem(storageKey(activeCampaign._id))
+      const saved = isPublicDemoPath() ? null : localStorage.getItem(storageKey(activeCampaign._id))
       if (saved) {
         try { setCtx(JSON.parse(saved)); setCharLoaded(true); } catch {}
       }
@@ -345,8 +367,8 @@ export default function RoleplayAssistant() {
             lore: char.lore || '',
           }))
         }
-        setCharLoaded(true)
       }
+      setCharLoaded(true)
     } catch {
       setCharLoaded(true)
     }
@@ -360,17 +382,22 @@ export default function RoleplayAssistant() {
     if (!activeCampaign) return
     setPlanLoaded(false)
     try {
-      const saved = localStorage.getItem(planStorageKey(activeCampaign._id))
+      const saved = isPublicDemoPath() ? null : localStorage.getItem(planStorageKey(activeCampaign._id))
       if (saved) {
         const parsed = JSON.parse(saved)
-        if (parsed.checklist) {
-          setChecklist(parsed.checklist)
-          setChecklistLevel(parsed.checklistLevel ?? null)
-          setChecked(parsed.checked || {})
+        // Older saves stored a single plan; wrap it as the first tab
+        const restored = Array.isArray(parsed.plans) ? parsed.plans
+          : parsed.checklist ? [{ id: 'legacy', label: 'Session plan', checklist: parsed.checklist, checklistLevel: parsed.checklistLevel ?? null, checked: parsed.checked || {} }]
+          : []
+        if (restored.length) {
+          setPlans(restored)
+          setActivePlanId(parsed.activePlanId || restored[restored.length - 1].id)
           setStep(parsed.step || 'checklist')
+        } else {
+          setPlans([]); setActivePlanId(null); setStep('context')
         }
       } else {
-        setChecklist(null); setChecklistLevel(null); setChecked({}); setStep('context')
+        setPlans([]); setActivePlanId(null); setStep('context')
       }
     } catch { /* ignore malformed storage */ }
     setPlanLoaded(true)
@@ -379,17 +406,17 @@ export default function RoleplayAssistant() {
   // Persist the generated plan whenever it changes
   useEffect(() => {
     if (!activeCampaign || !planLoaded) return
-    if (checklist) {
-      localStorage.setItem(planStorageKey(activeCampaign._id), JSON.stringify({ step, checklist, checklistLevel, checked }))
+    if (plans.length) {
+      if (!isPublicDemoPath()) localStorage.setItem(planStorageKey(activeCampaign._id), JSON.stringify({ step, plans, activePlanId }))
     } else {
-      localStorage.removeItem(planStorageKey(activeCampaign._id))
+      if (!isPublicDemoPath()) localStorage.removeItem(planStorageKey(activeCampaign._id))
     }
-  }, [activeCampaign, planLoaded, step, checklist, checklistLevel, checked])
+  }, [activeCampaign, planLoaded, step, plans, activePlanId])
 
   // Persist context to localStorage whenever it changes
   useEffect(() => {
     if (activeCampaign && charLoaded) {
-      localStorage.setItem(storageKey(activeCampaign._id), JSON.stringify(ctx))
+      if (!isPublicDemoPath()) localStorage.setItem(storageKey(activeCampaign._id), JSON.stringify(ctx))
     }
   }, [ctx, activeCampaign, charLoaded])
 
@@ -409,9 +436,9 @@ export default function RoleplayAssistant() {
         method: 'PATCH',
         body: { background: ctx.background, personality: ctx.personality, goals: ctx.goals, lore: ctx.lore },
       }).catch(() => {})
-      setChecklist(buildChecklist(ctx, dmGuide))
-      setChecklistLevel(Number(ctx.level) || null)
-      setChecked({})
+      const id = `plan_${Date.now()}`
+      setPlans(ps => [...ps, { id, label: `Session #${res.sessionCount}`, checklist: buildChecklist(ctx, dmGuide), checklistLevel: Number(ctx.level) || null, checked: {} }])
+      setActivePlanId(id)
       setStep('checklist')
     } catch (err) {
       toast(err.message || 'Failed to start session')
@@ -419,17 +446,32 @@ export default function RoleplayAssistant() {
     setLoading(false)
   }
 
-  const reset  = () => { setStep('context'); setChecklist(null); setChecked({}); setChecklistLevel(null) }
-  const toggle = (key) => setChecked(p => ({ ...p, [key]: !p[key] }))
+  const reset  = () => setStep('context')
+  const toggle = (key) => { if (activePlan) updatePlan(activePlan.id, { checked: { ...activePlan.checked, [key]: !activePlan.checked[key] } }) }
 
-  // Regeneration should respect the same free/premium gate as the initial
-  // generation — previously it silently rebuilt the checklist for free users
-  // with no limit, and gave no feedback once the free session was used up.
-  const regenerate = (level) => {
+  const closePlan = (id) => {
+    const remaining = plans.filter(p => p.id !== id)
+    setPlans(remaining)
+    if (!remaining.length) { setActivePlanId(null); setStep('context') }
+    else if (activePlan?.id === id) setActivePlanId(remaining[remaining.length - 1].id)
+  }
+
+  // Regenerate rebuilds the active tab's plan from the latest context and the
+  // DM's latest guide (re-fetched, since the DM may have updated quests/NPCs).
+  const regenerate = async (level) => {
     if (!canGenerate) { setShowUpgrade(true); return }
-    setChecklist(buildChecklist(ctx, dmGuide))
-    setChecked({})
-    if (level !== undefined) setChecklistLevel(level)
+    if (!activePlan) return
+    let guide = dmGuide
+    try {
+      const fresh = await api(`/campaigns/${activeCampaign._id}/guide`)
+      if (fresh) { guide = fresh; setDmGuide(fresh) }
+    } catch { /* fall back to cached guide */ }
+    updatePlan(activePlan.id, {
+      checklist: buildChecklist(ctx, guide),
+      checked: {},
+      ...(level !== undefined ? { checklistLevel: level } : {}),
+    })
+    toast('Plan regenerated from your latest context and DM guide.')
   }
 
   if (!activeCampaign) {
@@ -443,6 +485,19 @@ export default function RoleplayAssistant() {
     )
   }
 
+  if (activeCampaign.isPersonal) {
+    return (
+      <div className="page-content">
+        <div className="page-header-row" style={{ marginBottom: 16 }}>
+          <h2 style={{ fontSize: 20, marginBottom: 2 }}>Roleplay Assistant</h2>
+        </div>
+        <div style={{ color: 'var(--text-3)' }}>You need to join a campaign first.</div>
+      </div>
+    )
+  }
+
+  if (!charLoaded) return <SkeletonRoleplayPage />
+
   // ── Step 1: Context form ────────────────────────────────────────────────────
   if (step === 'context') {
     return (
@@ -452,12 +507,17 @@ export default function RoleplayAssistant() {
           <div>
             <h2 style={{ fontSize: 20, marginBottom: 2 }}>Roleplay Assistant</h2>
           </div>
-          {sessionCount > 0 && (
-            <div style={{ fontSize: 12, color: 'var(--text-3)', textAlign: 'right', flexShrink: 0, marginLeft: 16 }}>
-              {sessionCount} session{sessionCount !== 1 ? 's' : ''} run
-              {!isPremium && <div style={{ color: '#c0392b', marginTop: 2 }}>Upgrade for more</div>}
-            </div>
-          )}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0, marginLeft: 16 }}>
+            {plans.length > 0 && (
+              <button className="btn btn-ghost btn-sm" onClick={() => setStep('checklist')}>View plans ({plans.length})</button>
+            )}
+            {sessionCount > 0 && (
+              <div style={{ fontSize: 12, color: 'var(--text-3)', textAlign: 'right' }}>
+                {sessionCount} session{sessionCount !== 1 ? 's' : ''} run
+                {!isPremium && <div style={{ color: '#c0392b', marginTop: 2 }}>Upgrade for more</div>}
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Two-column body — fills remaining height */}
@@ -590,9 +650,28 @@ export default function RoleplayAssistant() {
   // ── Step 2: Checklist ───────────────────────────────────────────────────────
   return (
     <div className="page-content">
+      <div role="tablist" style={{ display: 'flex', gap: 4, marginBottom: 16, borderBottom: '1px solid var(--border)', overflowX: 'auto' }}>
+        {plans.map(p => {
+          const isActive = p.id === activePlan?.id
+          return (
+            <div key={p.id} role="tab" aria-selected={isActive} onClick={() => setActivePlanId(p.id)}
+              style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 14px', cursor: 'pointer', whiteSpace: 'nowrap', fontSize: 13, fontWeight: 600, color: isActive ? 'var(--gold)' : 'var(--text-3)', borderBottom: `2px solid ${isActive ? 'var(--gold)' : 'transparent'}`, marginBottom: -1 }}>
+              {renamingId === p.id ? renameInput : (
+                <span title="Double-click to rename" onDoubleClick={() => startRename(p)}>{p.label}</span>
+              )}
+              <span title="Close plan" aria-label={`Close ${p.label}`} onClick={(ev) => { ev.stopPropagation(); closePlan(p.id) }} style={{ fontSize: 14, opacity: 0.6, lineHeight: 1 }}>×</span>
+            </div>
+          )
+        })}
+        <div role="tab" onClick={reset} title="Generate a new session plan"
+          style={{ padding: '8px 14px', cursor: 'pointer', fontSize: 13, color: 'var(--text-3)', whiteSpace: 'nowrap' }}>+ New</div>
+      </div>
+
       <div className="page-header-row" style={{ marginBottom: 16 }}>
         <div>
-          <h2 style={{ fontSize: 22, marginBottom: 4 }}>Session #{sessionCount} Plan</h2>
+          {renamingId === activePlan?.id ? renameInput : (
+            <h2 style={{ fontSize: 22, marginBottom: 4, cursor: 'text' }} title="Click to rename" onClick={() => startRename(activePlan)}>{activePlan?.label}</h2>
+          )}
           <p style={{ color: 'var(--text-2)', fontSize: 14, margin: 0 }}>
             {ctx.name}{[ctx.race, ctx.characterClass, ctx.level ? `Level ${ctx.level}` : ''].filter(Boolean).length > 0
               ? ' · ' + [ctx.race, ctx.characterClass, ctx.level ? `Level ${ctx.level}` : ''].filter(Boolean).join(' · ')

@@ -1,3 +1,4 @@
+import { useDebouncedSave } from '../hooks/useDebouncedSave'
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { api } from '../context/AuthContext'
 import { useAuth } from '../context/AuthContext'
@@ -50,11 +51,10 @@ function ItemForm({ form, setForm }) {
   )
 }
 
-export default function Inventory() {
+// ── Shared party inventory (currency + items), shared by the standalone
+// Inventory/ShopItems page and the Character sheet's "Inventory" tab ──
+export function InventoryPanel({ toast, isDM = false }) {
   const { activeCampaign } = useCampaign()
-  const { user } = useAuth()
-  const isDM = user?.role === 'dm'
-  const { toast, ToastContainer } = useToast()
   const [inv, setInv] = useState(DEFAULT_INV)
   const [loaded, setLoaded] = useState(false)
   const [editingItem, setEditingItem] = useState(null)
@@ -62,7 +62,7 @@ export default function Inventory() {
   const [newItemForm, setNewItemForm] = useState(newItem())
   const [editingCurrency, setEditingCurrency] = useState(false)
   const [currencyDraft, setCurrencyDraft] = useState({ pp: 0, gp: 0, ep: 0, sp: 0, cp: 0 })
-  const saveTimer = useRef(null)
+  const { schedule: scheduleSave, flush: flushSave } = useDebouncedSave(600)
 
   const load = useCallback(async () => {
     if (!activeCampaign) return
@@ -72,13 +72,15 @@ export default function Inventory() {
 
   useEffect(() => { setLoaded(false); load() }, [load])
 
+  useEffect(() => flushSave, [activeCampaign?._id, flushSave])
+
   const persist = useCallback((next) => {
-    clearTimeout(saveTimer.current)
-    saveTimer.current = setTimeout(async () => {
-      try { await api(`/inventory/${activeCampaign._id}`, { method: 'PUT', body: { currency: next.currency, items: next.items } }) }
+    const campaignId = activeCampaign._id
+    scheduleSave(async () => {
+      try { await api(`/inventory/${campaignId}`, { method: 'PUT', body: { currency: next.currency, items: next.items } }) }
       catch { toast('Could not save') }
-    }, 600)
-  }, [activeCampaign])
+    })
+  }, [activeCampaign, scheduleSave])
 
   const adjustCurrency = (key, delta) => {
     const next = { ...inv, currency: { ...inv.currency, [key]: Math.max(0, (inv.currency[key] || 0) + delta) } }
@@ -114,35 +116,11 @@ export default function Inventory() {
 
   const totalWeight = inv.items.reduce((s, i) => s + (parseFloat(i.weight) || 0) * (i.qty || 1), 0)
 
-  if (!activeCampaign) return (
-    <div className="page-content">
-      <div className="page-header-row" style={{ marginBottom: 20 }}>
-        <div>
-          <h2 style={{ fontSize: 22, marginBottom: 4 }}>Inventory</h2>
-        </div>
-      </div>
-      <div style={{ color: 'var(--text-3)' }}>Select a campaign.</div>
-    </div>
-  )
-  if (!loaded) return (
-    <div className="page-content">
-      <div className="page-header-row" style={{ marginBottom: 20 }}>
-        <div>
-          <h2 style={{ fontSize: 22, marginBottom: 4 }}>Inventory</h2>
-        </div>
-      </div>
-      <SkeletonInventoryContent />
-    </div>
-  )
+  if (!activeCampaign) return <div style={{ color: 'var(--text-3)', fontSize: 13 }}>Select a campaign.</div>
+  if (!loaded) return <SkeletonInventoryContent />
 
   return (
-    <div className="page-content">
-      <div className="page-header-row" style={{ marginBottom: 20 }}>
-        <div>
-          <h2 style={{ fontSize: 22, marginBottom: 4 }}>Inventory</h2>
-        </div>
-      </div>
-
+    <>
       {/* ── Currency ── (players only — DMs manage the world, not personal gold) */}
       {!isDM && (
         <div className="card" style={{ padding: '16px 20px', marginBottom: 20 }}>
@@ -254,7 +232,22 @@ export default function Inventory() {
           </div>
         </div>
       )}
+    </>
+  )
+}
 
+export default function Inventory() {
+  const { user } = useAuth()
+  const isDM = user?.role === 'dm'
+  const { toast, ToastContainer } = useToast()
+  return (
+    <div className="page-content">
+      <div className="page-header-row" style={{ marginBottom: 20 }}>
+        <div>
+          <h2 style={{ fontSize: 22, marginBottom: 4 }}>{isDM ? 'Shop Items' : 'Inventory'}</h2>
+        </div>
+      </div>
+      <InventoryPanel toast={toast} isDM={isDM} />
       <ToastContainer />
     </div>
   )

@@ -1,9 +1,20 @@
+import { useDebouncedSave } from '../hooks/useDebouncedSave'
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { api, useAuth } from '../context/AuthContext'
 import { useCampaign } from '../context/CampaignContext'
 import { useToast } from '../hooks/useToast'
 import { uploadToCloudinary } from '../utils/uploadToCloudinary'
 import UpgradeModal from '../components/UpgradeModal'
+import CustomCharacterBuilder from '../components/CustomCharacterBuilder'
+import CharacterActions from '../components/CharacterActions'
+import RestPanel from '../components/RestPanel'
+import CombatPanel from '../components/CombatPanel'
+import GearTab from '../components/GearTab'
+import { InventoryPanel } from './Inventory'
+import { PrintOverlay } from '../components/CharacterSheet'
+import { derive } from '../utils/sheet'
+import { useRoller, RollPanel } from '../components/RollPanel'
+import { loadSrdMany } from '../utils/srd'
 import { SkeletonCharacterPage } from '../components/Skeleton'
 import { CloudinaryImage } from '@cloudinary/url-gen'
 import { quality, format } from '@cloudinary/url-gen/actions/delivery'
@@ -41,11 +52,18 @@ const DEFAULT = {
   background: '', personality: '', goals: '', lore: '',
 }
 
+// Remembers which character was last open per campaign (per browser), so
+// returning to the Character page shows that character again instead of
+// always resetting to the primary one.
+const lastCharKey = (campaignId) => `lastChar:${campaignId}`
+const recallLastChar = (campaignId) => { try { return localStorage.getItem(lastCharKey(campaignId)) } catch { return null } }
+const rememberLastChar = (campaignId, charId) => { try { localStorage.setItem(lastCharKey(campaignId), charId) } catch { /* ignore */ } }
+
 export default function Character() {
-  const { activeCampaign } = useCampaign()
+  const { activeCampaign, setActive, campaigns } = useCampaign()
   const { isPremium } = useAuth()
   const { toast, ToastContainer } = useToast()
-  const [tab, setTab]       = useState('stats')
+  const [tab, setTab]       = useState('actions')
   const [characters, setCharacters] = useState([])
   const [activeCharId, setActiveCharId] = useState(null)
   const [char, setChar]     = useState(null)
@@ -54,6 +72,18 @@ export default function Character() {
   const [avatarPreview, setAvatarPreview] = useState('')
   const [loaded, setLoaded] = useState(false)
   const [showUpgrade, setShowUpgrade] = useState(false)
+  const [builder, setBuilder] = useState(null) // null | 'custom'
+  const roller = useRoller()
+  const [srdData, setSrdData] = useState(null)
+  const [printing, setPrinting] = useState(false)
+  const [sharing, setSharing] = useState(false)
+
+  // Rules data is only fetched once the Actions / Gear tabs are opened
+  useEffect(() => {
+    if ((tab === 'actions' || tab === 'gear' || printing || sharing) && !srdData) {
+      loadSrdMany('core', 'classes', 'races', 'traits', 'features', 'equipment', 'spells').then(setSrdData).catch(() => toast('Could not load the rules data'))
+    }
+  }, [tab]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const FREE_CHAR_LIMIT = 2
   const atCharLimit = !isPremium && characters.length >= FREE_CHAR_LIMIT
@@ -61,17 +91,18 @@ export default function Character() {
   // Loads every character this player owns in the active campaign, then
   // selects the primary one (or the first) as the active sheet.
   const load = useCallback(async () => {
-    if (!activeCampaign) return
+    if (!activeCampaign || activeCampaign.isPersonal) return
     const list = await api(`/campaigns/${activeCampaign._id}/characters`)
     setCharacters(list)
-    const chosen = list.find(c => c.isPrimary) || list[0] || null
+    const rememberedId = recallLastChar(activeCampaign._id)
+    const chosen = (rememberedId && list.find(c => c._id === rememberedId)) || list.find(c => c.isPrimary) || list[0] || null
     setActiveCharId(chosen?._id || null)
-    if (chosen) { setChar(chosen); setForm(chosen); setAvatarPreview(chosen.avatarUrl || '') }
+    if (chosen) { setChar(chosen); setForm(chosen); setAvatarPreview(chosen.avatarUrl || ''); rememberLastChar(activeCampaign._id, chosen._id) }
     else { setChar(null); setForm(DEFAULT); setAvatarPreview('') }
     setLoaded(true)
   }, [activeCampaign])
 
-  useEffect(() => { if (!activeCampaign) return; setLoaded(false); load() }, [activeCampaign, load])
+  useEffect(() => { if (!activeCampaign || activeCampaign.isPersonal) return; setLoaded(false); load() }, [activeCampaign, load])
 
   const selectCharacter = (c) => {
     setActiveCharId(c._id)
@@ -79,33 +110,82 @@ export default function Character() {
     setForm(c)
     setAvatarPreview(c.avatarUrl || '')
     setEditing(false)
+    if (activeCampaign) rememberLastChar(activeCampaign._id, c._id)
   }
 
-  const addCharacter = async () => {
+  const [creatorNew, setCreatorNew] = useState(false) // creator launched from "+ New Character"
+  const openNewChooser = () => {
     if (!activeCampaign) return
     if (atCharLimit) { setShowUpgrade(true); return }
-    try {
-      const created = await api(`/campaigns/${activeCampaign._id}/characters`, { method: 'POST', body: DEFAULT })
-      setCharacters(p => [...p, created])
-      selectCharacter(created)
-      setEditing(true)
-    } catch (err) {
-      if (err?.status === 403) { setShowUpgrade(true); return }
-      toast(err.message || 'Could not create character')
-    }
+    setCreatorNew(true)
+    setBuilder('custom')
   }
 
-  const deleteCharacter = async (c, e) => {
+  // Deleting requires typing the character's exact (case-sensitive) name.
+  const [deleteTarget, setDeleteTarget] = useState(null)
+  const [deleteInput, setDeleteInput] = useState('')
+  const [deleteError, setDeleteError] = useState('')
+  const [deleteWorking, setDeleteWorking] = useState(false)
+  const deleteTargetName = deleteTarget ? (deleteTarget.name || 'Unnamed Hero') : ''
+
+  const deleteCharacter = (c, e) => {
     e.stopPropagation()
     if (characters.length <= 1) { toast('You must have at least one character sheet.'); return }
-    if (!window.confirm(`Delete "${c.name || 'Unnamed Hero'}"? This cannot be undone.`)) return
+    setDeleteTarget(c)
+    setDeleteInput('')
+    setDeleteError('')
+  }
+
+  const closeDeleteModal = () => { if (!deleteWorking) setDeleteTarget(null) }
+
+  const confirmDeleteCharacter = async () => {
+    const c = deleteTarget
+    if (!c || deleteWorking) return
+    if (deleteInput !== deleteTargetName) { setDeleteError('Name did not match — check capitalisation.'); return }
+    setDeleteError('')
+    setDeleteWorking(true)
     try {
-      await api(`/campaigns/${activeCampaign._id}/characters/${c._id}`, { method: 'DELETE' })
+      await api(`/campaigns/${activeCampaign._id}/characters/${c._id}`, { method: 'DELETE', body: { confirmName: deleteInput } })
       const remaining = characters.filter(x => x._id !== c._id)
       setCharacters(remaining)
       if (activeCharId === c._id) selectCharacter(remaining[0])
+      setDeleteTarget(null)
       toast('Character deleted')
-    } catch (err) { toast(err.message || 'Could not delete character') }
+    } catch (err) {
+      setDeleteError(err.message || 'Could not delete character')
+    } finally {
+      setDeleteWorking(false)
+    }
+  }
+
+  // Persist a creator / level-up result onto the active sheet
+  const applyBuild = async (campaignId, patch) => {
+    // The level-up flow passes only a patch; the creator also passes a target campaign
+    if (typeof campaignId === 'object') { patch = campaignId; campaignId = activeCampaign._id }
+    try {
+      let updated
+      if (campaignId === activeCampaign._id && activeCharIdRef.current && !creatorNew) {
+        updated = await api(`/campaigns/${campaignId}/characters/${activeCharIdRef.current}`, { method: 'PUT', body: { ...form, ...patch } })
+        setCharacters(p => p.map(c => c._id === updated._id ? updated : c))
+      } else {
+        updated = await api(`/campaigns/${campaignId}/characters`, { method: 'POST', body: { ...(campaignId === activeCampaign._id && !creatorNew ? form : DEFAULT), ...patch } })
+        if (campaignId === activeCampaign._id) {
+          setCharacters(p => [...p, updated])
+          setActiveCharId(updated._id)
+        } else {
+          setBuilder(null)
+          setActive(campaigns.find(c => c._id === campaignId))
+          toast('Character created in that campaign')
+          return
+        }
+      }
+      if (creatorNew) selectCharacter(updated); else { setChar(updated); setForm(updated) }
+      setBuilder(null); setCreatorNew(false)
+      toast('Character updated')
+    } catch (e) {
+      if (e?.status === 403) { setShowUpgrade(true); return }
+      toast(e.message || 'Save failed')
+    }
   }
 
   const [avatarUploading, setAvatarUploading] = useState(false)
@@ -145,7 +225,7 @@ export default function Character() {
     }
   }
 
-  const hpSaveTimer = useRef(null)
+  const { schedule: scheduleHpSave } = useDebouncedSave(400)
   const adjustHp = (delta) => {
     setForm(p => {
       const max = p.hp?.max ?? 10
@@ -153,37 +233,58 @@ export default function Character() {
       const next = Math.max(0, Math.min(max, current + delta))
       const nextForm = { ...p, hp: { current: next, max } }
       if (activeCampaign && activeCharIdRef.current) {
-        clearTimeout(hpSaveTimer.current)
-        hpSaveTimer.current = setTimeout(async () => {
+        const campaignId = activeCampaign._id, charId = activeCharIdRef.current
+        scheduleHpSave(async () => {
           try {
-            const updated = await api(`/campaigns/${activeCampaign._id}/characters/${activeCharIdRef.current}`, { method: 'PUT', body: nextForm })
+            const updated = await api(`/campaigns/${campaignId}/characters/${charId}`, { method: 'PUT', body: nextForm })
             setChar(updated)
             setCharacters(p => p.map(c => c._id === updated._id ? updated : c))
           } catch { toast('Could not save HP change') }
-        }, 400)
+        })
       }
       return nextForm
     })
   }
 
+  // Saves a partial update (spell slots, carried weapons…) without touching unsaved sheet edits
+  const setShare = async (enabled) => {
+    try {
+      const r = await api(`/campaigns/${activeCampaign._id}/characters/${activeCharIdRef.current}/share`, { method: 'POST', body: { enabled } })
+      const patch = { shareToken: r.shareToken || undefined }
+      setChar(c => (c ? { ...c, ...patch } : c))
+      setCharacters(p => p.map(c => (c._id === activeCharIdRef.current ? { ...c, ...patch } : c)))
+    } catch (e) { toast(e.message || 'Could not update sharing') }
+  }
+
+  const patchChar = useCallback(async (patch) => {
+    const id = activeCharIdRef.current
+    if (!activeCampaign || !id) return
+    setChar(c => (c ? { ...c, ...patch } : c))
+    setForm(f => ({ ...f, ...patch }))
+    setCharacters(p => p.map(c => (c._id === id ? { ...c, ...patch } : c)))
+    try {
+      await api(`/campaigns/${activeCampaign._id}/characters/${id}`, { method: 'PUT', body: patch })
+    } catch (e) { toast(e.message || 'Could not save') }
+  }, [activeCampaign]) // eslint-disable-line react-hooks/exhaustive-deps
+
   // Autosave for free-text fields (notes + backstory tabs) — debounced 800ms
   // after typing stops, so nothing is lost if the user navigates away or the
   // browser closes without clicking Save.
   const [autosaveStatus, setAutosaveStatus] = useState('') // '' | 'saving' | 'saved'
-  const textSaveTimer = useRef(null)
+  const { schedule: scheduleText, flush: flushText } = useDebouncedSave(800)
   const scheduleTextAutosave = useCallback((nextForm) => {
     if (!activeCampaign || !activeCharIdRef.current) return
-    clearTimeout(textSaveTimer.current)
+    const campaignId = activeCampaign._id, charId = activeCharIdRef.current
     setAutosaveStatus('saving')
-    textSaveTimer.current = setTimeout(async () => {
+    scheduleText(async () => {
       try {
-        const updated = await api(`/campaigns/${activeCampaign._id}/characters/${activeCharIdRef.current}`, { method: 'PUT', body: nextForm })
+        const updated = await api(`/campaigns/${campaignId}/characters/${charId}`, { method: 'PUT', body: nextForm })
         setChar(updated)
         setCharacters(p => p.map(c => c._id === updated._id ? updated : c))
         setAutosaveStatus('saved')
       } catch { setAutosaveStatus(''); toast('Could not autosave') }
-    }, 800)
-  }, [activeCampaign])
+    })
+  }, [activeCampaign, scheduleText])
 
   const setTextField = (field) => (e) => {
     const value = e.target.value
@@ -194,8 +295,8 @@ export default function Character() {
     })
   }
 
-  // Flush pending autosave on unmount
-  useEffect(() => () => { if (textSaveTimer.current) clearTimeout(textSaveTimer.current) }, [])
+  // Save pending text before the campaign changes (the hook also flushes on unmount).
+  useEffect(() => flushText, [activeCampaign?._id, flushText])
 
   const F = form
 
@@ -203,6 +304,14 @@ export default function Character() {
     <div className="page-content">
       <h2 style={{ fontSize: 22, marginBottom: 12 }}>My Characters</h2>
       <div style={{ color: 'var(--text-3)' }}>Select a campaign.</div>
+    </div>
+  )
+  // Characters belong to a real campaign — the auto-created personal "My
+  // Journal" space is for solo Journal/Lore only, not character sheets.
+  if (activeCampaign.isPersonal) return (
+    <div className="page-content">
+      <h2 style={{ fontSize: 22, marginBottom: 12 }}>My Characters</h2>
+      <div style={{ color: 'var(--text-3)' }}>You need to join a campaign first.</div>
     </div>
   )
   if (!loaded) return <SkeletonCharacterPage />
@@ -229,11 +338,11 @@ export default function Character() {
           </div>
         ))}
         <button
-          onClick={addCharacter}
+          onClick={openNewChooser}
           className="btn btn-ghost btn-sm"
           style={{ fontSize: 12, opacity: atCharLimit ? 0.7 : 1 }}
         >
-          {atCharLimit ? `✦ ${characters.length}/${FREE_CHAR_LIMIT} — Upgrade for more` : '+ New Character'}
+          {atCharLimit ? `✦ ${characters.length}/${FREE_CHAR_LIMIT}` : '+ New Character'}
         </button>
       </div>
 
@@ -309,7 +418,11 @@ export default function Character() {
         <div style={{ display: 'flex', gap: 8 }}>
           {editing
             ? <><button className="btn btn-primary btn-sm" onClick={save}>Save</button><button className="btn btn-ghost btn-sm" onClick={() => { setEditing(false); setForm(char || DEFAULT); setAvatarPreview(char?.avatarUrl || '') }}>Cancel</button></>
-            : <button className="btn btn-ghost btn-sm" onClick={() => setEditing(true)}>Edit</button>}
+            : <>
+                <button className="btn btn-ghost btn-sm" onClick={() => setEditing(true)}>Edit</button>
+                {char && <button className="btn btn-ghost btn-sm" onClick={() => setPrinting(true)} title="Printable sheet for playing without a device">Print</button>}
+                {char && <button className="btn btn-ghost btn-sm" onClick={() => setSharing(true)}>Share</button>}
+              </>}
         </div>
       </div>
 
@@ -322,12 +435,22 @@ export default function Character() {
 
       {/* Tabs */}
       <div style={{ display: 'flex', gap: 4, marginBottom: 16, flexWrap: 'wrap' }}>
-        {['stats', 'backstory', 'notes', 'dndbeyond'].map(t => (
+        {['stats', 'actions', 'gear', 'inventory', 'backstory', 'notes'].map(t => (
           <button key={t} onClick={() => setTab(t)} className={`btn btn-sm ${tab === t ? 'btn-primary' : 'btn-ghost'}`}>
-            {t === 'dndbeyond' ? 'D&D Beyond' : t.charAt(0).toUpperCase() + t.slice(1)}
+            {t.charAt(0).toUpperCase() + t.slice(1)}
           </button>
         ))}
       </div>
+
+      {(tab === 'actions' || tab === 'gear') && (
+        !char ? <div className="card" style={{ padding: 20, fontSize: 13, color: 'var(--text-2)' }}>Save your character first, then your actions will show up here.</div>
+        : !srdData ? <div style={{ color: 'var(--text-3)', fontSize: 13 }}>Loading rules…</div>
+        : tab === 'actions'
+          ? <><RestPanel char={char} srd={srdData} roller={roller} onPatch={patchChar} /><CombatPanel char={char} srd={srdData} d={derive(char, srdData)} roller={roller} onPatch={patchChar} /><CharacterActions char={char} srd={srdData} roller={roller} onPatch={patchChar} /></>
+          : <GearTab char={char} srd={srdData} d={derive(char, srdData)} onPatch={patchChar} />
+      )}
+      {tab === 'inventory' && <InventoryPanel toast={toast} />}
+      {tab === 'actions' && char && <RollPanel roller={roller} />}
 
       {tab === 'stats' && (
         <div className="stat-grid-6">
@@ -375,17 +498,60 @@ export default function Character() {
         </div>
       )}
 
-      {tab === 'dndbeyond' && (
-        <div className="card" style={{ padding: 20 }}>
-          <div style={{ fontSize: 13, color: 'var(--text-2)', marginBottom: 12 }}>Link your D&amp;D Beyond character sheet to embed it here.</div>
-          <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
-            <input className="input" style={{ flex: 1 }} placeholder="https://www.dndbeyond.com/characters/..." value={F.dndBeyondUrl || ''} onChange={e => setForm(p => ({ ...p, dndBeyondUrl: e.target.value }))} />
-            <button className="btn btn-primary" onClick={save}>Link</button>
+      {printing && srdData && char && <PrintOverlay char={char} srd={srdData} onClose={() => setPrinting(false)} />}
+      {printing && !srdData && <div style={{ position: 'fixed', inset: 0, zIndex: 2000, background: 'rgba(0,0,0,.5)', color: '#fff', display: 'grid', placeItems: 'center' }}>Preparing sheet…</div>}
+      {sharing && char && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }} onClick={() => setSharing(false)}>
+          <div className="card" style={{ width: '100%', maxWidth: 460, padding: 22 }} onClick={e => e.stopPropagation()}>
+            <div style={{ fontFamily: 'Cinzel, serif', fontSize: 17, color: 'var(--gold)', marginBottom: 8 }}>Share {char.name || 'this character'}</div>
+            <div style={{ fontSize: 13, color: 'var(--text-2)', lineHeight: 1.5, marginBottom: 12 }}>Anyone with the link can view a read-only sheet and print it, even without an account. Your notes, lore and goals are never shared.</div>
+            {char.shareToken ? (
+              <>
+                <input className="input" readOnly value={`${window.location.origin}/s/${char.shareToken}`} onFocus={e => e.target.select()} style={{ fontSize: 12, marginBottom: 10 }} />
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button className="btn btn-primary btn-sm" onClick={() => navigator.clipboard?.writeText(`${window.location.origin}/s/${char.shareToken}`).then(() => toast('Link copied'))}>Copy link</button>
+                  <button className="btn btn-ghost btn-sm" onClick={() => setShare(false)}>Stop sharing</button>
+                </div>
+              </>
+            ) : <button className="btn btn-primary btn-sm" onClick={() => setShare(true)}>Create share link</button>}
+            <div style={{ marginTop: 14 }}><button className="btn btn-ghost btn-sm" onClick={() => setSharing(false)}>Close</button></div>
           </div>
-          {F.dndBeyondUrl && <iframe src={F.dndBeyondUrl} title="D&D Beyond" style={{ width: '100%', height: 'calc(100vh - 260px)', minHeight: 500, border: 'none', borderRadius: 8 }} sandbox="allow-scripts allow-same-origin" />}
         </div>
       )}
       <ToastContainer />
+      {deleteTarget && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.65)', zIndex: 1100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }} onClick={closeDeleteModal}>
+          <div className="card" role="dialog" aria-modal="true" aria-labelledby="delete-char-title" style={{ width: '100%', maxWidth: 380, padding: 22 }} onClick={e => e.stopPropagation()}>
+            <div id="delete-char-title" style={{ fontFamily: 'Cinzel, serif', fontSize: 16, fontWeight: 600, color: 'var(--red)', marginBottom: 10 }}>Delete Character</div>
+            <div style={{ fontSize: 13, color: 'var(--text-2)', marginBottom: 14, lineHeight: 1.6 }}>
+              This permanently deletes this character sheet. This cannot be undone.{' '}
+              Type <strong style={{ color: 'var(--text)' }}>{deleteTargetName}</strong> exactly to confirm.
+            </div>
+            <input
+              autoFocus
+              className="input"
+              placeholder={deleteTargetName}
+              value={deleteInput}
+              onChange={e => setDeleteInput(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter' && deleteInput === deleteTargetName) confirmDeleteCharacter(); if (e.key === 'Escape') closeDeleteModal() }}
+              style={{ marginBottom: 10 }}
+            />
+            {deleteError && <div style={{ fontSize: 12, color: 'var(--red)', marginBottom: 10 }}>{deleteError}</div>}
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button
+                className="btn btn-sm"
+                onClick={confirmDeleteCharacter}
+                disabled={deleteWorking || deleteInput !== deleteTargetName}
+                style={{ background: 'var(--red)', color: '#fff', border: 'none', flex: 1, opacity: deleteInput === deleteTargetName ? 1 : 0.4, cursor: deleteInput === deleteTargetName && !deleteWorking ? 'pointer' : 'not-allowed' }}
+              >
+                {deleteWorking ? 'Deleting…' : 'Delete Forever'}
+              </button>
+              <button className="btn btn-ghost btn-sm" onClick={closeDeleteModal} disabled={deleteWorking}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
+      {builder === 'custom' && <CustomCharacterBuilder onClose={() => { setBuilder(null); setCreatorNew(false) }} onComplete={applyBuild} />}
       {showUpgrade && <UpgradeModal onClose={() => setShowUpgrade(false)} message={`Free accounts are limited to ${FREE_CHAR_LIMIT} characters per campaign. Upgrade to Premium for unlimited characters.`} />}
     </div>
   )

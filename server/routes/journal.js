@@ -24,6 +24,7 @@ router.get('/:campaignId', auth, async (req, res) => {
 
 router.post('/:campaignId', auth, async (req, res) => {
   try {
+    if (!await isMember(req.params.campaignId, req.userId)) return res.status(403).json({ error: 'Not a campaign member' })
     const user = await User.findById(req.userId)
     if (!user.isPremium) {
       const count = await Journal.countDocuments({ campaign: req.params.campaignId, author: req.userId })
@@ -46,7 +47,7 @@ router.put('/:id', auth, async (req, res) => {
   if (typeof req.body.content === 'string') updates.content = req.body.content
   if (req.body.day !== undefined) updates.day = req.body.day
   if (req.body.session !== undefined) updates.session = req.body.session
-  const entry = await Journal.findOneAndUpdate({ _id: req.params.id, author: req.userId }, updates, { new: true })
+  const entry = await Journal.findOneAndUpdate({ _id: req.params.id, author: req.userId }, updates, { returnDocument: 'after' })
   res.json(entry)
 })
 

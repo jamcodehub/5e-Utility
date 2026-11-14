@@ -1,10 +1,12 @@
+import { useDebouncedSave } from '../hooks/useDebouncedSave'
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { Navigate } from 'react-router-dom'
+import { Link, Navigate } from 'react-router-dom'
 import UpgradeModal from '../components/UpgradeModal'
 import { api, useAuth } from '../context/AuthContext'
 import { useCampaign } from '../context/CampaignContext'
 import { useToast } from '../hooks/useToast'
 import { SkeletonTextLines } from '../components/Skeleton'
+import { isPublicDemoPath } from '../utils/demoRuntime'
 
 const wordCount = s => s.trim().split(/\s+/).filter(Boolean).length
 
@@ -25,12 +27,13 @@ export default function Journal() {
   const [entriesReload, setEntriesReload] = useState(0)
   const [activeId, setActiveId] = useState(null)
   const [content, setContent] = useState('')
+  const [hasEditedContent, setHasEditedContent] = useState(false)
   const [saving, setSaving] = useState(false)
   const [showUpgrade, setShowUpgrade] = useState(false)
   const [renamingId, setRenamingId] = useState(null)
   const [titleDraft, setTitleDraft] = useState('')
   const renameCancelled = useRef(false)
-  const saveTimer = useRef(null)
+  const { schedule: scheduleSave, flush: flushSave } = useDebouncedSave(800)
 
   const active = entries.find(e => e._id === activeId)
   const entryNum = e => e.day ?? '?'
@@ -43,6 +46,7 @@ export default function Journal() {
       setEntriesCampaignId(null)
       setActiveId(null)
       setContent('')
+      setHasEditedContent(false)
       setEntriesLoading(false)
       return
     }
@@ -50,6 +54,7 @@ export default function Journal() {
     setEntries([])
     setActiveId(null)
     setContent('')
+    setHasEditedContent(false)
     setEntriesLoading(true)
     setEntriesError('')
     api(`/${apiBase}/${activeCampaign._id}?kind=day`)
@@ -57,7 +62,7 @@ export default function Journal() {
         if (cancelled) return
         setEntries(data)
         setEntriesCampaignId(activeCampaign._id)
-        if (data.length) { setActiveId(data[0]._id); setContent(data[0].content) }
+        if (data.length) { setActiveId(data[0]._id); setContent(data[0].content); setHasEditedContent(false) }
       })
       .catch(err => {
         if (!cancelled) {
@@ -68,17 +73,15 @@ export default function Journal() {
       .finally(() => {
         if (!cancelled) setEntriesLoading(false)
       })
-    return () => { cancelled = true }
-  }, [activeCampaign, entriesReload])
+    return () => { cancelled = true; flushSave() }
+  }, [activeCampaign, entriesReload, flushSave])
 
   const selectEntry = (e) => {
     // Flush any pending save for the current entry before switching
-    if (saveTimer.current) {
-      clearTimeout(saveTimer.current)
-      saveTimer.current = null
-    }
+    flushSave()
     setActiveId(e._id)
     setContent(e.content)
+    setHasEditedContent(false)
   }
 
   // Autosave — debounced 800ms after the user stops typing.
@@ -100,16 +103,10 @@ export default function Journal() {
   const handleContentChange = (e) => {
     const text = e.target.value
     setContent(text)
-    if (saveTimer.current) clearTimeout(saveTimer.current)
-    saveTimer.current = setTimeout(() => autosave(activeId, text), 800)
+    setHasEditedContent(true)
+    const id = activeId
+    scheduleSave(() => autosave(id, text))
   }
-
-  // Flush on unmount / tab close so nothing typed just before navigating away is lost.
-  useEffect(() => {
-    const flush = () => { if (saveTimer.current) clearTimeout(saveTimer.current) }
-    window.addEventListener('beforeunload', flush)
-    return () => { flush(); window.removeEventListener('beforeunload', flush) }
-  }, [])
 
   const startRename = (e, entry) => {
     e.stopPropagation()
@@ -150,6 +147,7 @@ export default function Journal() {
       setEntries(p => [entry, ...p])
       setActiveId(entry._id)
       setContent('')
+      setHasEditedContent(false)
     } catch (err) {
       if (err && (err.status === 403 || String(err.message || '').toLowerCase().includes('limited'))) {
         setShowUpgrade(true)
@@ -161,7 +159,7 @@ export default function Journal() {
 
   // DMs shouldn't land here — send them to their own Session Planner instead.
   // (Placed after all hooks above to satisfy the Rules of Hooks.)
-  if (user?.role === 'dm') return <Navigate to="/session-planner" replace />
+  if (user?.role === 'dm' && !isPublicDemoPath()) return <Navigate to="/session-planner" replace />
 
   // Sort sidebar numerically by day number, descending (newest first) —
   // independent of title text, so renaming a title never shuffles the list.
@@ -187,7 +185,7 @@ export default function Journal() {
               borderLeft: `2px solid ${activeId === e._id ? 'var(--gold)' : 'transparent'}`,
             }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6 }}>
-              {renamingId === e._id ? (
+              {renamingId === e._id && e._id !== activeId ? (
                 <input
                   autoFocus
                   className="input"
@@ -204,8 +202,8 @@ export default function Journal() {
               ) : (
                 <span
                   onMouseDown={(ev) => ev.stopPropagation()}
-                  onClick={(ev) => startRename(ev, e)}
-                  title="Click to rename"
+                  onClick={e._id === activeId && renamingId !== e._id ? (ev) => startRename(ev, e) : undefined}
+                  title={e._id === activeId && renamingId !== e._id ? 'Click to rename' : undefined}
                   style={{ fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', cursor: 'text', flex: 1 }}
                 >{entryTitle(e)}</span>
               )}
@@ -264,10 +262,14 @@ export default function Journal() {
             <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{wordCount(content)} words</span>
             {/* Autosave indicator — no manual save button needed */}
             {saving && <span style={{ fontSize: 11, color: 'var(--text-3)' }}>Saving…</span>}
-            {!saving && activeId && <span style={{ fontSize: 11, color: 'var(--green)' }}>Saved</span>}
+            {isPublicDemoPath() ? (
+              <Link to="/register" className="journal-demo-save-link">Sign up to save journal entries</Link>
+            ) : (
+              !saving && activeId && <span style={{ fontSize: 11, color: 'var(--green)' }}>Saved</span>
+            )}
           </div>
         </div>
-        <div style={{ flex: 1, overflowY: 'auto', padding: '24px 32px' }}>
+        <div className="journal-content-area" style={{ flex: 1, overflowY: 'auto', padding: '24px 32px' }}>
           {loadingContent ? (
             <SkeletonTextLines lines={12} style={{ maxWidth: 840 }} />
           ) : campaignsError ? (
@@ -285,16 +287,18 @@ export default function Journal() {
               <button className="btn btn-ghost" onClick={() => setEntriesReload(n => n + 1)}>Retry</button>
             </div>
           ) : activeId ? (
-            <textarea
-              value={content}
-              onChange={handleContentChange}
-              placeholder={placeholder}
-              style={{
-                width: '100%', minHeight: '100%', border: 'none', outline: 'none', resize: 'none',
-                fontSize: 15, lineHeight: 1.8, color: 'var(--text)', background: 'transparent',
-                fontFamily: 'Georgia, serif',
-              }}
-            />
+            <>
+              <textarea
+                value={content}
+                onChange={handleContentChange}
+                placeholder={placeholder}
+                style={{
+                  width: '100%', minHeight: '100%', border: 'none', outline: 'none', resize: 'none',
+                  fontSize: 15, lineHeight: 1.8, color: 'var(--text)', background: 'transparent',
+                  fontFamily: 'Georgia, serif',
+                }}
+              />
+            </>
           ) : (
             <div style={{ textAlign: 'center', color: 'var(--text-3)', marginTop: 60, fontSize: 13 }}>
               No day selected. Start a new one with +

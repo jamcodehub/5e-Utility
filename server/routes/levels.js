@@ -4,6 +4,9 @@ import { auth, isMember } from './campaigns.js'
 
 const router = Router()
 
+// Keep in sync with src/data/levelThemes.js (only themes that are live)
+const ALLOWED_THEMES = ['medieval', 'cartoon']
+
 router.get('/:campaignId', auth, async (req, res) => {
   if (!await isMember(req.params.campaignId, req.userId)) return res.status(403).json({ error: 'Not a campaign member' })
   res.json(await LevelPlan.find({ campaign: req.params.campaignId }).sort({ createdAt: 1 }))
@@ -11,13 +14,18 @@ router.get('/:campaignId', auth, async (req, res) => {
 
 router.post('/:campaignId', auth, async (req, res) => {
   try {
+    if (!await isMember(req.params.campaignId, req.userId)) return res.status(403).json({ error: 'Not a campaign member' })
     const campaign = await Campaign.findById(req.params.campaignId)
     const owner = campaign ? await User.findById(campaign.owner) : null
     if (!owner?.isPremium) {
       const count = await LevelPlan.countDocuments({ campaign: req.params.campaignId })
       if (count >= 5) return res.status(403).json({ error: 'Free campaigns are limited to 5 level plans. Upgrade to the Ultimate DM Toolkit for unlimited plans.' })
     }
-    const plan = await LevelPlan.create({ ...req.body, campaign: req.params.campaignId, owner: req.userId })
+    const plan = await LevelPlan.create({
+      title: req.body.title, content: req.body.content, tokens: req.body.tokens, stairLinks: req.body.stairLinks,
+      theme: ALLOWED_THEMES.includes(req.body.theme) ? req.body.theme : 'medieval',
+      campaign: req.params.campaignId, owner: req.userId,
+    })
     res.json(plan)
   } catch (e) { res.status(500).json({ error: e.message }) }
 })
@@ -31,7 +39,10 @@ router.put('/:id', auth, async (req, res) => {
   if (typeof req.body.title === 'string') updates.title = req.body.title
   if (typeof req.body.content === 'string') updates.content = req.body.content
   if (req.body.tokens !== undefined) updates.tokens = req.body.tokens
-  const plan = await LevelPlan.findOneAndUpdate({ _id: req.params.id, owner: req.userId }, updates, { new: true })
+  if (ALLOWED_THEMES.includes(req.body.theme)) updates.theme = req.body.theme
+  if (typeof req.body.darkMode === 'boolean') updates.darkMode = req.body.darkMode
+  if (Array.isArray(req.body.doorStates)) updates.doorStates = req.body.doorStates
+  const plan = await LevelPlan.findOneAndUpdate({ _id: req.params.id, owner: req.userId }, updates, { returnDocument: 'after' })
   res.json(plan)
 })
 

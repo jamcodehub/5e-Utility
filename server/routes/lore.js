@@ -25,7 +25,7 @@ router.put('/:id', auth, async (req, res) => {
     // smuggle in a different campaign id and move the entry somewhere they
     // don't have access to.
     const { campaign, _id, ...safeUpdates } = req.body
-    res.json(await Lore.findByIdAndUpdate(req.params.id, safeUpdates, { new: true }))
+    res.json(await Lore.findByIdAndUpdate(req.params.id, safeUpdates, { returnDocument: 'after' }))
   } catch { res.status(500).json({ error: 'Failed to update' }) }
 })
 
