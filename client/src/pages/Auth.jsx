@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import { emailHint } from '../utils/emailCheck'
 import { useLocation } from 'react-router-dom'
 import { api, useAuth, useAuthConfig } from '../context/AuthContext'
 import Turnstile from '../components/Turnstile'
@@ -23,6 +24,7 @@ export default function Auth() {
   const [form, setForm] = useState({ username: '', email: '', password: '', phone: '', role: 'player' })
   const [googleSignup, setGoogleSignup] = useState(null) // { credential, email } once Google verified the account
   const [error, setError] = useState('')
+  const [emailTouched, setEmailTouched] = useState(false)
   const [loading, setLoading] = useState(false)
   const [serverStatus, setServerStatus] = useState('connecting')
 
@@ -72,6 +74,7 @@ export default function Auth() {
         const result = await login(form.email, form.password, captchaToken)
         if (result?.requires2FA) { setTwoFA(result); setCode(''); setNotice('') }
       } else {
+        if (method === 'email') { const h = emailHint(form.email); if (h) { setEmailTouched(true); throw new Error(h) } }
         if (form.password.length < 8) throw new Error('Password must be at least 8 characters')
         if (method === 'google' && !googleSignup) throw new Error('Verify your Gmail account with Google first')
         const result = await register({
@@ -321,7 +324,12 @@ return (
           {!(mode === 'register' && method === 'google') && (
             <div style={{ marginBottom: 12 }}>
               <label style={labelStyle}>Email</label>
-              <input className="input" type="email" placeholder="adventurer@realm.com" value={form.email} onChange={set('email')} required />
+              <input className="input" type="email" placeholder="adventurer@realm.com" value={form.email} onChange={set('email')} onBlur={() => setEmailTouched(true)} required
+                aria-invalid={mode === 'register' && emailTouched && !!emailHint(form.email)} aria-describedby="email-hint"
+                style={mode === 'register' && emailTouched && emailHint(form.email) ? { borderColor: 'var(--red)' } : undefined} />
+              {mode === 'register' && emailTouched && emailHint(form.email) && (
+                <div id="email-hint" role="alert" style={{ fontSize: 12, color: 'var(--red)', marginTop: 5 }}>{emailHint(form.email)}</div>
+              )}
             </div>
           )}
           {mode === 'register' && (
