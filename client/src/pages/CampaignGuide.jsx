@@ -91,7 +91,7 @@ function DropTextarea({ value, onChange, activePlayer, onInserted, style = {}, r
         }}
       />
       {activePlayer && (
-        <div style={{ position: 'absolute', top: 4, right: 4, background: 'var(--gold)', color: '#2a1a00', borderRadius: 4, padding: '1px 5px', fontSize: 9, fontWeight: 700, pointerEvents: 'none', lineHeight: 1.6 }}>
+        <div style={{ position: 'absolute', top: 4, right: 4, background: 'var(--gold-fill, var(--gold))', color: '#2a1a00', borderRadius: 4, padding: '1px 5px', fontSize: 9, fontWeight: 700, pointerEvents: 'none', lineHeight: 1.6 }}>
           tap → {activePlayer.name}
         </div>
       )}

@@ -383,7 +383,7 @@ export default function Character() {
             { label: 'HP',   color: 'var(--green)' },
             { label: 'AC',   color: 'var(--text)'  },
             { label: 'Prof', color: 'var(--text)'  },
-            { label: 'Init', color: 'var(--accent)' },
+            { label: 'Init', color: 'var(--gold)' },
           ].map(({ label, color }) => (
             <div key={label} style={{ textAlign: 'center', minWidth: 44 }}>
               <div style={{ fontSize: 9, fontWeight: 600, color: 'var(--text-3)', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 2 }}>{label}</div>

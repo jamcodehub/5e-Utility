@@ -17,18 +17,20 @@ html, body { overflow-x: hidden; }
 .pill-carousel-track::-webkit-scrollbar { display: none; }
 
 :root {
-  --bg: #f5f4f1;
+  --bg: #fbfaf6;
   --surface: #ffffff;
-  --surface2: #f0ede8;
-  --border: #e4e0d8;
-  --border-strong: #ccc8bf;
+  --surface2: #f3f0e8;
+  --border: #e8e4da;
+  --border-strong: #d2cdc0;
   --text: #1a1917;
-  --text-2: #6b6760;
-  --text-3: #a8a49c;
-  --gold: #9a7c3a;
-  --accent: #7e22ce;
-  --gold-bg: #faf6ed;
-  --gold-border: #e8d9a8;
+  --text-2: #5e5a52;
+  --text-3: #8a857b;
+  /* --gold is the text-safe deep gold; --gold-fill is for buttons/fills */
+  --gold: #7a5c14;
+  --gold-fill: #c9a24b;
+  --gold-fill-hover: #b88f34;
+  --gold-bg: #f8f0d8;
+  --gold-border: #e3cf94;
   --red: #c0392b;
   --green: #2e7d52;
   --radius: 12px;
@@ -60,8 +62,8 @@ input, textarea, select { font-family: inherit; }
   font-size: 13px; font-weight: 500; border: none;
   transition: all .15s; line-height: 1;
 }
-.btn-primary { background: var(--gold); color: var(--text); }
-.btn-primary:hover { background: var(--gold); }
+.btn-primary { background: var(--gold-fill, var(--gold)); color: #1a1917; }
+.btn-primary:hover { background: var(--gold-fill-hover, var(--gold)); }
 .btn-ghost { background: transparent; color: var(--text-2); border: 1px solid var(--border); }
 .btn-ghost:hover { background: var(--surface2); color: var(--text); }
 .btn-gold { background: var(--gold-bg); color: var(--gold); border: 1px solid var(--gold-border); }
