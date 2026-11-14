@@ -33,7 +33,7 @@ router.post('/checkout', auth, async (req, res) => {
     })
 
     res.json({ url: session.url })
-  } catch (e) { res.status(500).json({ error: e.message }) }
+  } catch (e) { console.error('[payments]', e); res.status(500).json({ error: 'Internal server error' }) }
 })
 
 // Create a billing portal session (manage/cancel subscription)
@@ -47,7 +47,7 @@ router.post('/portal', auth, async (req, res) => {
       return_url: `${primaryClientUrl()}/premium`,
     })
     res.json({ url: session.url })
-  } catch (e) { res.status(500).json({ error: e.message }) }
+  } catch (e) { console.error('[payments]', e); res.status(500).json({ error: 'Internal server error' }) }
 })
 
 // Stripe webhook — must be raw body

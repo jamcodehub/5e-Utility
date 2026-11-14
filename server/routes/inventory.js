@@ -27,7 +27,7 @@ router.get('/:campaignId', auth, async (req, res) => {
       })
     }
     res.json(inv)
-  } catch (e) { res.status(500).json({ error: e.message }) }
+  } catch (e) { console.error('[inventory]', e); res.status(500).json({ error: 'Internal server error' }) }
 })
 
 // PUT /api/inventory/:campaignId — upsert (currency + items)
@@ -44,7 +44,7 @@ router.put('/:campaignId', auth, async (req, res) => {
       { returnDocument: 'after', upsert: true, runValidators: true }
     )
     res.json(inv)
-  } catch (e) { res.status(500).json({ error: e.message }) }
+  } catch (e) { console.error('[inventory]', e); res.status(500).json({ error: 'Internal server error' }) }
 })
 
 export default router
