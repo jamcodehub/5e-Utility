@@ -48,23 +48,3 @@ Features
 ## Built for the whole campaign
 
 5e Utility is designed to support a campaign from prep through play: DMs can organize sessions and campaign material, while players can maintain their characters and journal. Shared maps and campaign tools help bring those pieces together at the table.
-
-## Account verification and two-factor
-
-New accounts verify at sign-up in one of two ways, and either one becomes the account's two-factor method automatically:
-
-- **Gmail** ("Sign up with Google"): verified instantly.
-- **Email code**: we email a 6-digit code to confirm the address, and the account is only created once it's entered.
-
-From then on, signing in on a **new device** asks for a Google confirmation or an emailed code, and a device that passed it is remembered for 30 days. There's no toggle to turn it off. Existing accounts keep working unchanged: they can verify with Google from Settings → Security, or keep the older opt-in "email code on new devices" switch.
-
-If neither option is configured, sign-up falls back to plain email + password.
-
-| Where | Variable | Purpose |
-| --- | --- | --- |
-| Render (API) | `CLIENT_URL` | Site address(es) allowed to call the API, comma-separated, e.g. `https://www.5eutility.com,https://5eutility.com`. The first one is used for links in emails and Stripe redirects. Use `https://` and no trailing slash. If the site says it can't reach the server, this is the first thing to check. |
-| Render (API) | `GOOGLE_CLIENT_ID` | Google Cloud OAuth **Web** client ID. The client fetches it from `/api/auth/config`, so no frontend variable is needed. |
-| Render (API) | `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM` | Outgoing email (password resets and email codes). The **Email code** option only appears in production once `SMTP_HOST` is set. A free tier at [Brevo](https://www.brevo.com) or [Resend](https://resend.com) works; verify your domain with them first. Use `SMTP_FROM` like `5e Utility <no-reply@5eutility.com>`. |
-| Netlify (optional) | `VITE_GOOGLE_CLIENT_ID` | Only used if the API can't be reached for config; same value as `GOOGLE_CLIENT_ID`. |
-
-In the Google Cloud console, add your site (e.g. `https://5e-utility.netlify.app`) and `http://localhost:5173` as **Authorized JavaScript origins** for the Web client, and publish the app on the Audience page so anyone can sign in. No client secret is needed (ID-token flow). Outside production, email codes are printed in the server log instead of sent.
