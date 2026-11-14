@@ -2,6 +2,7 @@ import { Router } from 'express'
 import Stripe from 'stripe'
 import { User } from '../models/index.js'
 import { auth } from './campaigns.js'
+import { primaryClientUrl } from '../lib/clientUrl.js'
 
 const router = Router()
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY)
@@ -26,8 +27,8 @@ router.post('/checkout', auth, async (req, res) => {
         price: process.env.STRIPE_PRICE_ID,
         quantity: 1,
       }],
-      success_url: `${process.env.CLIENT_URL}/premium?success=true`,
-      cancel_url:  `${process.env.CLIENT_URL}/premium?cancelled=true`,
+      success_url: `${primaryClientUrl()}/premium?success=true`,
+      cancel_url:  `${primaryClientUrl()}/premium?cancelled=true`,
       metadata: { userId: req.userId.toString() },
     })
 
@@ -43,14 +44,14 @@ router.post('/portal', auth, async (req, res) => {
 
     const session = await stripe.billingPortal.sessions.create({
       customer: user.stripeCustomerId,
-      return_url: `${process.env.CLIENT_URL}/premium`,
+      return_url: `${primaryClientUrl()}/premium`,
     })
     res.json({ url: session.url })
   } catch (e) { res.status(500).json({ error: e.message }) }
 })
 
 // Stripe webhook — must be raw body
-router.post('/webhook', express => express, async (req, res) => {
+router.post('/webhook', async (req, res) => {
   const sig = req.headers['stripe-signature']
   let event
   try {

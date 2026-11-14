@@ -1,0 +1,54 @@
+import { Router } from 'express'
+import { LevelPlan, Campaign, User } from '../models/index.js'
+import { auth, isMember } from './campaigns.js'
+
+const router = Router()
+
+// Keep in sync with src/data/levelThemes.js (only themes that are live)
+const ALLOWED_THEMES = ['medieval', 'cartoon']
+
+router.get('/:campaignId', auth, async (req, res) => {
+  if (!await isMember(req.params.campaignId, req.userId)) return res.status(403).json({ error: 'Not a campaign member' })
+  res.json(await LevelPlan.find({ campaign: req.params.campaignId }).sort({ createdAt: 1 }))
+})
+
+router.post('/:campaignId', auth, async (req, res) => {
+  try {
+    if (!await isMember(req.params.campaignId, req.userId)) return res.status(403).json({ error: 'Not a campaign member' })
+    const campaign = await Campaign.findById(req.params.campaignId)
+    const owner = campaign ? await User.findById(campaign.owner) : null
+    if (!owner?.isPremium) {
+      const count = await LevelPlan.countDocuments({ campaign: req.params.campaignId })
+      if (count >= 5) return res.status(403).json({ error: 'Free campaigns are limited to 5 level plans. Upgrade to the Ultimate DM Toolkit for unlimited plans.' })
+    }
+    const plan = await LevelPlan.create({
+      title: req.body.title, content: req.body.content, tokens: req.body.tokens, stairLinks: req.body.stairLinks,
+      theme: ALLOWED_THEMES.includes(req.body.theme) ? req.body.theme : 'medieval',
+      campaign: req.params.campaignId, owner: req.userId,
+    })
+    res.json(plan)
+  } catch (e) { res.status(500).json({ error: e.message }) }
+})
+
+router.put('/:id', auth, async (req, res) => {
+  // Whitelist fields explicitly — previously the raw body was passed
+  // straight into findOneAndUpdate, which would let a client smuggle in
+  // `owner`/`campaign` and move the map into another campaign they don't
+  // have access to.
+  const updates = {}
+  if (typeof req.body.title === 'string') updates.title = req.body.title
+  if (typeof req.body.content === 'string') updates.content = req.body.content
+  if (req.body.tokens !== undefined) updates.tokens = req.body.tokens
+  if (ALLOWED_THEMES.includes(req.body.theme)) updates.theme = req.body.theme
+  if (typeof req.body.darkMode === 'boolean') updates.darkMode = req.body.darkMode
+  if (Array.isArray(req.body.doorStates)) updates.doorStates = req.body.doorStates
+  const plan = await LevelPlan.findOneAndUpdate({ _id: req.params.id, owner: req.userId }, updates, { returnDocument: 'after' })
+  res.json(plan)
+})
+
+router.delete('/:id', auth, async (req, res) => {
+  await LevelPlan.findOneAndDelete({ _id: req.params.id, owner: req.userId })
+  res.json({ ok: true })
+})
+
+export default router

@@ -4,25 +4,52 @@ import { useAuth } from '../context/AuthContext'
 import { api } from '../context/AuthContext'
 
 const FEATURES = {
-  free: [
-    '1 campaign',
-    '1 character sheet',
-    '5 Journal entries',
-    'Lore board',
-    'Storyboard (5 scenes)',
-  ],
-  premium: [
-    'Unlimited campaigns',
-    'Unlimited characters',
-    'Unlimited journal entries',
-    'Unlimited storyboard scenes',
-    'Lore board',
-    'Priority support',
-  ]
+  dm: {
+    free: [
+      'NPC / World Lore ledger',
+      'Character Builder x20',
+      'Storyboard generation x10',
+      'Idea generator',
+      'HP tracker',
+      'x5 level builder',
+    ],
+    premium: [
+      'NPC / World Lore ledger',
+      'Character Builder — unlimited',
+      'Idea generator',
+      'HP tracker',
+      '5e rules & misc reference page',
+      'Unlimited level building editor',
+      'Unlimited storyboard generations',
+      '11 exclusive class themes',
+    ],
+    price: 20,
+  },
+  player: {
+    free: [
+      '1 campaign',
+      '1 character sheet',
+      '15 Journal / Session Planner entries',
+      'Lore board',
+    ],
+    premium: [
+      'Unlimited campaigns',
+      'Unlimited characters',
+      'Unlimited journal entries',
+      'Lore board',
+      'Unlimited Roleplay Assistant session plans',
+      'Level-up plan regeneration — fresh checklist every time you level',
+      'Roleplay plan syncs with DM Campaign Guide',
+      '11 exclusive class themes — Bard, Cleric, Fighter, Monk, Ranger, Sorcerer, Warlock, Gunslinger, Artificer, Bloodhunter & Wizard',
+    ],
+    price: 5,
+  },
 }
 
 export default function Premium() {
   const { user, isPremium, refreshUser } = useAuth()
+  const isDM = user?.role === 'dm'
+  const tier = FEATURES[isDM ? 'dm' : 'player']
   const [searchParams] = useSearchParams()
   const navigate = useNavigate()
   const [loading, setLoading] = useState(false)
@@ -68,7 +95,7 @@ export default function Premium() {
       <div className="page-header-row" style={{ marginBottom: 24 }}>
         <div>
           <h2 style={{ fontSize: 22, marginBottom: 4 }}>Premium</h2>
-          <p style={{ color: 'var(--text-2)', fontSize: 14, margin: 0 }}>Unlock the full Lore &amp; Ledger experience for your campaigns.</p>
+          <p style={{ color: 'var(--text-2)', fontSize: 14, margin: 0 }}>Unlock the full &amp; Utility experience for your campaigns.</p>
         </div>
       </div>
 
@@ -76,11 +103,11 @@ export default function Premium() {
         {/* Premium */}
         <div className="card" style={{ padding: 24, border: '2px solid var(--gold-border)', background: 'var(--gold-bg)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-            <div style={{ fontFamily: 'Cinzel, serif', fontSize: 16 }}>Premium</div>
+            <div style={{ fontFamily: 'Cinzel, serif', fontSize: 16 }}>{isDM ? 'Ultimate DM Toolkit' : 'Premium'}</div>
             <span style={{ background: 'var(--gold)', color: '#fff', fontSize: 10, padding: '2px 8px', borderRadius: 20, fontWeight: 600 }}>✦ PRO</span>
           </div>
-          <div style={{ fontSize: 28, fontWeight: 600, marginBottom: 20, color: 'var(--gold)' }}>$5 <span style={{ fontSize: 13, fontWeight: 400, color: 'var(--text-2)' }}>/month</span></div>
-          {FEATURES.premium.map(f => (
+          <div style={{ fontSize: 28, fontWeight: 600, marginBottom: 20, color: 'var(--gold)' }}>${tier.price} <span style={{ fontSize: 13, fontWeight: 400, color: 'var(--text-2)' }}>/month</span></div>
+          {tier.premium.map(f => (
             <div key={f} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10, fontSize: 13, color: 'var(--text)' }}>
               <span style={{ color: 'var(--gold)' }}>✦</span> {f}
             </div>
@@ -103,9 +130,9 @@ export default function Premium() {
 
         {/* Free */}
         <div className="card" style={{ padding: 24 }}>
-          <div style={{ fontFamily: 'Cinzel, serif', fontSize: 16, marginBottom: 4 }}>Free</div>
+          <div style={{ fontFamily: 'Cinzel, serif', fontSize: 16, marginBottom: 4 }}>{isDM ? 'Standard DM Toolkit' : 'Free'}</div>
           <div style={{ fontSize: 28, fontWeight: 600, marginBottom: 20 }}>$0 <span style={{ fontSize: 13, fontWeight: 400, color: 'var(--text-2)' }}>/month</span></div>
-          {FEATURES.free.map(f => (
+          {tier.free.map(f => (
             <div key={f} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10, fontSize: 13, color: 'var(--text-2)' }}>
               <span style={{ color: 'var(--green)' }}>✓</span> {f}
             </div>

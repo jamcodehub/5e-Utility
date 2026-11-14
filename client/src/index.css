@@ -1,8 +1,20 @@
-@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600&family=Inter:wght@400;500;600&display=swap');
-
+/* Font is now loaded via a <link> tag in index.html (not @import) so it
+   downloads in parallel with other assets instead of blocking CSSOM. */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 html, body { overflow-x: hidden; }
+
+/* Skeleton shimmer loading placeholders (Skeleton.jsx) */
+@keyframes skeleton-shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+.skeleton-shimmer {
+  background: linear-gradient(90deg, var(--surface2) 25%, var(--border) 50%, var(--surface2) 75%);
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.4s ease-in-out infinite;
+}
+.pill-carousel-track::-webkit-scrollbar { display: none; }
 
 :root {
   --bg: #f5f4f1;
@@ -49,11 +61,11 @@ input, textarea, select { font-family: inherit; }
   transition: all .15s; line-height: 1;
 }
 .btn-primary { background: var(--gold); color: var(--text); }
-.btn-primary:hover { background: #b8914a; }
+.btn-primary:hover { background: var(--gold); }
 .btn-ghost { background: transparent; color: var(--text-2); border: 1px solid var(--border); }
 .btn-ghost:hover { background: var(--surface2); color: var(--text); }
 .btn-gold { background: var(--gold-bg); color: var(--gold); border: 1px solid var(--gold-border); }
-.btn-gold:hover { background: #f0e8cc; }
+.btn-gold:hover { background: var(--gold-bg); }
 .btn-sm { padding: 5px 10px; font-size: 12px; }
 
 .card {
@@ -67,7 +79,7 @@ input, textarea, select { font-family: inherit; }
 .stat-grid-6 { display: grid; grid-template-columns: repeat(6, 1fr); gap: 10px; }
 
 /* book viewport helper for storyboard */
-.book-viewport { width: 100%; max-width: 880px; aspect-ratio: 2 / 1.25; max-height: calc(100vh - 200px); position: relative; min-width: 0; }
+.book-viewport { width: min(98%, 1400px); aspect-ratio: 2 / 1.1; max-height: calc(100vh - 140px); position: relative; min-width: 0; }
 
 /* journal defaults (overridden on mobile) */
 .journal-layout { display: flex; height: 100%; overflow: hidden; }
@@ -101,10 +113,9 @@ input, textarea, select { font-family: inherit; }
 }
 
 .book-viewport {
-  width: 100%;
-  max-width: 880px;
-  aspect-ratio: 2 / 1.25;
-  max-height: calc(100vh - 200px);
+  width: min(98%, 1400px);
+  aspect-ratio: 2 / 1.1;
+  max-height: calc(100vh - 110px);
   position: relative;
   margin: 0 auto;
 }
@@ -155,11 +166,37 @@ input, textarea, select { font-family: inherit; }
   .journal-layout { flex-direction: column !important; }
   .journal-day-list { width: 100% !important; border-right: none !important; border-bottom: 1px solid var(--border) !important; max-height: 120px !important; display: flex !important; flex-direction: row !important; overflow-x: auto !important; }
 
-  /* Book — smaller padding */
-  .book-viewport { padding: 8px !important; max-width: 100% !important; max-height: calc(100vh - 180px) !important; aspect-ratio: 1.05 / 1 !important; }
+  /* Book — stacked portrait layout on mobile */
+  .book-viewport { padding: 0 !important; max-width: 100% !important; max-height: calc(100dvh - 160px) !important; aspect-ratio: 0.65 / 1 !important; }
   .page-content { padding: 16px !important; }
   .page-panel { grid-template-columns: 1fr !important; }
   .page-header-row { flex-direction: column !important; align-items: stretch !important; }
   .page-header-row > * { width: 100%; min-width: 0; }
   .page-header-row button { min-width: 0; }
+
+  /* Stack roleplay form and controls in one page-level scroll area on phones. */
+  .roleplay-page {
+    height: 100% !important;
+    min-height: 0;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    padding: 14px 12px 90px !important;
+  }
+  .roleplay-header { align-items: flex-start !important; margin-bottom: 12px !important; }
+  .roleplay-header > div { min-width: 0; }
+  .roleplay-header > div + div { margin-left: 8px !important; }
+  .roleplay-form-layout {
+    display: flex !important;
+    flex-direction: column !important;
+    flex: none !important;
+    gap: 12px !important;
+    overflow: visible !important;
+    padding-bottom: 12px !important;
+  }
+  .roleplay-form-column {
+    flex: none !important;
+    overflow: visible !important;
+    padding-right: 0 !important;
+  }
+  .roleplay-generate-column { width: 100% !important; }
 }
