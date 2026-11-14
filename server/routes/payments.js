@@ -3,6 +3,7 @@ import Stripe from 'stripe'
 import { User } from '../models/index.js'
 import { auth } from './campaigns.js'
 import { primaryClientUrl } from '../lib/clientUrl.js'
+import { startGrace, clearGrace, sendGraceEmail } from '../lib/grace.js'
 
 const router = Router()
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY)
@@ -68,13 +69,43 @@ router.post('/webhook', async (req, res) => {
         await User.findByIdAndUpdate(userId, {
           isPremium: true,
           stripeSubId: session.subscription,
+          graceEndsAt: null,
+          graceReminderSent: false,
         })
       }
       break
     }
     case 'customer.subscription.deleted': {
       const sub = event.data.object
-      await User.findOneAndUpdate({ stripeSubId: sub.id }, { isPremium: false, stripeSubId: '' })
+      await User.findOneAndUpdate({ stripeSubId: sub.id }, { isPremium: false, stripeSubId: '', graceEndsAt: null, graceReminderSent: false })
+      break
+    }
+    // A renewal went through: premium stays/returns and any grace period ends.
+    case 'invoice.paid':
+    case 'invoice.payment_succeeded': {
+      const subId = event.data.object?.subscription
+      if (subId) await clearGrace({ stripeSubId: subId })
+      break
+    }
+    // Payment failed: keep premium for the 5-day grace period and email the user.
+    case 'invoice.payment_failed': {
+      const subId = event.data.object?.subscription
+      if (subId) {
+        const user = await startGrace(subId)
+        if (user) await sendGraceEmail(user, 'failed')
+      }
+      break
+    }
+    case 'customer.subscription.updated': {
+      const sub = event.data.object
+      if (sub.status === 'active' || sub.status === 'trialing') {
+        await clearGrace({ stripeSubId: sub.id })
+      } else if (sub.status === 'past_due') {
+        const user = await startGrace(sub.id)
+        if (user) await sendGraceEmail(user, 'failed')
+      } else if (sub.status === 'canceled' || sub.status === 'unpaid' || sub.status === 'incomplete_expired') {
+        await User.findOneAndUpdate({ stripeSubId: sub.id }, { isPremium: false, graceEndsAt: null, graceReminderSent: false })
+      }
       break
     }
   }

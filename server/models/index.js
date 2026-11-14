@@ -14,6 +14,9 @@ const UserSchema = new Schema({
   isPremium:        { type: Boolean, default: false },
   stripeCustomerId: { type: String, default: '' },
   stripeSubId:      { type: String, default: '' },
+  // Failed-payment grace period: premium stays on until graceEndsAt.
+  graceEndsAt:      { type: Date, default: null },
+  graceReminderSent: { type: Boolean, default: false },
   twoFactorEnabled:     { type: Boolean, default: false },
   twoFactorCode:        { type: String, default: '' },
   twoFactorCodeExpires: { type: Date },

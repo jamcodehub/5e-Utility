@@ -23,6 +23,7 @@ import sharedRoutes from './routes/shared.js'
 import { attachRealtime } from './realtime.js'
 import { clientOrigins } from './lib/clientUrl.js'
 import { rejectOperatorKeys } from './lib/guards.js'
+import { runGraceSweep } from './lib/grace.js'
 import { Character, DMBoard } from './models/index.js'
 
 dotenv.config({ quiet: true })
@@ -104,6 +105,12 @@ mongoose.connect(process.env.MONGO_URI).then(async () => {
       console.log('Dropped stale unique index campaign_1 on dmboards collection')
     }
   } catch (e) { if (e.codeName !== 'NamespaceNotFound') console.error('DM board index self-heal check failed:', e.message) }
+
+  // Premium grace periods: send the pre-expiry reminder and remove premium once
+  // the 5 days run out. Runs once at boot, then hourly.
+  const sweep = () => runGraceSweep().catch(e => console.error('[grace]', e))
+  sweep()
+  setInterval(sweep, 60 * 60 * 1000).unref()
 
   const httpServer = createServer(app)
   attachRealtime(httpServer)
