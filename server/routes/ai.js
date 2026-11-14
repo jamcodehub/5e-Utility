@@ -6,15 +6,41 @@ import { auth } from './campaigns.js'
 
 const router = Router()
 
-// Model names change over time, so each request walks a list until one is accepted.
-// GEMINI_MODEL / GEMINI_IMAGE_MODEL (when set) are tried first.
-const TEXT_MODELS = () => [process.env.GEMINI_MODEL, 'gemini-2.5-flash', 'gemini-flash-latest', 'gemini-2.0-flash'].filter(Boolean)
-const IMAGE_MODELS = () => [process.env.GEMINI_IMAGE_MODEL, 'gemini-2.5-flash-image', 'gemini-2.5-flash-image-preview', 'gemini-2.0-flash-preview-image-generation'].filter(Boolean)
+// Gemini retires model names often, so the usable models are discovered from Google's own
+// model list (cached for an hour) and the newest "flash" ones are tried first.
+// GEMINI_MODEL / GEMINI_IMAGE_MODEL (when set) are always tried first; the fixed names are a last resort.
 const GEMINI = 'https://generativelanguage.googleapis.com/v1beta/models'
+let discovered = { at: 0, models: [] }
+const version = (name) => { const m = name.match(/gemini-(\d+(?:\.\d+)?)/); return m ? parseFloat(m[1]) : 0 }
 
-const callGemini = async (models, body) => {
+const discoverModels = async (key) => {
+  if (Date.now() - discovered.at < 60 * 60 * 1000) return discovered.models
+  try {
+    const r = await fetch(`${GEMINI}?pageSize=200`, { headers: { 'x-goog-api-key': key }, signal: AbortSignal.timeout(8000) })
+    if (!r.ok) throw new Error(`HTTP ${r.status}`)
+    const list = (await r.json()).models || []
+    discovered = { at: Date.now(), models: list.filter(m => (m.supportedGenerationMethods || []).includes('generateContent')).map(m => String(m.name).replace(/^models\//, '')) }
+  } catch (e) {
+    console.error('Could not list Gemini models:', e.message)
+    discovered = { at: Date.now() - 50 * 60 * 1000, models: [] } // retry in ~10 minutes
+  }
+  return discovered.models
+}
+const newestFirst = (names) => [...names].sort((a, b) => version(b) - version(a) || a.length - b.length)
+const textModels = async (key) => {
+  const found = (await discoverModels(key)).filter(n => /flash/.test(n) && !/image|tts|live|audio|embed|thinking|exp|lite|latest/.test(n))
+  return [process.env.GEMINI_MODEL, ...newestFirst(found).slice(0, 3), 'gemini-flash-latest', 'gemini-2.5-flash'].filter(Boolean)
+}
+const imageModels = async (key) => {
+  const found = (await discoverModels(key)).filter(n => /image/.test(n) && !/tts|live|audio|embed/.test(n))
+  return [process.env.GEMINI_IMAGE_MODEL, ...newestFirst(found).slice(0, 3), 'gemini-2.5-flash-image'].filter(Boolean)
+}
+
+// `pickModels` is a function (key) => model names, or a plain list.
+const callGemini = async (pickModels, body) => {
   const key = (process.env.GEMINI_API_KEY || '').trim()
   if (!key) throw Object.assign(new Error('The AI features are not configured on this server (GEMINI_API_KEY is missing).'), { status: 503 })
+  const models = typeof pickModels === 'function' ? await pickModels(key) : pickModels
   let last
   const deadline = Date.now() + 55000
   for (const model of [...new Set(models)]) {
@@ -95,7 +121,7 @@ router.post('/worldbuild', auth, limiter(60, 'You have reached the hourly limit 
       guide?.worldNotes && `World notes: ${guide.worldNotes}`,
     ].filter(Boolean).join('\n').slice(0, 2500)
 
-    const data = await callGemini(TEXT_MODELS(), (model) => ({
+    const data = await callGemini(textModels, (model) => ({
       systemInstruction: { parts: [{ text: `${COACH_PROMPT}\n\nCampaign "${req.campaign.name}"${notes ? `, notes the DM has written:\n${notes}` : ' (no notes written yet)'}` }] },
       contents: messages.map(m => ({ role: m.role, parts: [{ text: m.text }] })),
       // 2.5 models "think" before answering; spending the budget on that would leave no reply.
@@ -128,14 +154,23 @@ const loadAvatar = async (url) => {
 
 // Free, key-less fallback used when Gemini has no image quota. It can't take reference
 // pictures, so the characters are described in words (their saved appearance prompts).
+// The free service only allows one request at a time, so images are made one after another.
 const pollinationsImage = async (prompt) => {
-  const url = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt.slice(0, 1200))}?width=1024&height=576&nologo=true&model=flux&seed=${Math.floor(Math.random() * 1e6)}`
-  const r = await fetch(url, { signal: AbortSignal.timeout(90000) })
-  const type = r.headers.get('content-type') || ''
-  if (!r.ok || !/^image\/(png|jpeg|webp)/.test(type)) throw new Error(`free image service returned ${r.status}`)
-  const buf = Buffer.from(await r.arrayBuffer())
-  if (buf.length > 8 * 1024 * 1024) throw new Error('image too large')
-  return `data:${type.split(';')[0]};base64,${buf.toString('base64')}`
+  let lastError
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const url = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt.slice(0, 1200))}?width=1024&height=576&nologo=true&model=flux&seed=${Math.floor(Math.random() * 1e6)}`
+    try {
+      const r = await fetch(url, { signal: AbortSignal.timeout(45000) })
+      const type = r.headers.get('content-type') || ''
+      if (r.ok && /^image\/(png|jpeg|webp)/.test(type)) {
+        const buf = Buffer.from(await r.arrayBuffer())
+        if (buf.length <= 8 * 1024 * 1024) return `data:${type.split(';')[0]};base64,${buf.toString('base64')}`
+        lastError = new Error('image too large')
+      } else lastError = new Error(`free image service returned ${r.status}`)
+    } catch (e) { lastError = e }
+    await new Promise(r => setTimeout(r, 2500))
+  }
+  throw lastError
 }
 
 router.post('/storyboard-image', auth, limiter(20, 'You have reached the hourly image limit. Please try again later.'), requireDM, async (req, res) => {
@@ -151,7 +186,7 @@ router.post('/storyboard-image', auth, limiter(20, 'You have reached the hourly 
       + (loaded.length ? `\nThe reference images are the player characters (${loaded.map(c => c.name).join(', ')}). Show them in the scene and keep each one's look recognisable.` : '')
     let images, source = 'gemini'
     try {
-      const data = await callGemini(IMAGE_MODELS(), {
+      const data = await callGemini(imageModels, {
         contents: [{ parts: [{ text }, ...loaded.map(c => ({ inlineData: c.image }))] }],
         generationConfig: { responseModalities: ['IMAGE', 'TEXT'] },
       })
@@ -164,12 +199,14 @@ router.post('/storyboard-image', auth, limiter(20, 'You have reached the hourly 
       const cast = characters.map(c => [c.name, c.appearancePrompt || [c.race, c.class].filter(Boolean).join(' ')].filter(Boolean).join(': ')).filter(Boolean).join('; ')
       const fallback = `Wide fantasy storyboard illustration, painterly, cinematic lighting, no text. Scene: ${prompt}.${cast ? ` Characters: ${cast}.` : ''}`
       try {
-        // Four different takes in parallel so the DM can choose.
-        const results = await Promise.allSettled([0, 1, 2, 3].map(() => pollinationsImage(fallback)))
-        images = results.filter(r => r.status === 'fulfilled').map(r => r.value)
-        if (!images.length) throw new Error(results[0].reason?.message || 'no images')
+        // Up to three takes for the DM to choose from, within a time budget.
+        images = []
+        const deadline = Date.now() + 70000
+        while (images.length < 3 && (images.length === 0 || Date.now() < deadline - 20000)) {
+          try { images.push(await pollinationsImage(fallback)) } catch (e3) { if (images.length) break; throw e3 }
+        }
         source = 'free'
-      } catch (e2) { console.error('Free image fallback failed:', e2.message); throw Object.assign(new Error(`Image generation is unavailable right now. ${e.message}`), { status: 502 }) }
+      } catch (e2) { console.error('Free image fallback failed:', e2.message); throw Object.assign(new Error(`Image generation is unavailable right now. Gemini: ${e.message} Free service: ${e2.message}`.slice(0, 500)), { status: 502 }) }
     }
     res.json({ images, source, usedAvatars: source === 'gemini' ? loaded.length : 0 })
   } catch (e) { fail(res, e) }

@@ -49,7 +49,7 @@ function indexAtPoint(ta, x, y) {
 // ─── DropTextarea ─────────────────────────────────────────────────────────────
 // Desktop: drag a player avatar onto this → inserts their name at drop position.
 // Mobile:  tap an avatar to select it, then tap this field → inserts name at cursor.
-function DropTextarea({ value, onChange, activePlayer, onInserted, style = {}, rows = 2, placeholder }) {
+function DropTextarea({ value, onChange, activePlayer, onInserted, style = {}, rows = 2, placeholder, fill = false }) {
   const [over, setOver] = useState(false)
   const ref = useRef(null)
 
@@ -71,7 +71,7 @@ function DropTextarea({ value, onChange, activePlayer, onInserted, style = {}, r
   }
 
   return (
-    <div style={{ position: 'relative' }}>
+    <div style={{ position: 'relative', ...(fill ? { flex: 1, minHeight: 0, display: 'flex' } : {}) }}>
       <textarea
         ref={ref}
         className="input"
@@ -84,7 +84,7 @@ function DropTextarea({ value, onChange, activePlayer, onInserted, style = {}, r
         onDrop={e => { e.preventDefault(); setOver(false); const n = e.dataTransfer.getData('text/plain'); if (n) insert(n, e.target, indexAtPoint(e.target, e.clientX, e.clientY)) }}
         onClick={e => { if (activePlayer) insert(activePlayer.name, e.target) }}
         style={{
-          width: '100%', resize: 'none', fontSize: 12, lineHeight: 1.55, boxSizing: 'border-box',
+          width: '100%', resize: 'none', fontSize: 12, lineHeight: 1.55, boxSizing: 'border-box', ...(fill ? { height: '100%', fontSize: 13 } : {}),
           outline: over ? '2px solid var(--gold)' : activePlayer ? '2px dashed rgba(154,124,58,0.45)' : undefined,
           cursor: activePlayer ? 'cell' : undefined,
           ...style,
@@ -356,16 +356,16 @@ export default function CampaignGuide() {
   if (!isDM) return <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-3)', flexDirection: 'column', gap: 8 }}><div style={{ fontSize: 28 }}>📖</div><div>Only Dungeon Masters can edit the Campaign Guide.</div></div>
 
   const StorySection = (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+    <div style={isMobile ? { display: 'flex', flexDirection: 'column', gap: 12 } : { display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gridAutoRows: '1fr', gap: 14, height: '100%' }}>
       {[
         { key: 'story',       label: 'Campaign Story & Setting', rows: 4, ph: "World, tone, stakes.\ne.g. A dying empire fracturing into city-states. Two claimants fight for the throne." },
         { key: 'currentArc',  label: 'Current Story Arc',        rows: 3, ph: "What arc are you in? What is the party trying to achieve right now?" },
         { key: 'lastSession', label: 'Last Session Recap',       rows: 3, ph: "2–4 sentences. Update after every session — feeds directly into each player's continuity hooks." },
         { key: 'worldNotes',  label: 'World Notes',              rows: 3, ph: "Factions, lore, recurring themes, world rules — anything that keeps players immersed." },
       ].map(({ key, label, rows, ph }) => (
-        <div key={key} className="card" style={{ padding: '14px 16px' }}>
+        <div key={key} className="card" style={{ padding: '14px 16px', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
           <SectionLabel>{label}</SectionLabel>
-          <DropTextarea value={guide[key]} onChange={upd(key)} rows={rows} placeholder={ph} activePlayer={activePlayer} onInserted={clearPlayer} />
+          <DropTextarea value={guide[key]} onChange={upd(key)} rows={rows} placeholder={ph} activePlayer={activePlayer} onInserted={clearPlayer} fill={!isMobile} />
         </div>
       ))}
     </div>
@@ -379,7 +379,7 @@ export default function CampaignGuide() {
       </div>
       {guide.npcs.length === 0
         ? <div style={{ fontSize: 12, color: 'var(--text-3)', lineHeight: 1.8 }}>No NPCs yet. The <span style={{ color: 'var(--gold)' }}>Character Relation</span> field appears directly in each player's session plan.</div>
-        : <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        : <div style={isMobile ? { display: 'flex', flexDirection: 'column', gap: 10 } : { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: 12, alignItems: 'start' }}>
             {guide.npcs.map(n => <NpcCard key={n.id} npc={n} onChange={v => updNpc(n.id, v)} onRemove={() => rmNpc(n.id)} activePlayer={activePlayer} onInserted={clearPlayer} />)}
           </div>}
       {guide.npcs.length > 0 && (
@@ -398,7 +398,7 @@ export default function CampaignGuide() {
       </div>
       {guide.quests.length === 0
         ? <div style={{ fontSize: 12, color: 'var(--text-3)', lineHeight: 1.8 }}>No quests yet. The <span style={{ color: 'var(--gold)' }}>Character Relation</span> field ties each quest to a specific character's motivation.</div>
-        : <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        : <div style={isMobile ? { display: 'flex', flexDirection: 'column', gap: 10 } : { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: 12, alignItems: 'start' }}>
             {guide.quests.map(q => <QuestCard key={q.id} quest={q} onChange={v => updQuest(q.id, v)} onRemove={() => rmQuest(q.id)} activePlayer={activePlayer} onInserted={clearPlayer} />)}
           </div>}
       {guide.quests.length > 0 && (
@@ -497,28 +497,16 @@ export default function CampaignGuide() {
 
       {AvatarRow}
 
-      {isMobile ? (
-        <>
-          <div style={{ display: 'flex', gap: 4, padding: '0 16px', marginBottom: 8, flexShrink: 0 }}>
-            {[['story', 'Story'], ['npcs', 'NPCs'], ['quests', 'Quests']].map(([k, lbl]) => (
-              <button key={k} onClick={() => setMobileTab(k)} className={`btn btn-sm ${mobileTab === k ? 'btn-primary' : 'btn-ghost'}`} style={{ flex: 1 }}>{lbl}</button>
-            ))}
-          </div>
-          <div style={{ flex: 1, overflowY: 'auto', padding: '0 16px 80px' }}>
-            {mobileTab === 'story'  && StorySection}
-            {mobileTab === 'npcs'   && NpcsSection}
-            {mobileTab === 'quests' && QuestsSection}
-          </div>
-        </>
-      ) : (
-        <div style={{ display: 'flex', gap: 16, flex: 1, overflow: 'hidden', padding: '0 24px 20px' }}>
-          <div style={{ flex: 1, overflowY: 'auto' }}>{StorySection}</div>
-          <div style={{ width: 360, flexShrink: 0, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 12 }}>
-            {NpcsSection}
-            {QuestsSection}
-          </div>
-        </div>
-      )}
+      <div role="tablist" style={{ display: 'flex', gap: 4, padding: isMobile ? '0 16px' : '0 24px', marginBottom: 10, flexShrink: 0 }}>
+        {[['story', 'Story & World'], ['npcs', `NPCs${guide.npcs.length ? ` (${guide.npcs.length})` : ''}`], ['quests', `Quests${guide.quests.length ? ` (${guide.quests.length})` : ''}`]].map(([k, lbl]) => (
+          <button key={k} role="tab" aria-selected={mobileTab === k} onClick={() => setMobileTab(k)} className={`btn btn-sm ${mobileTab === k ? 'btn-primary' : 'btn-ghost'}`} style={isMobile ? { flex: 1 } : { minWidth: 120 }}>{lbl}</button>
+        ))}
+      </div>
+      <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: isMobile ? '0 16px 80px' : '0 24px 20px' }}>
+        {mobileTab === 'story'  && StorySection}
+        {mobileTab === 'npcs'   && NpcsSection}
+        {mobileTab === 'quests' && QuestsSection}
+      </div>
 
       {charModal && <CharModal player={charModal} onClose={() => setCharModal(null)} />}
       <ToastContainer />

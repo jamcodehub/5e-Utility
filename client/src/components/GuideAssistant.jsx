@@ -22,7 +22,7 @@ export default function GuideAssistant({ campaignId }) {
       <button
         onClick={() => setOpen(o => !o)} aria-expanded={open} title={open ? 'Hide the world-building guide' : 'Open the world-building guide'}
         style={{
-          position: 'absolute', top: 70, right: open ? 'min(340px, 100%)' : 0, zIndex: 5, transition: `right .3s ${EASE}`,
+          position: 'absolute', top: 70, right: open ? (narrow ? 'min(340px, 100%)' : 340) : 0, zIndex: 5, transition: `right .3s ${EASE}`,
           display: 'flex', alignItems: 'center', gap: 6, padding: '7px 10px', border: '1px solid var(--gold-border)', borderRight: open ? '1px solid var(--gold-border)' : 'none',
           borderRadius: '10px 0 0 10px', background: 'var(--gold-bg)', color: 'var(--gold)', cursor: 'pointer', fontSize: 12, fontWeight: 600,
         }}
@@ -30,13 +30,14 @@ export default function GuideAssistant({ campaignId }) {
       <aside
         aria-hidden={!open}
         style={{
-          width: 'min(340px, 100%)', flexShrink: 0, background: 'var(--surface)', borderLeft: '1px solid var(--border)', visibility: open ? 'visible' : 'hidden',
+          background: 'var(--surface)', visibility: open ? 'visible' : 'hidden',
           ...(narrow
-            ? { position: 'absolute', top: 0, right: 0, bottom: 0, zIndex: 4, transform: open ? 'none' : 'translateX(100%)', transition: `transform .3s ${EASE}, visibility .3s`, boxShadow: open ? '-8px 0 24px rgba(0,0,0,.25)' : 'none' }
-            : { marginRight: open ? 0 : 'calc(-1 * min(340px, 100%))', transition: `margin-right .3s ${EASE}, visibility .3s` }),
+            ? { position: 'absolute', top: 0, right: 0, bottom: 0, width: 'min(340px, 100%)', zIndex: 4, borderLeft: '1px solid var(--border)', transform: open ? 'none' : 'translateX(100%)', transition: `transform .3s ${EASE}, visibility .3s`, boxShadow: open ? '-8px 0 24px rgba(0,0,0,.25)' : 'none' }
+            // Closed = zero width, so nothing is left hanging off the page to scroll sideways.
+            : { flexShrink: 0, width: open ? 340 : 0, overflow: 'hidden', borderLeft: open ? '1px solid var(--border)' : 'none', transition: `width .3s ${EASE}, visibility .3s` }),
         }}
       >
-        <WorldAssistant campaignId={campaignId} />
+        <div style={{ width: narrow ? '100%' : 340, height: '100%' }}><WorldAssistant campaignId={campaignId} /></div>
       </aside>
     </>
   )

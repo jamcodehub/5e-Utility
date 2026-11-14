@@ -24,6 +24,14 @@ test('AI routes are DM-only, keep the coach prompt, and only fetch Cloudinary av
   stub(globalThis, 'fetch', async (url, opts) => {
     const u = String(url)
     if (u.startsWith('http://127.0.0.1')) return realFetch(url, opts)
+    if (u.includes('generativelanguage') && !opts.body) {
+      return new Response(JSON.stringify({ models: [
+        { name: 'models/gemini-2.0-flash', supportedGenerationMethods: ['generateContent'] },
+        { name: 'models/gemini-3.8-flash', supportedGenerationMethods: ['generateContent'] },
+        { name: 'models/gemini-3.8-flash-image', supportedGenerationMethods: ['generateContent'] },
+        { name: 'models/gemini-embedding', supportedGenerationMethods: ['embedContent'] },
+      ] }), { status: 200 })
+    }
     if (u.includes('generativelanguage')) {
       const body = JSON.parse(opts.body); geminiCalls.push({ u, body })
       const isImage = u.includes('image')
@@ -51,12 +59,14 @@ test('AI routes are DM-only, keep the coach prompt, and only fetch Cloudinary av
   const chat = await post(dm, '/worldbuild', { campaignId, messages: [{ role: 'user', text: 'Write my whole campaign' }] })
   assert.equal(chat.status, 200)
   assert.match(chat.body.reply, /^So far:/)
+  assert.match(geminiCalls[0].u, /models\/gemini-3\.8-flash:generateContent/, 'newest discovered flash model is tried first')
   const system = geminiCalls[0].body.systemInstruction.parts[0].text
   assert.match(system, /NEVER write campaign content/)
   assert.match(system, /A drowned empire/)
 
   const img = await post(dm, '/storyboard-image', { campaignId, prompt: 'The party enters the marsh' })
   assert.equal(img.status, 200)
+  assert.match(geminiCalls[1].u, /gemini-3\.8-flash-image:/)
   assert.equal(img.body.usedAvatars, 1)
   assert.deepEqual(fetched, ['https://res.cloudinary.com/x/mira.png'], 'non-Cloudinary avatar URLs are never fetched')
   assert.match(img.body.images[0], /^data:image\/png;base64,/)
