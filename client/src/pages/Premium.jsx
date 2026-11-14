@@ -103,7 +103,7 @@ export default function Premium() {
         {/* Premium */}
         <div className="card" style={{ padding: 24, border: '2px solid var(--gold-border)', background: 'var(--gold-bg)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-            <div style={{ fontFamily: 'Cinzel, serif', fontSize: 16 }}>{isDM ? 'Ultimate DM Toolkit' : 'Premium'}</div>
+            <div style={{ fontFamily: 'var(--font-title)', fontSize: 16 }}>{isDM ? 'Ultimate DM Toolkit' : 'Premium'}</div>
             <span style={{ background: 'var(--gold)', color: '#fff', fontSize: 10, padding: '2px 8px', borderRadius: 20, fontWeight: 600 }}>✦ PRO</span>
           </div>
           <div style={{ fontSize: 28, fontWeight: 600, marginBottom: 20, color: 'var(--gold)' }}>${tier.price} <span style={{ fontSize: 13, fontWeight: 400, color: 'var(--text-2)' }}>/month</span></div>
@@ -130,7 +130,7 @@ export default function Premium() {
 
         {/* Free */}
         <div className="card" style={{ padding: 24 }}>
-          <div style={{ fontFamily: 'Cinzel, serif', fontSize: 16, marginBottom: 4 }}>{isDM ? 'Standard DM Toolkit' : 'Free'}</div>
+          <div style={{ fontFamily: 'var(--font-title)', fontSize: 16, marginBottom: 4 }}>{isDM ? 'Standard DM Toolkit' : 'Free'}</div>
           <div style={{ fontSize: 28, fontWeight: 600, marginBottom: 20 }}>$0 <span style={{ fontSize: 13, fontWeight: 400, color: 'var(--text-2)' }}>/month</span></div>
           {tier.free.map(f => (
             <div key={f} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10, fontSize: 13, color: 'var(--text-2)' }}>

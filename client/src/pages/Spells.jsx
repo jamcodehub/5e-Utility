@@ -11,7 +11,7 @@ const Chip = ({ children }) => (
 function SpellDetail({ spell, children }) {
   return (
     <>
-      <div style={{ fontFamily: 'Cinzel, serif', fontSize: 18, color: 'var(--gold)', marginBottom: 4 }}>{spell.name}</div>
+      <div style={{ fontFamily: 'var(--font-title)', fontSize: 18, color: 'var(--gold)', marginBottom: 4 }}>{spell.name}</div>
       <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 12 }}>
         {levelName(spell.level)} {spell.school}{spell.ritual ? ' (ritual)' : ''}
       </div>

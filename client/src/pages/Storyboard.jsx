@@ -79,10 +79,10 @@ function Cover({ campaignName, isMobile }) {
           borderRadius: 6,
           pointerEvents: 'none',
         }} />
-        <div style={{ fontFamily: 'Cinzel, serif', fontSize: isMobile ? 22 : 34, color: 'var(--sb-page-title)', lineHeight: 1.2, fontWeight: 700, letterSpacing: '0.06em', textAlign: 'center', textShadow: '0 1px 2px rgba(0,0,0,0.3)' }}>
+        <div style={{ fontFamily: 'var(--font-title)', fontSize: isMobile ? 22 : 34, color: 'var(--sb-page-title)', lineHeight: 1.2, fontWeight: 700, letterSpacing: '0.06em', textAlign: 'center', textShadow: '0 1px 2px rgba(0,0,0,0.3)' }}>
           {campaignName || 'Your Campaign'}
         </div>
-        <div style={{ marginTop: 18, fontSize: 12, color: 'var(--sb-page-body)', letterSpacing: '0.2em', fontFamily: 'Cinzel, serif', textAlign: 'center' }}>
+        <div style={{ marginTop: 18, fontSize: 12, color: 'var(--sb-page-body)', letterSpacing: '0.2em', fontFamily: 'var(--font-title)', textAlign: 'center' }}>
           CHRONICLE
         </div>
       </div>
@@ -98,19 +98,19 @@ function BookSpread({ card, index, onEdit, isMobile }) {
         <div style={{ flex: '0 0 55%', background: 'var(--sb-bar)', borderBottom: '2px solid var(--sb-spine)', overflow: 'hidden', position: 'relative' }}>
           {card.imageUrl
             ? <img src={getOptimisedUrl(card.imageUrl)} alt={card.title} style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center top', display: 'block' }} onError={e => { e.target.style.display = 'none' }} />
-            : <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8, color: 'var(--sb-page-meta)' }}><div style={{ fontSize: 32, opacity: 0.3 }}>✦</div><div style={{ fontSize: 11, fontFamily: 'Cinzel, serif' }}>No image</div></div>
+            : <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8, color: 'var(--sb-page-meta)' }}><div style={{ fontSize: 32, opacity: 0.3 }}>✦</div><div style={{ fontSize: 11, fontFamily: 'var(--font-title)' }}>No image</div></div>
           }
           <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 32, background: 'linear-gradient(to top, rgba(0,0,0,0.35), transparent)', pointerEvents: 'none' }} />
         </div>
         <div style={{ flex: 1, background: 'linear-gradient(180deg, var(--sb-page-start), var(--sb-page-end))', padding: '14px 20px 12px', display: 'flex', flexDirection: 'column', position: 'relative', overflow: 'hidden', backgroundImage: 'repeating-linear-gradient(transparent, transparent 27px, rgba(0,0,0,0.032) 28px)', backgroundPosition: '0 14px' }}>
-          <div style={{ position: 'absolute', top: 8, right: 12, fontFamily: 'Cinzel, serif', fontSize: 9, color: 'var(--sb-page-meta)', letterSpacing: '0.1em' }}>{index * 2 + 2}</div>
-          <button onClick={onEdit} style={{ position: 'absolute', top: 10, right: 36, background: 'rgba(0,0,0,0.08)', border: '1px solid rgba(0,0,0,0.15)', color: 'var(--sb-page-meta)', borderRadius: 6, padding: '2px 8px', fontSize: 10, cursor: 'pointer', fontFamily: 'Cinzel, serif', zIndex: 2 }}>Edit</button>
-          <h2 style={{ fontFamily: 'Cinzel, serif', fontSize: 15, color: 'var(--sb-page-title)', lineHeight: 1.3, margin: '0 0 10px 0', textAlign: 'center', position: 'relative', zIndex: 1 }}>{card.title}</h2>
+          <div style={{ position: 'absolute', top: 8, right: 12, fontFamily: 'var(--font-title)', fontSize: 9, color: 'var(--sb-page-meta)', letterSpacing: '0.1em' }}>{index * 2 + 2}</div>
+          <button onClick={onEdit} style={{ position: 'absolute', top: 10, right: 36, background: 'rgba(0,0,0,0.08)', border: '1px solid rgba(0,0,0,0.15)', color: 'var(--sb-page-meta)', borderRadius: 6, padding: '2px 8px', fontSize: 10, cursor: 'pointer', fontFamily: 'var(--font-title)', zIndex: 2 }}>Edit</button>
+          <h2 style={{ fontFamily: 'var(--font-title)', fontSize: 15, color: 'var(--sb-page-title)', lineHeight: 1.3, margin: '0 0 10px 0', textAlign: 'center', position: 'relative', zIndex: 1 }}>{card.title}</h2>
           <div data-story-text style={{ flex: 1, overflow: 'auto', minHeight: 0, overscrollBehavior: 'contain' }}>
             <p style={{ fontFamily: 'Georgia, serif', fontSize: 12.5, color: 'var(--sb-page-body)', lineHeight: 1.85, margin: 0, textAlign: 'justify', hyphens: 'auto', position: 'relative', zIndex: 1 }}>{card.description}</p>
           </div>
           {card.createdAt && (
-            <div style={{ fontSize: 9, color: 'var(--sb-page-meta)', fontFamily: 'Cinzel, serif', letterSpacing: '0.06em', marginTop: 8, textAlign: 'right', position: 'relative', zIndex: 1 }}>
+            <div style={{ fontSize: 9, color: 'var(--sb-page-meta)', fontFamily: 'var(--font-title)', letterSpacing: '0.06em', marginTop: 8, textAlign: 'right', position: 'relative', zIndex: 1 }}>
               {new Date(card.createdAt).toLocaleDateString('en-AU', { day: 'numeric', month: 'long', year: 'numeric' })}
             </div>
           )}
@@ -124,19 +124,19 @@ function BookSpread({ card, index, onEdit, isMobile }) {
       <div style={{ flex: 1, background: 'var(--sb-bar)', borderRight: '2px solid var(--sb-spine)', overflow: 'hidden', position: 'relative' }}>
         {card.imageUrl
           ? <img src={getOptimisedUrl(card.imageUrl)} alt={card.title} style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center', display: 'block' }} onError={e => { e.target.style.display = 'none' }} />
-          : <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 10, color: 'var(--sb-page-meta)' }}><div style={{ fontSize: 40, opacity: 0.3 }}>✦</div><div style={{ fontSize: 11, fontFamily: 'Cinzel, serif' }}>No image uploaded</div></div>
+          : <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 10, color: 'var(--sb-page-meta)' }}><div style={{ fontSize: 40, opacity: 0.3 }}>✦</div><div style={{ fontSize: 11, fontFamily: 'var(--font-title)' }}>No image uploaded</div></div>
         }
         <div style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: 24, background: 'linear-gradient(to left, rgba(0,0,0,0.18), transparent)', pointerEvents: 'none' }} />
       </div>
       <div style={{ flex: 1, background: 'linear-gradient(180deg, var(--sb-page-start), var(--sb-page-end))', padding: '32px 44px 28px 40px', display: 'flex', flexDirection: 'column', position: 'relative', backgroundImage: 'repeating-linear-gradient(transparent, transparent 27px, rgba(0,0,0,0.032) 28px)', backgroundPosition: '0 32px' }}>
-        <div style={{ position: 'absolute', top: 14, right: 18, fontFamily: 'Cinzel, serif', fontSize: 10, color: 'var(--sb-page-meta)', letterSpacing: '0.1em' }}>{index * 2 + 2}</div>
-        <button onClick={onEdit} style={{ position: 'absolute', top: 32, right: 18, background: 'rgba(0,0,0,0.08)', border: '1px solid rgba(0,0,0,0.15)', color: 'var(--sb-page-meta)', borderRadius: 6, padding: '3px 9px', fontSize: 11, cursor: 'pointer', fontFamily: 'Cinzel, serif', zIndex: 2 }}>Edit</button>
-        <h2 style={{ fontFamily: 'Cinzel, serif', fontSize: 17, color: 'var(--sb-page-title)', lineHeight: 1.4, margin: '0 0 20px 0', textAlign: 'center', position: 'relative', zIndex: 1, paddingRight: 44 }}>{card.title}</h2>
+        <div style={{ position: 'absolute', top: 14, right: 18, fontFamily: 'var(--font-title)', fontSize: 10, color: 'var(--sb-page-meta)', letterSpacing: '0.1em' }}>{index * 2 + 2}</div>
+        <button onClick={onEdit} style={{ position: 'absolute', top: 32, right: 18, background: 'rgba(0,0,0,0.08)', border: '1px solid rgba(0,0,0,0.15)', color: 'var(--sb-page-meta)', borderRadius: 6, padding: '3px 9px', fontSize: 11, cursor: 'pointer', fontFamily: 'var(--font-title)', zIndex: 2 }}>Edit</button>
+        <h2 style={{ fontFamily: 'var(--font-title)', fontSize: 17, color: 'var(--sb-page-title)', lineHeight: 1.4, margin: '0 0 20px 0', textAlign: 'center', position: 'relative', zIndex: 1, paddingRight: 44 }}>{card.title}</h2>
         <div data-story-text style={{ flex: 1, minHeight: 0, overflow: 'auto', display: 'flex', justifyContent: 'center', overscrollBehavior: 'contain' }}>
           <p style={{ fontFamily: 'Georgia, serif', fontSize: 13.5, color: 'var(--sb-page-body)', lineHeight: 2, margin: 0, maxWidth: 320, width: '100%', textAlign: 'justify', hyphens: 'auto', position: 'relative', zIndex: 1 }}>{card.description}</p>
         </div>
         {card.createdAt && (
-          <div style={{ fontSize: 10, color: 'var(--sb-page-meta)', fontFamily: 'Cinzel, serif', letterSpacing: '0.06em', marginTop: 20, textAlign: 'right', position: 'relative', zIndex: 1 }}>
+          <div style={{ fontSize: 10, color: 'var(--sb-page-meta)', fontFamily: 'var(--font-title)', letterSpacing: '0.06em', marginTop: 20, textAlign: 'right', position: 'relative', zIndex: 1 }}>
             {new Date(card.createdAt).toLocaleDateString('en-AU', { day: 'numeric', month: 'long', year: 'numeric' })}
           </div>
         )}
@@ -308,8 +308,8 @@ export default function Storyboard() {
     toast('Scene removed')
   }
 
-  if (!activeCampaign) return <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#c8a060', fontFamily: 'Cinzel, serif' }}>Select a campaign first.</div>
-  if (activeCampaign.isPersonal) return <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', textAlign: 'center', color: '#c8a060', fontFamily: 'Cinzel, serif', padding: 24 }}>The Storyboard is a shared party feature.<br />Join or create a real campaign to use it.</div>
+  if (!activeCampaign) return <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#c8a060', fontFamily: 'var(--font-title)' }}>Select a campaign first.</div>
+  if (activeCampaign.isPersonal) return <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', textAlign: 'center', color: '#c8a060', fontFamily: 'var(--font-title)', padding: 24 }}>The Storyboard is a shared party feature.<br />Join or create a real campaign to use it.</div>
 
   const onCover = currentPage === -1
   const currentCard = cards[currentPage]
@@ -318,14 +318,14 @@ export default function Storyboard() {
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden', background: 'var(--sb-outer)', color: 'var(--text)' }}>
       {/* Top bar */}
       <div style={{ padding: '8px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'var(--sb-bar)', borderBottom: '1px solid var(--sb-bar-border)', flexShrink: 0 }}>
-        <div style={{ fontFamily: 'Cinzel, serif', fontSize: 12, color: 'var(--sb-page-meta)' }}>
+        <div style={{ fontFamily: 'var(--font-title)', fontSize: 12, color: 'var(--sb-page-meta)' }}>
           {onCover ? activeCampaign.name : `Scene ${currentPage + 1} / ${cards.length}`}
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
-          <button type="button" onClick={() => window.print()} style={{ background: 'var(--sb-bar-border)', border: 'none', color: 'var(--sb-accent)', padding: '6px 14px', borderRadius: 6, fontFamily: 'Cinzel, serif', fontSize: 11, cursor: 'pointer', letterSpacing: '0.05em' }}>
+          <button type="button" onClick={() => window.print()} style={{ background: 'var(--sb-bar-border)', border: 'none', color: 'var(--sb-accent)', padding: '6px 14px', borderRadius: 6, fontFamily: 'var(--font-title)', fontSize: 11, cursor: 'pointer', letterSpacing: '0.05em' }}>
             Print Book
           </button>
-          <button onClick={() => setShowForm(f => !f)} style={{ background: showForm ? 'var(--sb-accent)' : 'var(--sb-bar-border)', border: 'none', color: showForm ? 'var(--sb-outer)' : 'var(--sb-accent)', padding: '6px 14px', borderRadius: 6, fontFamily: 'Cinzel, serif', fontSize: 11, cursor: 'pointer', letterSpacing: '0.05em' }}>
+          <button onClick={() => setShowForm(f => !f)} style={{ background: showForm ? 'var(--sb-accent)' : 'var(--sb-bar-border)', border: 'none', color: showForm ? 'var(--sb-outer)' : 'var(--sb-accent)', padding: '6px 14px', borderRadius: 6, fontFamily: 'var(--font-title)', fontSize: 11, cursor: 'pointer', letterSpacing: '0.05em' }}>
             {showForm ? '✕ Close' : '+ Add Scene'}
           </button>
         </div>
@@ -346,7 +346,7 @@ export default function Storyboard() {
               {newImage && <button onClick={() => setNewImage(null)} style={{ background: 'none', border: 'none', color: 'var(--text-3)', cursor: 'pointer', fontSize: 12 }}>✕ Remove</button>}
             </div>
           </div>
-          <button onClick={addScene} disabled={saving || !newTitle.trim()} style={{ background: saving ? 'var(--border)' : 'var(--sb-accent)', border: 'none', color: saving ? 'var(--text-3)' : 'var(--sb-outer)', padding: '10px 18px', borderRadius: 6, fontFamily: 'Cinzel, serif', fontSize: 12, cursor: 'pointer', whiteSpace: 'nowrap', alignSelf: 'stretch', opacity: saving ? 0.7 : 1 }}>
+          <button onClick={addScene} disabled={saving || !newTitle.trim()} style={{ background: saving ? 'var(--border)' : 'var(--sb-accent)', border: 'none', color: saving ? 'var(--text-3)' : 'var(--sb-outer)', padding: '10px 18px', borderRadius: 6, fontFamily: 'var(--font-title)', fontSize: 12, cursor: 'pointer', whiteSpace: 'nowrap', alignSelf: 'stretch', opacity: saving ? 0.7 : 1 }}>
             {saving ? 'Saving...' : '✦ Add'}
           </button>
         </div>
@@ -410,7 +410,7 @@ export default function Storyboard() {
           {cards.length === 0 && !onCover && (
             <div style={{ position: 'absolute', inset: 0, background: 'var(--sb-page-start)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 12, color: 'var(--sb-page-meta)' }}>
               <div style={{ fontSize: 28, opacity: 0.3 }}>✦</div>
-              <div style={{ fontFamily: 'Cinzel, serif', fontSize: 13 }}>Your chronicle awaits</div>
+              <div style={{ fontFamily: 'var(--font-title)', fontSize: 13 }}>Your chronicle awaits</div>
             </div>
           )}
         </div>
@@ -422,7 +422,7 @@ export default function Storyboard() {
 
         {/* Mobile swipe hint on cover */}
         {isMobile && onCover && cards.length > 0 && (
-          <div style={{ position: 'absolute', bottom: 16, left: 0, right: 0, textAlign: 'center', fontSize: 10, color: 'var(--sb-page-meta)', fontFamily: 'Cinzel, serif', letterSpacing: '0.1em', pointerEvents: 'none', opacity: 0.7 }}>
+          <div style={{ position: 'absolute', bottom: 16, left: 0, right: 0, textAlign: 'center', fontSize: 10, color: 'var(--sb-page-meta)', fontFamily: 'var(--font-title)', letterSpacing: '0.1em', pointerEvents: 'none', opacity: 0.7 }}>
             SWIPE TO OPEN
           </div>
         )}
@@ -440,7 +440,7 @@ export default function Storyboard() {
       {editCard && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }} onClick={() => setEditCard(null)}>
           <div style={{ width: '100%', maxWidth: 520, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, padding: 24 }} onClick={e => e.stopPropagation()}>
-            <div style={{ fontFamily: 'Cinzel, serif', fontSize: 16, fontWeight: 600, color: 'var(--gold)', marginBottom: 16 }}>Edit Scene</div>
+            <div style={{ fontFamily: 'var(--font-title)', fontSize: 16, fontWeight: 600, color: 'var(--gold)', marginBottom: 16 }}>Edit Scene</div>
             
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
               <input className="input" placeholder="Title" value={editCard.title} onChange={e => editField(p => ({ ...p, title: e.target.value }))} />

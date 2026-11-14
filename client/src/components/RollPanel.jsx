@@ -117,7 +117,7 @@ export function RollPanel({ roller }) {
           <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-2)' }}>{first.title}{first.subtitle ? <span style={{ fontWeight: 400, color: 'var(--text-3)' }}> · {first.subtitle}</span> : null}</div>
           {first.lines.map((l, i) => (
             <div key={i} style={{ display: 'flex', alignItems: 'baseline', gap: 10, marginTop: 4 }}>
-              <div style={{ fontFamily: 'Cinzel, serif', fontSize: l.total == null ? 14 : 28, fontWeight: 600, color: toneColor(l.tone), minWidth: 44 }}>{l.total == null ? '—' : l.total}</div>
+              <div style={{ fontFamily: 'var(--font-title)', fontSize: l.total == null ? 14 : 28, fontWeight: 600, color: toneColor(l.tone), minWidth: 44 }}>{l.total == null ? '—' : l.total}</div>
               <div style={{ fontSize: 11, color: 'var(--text-3)', lineHeight: 1.4 }}>
                 <div style={{ color: 'var(--text-2)', fontSize: 12 }}>{l.label}{l.note ? ` · ${l.note}` : ''}</div>
                 <div>{l.detail}</div>

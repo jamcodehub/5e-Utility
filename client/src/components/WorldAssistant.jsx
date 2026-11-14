@@ -28,7 +28,7 @@ export default function WorldAssistant({ campaignId }) {
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}>
       <div style={{ padding: '14px 14px 10px', borderBottom: '1px solid var(--border)' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <span style={{ fontFamily: 'Cinzel, serif', fontSize: 13, color: 'var(--gold)', letterSpacing: '0.04em' }}>World-building guide</span>
+          <span style={{ fontFamily: 'var(--font-title)', fontSize: 13, color: 'var(--gold)', letterSpacing: '0.04em' }}>World-building guide</span>
           {messages.length > 0 && <button className="btn btn-ghost btn-sm" onClick={() => { if (window.confirm('Clear this conversation?')) clear() }} style={{ padding: '2px 8px', fontSize: 11 }}>Clear</button>}
         </div>
         <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 4, lineHeight: 1.5 }}>Asks questions only. You write the world.</div>

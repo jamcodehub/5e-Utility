@@ -89,7 +89,7 @@ function PageLoader() {
     return (
       <div style={{ height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden', background: 'var(--sb-outer)', color: 'var(--text)' }}>
         <div style={{ padding: '8px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'var(--sb-bar)', borderBottom: '1px solid var(--sb-bar-border)', flexShrink: 0 }}>
-          <div style={{ fontFamily: 'Cinzel, serif', fontSize: 12, color: 'var(--sb-page-meta)' }}>{activeCampaign?.name || 'Storyboard'}</div>
+          <div style={{ fontFamily: 'var(--font-title)', fontSize: 12, color: 'var(--sb-page-meta)' }}>{activeCampaign?.name || 'Storyboard'}</div>
           <button className="btn btn-primary btn-sm" disabled>+ Add Scene</button>
         </div>
         <div style={{ flex: 1 }} />

@@ -151,7 +151,7 @@ export default function Auth() {
       <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg)', padding: 20 }}>
         <div className="card" style={{ width: '100%', maxWidth: 380, padding: 32 }}>
           <div style={{ marginBottom: 20, textAlign: 'center' }}>
-            <div style={{ fontFamily: 'Cinzel, serif', fontSize: 20, fontWeight: 600, color: 'var(--gold)', marginBottom: 6 }}>Forgot your password?</div>
+            <div style={{ fontFamily: 'var(--font-title)', fontSize: 20, fontWeight: 600, color: 'var(--gold)', marginBottom: 6 }}>Forgot your password?</div>
             <div style={{ fontSize: 13, color: 'var(--text-2)' }}>Enter your account email and we'll send you a reset link.</div>
           </div>
           {error && (
@@ -186,7 +186,7 @@ export default function Auth() {
       <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg)', padding: 20 }}>
         <div className="card" style={{ width: '100%', maxWidth: 380, padding: 32 }}>
           <div style={{ marginBottom: 20, textAlign: 'center' }}>
-            <div style={{ fontFamily: 'Cinzel, serif', fontSize: 20, fontWeight: 600, color: 'var(--gold)', marginBottom: 6 }}>Choose a new password</div>
+            <div style={{ fontFamily: 'var(--font-title)', fontSize: 20, fontWeight: 600, color: 'var(--gold)', marginBottom: 6 }}>Choose a new password</div>
             {!resetDone && <div style={{ fontSize: 13, color: 'var(--text-2)' }}>Your reset link is valid for 1 hour.</div>}
           </div>
           {error && (
@@ -227,7 +227,7 @@ export default function Auth() {
       <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg)', padding: 20 }}>
         <div className="card" style={{ width: '100%', maxWidth: 380, padding: 32 }}>
           <div style={{ marginBottom: 20, textAlign: 'center' }}>
-            <div style={{ fontFamily: 'Cinzel, serif', fontSize: 20, fontWeight: 600, color: 'var(--gold)', marginBottom: 6 }}>
+            <div style={{ fontFamily: 'var(--font-title)', fontSize: 20, fontWeight: 600, color: 'var(--gold)', marginBottom: 6 }}>
               {twoFA.signup ? 'Confirm your email' : 'Verify this device'}
             </div>
             <div style={{ fontSize: 13, color: 'var(--text-2)' }}>

@@ -243,7 +243,7 @@ function PeekingViewers({ viewers }) {
         }}>
           {v.avatar
             ? <img src={v.avatar} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-            : <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--gold)', fontFamily: 'Cinzel, serif' }}>{v.username?.[0]?.toUpperCase()}</span>
+            : <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--gold)', fontFamily: 'var(--font-title)' }}>{v.username?.[0]?.toUpperCase()}</span>
           }
         </div>
       ))}
@@ -280,7 +280,7 @@ function Token({ token, cellSize, onDragStart, dragging }) {
     >
       {token.avatar
         ? <img src={token.avatar} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-        : <span style={{ fontSize: Math.max(8, cellSize * 0.35), color: '#fff', fontWeight: 700, fontFamily: 'Cinzel, serif' }}>{initials}</span>
+        : <span style={{ fontSize: Math.max(8, cellSize * 0.35), color: '#fff', fontWeight: 700, fontFamily: 'var(--font-title)' }}>{initials}</span>
       }
     </div>
   )
@@ -1258,7 +1258,7 @@ export default function LevelBuilder() {
       `}</style>
       {/* Play toolbar */}
       {!isFullscreen && <div className="level-play-toolbar" style={{ padding: '10px 16px', background: 'var(--surface)', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
-        <span style={{ fontFamily: 'Cinzel, serif', fontSize: 14, fontWeight: 600, flex: 1 }}>{selectedPlan?.title}</span>
+        <span style={{ fontFamily: 'var(--font-title)', fontSize: 14, fontWeight: 600, flex: 1 }}>{selectedPlan?.title}</span>
         <PeekingViewers viewers={viewers} />
         {isDm && (
           <button
@@ -1491,7 +1491,7 @@ export default function LevelBuilder() {
         >
           {dragPreviewToken.avatar
             ? <img src={dragPreviewToken.avatar} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-            : <span style={{ fontSize: Math.max(10, cellSize * 0.35), color: '#fff', fontWeight: 700, fontFamily: 'Cinzel, serif' }}>{dragPreviewToken.name?.[0]?.toUpperCase() || '?'}</span>
+            : <span style={{ fontSize: Math.max(10, cellSize * 0.35), color: '#fff', fontWeight: 700, fontFamily: 'var(--font-title)' }}>{dragPreviewToken.name?.[0]?.toUpperCase() || '?'}</span>
           }
         </div>,
         playRootRef.current || document.body,
@@ -1551,7 +1551,7 @@ export default function LevelBuilder() {
               >
                 <MapThumb content={plan.content} theme={plan.theme} />
                 <div style={{ padding: '10px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <span style={{ fontFamily: 'Cinzel, serif', fontSize: 13, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{plan.title}</span>
+                  <span style={{ fontFamily: 'var(--font-title)', fontSize: 13, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{plan.title}</span>
                   {isDm && (
                     <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
                       <button onClick={e => { e.stopPropagation(); openEditor(plan) }} title="Edit tiles"

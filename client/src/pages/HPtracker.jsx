@@ -55,7 +55,7 @@ function CombatantCard({ c, onChange, onRemove }) {
           }
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontFamily: 'Cinzel, serif', fontSize: 14, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          <div style={{ fontFamily: 'var(--font-title)', fontSize: 14, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
             {c.name} {isDead && <span style={{ fontSize: 11, color: 'var(--red)' }}>— Down</span>}
           </div>
           <div style={{ fontSize: 11, color: 'var(--text-3)', textTransform: 'capitalize' }}>{c.type}</div>

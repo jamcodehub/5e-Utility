@@ -25,7 +25,7 @@ function Stat({ name, value, onClick, sub }) {
   return (
     <div onClick={onClick} style={{ textAlign: 'center', padding: '8px 4px', background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 8, cursor: onClick ? 'pointer' : 'default' }}>
       <div style={{ fontSize: 9, color: 'var(--text-3)', letterSpacing: '0.06em', textTransform: 'uppercase' }}>{name}</div>
-      <div style={{ fontSize: 20, fontFamily: 'Cinzel, serif', color: 'var(--gold)' }}>{value}</div>
+      <div style={{ fontSize: 20, fontFamily: 'var(--font-title)', color: 'var(--gold)' }}>{value}</div>
       {sub && <div style={{ fontSize: 9, color: 'var(--text-3)' }}>{sub}</div>}
     </div>
   )
@@ -127,7 +127,7 @@ export default function CombatPanel({ char, srd, d, roller, onPatch }) {
         <span style={chip(true)} onClick={() => patchCombat({ concentrating: '' })} title="Click to stop concentrating">🧠 Concentrating: {combat.concentrating} ✕</span>
       )}>
         <div style={{ display: 'flex', alignItems: 'baseline', gap: 14, flexWrap: 'wrap', marginBottom: 10 }}>
-          <span style={{ fontSize: 28, fontFamily: 'Cinzel, serif', color: hp.current === 0 ? 'var(--red)' : 'var(--text)' }}>{hp.current}<span style={{ fontSize: 16, color: 'var(--text-3)' }}> / {hp.max}</span></span>
+          <span style={{ fontSize: 28, fontFamily: 'var(--font-title)', color: hp.current === 0 ? 'var(--red)' : 'var(--text)' }}>{hp.current}<span style={{ fontSize: 16, color: 'var(--text-3)' }}> / {hp.max}</span></span>
           {combat.tempHp > 0 && <span style={{ fontSize: 14, color: 'var(--gold)' }}>+{combat.tempHp} temp</span>}
           {combat.exhaustion >= 4 && <span style={{ fontSize: 11, color: 'var(--red)' }}>HP maximum halved by exhaustion → {Math.floor(hp.max / 2)}</span>}
         </div>

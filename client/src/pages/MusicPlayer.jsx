@@ -303,7 +303,7 @@ export default function MusicPlayer() {
           pointerEvents: 'none'
         }}>
           <div style={{ fontSize: 48, marginBottom: 12 }}>🎵</div>
-          <div style={{ fontFamily: 'Cinzel, serif', fontSize: 22, fontWeight: 700, color: 'var(--gold)', letterSpacing: '0.05em' }}>
+          <div style={{ fontFamily: 'var(--font-title)', fontSize: 22, fontWeight: 700, color: 'var(--gold)', letterSpacing: '0.05em' }}>
             Upload to Tracks
           </div>
           <div style={{ fontSize: 13, color: 'var(--text-2)', marginTop: 6 }}>
@@ -355,7 +355,7 @@ export default function MusicPlayer() {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 16, marginBottom: 20, alignItems: 'start' }}>
         {/* Your Tracks */}
         <div className="card" style={{ flex: 1, minWidth: 0, padding: '16px 18px', display: 'flex', flexDirection: 'column', gap: 12 }}>
-          <div style={{ fontFamily: 'Cinzel, serif', fontSize: 12, fontWeight: 600, color: 'var(--gold)', letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+          <div style={{ fontFamily: 'var(--font-title)', fontSize: 12, fontWeight: 600, color: 'var(--gold)', letterSpacing: '0.06em', textTransform: 'uppercase' }}>
             Your Tracks {!isPremium && <span style={{ fontSize: 10, fontFamily: 'sans-serif', fontWeight: 400, color: 'var(--text-3)', textTransform: 'none' }}>({playlist.length}/{FREE_TRACK_LIMIT} free)</span>}
           </div>
 
@@ -490,7 +490,7 @@ export default function MusicPlayer() {
 
         {/* Session Planner — sits side-by-side with Your Tracks */}
         <div className="card" style={{ padding: '16px 18px', minWidth: 0, display: 'flex', flexDirection: 'column', gap: 12, maxHeight: 480, overflow: 'hidden' }}>
-        <div style={{ fontFamily: 'Cinzel, serif', fontSize: 12, fontWeight: 600, color: 'var(--gold)', letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+        <div style={{ fontFamily: 'var(--font-title)', fontSize: 12, fontWeight: 600, color: 'var(--gold)', letterSpacing: '0.06em', textTransform: 'uppercase' }}>
           Session Planner
         </div>
         {!activeCampaign ? (

@@ -161,11 +161,11 @@ export default function Dice() {
           .d20-spot { position: absolute; inset: 0; display:flex; align-items:center; justify-content:center; pointer-events:none; }
           .d20 { display:flex; align-items:center; justify-content:center; width:${DIE}px; height:${DIE}px; perspective:700px; }
           .die3d { position:relative; width:100%; height:100%; transform-style:preserve-3d; filter: drop-shadow(0 14px 10px rgba(0,0,0,0.35)); }
-          .die-face { position:absolute; left:0; top:0; width:100%; height:100%; clip-path:${FACE_CLIP}; backface-visibility:hidden; display:flex; align-items:center; justify-content:center; font-family: Cinzel, serif; font-weight:700; font-size:${Math.round(DIE * 0.34)}px; padding-top:${Math.round(DIE * 0.1)}px; box-sizing:border-box; }
+          .die-face { position:absolute; left:0; top:0; width:100%; height:100%; clip-path:${FACE_CLIP}; backface-visibility:hidden; display:flex; align-items:center; justify-content:center; font-family: 'Young Serif',Georgia,serif; font-weight:700; font-size:${Math.round(DIE * 0.34)}px; padding-top:${Math.round(DIE * 0.1)}px; box-sizing:border-box; }
           .streaks { position:absolute; top:12px; right:16px; z-index:2; max-width:55%; text-align:right; font-size:11px; letter-spacing:.04em; color:var(--text-3); opacity:.8; pointer-events:auto; cursor:default; }
           .streaks b { color:var(--text-2); font-weight:600; }
           .dice-controls { display:flex; justify-content:stretch; align-items:stretch; gap:20px; width:100%; max-width:1280px; margin:0 auto; }
-          .dice-btn { border:none; border-radius:22px; padding:32px 24px; font-family: 'Cinzel, serif'; font-size:26px; font-weight:700; line-height:1; transition: transform .08s ease, filter .12s ease, opacity .12s ease, box-shadow .08s ease; white-space: nowrap; flex:1 1 0; text-align:center; }
+          .dice-btn { border:none; border-radius:22px; padding:32px 24px; font-family: 'var(--font-title)'; font-size:26px; font-weight:700; line-height:1; transition: transform .08s ease, filter .12s ease, opacity .12s ease, box-shadow .08s ease; white-space: nowrap; flex:1 1 0; text-align:center; }
           .dice-roll-btn {
             box-shadow: 0 5px 0 rgba(0,0,0,0.35), 0 8px 14px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.35);
           }

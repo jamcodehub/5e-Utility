@@ -125,7 +125,7 @@ export function InventoryPanel({ toast, isDM = false }) {
       {!isDM && (
         <div className="card" style={{ padding: '16px 20px', marginBottom: 20 }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
-            <div style={{ fontFamily: 'Cinzel, serif', fontSize: 14, fontWeight: 600, color: 'var(--gold)' }}>My Currency</div>
+            <div style={{ fontFamily: 'var(--font-title)', fontSize: 14, fontWeight: 600, color: 'var(--gold)' }}>My Currency</div>
             <button className="btn btn-ghost btn-sm" onClick={() => { setCurrencyDraft({ ...inv.currency }); setEditingCurrency(true) }}>Edit all</button>
           </div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
@@ -138,7 +138,7 @@ export function InventoryPanel({ toast, isDM = false }) {
                 {c.sub && <div style={{ fontSize: 10, color: 'var(--text-3)', marginBottom: 6, paddingLeft: 16 }}>{c.sub}</div>}
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, paddingLeft: 16 }}>
                   <button onClick={() => adjustCurrency(c.key, -1)} style={{ width: 20, height: 20, borderRadius: 4, border: '1px solid var(--border)', background: 'transparent', color: 'var(--text-2)', fontSize: 13, fontWeight: 700, cursor: 'pointer', lineHeight: 1, padding: 0 }}>−</button>
-                  <span style={{ fontFamily: 'Cinzel, serif', fontSize: 18, fontWeight: 700, color: c.key === 'gp' ? 'var(--gold)' : 'var(--text)', minWidth: 32, textAlign: 'center' }}>{(inv.currency[c.key] || 0).toLocaleString()}</span>
+                  <span style={{ fontFamily: 'var(--font-title)', fontSize: 18, fontWeight: 700, color: c.key === 'gp' ? 'var(--gold)' : 'var(--text)', minWidth: 32, textAlign: 'center' }}>{(inv.currency[c.key] || 0).toLocaleString()}</span>
                   <button onClick={() => adjustCurrency(c.key, 1)} style={{ width: 20, height: 20, borderRadius: 4, border: '1px solid var(--border)', background: 'transparent', color: 'var(--text-2)', fontSize: 13, fontWeight: 700, cursor: 'pointer', lineHeight: 1, padding: 0 }}>+</button>
                 </div>
               </div>
@@ -150,7 +150,7 @@ export function InventoryPanel({ toast, isDM = false }) {
       {/* ── Items ── */}
       <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
         <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div style={{ fontFamily: 'Cinzel, serif', fontSize: 14, fontWeight: 600, color: 'var(--gold)' }}>
+          <div style={{ fontFamily: 'var(--font-title)', fontSize: 14, fontWeight: 600, color: 'var(--gold)' }}>
             Items
             {totalWeight > 0 && <span style={{ fontFamily: 'inherit', fontSize: 11, fontWeight: 400, color: 'var(--text-3)', marginLeft: 10 }}>{totalWeight.toFixed(1)} lb total</span>}
           </div>
@@ -174,7 +174,7 @@ export function InventoryPanel({ toast, isDM = false }) {
               {item.notes && <div style={{ fontSize: 11, color: 'var(--text-3)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: 1 }}>{item.notes}</div>}
             </div>
             <div style={{ fontSize: 11, color: 'var(--text-3)', whiteSpace: 'nowrap' }}>{item.value || ''}</div>
-            <div style={{ fontSize: 12, fontFamily: 'Cinzel, serif', color: 'var(--text-2)', minWidth: 24, textAlign: 'center' }}>×{item.qty || 1}</div>
+            <div style={{ fontSize: 12, fontFamily: 'var(--font-title)', color: 'var(--text-2)', minWidth: 24, textAlign: 'center' }}>×{item.qty || 1}</div>
             <div style={{ display: 'flex', gap: 2 }}>
               <button onClick={() => setEditingItem({ ...item })} style={{ background: 'none', border: 'none', color: 'var(--text-3)', cursor: 'pointer', fontSize: 13, padding: '2px 4px' }}>✎</button>
               <button onClick={() => removeItem(item.id)} style={{ background: 'none', border: 'none', color: 'var(--text-3)', cursor: 'pointer', fontSize: 13, padding: '2px 4px' }}>✕</button>
@@ -187,7 +187,7 @@ export function InventoryPanel({ toast, isDM = false }) {
       {addingItem && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', zIndex: 300, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }} onClick={() => setAddingItem(false)}>
           <div className="card" style={{ width: '100%', maxWidth: 440, padding: 24 }} onClick={e => e.stopPropagation()}>
-            <div style={{ fontFamily: 'Cinzel, serif', fontSize: 16, fontWeight: 600, color: 'var(--gold)', marginBottom: 16 }}>Add Item</div>
+            <div style={{ fontFamily: 'var(--font-title)', fontSize: 16, fontWeight: 600, color: 'var(--gold)', marginBottom: 16 }}>Add Item</div>
             <ItemForm form={newItemForm} setForm={setNewItemForm} />
             <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
               <button className="btn btn-primary" style={{ flex: 1, justifyContent: 'center' }} onClick={addItem}>Add</button>
@@ -201,7 +201,7 @@ export function InventoryPanel({ toast, isDM = false }) {
       {editingItem && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', zIndex: 300, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }} onClick={() => setEditingItem(null)}>
           <div className="card" style={{ width: '100%', maxWidth: 440, padding: 24 }} onClick={e => e.stopPropagation()}>
-            <div style={{ fontFamily: 'Cinzel, serif', fontSize: 16, fontWeight: 600, color: 'var(--gold)', marginBottom: 16 }}>Edit Item</div>
+            <div style={{ fontFamily: 'var(--font-title)', fontSize: 16, fontWeight: 600, color: 'var(--gold)', marginBottom: 16 }}>Edit Item</div>
             <ItemForm form={editingItem} setForm={setEditingItem} />
             <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
               <button className="btn btn-primary" style={{ flex: 1, justifyContent: 'center' }} onClick={saveItemEdit}>Save</button>
@@ -215,7 +215,7 @@ export function InventoryPanel({ toast, isDM = false }) {
       {editingCurrency && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', zIndex: 300, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }} onClick={() => setEditingCurrency(false)}>
           <div className="card" style={{ width: '100%', maxWidth: 360, padding: 24 }} onClick={e => e.stopPropagation()}>
-            <div style={{ fontFamily: 'Cinzel, serif', fontSize: 16, fontWeight: 600, color: 'var(--gold)', marginBottom: 16 }}>Edit Currency</div>
+            <div style={{ fontFamily: 'var(--font-title)', fontSize: 16, fontWeight: 600, color: 'var(--gold)', marginBottom: 16 }}>Edit Currency</div>
             {CURRENCY.map(c => (
               <div key={c.key} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>

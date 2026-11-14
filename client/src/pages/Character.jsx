@@ -371,7 +371,7 @@ export default function Character() {
             </div>
           ) : (
             <>
-              <div style={{ fontFamily: 'Cinzel, serif', fontSize: 18, fontWeight: 600 }}>{F.name || 'Unnamed Hero'}</div>
+              <div style={{ fontFamily: 'var(--font-title)', fontSize: 18, fontWeight: 600 }}>{F.name || 'Unnamed Hero'}</div>
               <div style={{ fontSize: 12, color: 'var(--text-2)', marginTop: 2 }}>{[F.race, F.class, F.level ? `Level ${F.level}` : ''].filter(Boolean).join(' · ')}</div>
             </>
           )}
@@ -394,14 +394,14 @@ export default function Character() {
                     <input type="number" className="input" style={{ width: 42, padding: '4px', fontSize: 11, textAlign: 'center' }} value={F.hp?.max ?? 10} onChange={e => setForm(p => ({ ...p, hp: { ...p.hp, max: +e.target.value } }))} />
                   </div>
                 ) : label === 'Init' ? (
-                  <div style={{ fontFamily: 'Cinzel, serif', fontSize: 16, fontWeight: 600, color }}>{mod(F.stats?.dex ?? 10)}</div>
+                  <div style={{ fontFamily: 'var(--font-title)', fontSize: 16, fontWeight: 600, color }}>{mod(F.stats?.dex ?? 10)}</div>
                 ) : (
                   <input type="number" className="input" style={{ width: 52, padding: '4px', fontSize: 11, textAlign: 'center' }}
                     value={label === 'AC' ? F.ac ?? 10 : F.profBonus ?? 2}
                     onChange={e => setForm(p => ({ ...p, [label === 'AC' ? 'ac' : 'profBonus']: +e.target.value }))} />
                 )
               ) : (
-                <div style={{ fontFamily: 'Cinzel, serif', fontSize: 18, fontWeight: 600, color }}>
+                <div style={{ fontFamily: 'var(--font-title)', fontSize: 18, fontWeight: 600, color }}>
                   {label === 'HP' ? `${F.hp?.current ?? 10}/${F.hp?.max ?? 10}` : label === 'AC' ? F.ac ?? 10 : label === 'Prof' ? `+${F.profBonus ?? 2}` : mod(F.stats?.dex ?? 10)}
                 </div>
               )}
@@ -459,7 +459,7 @@ export default function Character() {
               <div style={{ fontSize: 9, fontWeight: 600, color: 'var(--text-3)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 4 }}>{STAT_LABELS[k]}</div>
               {editing
                 ? <input type="number" className="input" style={{ textAlign: 'center', padding: '4px', fontSize: 15 }} value={F.stats?.[k] ?? 10} onChange={e => setForm(p => ({ ...p, stats: { ...p.stats, [k]: +e.target.value } }))} />
-                : <><div style={{ fontFamily: 'Cinzel, serif', fontSize: 24, fontWeight: 600, color: 'var(--gold)' }}>{mod(F.stats?.[k] ?? 10)}</div><div style={{ fontSize: 11, color: 'var(--text-2)', marginTop: 1 }}>{F.stats?.[k] ?? 10}</div></>
+                : <><div style={{ fontFamily: 'var(--font-title)', fontSize: 24, fontWeight: 600, color: 'var(--gold)' }}>{mod(F.stats?.[k] ?? 10)}</div><div style={{ fontSize: 11, color: 'var(--text-2)', marginTop: 1 }}>{F.stats?.[k] ?? 10}</div></>
               }
             </div>
           ))}
@@ -503,7 +503,7 @@ export default function Character() {
       {sharing && char && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }} onClick={() => setSharing(false)}>
           <div className="card" style={{ width: '100%', maxWidth: 460, padding: 22 }} onClick={e => e.stopPropagation()}>
-            <div style={{ fontFamily: 'Cinzel, serif', fontSize: 17, color: 'var(--gold)', marginBottom: 8 }}>Share {char.name || 'this character'}</div>
+            <div style={{ fontFamily: 'var(--font-title)', fontSize: 17, color: 'var(--gold)', marginBottom: 8 }}>Share {char.name || 'this character'}</div>
             <div style={{ fontSize: 13, color: 'var(--text-2)', lineHeight: 1.5, marginBottom: 12 }}>Anyone with the link can view a read-only sheet and print it, even without an account. Your notes, lore and goals are never shared.</div>
             {char.shareToken ? (
               <>
@@ -522,7 +522,7 @@ export default function Character() {
       {deleteTarget && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.65)', zIndex: 1100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }} onClick={closeDeleteModal}>
           <div className="card" role="dialog" aria-modal="true" aria-labelledby="delete-char-title" style={{ width: '100%', maxWidth: 380, padding: 22 }} onClick={e => e.stopPropagation()}>
-            <div id="delete-char-title" style={{ fontFamily: 'Cinzel, serif', fontSize: 16, fontWeight: 600, color: 'var(--red)', marginBottom: 10 }}>Delete Character</div>
+            <div id="delete-char-title" style={{ fontFamily: 'var(--font-title)', fontSize: 16, fontWeight: 600, color: 'var(--red)', marginBottom: 10 }}>Delete Character</div>
             <div style={{ fontSize: 13, color: 'var(--text-2)', marginBottom: 14, lineHeight: 1.6 }}>
               This permanently deletes this character sheet. This cannot be undone.{' '}
               Type <strong style={{ color: 'var(--text)' }}>{deleteTargetName}</strong> exactly to confirm.

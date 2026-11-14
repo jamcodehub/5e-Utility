@@ -101,7 +101,7 @@ function DropTextarea({ value, onChange, activePlayer, onInserted, style = {}, r
 
 function SectionLabel({ children, style = {} }) {
   return (
-    <div style={{ fontFamily: 'Cinzel, serif', fontSize: 11, fontWeight: 600, color: 'var(--gold)', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 10, ...style }}>
+    <div style={{ fontFamily: 'var(--font-title)', fontSize: 11, fontWeight: 600, color: 'var(--gold)', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 10, ...style }}>
       {children}
     </div>
   )
@@ -168,7 +168,7 @@ function CharModal({ player, onClose }) {
   const char = player.character
   const Row = ({ label, val }) => val ? (
     <div style={{ marginBottom: 12 }}>
-      <div style={{ fontSize: 10, fontFamily: 'Cinzel, serif', fontWeight: 600, color: 'var(--gold)', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 3 }}>{label}</div>
+      <div style={{ fontSize: 10, fontFamily: 'var(--font-title)', fontWeight: 600, color: 'var(--gold)', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 3 }}>{label}</div>
       <div style={{ fontSize: 13, color: 'var(--text)', lineHeight: 1.65, whiteSpace: 'pre-wrap' }}>{val}</div>
     </div>
   ) : null
@@ -181,10 +181,10 @@ function CharModal({ player, onClose }) {
           <div style={{ width: 48, height: 48, borderRadius: '50%', flexShrink: 0, overflow: 'hidden', background: 'var(--gold-bg)', border: '2px solid var(--gold-border)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             {char?.avatarUrl
               ? <img src={char.avatarUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-              : <span style={{ fontFamily: 'Cinzel, serif', fontSize: 18, color: 'var(--gold)', fontWeight: 600 }}>{(char?.name || player.username)?.[0]?.toUpperCase()}</span>}
+              : <span style={{ fontFamily: 'var(--font-title)', fontSize: 18, color: 'var(--gold)', fontWeight: 600 }}>{(char?.name || player.username)?.[0]?.toUpperCase()}</span>}
           </div>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontFamily: 'Cinzel, serif', fontSize: 16, fontWeight: 600 }}>{char?.name || player.username}</div>
+            <div style={{ fontFamily: 'var(--font-title)', fontSize: 16, fontWeight: 600 }}>{char?.name || player.username}</div>
             {char && <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 1 }}>{[char.race, char.class, char.level ? `Lvl ${char.level}` : null, char.hp ? `${char.hp.current}/${char.hp.max} HP` : null, char.ac ? `AC ${char.ac}` : null].filter(Boolean).join(' · ')}</div>}
             <div style={{ fontSize: 11, color: 'var(--text-3)' }}>@{player.username}</div>
           </div>
@@ -203,7 +203,7 @@ function CharModal({ player, onClose }) {
                   return (
                     <div key={s} style={{ textAlign: 'center', padding: '5px 2px', border: '1px solid var(--border)', borderRadius: 6 }}>
                       <div style={{ fontSize: 9, color: 'var(--text-3)', textTransform: 'uppercase' }}>{s}</div>
-                      <div style={{ fontSize: 13, fontWeight: 700, fontFamily: 'Cinzel, serif' }}>{v}</div>
+                      <div style={{ fontSize: 13, fontWeight: 700, fontFamily: 'var(--font-title)' }}>{v}</div>
                       <div style={{ fontSize: 10, color: 'var(--text-3)' }}>{m >= 0 ? '+' : ''}{m}</div>
                     </div>
                   )
@@ -446,7 +446,7 @@ export default function CampaignGuide() {
             >
               {p.character?.avatarUrl
                 ? <img src={p.character.avatarUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                : <span style={{ fontFamily: 'Cinzel, serif', fontSize: 15, color: 'var(--gold)', fontWeight: 600 }}>{name[0]?.toUpperCase()}</span>}
+                : <span style={{ fontFamily: 'var(--font-title)', fontSize: 15, color: 'var(--gold)', fontWeight: 600 }}>{name[0]?.toUpperCase()}</span>}
             </div>
             <div style={{ fontSize: 9, color: selected ? 'var(--gold)' : 'var(--text-3)', fontWeight: selected ? 700 : 400, maxWidth: 44, textAlign: 'center', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{name}</div>
             <button

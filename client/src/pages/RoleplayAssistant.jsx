@@ -557,7 +557,7 @@ export default function RoleplayAssistant() {
 
             {/* Generate card */}
             <div className="card" style={{ padding: '18px 16px', display: 'flex', flexDirection: 'column', gap: 12 }}>
-              <div style={{ fontFamily: 'Cinzel, serif', fontSize: 12, fontWeight: 600, color: 'var(--gold)', letterSpacing: '0.05em', textTransform: 'uppercase' }}>Ready to Play</div>
+              <div style={{ fontFamily: 'var(--font-title)', fontSize: 12, fontWeight: 600, color: 'var(--gold)', letterSpacing: '0.05em', textTransform: 'uppercase' }}>Ready to Play</div>
 
               {/* Completion indicators */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -630,7 +630,7 @@ export default function RoleplayAssistant() {
               )
               return (
                 <div style={{ padding: '12px 14px', background: 'var(--gold-bg)', border: '1px solid var(--gold-border)', borderRadius: 8, fontSize: 11, color: 'var(--text-2)', lineHeight: 1.7 }}>
-                  <div style={{ fontFamily: 'Cinzel, serif', fontSize: 10, fontWeight: 600, color: 'var(--gold)', letterSpacing: '0.05em', textTransform: 'uppercase', marginBottom: 8 }}>DM Context Active</div>
+                  <div style={{ fontFamily: 'var(--font-title)', fontSize: 10, fontWeight: 600, color: 'var(--gold)', letterSpacing: '0.05em', textTransform: 'uppercase', marginBottom: 8 }}>DM Context Active</div>
                   {dmGuide.currentArc && <div style={{ marginBottom: 5 }}><strong style={{ color: 'var(--text)' }}>Arc:</strong> {dmGuide.currentArc.slice(0, 80)}{dmGuide.currentArc.length > 80 ? '…' : ''}</div>}
                   {dmGuide.lastSession && <div style={{ marginBottom: 5 }}><strong style={{ color: 'var(--text)' }}>Last session:</strong> {dmGuide.lastSession.slice(0, 80)}{dmGuide.lastSession.length > 80 ? '…' : ''}</div>}
                   {(dmGuide.npcs || []).filter(n => n.name).length > 0 && <div style={{ marginBottom: 5 }}><strong style={{ color: 'var(--text)' }}>NPCs:</strong> {(dmGuide.npcs || []).filter(n => n.name).map(n => n.name).join(', ')}</div>}
@@ -707,7 +707,7 @@ export default function RoleplayAssistant() {
           return (
             <div key={phase.phase} className="card" style={{ marginBottom: 14, overflow: 'hidden' }}>
               <div style={{ padding: '10px 16px', background: phase.headerBg, borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <div style={{ fontFamily: 'Cinzel, serif', fontSize: 13, fontWeight: 600, color: phase.headerColor }}>{phase.phase}</div>
+                <div style={{ fontFamily: 'var(--font-title)', fontSize: 13, fontWeight: 600, color: phase.headerColor }}>{phase.phase}</div>
                 <div style={{ fontSize: 11, color: 'var(--text-3)' }}>{done}/{phase.items.length} done</div>
               </div>
 
@@ -759,7 +759,7 @@ export default function RoleplayAssistant() {
 
 function SectionLabel({ children }) {
   return (
-    <div style={{ fontFamily: 'Cinzel, serif', fontSize: 12, fontWeight: 600, color: 'var(--gold)', marginBottom: 14, letterSpacing: '0.05em', textTransform: 'uppercase' }}>
+    <div style={{ fontFamily: 'var(--font-title)', fontSize: 12, fontWeight: 600, color: 'var(--gold)', marginBottom: 14, letterSpacing: '0.05em', textTransform: 'uppercase' }}>
       {children}
     </div>
   )

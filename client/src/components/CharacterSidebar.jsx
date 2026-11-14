@@ -55,11 +55,11 @@ export default function CharacterOverview({ campaignId, refreshKey }) {
   return (
     <div style={{ padding: '14px 14px 24px' }}>
       <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-        <div style={{ width: 44, height: 44, borderRadius: '50%', background: 'var(--gold-bg)', border: '1px solid var(--gold-border)', overflow: 'hidden', flexShrink: 0, display: 'grid', placeItems: 'center', color: 'var(--gold)', fontFamily: 'Cinzel, serif' }}>
+        <div style={{ width: 44, height: 44, borderRadius: '50%', background: 'var(--gold-bg)', border: '1px solid var(--gold-border)', overflow: 'hidden', flexShrink: 0, display: 'grid', placeItems: 'center', color: 'var(--gold)', fontFamily: 'var(--font-title)' }}>
           {char.avatarUrl ? <img src={char.avatarUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : (char.name || 'H')[0]}
         </div>
         <div style={{ minWidth: 0 }}>
-          <div style={{ fontFamily: 'Cinzel, serif', fontSize: 15, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{char.name || 'Unnamed Hero'}</div>
+          <div style={{ fontFamily: 'var(--font-title)', fontSize: 15, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{char.name || 'Unnamed Hero'}</div>
           <div style={{ fontSize: 11, color: 'var(--text-3)' }}>Level {d.level} {[char.race, char.class].filter(Boolean).join(' ')}</div>
         </div>
       </div>
