@@ -14,7 +14,8 @@ import {
 
 const nanoid = () => Math.random().toString(36).slice(2, 9)
 const ABIL = ['STR', 'DEX', 'CON', 'INT', 'WIS', 'CHA']
-const TYPE_COLOR = { boss: '#f59e0b', enemy: '#ef4444', player: '#6366f1', npc: '#10b981' }
+// Players are green and enemies red (the theme's own green and red); bosses amber, friendly NPCs a calm blue so they never read as players
+const TYPE_COLOR = { boss: '#f59e0b', enemy: 'var(--red)', player: 'var(--green)', npc: '#4f7cac' }
 
 function HpBar({ current, max }) {
   if (!max) return null
@@ -113,7 +114,7 @@ function CombatantCard({ c, others, isTurn, expanded, onToggle, onChange, onRemo
   const hp = c.hp ?? c.maxHp ?? 0
   const maxHp = c.maxHp ?? 0
   const isDead = maxHp > 0 && hp === 0
-  const tagColor = TYPE_COLOR[c.type] || '#10b981'
+  const tagColor = TYPE_COLOR[c.type] || 'var(--green)'
   const outline = isTurn ? '2px solid var(--gold-fill, var(--gold))' : undefined
 
   return (
