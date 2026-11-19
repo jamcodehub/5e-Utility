@@ -312,6 +312,7 @@ export default function LevelBuilder() {
   const [linkDestinationId, setLinkDestinationId] = useState('')
   const [tool, setTool] = useState('wall')
   const [painting, setPainting] = useState(false)
+  const lastTouchCell = useRef(null)
 
   // ── Play mode state ──
   const [tokens, setTokens] = useState([]) // { id, name, avatar, color, row, col, hp, maxHp }
@@ -1116,6 +1117,17 @@ export default function LevelBuilder() {
       <div className="lb-editor-canvas-wrap">
         <div
           id="level-print"
+          onTouchMove={e => {
+            // Finger-drag painting: paint every cell the finger passes over.
+            if (linkMode) return
+            const t = e.touches[0]
+            const el = t && document.elementFromPoint(t.clientX, t.clientY)?.closest('[data-lb-cell]')
+            if (!el || el.dataset.lbCell === lastTouchCell.current) return
+            lastTouchCell.current = el.dataset.lbCell
+            const [r, c] = el.dataset.lbCell.split('-').map(Number)
+            paint(r, c)
+          }}
+          onTouchEnd={() => { lastTouchCell.current = null }}
           onMouseUp={() => setPainting(false)}
           onMouseLeave={() => setPainting(false)}
           style={{
@@ -1134,7 +1146,7 @@ export default function LevelBuilder() {
             const t = TILES.find(x => x.id === cellId) || TILES[TILES.length - 1]
             const object = objectTile(objectGrid[r]?.[c])
             return (
-              <div key={`${r}-${c}`} className="lb-cell"
+              <div key={`${r}-${c}`} className="lb-cell" data-lb-cell={`${r}-${c}`}
                 onMouseDown={() => { if (linkMode) return; setPainting(true); paint(r, c) }}
                 onMouseEnter={() => { if (painting && !linkMode) paint(r, c) }}
                 onClick={() => handleEditorCellClick(r, c)}
@@ -1244,8 +1256,10 @@ export default function LevelBuilder() {
           .level-play-content { flex-direction: column; }
           .level-play-map { min-height: 0; flex: 1 1 auto !important; padding: 0 !important; }
           .level-play-map > div { width: 100% !important; max-width: 100% !important; }
-          .level-play-tokens { top: auto !important; left: 0 !important; right: 0 !important; width: 100% !important; height: 38%; min-height: 155px; max-height: 270px; border-left: 0 !important; border-top: 1px solid var(--border); }
-          .level-play-controls[data-tokens-open="true"] { right: 18px; bottom: calc(38% + 10px); }
+          .level-play-tokens { top: auto !important; left: 0 !important; right: 0 !important; bottom: 0 !important; width: 100% !important; height: 34vh; min-height: 155px; max-height: 270px; border-left: 0 !important; border-top: 1px solid var(--border); }
+          .level-play-map > .level-play-controls { left: auto !important; right: 10px !important; bottom: 10px !important; width: max-content !important; max-width: calc(100% - 20px) !important; }
+          .level-play-map > .level-play-controls[data-tokens-open="true"] { bottom: calc(max(155px, min(34vh, 270px)) + 10px) !important; }
+          .level-play-toolbar > span:first-child { font-size: 15px; }
           .level-play-token-list { display: flex; flex: 1 1 auto; flex-direction: row; align-items: stretch; gap: 6px; overflow-x: auto; overflow-y: hidden; padding: 6px 8px; }
           .level-play-token-heading { display: none; }
           .level-play-token-entry { flex: 0 0 148px; margin: 0; }
