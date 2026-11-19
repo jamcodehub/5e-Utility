@@ -206,3 +206,12 @@ input, textarea, select { font-family: inherit; }
   }
   .roleplay-generate-column { width: 100% !important; }
 }
+
+/* Touch devices: app chrome and boards shouldn't start a text selection on long-press or drag;
+   text stays selectable inside real text fields. */
+@media (pointer: coarse) {
+  body { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent; }
+  input, textarea, select, [contenteditable="true"], .allow-select, .allow-select * {
+    -webkit-user-select: text; user-select: text; -webkit-touch-callout: default;
+  }
+}

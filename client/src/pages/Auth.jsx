@@ -318,7 +318,7 @@ return (
           {mode === 'register' && (
             <div style={{ marginBottom: 12 }}>
               <label style={labelStyle}>Username</label>
-              <input className="input" placeholder="Boroos" value={form.username} onChange={set('username')} required />
+              <input className="input" placeholder="Username" value={form.username} onChange={set('username')} required />
             </div>
           )}
           {!(mode === 'register' && method === 'google') && (

@@ -813,19 +813,19 @@ const CSS = `
 .dmb-hit{fill:none;stroke:transparent;stroke-width:16;stroke-linecap:round;stroke-linejoin:round;cursor:pointer}
 .dmb-marq{fill:color-mix(in srgb,var(--dmb-line) 8%,transparent);stroke:var(--dmb-line);stroke-width:1.2;stroke-dasharray:5 4}
 .dmb-bar,.dmb-tl,.dmb-zoom,.dmb-tools,.dmb-pop{position:absolute;display:flex;gap:2px;align-items:center;background:var(--dmb-chrome);border:1px solid color-mix(in srgb,var(--dmb-rim) 60%,transparent);border-radius:10px;padding:4px;box-shadow:0 2px 10px rgba(0,0,0,.25)}
-.dmb-bar{left:50%;bottom:14px;transform:translateX(-50%);max-width:calc(100% - 24px);overflow-x:auto}
+.dmb-bar{padding:3px;left:50%;bottom:14px;transform:translateX(-50%);max-width:calc(100% - 24px);overflow-x:auto}
 .dmb-tl{left:12px;top:12px}
-.dmb-tools{left:12px;top:64px;flex-direction:column;border-radius:20px;padding:5px 4px;max-height:calc(100% - 240px);overflow-y:auto}
+.dmb-tools{left:12px;top:64px;flex-direction:column;border-radius:16px;padding:3px;gap:1px;max-height:calc(100% - 240px);overflow-y:auto}
 .dmb-pop{left:62px;top:64px;flex-direction:column;align-items:stretch;padding:8px;max-width:calc(100% - 80px);z-index:2}
 .dmb-pop-row{display:flex;flex-wrap:wrap;gap:2px}
 .dmb-pop-title{color:var(--dmb-chrome-text);opacity:.75;font:12px 'MedievalSharp',serif;text-transform:uppercase;letter-spacing:.08em}
 .dmb-zoom{left:12px;bottom:70px;color:var(--dmb-chrome-text);font:13px 'MedievalSharp',serif}
 .dmb-zoom span{min-width:46px;text-align:center}
-.dmb-root button{display:flex;align-items:center;justify-content:center;width:32px;height:32px;padding:0;background:none;border:1px solid transparent;border-radius:7px;color:var(--dmb-chrome-text);font:12px 'MedievalSharp',serif;cursor:pointer}
+.dmb-root button{display:flex;align-items:center;justify-content:center;width:28px;height:28px;padding:0;background:none;border:1px solid transparent;border-radius:6px;color:var(--dmb-chrome-text);font:12px 'MedievalSharp',serif;cursor:pointer}
 .dmb-zoom button,.dmb-status button,.dmb-panel button{width:auto;min-width:28px;height:28px;padding:0 7px}
 .dmb-root button.on,.dmb-root button:hover:not(:disabled){background:var(--dmb-chrome-hi);border-color:var(--dmb-rim)}
 .dmb-root button:disabled{opacity:.35;cursor:default}
-.dmb-bar img,.dmb-tl img,.dmb-tools img,.dmb-pop img{width:20px;height:20px;filter:var(--dmb-icon-filter)}
+.dmb-bar img,.dmb-tl img,.dmb-tools img,.dmb-pop img{width:18px;height:18px;filter:var(--dmb-icon-filter)}
 .dmb-top{position:absolute;right:12px;top:12px;display:flex;gap:8px;max-width:calc(100% - 100px)}
 .dmb-root .dmb-fs{width:auto;height:auto;padding:7px 12px;background:var(--dmb-rim);color:#1d1208;border:1px solid var(--dmb-chrome);font-size:14px;box-shadow:0 2px 10px rgba(0,0,0,.25);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
 .dmb-root .dmb-fs:hover{background:color-mix(in srgb,var(--dmb-rim) 82%,#fff);border-color:var(--dmb-chrome)}

@@ -953,7 +953,7 @@ export default function LevelBuilder() {
           position: relative;
           display: inline-flex;
           align-items: center;
-          width: 132px;
+          width: 190px;
           height: 34px;
           padding: 3px;
           border: 1px solid var(--border);
@@ -1029,13 +1029,13 @@ export default function LevelBuilder() {
             className="level-darkness-toggle"
             data-dark={darkMode}
             onClick={() => toggleDarkMode(editPlanId)}
-            aria-label="Map lighting"
+            aria-label="Fog of war (map darkness for players)"
             aria-pressed={darkMode}
-            title={darkMode ? 'Darkness is on for players' : 'Darkness is off for players'}
+            title={darkMode ? 'Fog of war is on for players' : 'Fog of war is off for players'}
           >
             <span className="level-darkness-toggle-thumb" aria-hidden="true" />
-            <span className="level-darkness-toggle-label">☀ Light</span>
-            <span className="level-darkness-toggle-label">☾ Dark</span>
+            <span className="level-darkness-toggle-label">☀ Fog off</span>
+            <span className="level-darkness-toggle-label">☾ Fog of war</span>
           </button>
         )}
         <div style={{ display: 'flex', gap: 8, flexShrink: 0, marginLeft: 'auto' }}>
@@ -1188,7 +1188,7 @@ export default function LevelBuilder() {
           position: relative;
           display: inline-flex;
           align-items: center;
-          width: 132px;
+          width: 190px;
           height: 34px;
           padding: 3px;
           border: 1px solid var(--border);
@@ -1266,13 +1266,13 @@ export default function LevelBuilder() {
             className="level-darkness-toggle"
             data-dark={darkMode}
             onClick={() => toggleDarkMode(selectedPlanId)}
-            aria-label="Map lighting"
+            aria-label="Fog of war (map darkness for players)"
             aria-pressed={darkMode}
-            title={darkMode ? 'Darkness is on for players' : 'Darkness is off for players'}
+            title={darkMode ? 'Fog of war is on for players' : 'Fog of war is off for players'}
           >
             <span className="level-darkness-toggle-thumb" aria-hidden="true" />
-            <span className="level-darkness-toggle-label">☀ Light</span>
-            <span className="level-darkness-toggle-label">☾ Dark</span>
+            <span className="level-darkness-toggle-label">☀ Fog off</span>
+            <span className="level-darkness-toggle-label">☾ Fog of war</span>
           </button>
         )}
         <button className="btn btn-ghost btn-sm" onClick={() => { setTokens([]); setMode('gallery') }}>← Back</button>
