@@ -12,6 +12,7 @@ import { SkeletonBlock } from '../components/Skeleton'
 import { TILES, OBJECT_TILES } from '../data/levelTiles'
 import { THEMES, DEFAULT_THEME, resolveThemeId, getThemeTiles } from '../data/levelThemes'
 import { avatarSrc } from '../components/ProfileAvatar'
+import { tokenColor } from '../utils/tokenColor'
 // Note: module-level TILES / OBJECT_TILES above are the base (Medieval) set, used for
 // logic that doesn't depend on artwork. MapThumb and LevelBuilder shadow them with the
 // active theme's tiles (same ids, different art).
@@ -282,7 +283,7 @@ function Token({ token, cellSize, onDragStart, dragging }) {
         inset: 2,
         borderRadius: '50%',
         overflow: 'hidden',
-        background: token.color || '#6366f1',
+        background: tokenColor(token),
         border: '2px solid rgba(255,255,255,0.8)',
         boxShadow: '0 2px 6px rgba(0,0,0,0.4)',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -511,7 +512,7 @@ export default function LevelBuilder() {
           id: `char-${m.userId}`,
           name: m.character?.name || m.username,
           avatar: picture ? avatarSrc(picture, 96) : null,
-          color: '#6366f1',
+          color: tokenColor({ type: 'player' }),
           hp: m.character?.hp?.current ?? m.character?.hp?.max ?? 10,
           maxHp: m.character?.hp?.max ?? 10,
           type: 'player',
@@ -525,7 +526,7 @@ export default function LevelBuilder() {
           loreId: l._id,
           name: l.title,
           avatar: null,
-          color: l.tag === 'boss' ? '#f59e0b' : l.tag === 'enemy' ? '#ef4444' : '#10b981',
+          color: tokenColor({ type: l.tag }),
           hp: l.hp ?? l.maxHp ?? 10,
           maxHp: l.maxHp ?? 10,
           type: l.tag,
@@ -1500,7 +1501,7 @@ export default function LevelBuilder() {
               <div className="level-play-on-map-list">
               {tokens.map(t => (
                 <div key={t.id} className="level-play-on-map-row">
-                  <div style={{ width: 20, height: 20, borderRadius: '50%', background: t.color, border: '1px solid rgba(255,255,255,0.3)', flexShrink: 0, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <div style={{ width: 20, height: 20, borderRadius: '50%', background: tokenColor(t), border: '1px solid rgba(255,255,255,0.3)', flexShrink: 0, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                     {t.avatar
                       ? <img src={t.avatar} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                       : <span style={{ fontSize: 9, color: '#fff', fontWeight: 700 }}>{t.name?.[0]}</span>
@@ -1544,7 +1545,7 @@ export default function LevelBuilder() {
             transform: dragPreviewTransform(dragPosRef.current),
             borderRadius: '50%',
             overflow: 'hidden',
-            background: dragPreviewToken.color || '#6366f1',
+            background: tokenColor(dragPreviewToken),
             border: '2px solid rgba(255,255,255,0.9)',
             boxShadow: '0 4px 12px rgba(0,0,0,0.45)',
             display: 'flex',
@@ -1704,7 +1705,7 @@ function SidebarToken({ token, placed, dragging, selected, onDragStart, onSelect
         touchAction: 'pan-x',
       }}
     >
-      <div style={{ width: 28, height: 28, borderRadius: '50%', background: token.color, border: '2px solid rgba(255,255,255,0.2)', flexShrink: 0, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <div style={{ width: 28, height: 28, borderRadius: '50%', background: tokenColor(token), border: '2px solid rgba(255,255,255,0.2)', flexShrink: 0, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         {token.avatar
           ? <img src={token.avatar} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
           : <span style={{ fontSize: 12, color: '#fff', fontWeight: 700 }}>{token.name?.[0]?.toUpperCase()}</span>

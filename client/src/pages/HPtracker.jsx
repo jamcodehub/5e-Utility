@@ -8,14 +8,13 @@ import { useDebouncedSave } from '../hooks/useDebouncedSave'
 import { loadSrd, loadSrdMany } from '../utils/srd'
 import { derive, weaponStats } from '../utils/sheet'
 import { signed } from '../utils/dice'
+import { tokenColor } from '../utils/tokenColor'
 import {
   abilityMod, rollInitiative, sortByInitiative, nextTurn, resolveAttack, applyDamage, applyHeal, parseAmount, describeAttack, mergeSaved,
 } from '../utils/combat'
 
 const nanoid = () => Math.random().toString(36).slice(2, 9)
 const ABIL = ['STR', 'DEX', 'CON', 'INT', 'WIS', 'CHA']
-// Players are green and enemies red (the theme's own green and red); bosses amber, friendly NPCs a calm blue so they never read as players
-const TYPE_COLOR = { boss: '#f59e0b', enemy: 'var(--red)', player: 'var(--green)', npc: '#4f7cac' }
 
 function HpBar({ current, max }) {
   if (!max) return null
@@ -114,7 +113,7 @@ function CombatantCard({ c, others, isTurn, expanded, onToggle, onChange, onRemo
   const hp = c.hp ?? c.maxHp ?? 0
   const maxHp = c.maxHp ?? 0
   const isDead = maxHp > 0 && hp === 0
-  const tagColor = TYPE_COLOR[c.type] || 'var(--green)'
+  const tagColor = tokenColor(c)
   const outline = isTurn ? '2px solid var(--gold-fill, var(--gold))' : undefined
 
   return (

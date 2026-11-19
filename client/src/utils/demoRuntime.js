@@ -115,8 +115,8 @@ const demoLore = [
 ]
 
 const DEMO_TOKENS = [
-  { id: 'char-demo-player', name: 'Avery Thornfield', row: 10, col: 10, color: '#6366f1', hp: 22, maxHp: 28, type: 'player', lightSource: true },
-  { id: 'lore-demo-goblin', loreId: 'demo-goblin', name: 'Roadside Goblin', row: 9, col: 20, color: '#ef4444', hp: 9, maxHp: 12, type: 'enemy' },
+  { id: 'char-demo-player', name: 'Avery Thornfield', row: 10, col: 10, color: 'var(--green)', hp: 22, maxHp: 28, type: 'player', lightSource: true },
+  { id: 'lore-demo-goblin', loreId: 'demo-goblin', name: 'Roadside Goblin', row: 9, col: 20, color: 'var(--red)', hp: 9, maxHp: 12, type: 'enemy' },
 ]
 
 let sceneCards = demoSceneCards.map(card => ({ ...card }))
