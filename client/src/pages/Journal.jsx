@@ -8,12 +8,14 @@ import { useToast } from '../hooks/useToast'
 import { SkeletonTextLines } from '../components/Skeleton'
 import { isPublicDemoPath } from '../utils/demoRuntime'
 
-const wordCount = s => s.trim().split(/\s+/).filter(Boolean).length
+const fmtDate = d => d ? new Date(d).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' }) : ''
+const fmtDateTime = d => d ? new Date(d).toLocaleString(undefined, { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' }) : ''
+const campaignLabel = c => (c.isPersonal ? 'Personal journal' : c.name)
 
 // Player-only journal — split out from the old shared Journal/Sessions page.
 // DMs now use SessionPlanner.jsx instead (see /session-planner route).
 export default function Journal() {
-  const { activeCampaign, campaignsLoading, campaignsError, reload: reloadCampaigns } = useCampaign()
+  const { campaigns, activeCampaign, setActive, campaignsLoading, campaignsError, reload: reloadCampaigns } = useCampaign()
   const { user } = useAuth()
   const { toast, ToastContainer } = useToast()
 
@@ -94,8 +96,8 @@ export default function Journal() {
     setSaving(true)
     try {
       await api(`/${apiBase}/${id}`, { method: 'PUT', body: { content: text } })
-      // Only update content in the sidebar list (word count), don't replace whole entry
-      setEntries(p => p.map(e => e._id === id ? { ...e, content: text } : e))
+      // Only update content/updatedAt in the list, don't replace the whole entry
+      setEntries(p => p.map(e => e._id === id ? { ...e, content: text, updatedAt: new Date().toISOString() } : e))
     } catch { /* silently ignore — next keystroke will retry */ }
     setSaving(false)
   }, [])
@@ -168,7 +170,19 @@ export default function Journal() {
   return (
     <div className="journal-layout" style={{ display: 'flex', height: '100%', overflow: 'hidden' }}>
       {/* Sidebar list */}
-      <div className="journal-day-list" style={{ width: 180, flexShrink: 0, borderRight: '1px solid var(--border)', overflowY: 'auto', background: 'var(--surface)' }}>
+      <div className="journal-day-list" style={{ width: 210, flexShrink: 0, borderRight: '1px solid var(--border)', overflowY: 'auto', background: 'var(--surface)' }}>
+        {campaigns?.length > 0 && (
+          <div className="journal-campaign-pick" style={{ padding: '12px 14px 4px', flexShrink: 0 }}>
+            <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4 }} htmlFor="journal-campaign">Campaign</label>
+            <select
+              id="journal-campaign" className="input" style={{ padding: '6px 8px', fontSize: 13 }}
+              value={activeCampaign?._id || ''}
+              onChange={ev => { flushSave(); const c = campaigns.find(x => x._id === ev.target.value); if (c) setActive(c) }}
+            >
+              {campaigns.map(c => <option key={c._id} value={c._id}>{campaignLabel(c)}</option>)}
+            </select>
+          </div>
+        )}
         <div style={{ padding: '14px 14px 8px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Days</span>
           <button className="btn btn-ghost btn-sm" onClick={newEntry} disabled={!activeCampaign} style={{ padding: '3px 8px' }}>+</button>
@@ -208,9 +222,7 @@ export default function Journal() {
                 >{entryTitle(e)}</span>
               )}
             </div>
-            <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 2 }}>
-              {wordCount(e.content || '')} words
-            </div>
+            {e.createdAt && <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 2 }}>{fmtDate(e.createdAt)}</div>}
           </div>
         ))}
         {!loadingContent && activeCampaign && !entriesError && !entries.length && (
@@ -259,7 +271,6 @@ export default function Journal() {
             )}
           </h2>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{wordCount(content)} words</span>
             {/* Autosave indicator — no manual save button needed */}
             {saving && <span style={{ fontSize: 11, color: 'var(--text-3)' }}>Saving…</span>}
             {isPublicDemoPath() ? (
@@ -269,6 +280,13 @@ export default function Journal() {
             )}
           </div>
         </div>
+        {active && activeCampaign && (
+          <div className="journal-details" style={{ padding: '8px 24px', borderBottom: '1px solid var(--border)', background: 'var(--surface)', fontSize: 12, color: 'var(--text-2)', display: 'flex', flexWrap: 'wrap', gap: '4px 18px' }}>
+            <span><b style={{ fontWeight: 600 }}>Campaign:</b> {campaignLabel(activeCampaign)}</span>
+            {active.createdAt && <span><b style={{ fontWeight: 600 }}>Written:</b> {fmtDate(active.createdAt)}</span>}
+            {active.updatedAt && <span><b style={{ fontWeight: 600 }}>Last edited:</b> {fmtDateTime(active.updatedAt)}</span>}
+          </div>
+        )}
         <div className="journal-content-area" style={{ flex: 1, overflowY: 'auto', padding: '24px 32px' }}>
           {loadingContent ? (
             <SkeletonTextLines lines={12} style={{ maxWidth: 840 }} />
