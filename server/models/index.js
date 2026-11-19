@@ -181,6 +181,9 @@ const LevelPlanSchema = new Schema({
   tokens:   { type: Schema.Types.Mixed, default: [] },
   darkMode: { type: Boolean, default: false },
   doorStates: { type: Schema.Types.Mixed, default: [] },
+  // Tile art theme. A map has exactly one theme (grids store tile ids; the theme only decides the artwork).
+  // Without this field Mongoose silently dropped the theme, so every saved map came back as Medieval.
+  theme:    { type: String, default: 'medieval' },
 }, { timestamps: true })
 
 const InventorySchema = new Schema({

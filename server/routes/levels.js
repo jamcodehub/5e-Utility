@@ -5,7 +5,7 @@ import { auth, isMember } from './campaigns.js'
 const router = Router()
 
 // Keep in sync with src/data/levelThemes.js (only themes that are live)
-const ALLOWED_THEMES = ['medieval', 'cartoon']
+export const ALLOWED_THEMES = ['medieval', 'cartoon', 'scifi']
 
 router.get('/:campaignId', auth, async (req, res) => {
   if (!await isMember(req.params.campaignId, req.userId)) return res.status(403).json({ error: 'Not a campaign member' })
