@@ -993,7 +993,7 @@
 .demo-hero-backdrop { background: var(--bg); }
 /* The knight video is black on white. Light themes: 'darken' lets the paper show through the white.
    Dark themes: invert it and use 'lighten' so the knight is pale on the dark paper. */
-.demo-hero-video { background: transparent; mix-blend-mode: darken; transform: translate(20%, 16%) scale(0.78); }
+.demo-hero-video { background: transparent; mix-blend-mode: darken; height: calc(100% - 64px); transform: translateX(30%) scale(0.92); }
 .demo-hero.is-dark .demo-hero-video { filter: invert(1); mix-blend-mode: lighten; }
 
 .demo-hero-content { z-index: 2; }
@@ -1067,10 +1067,8 @@
 }
 .demo-hero-auth-btn.is-register:hover { filter: saturate(1.6) brightness(1.08); }
 .demo-hero-cta { width: 100%; max-width: 330px; }
-/* on wide screens keep the text clear of the knight */
-@media (min-width: 1000px) {
-  .demo-app.is-landing .demo-hero-content { width: min(100%, 440px); margin-right: auto; margin-left: clamp(30px, 8vw, 220px); }
-}
+/* the text column stays centred; the knight stands to its right on wide screens only (see below) */
+.demo-app.is-landing .demo-hero-content { width: min(100%, 440px); margin-left: auto; margin-right: auto; }
 .demo-hero-actions { width: 100%; max-width: 330px; }
 .demo-hero-actions .demo-hero-cta { width: 100%; }
 
@@ -1082,6 +1080,6 @@
   --red: inherit; --green: inherit;
 }
 /* narrower screens: the knight stands smaller, below the buttons, so he never covers the text */
-@media (max-width: 999px) {
-  .demo-app.is-landing .demo-hero-video { transform: translate(8%, 24%) scale(0.46); }
+@media (max-width: 1199px) {
+  .demo-app.is-landing .demo-hero-video { transform: translate(10%, 26%) scale(0.44); }
 }
