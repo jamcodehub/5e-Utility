@@ -10,11 +10,11 @@ import { COINS, FEATS, alwaysPrepared, derive, itemWeight, weaponStats } from '.
 const CSS = `
 .cs{font-family:Georgia,'Times New Roman',serif;color:#111;background:#fff;padding:14mm 12mm;max-width:210mm;margin:0 auto;font-size:11px;line-height:1.35}
 .cs *{box-sizing:border-box}
-.cs h1{font-family:'IM Fell English',Georgia,serif;font-size:24px;margin:0}
-.cs h2{font-family:'IM Fell English',Georgia,serif;font-size:11px;letter-spacing:.08em;text-transform:uppercase;border-bottom:1.5px solid #111;margin:12px 0 5px;padding-bottom:2px}
+.cs h1{font-family:'Fell Title','IM Fell English',Georgia,serif;font-size:24px;margin:0}
+.cs h2{font-family:'Fell Title','IM Fell English',Georgia,serif;font-size:11px;letter-spacing:.08em;text-transform:uppercase;border-bottom:1.5px solid #111;margin:12px 0 5px;padding-bottom:2px}
 .cs .row{display:flex;gap:8px;flex-wrap:wrap}
 .cs .box{border:1.5px solid #111;border-radius:5px;padding:4px 6px;text-align:center;min-width:62px}
-.cs .box b{display:block;font-size:17px;font-family:'IM Fell English',Georgia,serif}
+.cs .box b{display:block;font-size:17px;font-family:'Fell Title','IM Fell English',Georgia,serif}
 .cs .box small{font-size:8px;letter-spacing:.07em;text-transform:uppercase;color:#444}
 .cs .cols{display:grid;grid-template-columns:1fr 1fr;gap:0 18px}
 .cs .cols3{display:grid;grid-template-columns:repeat(3,1fr);gap:0 14px}

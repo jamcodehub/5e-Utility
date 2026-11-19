@@ -115,7 +115,7 @@ function RelationNote() {
 function NpcCard({ npc, onChange, onRemove, activePlayer, onInserted }) {
   const u = f => e => onChange({ ...npc, [f]: e.target.value })
   return (
-    <div style={{ border: '1px solid var(--border)', borderRadius: 8, padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+    <div style={{ border: '1px solid var(--border)', borderRadius: 3, padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 8 }}>
       <div style={{ display: 'flex', gap: 8 }}>
         <input className="input" value={npc.name} onChange={u('name')} placeholder="NPC name" style={{ flex: 1, fontSize: 13, fontWeight: 500 }} />
         <button onClick={onRemove} style={{ background: 'none', border: 'none', color: 'var(--text-3)', cursor: 'pointer', fontSize: 18, lineHeight: 1, padding: '0 2px', flexShrink: 0 }}>✕</button>
@@ -139,7 +139,7 @@ function QuestCard({ quest, onChange, onRemove, activePlayer, onInserted }) {
   const u = f => e => onChange({ ...quest, [f]: e.target.value })
   const SC = { active: '#1d6a3a', completed: '#9a7c3a', failed: '#b03030' }
   return (
-    <div style={{ border: '1px solid var(--border)', borderRadius: 8, padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+    <div style={{ border: '1px solid var(--border)', borderRadius: 3, padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 8 }}>
       <div style={{ display: 'flex', gap: 8 }}>
         <input className="input" value={quest.title} onChange={u('title')} placeholder="Quest title" style={{ flex: 1, fontSize: 13, fontWeight: 500 }} />
         <select value={quest.status} onChange={u('status')} style={{ fontSize: 11, border: '1px solid var(--border)', borderRadius: 6, padding: '4px 6px', background: 'var(--surface)', color: SC[quest.status], cursor: 'pointer', flexShrink: 0 }}>
@@ -216,7 +216,7 @@ function CharModal({ player, onClose }) {
             <Row label="Lore / Secrets"       val={char.lore} />
             {char.notes && <Row label="Notes" val={char.notes} />}
             {!char.background && !char.personality && !char.goals && !char.lore && (
-              <div style={{ fontSize: 12, color: 'var(--text-3)', lineHeight: 1.7, background: 'var(--surface2)', borderRadius: 8, padding: '10px 12px' }}>
+              <div style={{ fontSize: 12, color: 'var(--text-3)', lineHeight: 1.7, background: 'var(--surface2)', borderRadius: 3, padding: '10px 12px' }}>
                 No character depth filled in yet. Ask {player.username} to complete their <strong>Backstory</strong> tab on the Character sheet, or generate a Roleplay Assistant plan — both save this data.
               </div>
             )}

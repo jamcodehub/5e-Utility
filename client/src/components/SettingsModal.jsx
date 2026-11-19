@@ -149,7 +149,7 @@ export default function SettingsModal({ onClose }) {
               const active = user?.role === opt.v
               return (
                 <button type="button" key={opt.v} onClick={() => changeRole(opt.v)} disabled={roleWorking} aria-pressed={active} style={{
-                  flex: 1, padding: '8px 12px', borderRadius: 8, cursor: active ? 'default' : 'pointer',
+                  flex: 1, padding: '8px 12px', borderRadius: 3, cursor: active ? 'default' : 'pointer',
                   border: `1px solid ${active ? 'var(--gold)' : 'var(--border)'}`,
                   background: active ? 'var(--gold-bg)' : 'transparent',
                   color: active ? 'var(--gold)' : 'var(--text-2)', fontSize: 13, fontWeight: active ? 600 : 400,
@@ -197,7 +197,7 @@ export default function SettingsModal({ onClose }) {
           <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-2)', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 12 }}>Security</div>
             <>
               {googleAvailable && !channelOpen && (
-                <div style={{ padding: '10px 12px', borderRadius: 8, background: 'var(--surface2)', border: '1px solid var(--border)', marginBottom: 10 }}>
+                <div style={{ padding: '10px 12px', borderRadius: 3, background: 'var(--surface2)', border: '1px solid var(--border)', marginBottom: 10 }}>
                   <div style={{ fontSize: 13, fontWeight: 500 }}>Secure your account</div>
                   <div style={{ fontSize: 11, color: 'var(--text-3)', marginBottom: 8 }}>Verify the Google account that matches your email. We'll then protect sign-ins from new devices automatically. This can't be changed later.</div>
                   <button type="button" className="btn btn-primary btn-sm" onClick={() => setChannelOpen(true)}>Verify with Google</button>
@@ -206,7 +206,7 @@ export default function SettingsModal({ onClose }) {
             </>
 
           {channelOpen && (
-            <div style={{ marginTop: 10, padding: 12, borderRadius: 8, border: '1px solid var(--border)' }}>
+            <div style={{ marginTop: 10, padding: 12, borderRadius: 3, border: '1px solid var(--border)' }}>
               <GoogleButton clientId={googleClientId} onCredential={linkGoogleAccount} text="continue_with" width={280} />
               <div style={{ marginTop: 10 }}>
                 <button type="button" onClick={closeChannelSetup} style={{ background: 'none', border: 'none', color: 'var(--text-3)', fontSize: 12, cursor: 'pointer', padding: 0 }}>Cancel</button>
@@ -225,14 +225,14 @@ export default function SettingsModal({ onClose }) {
               <>
                 <button type="button" onClick={() => { setConfirmAction('delete'); setConfirmInput(''); setConfirmError('') }}
                   disabled={!isPremium}
-                  style={{ padding: '6px 12px', borderRadius: 8, border: '1px solid var(--border)', background: 'transparent', color: isPremium ? 'var(--red)' : 'var(--text-3)', fontWeight: 500, fontSize: 12, cursor: isPremium ? 'pointer' : 'not-allowed', opacity: isPremium ? 1 : 0.6 }}>
+                  style={{ padding: '6px 12px', borderRadius: 3, border: '1px solid var(--border)', background: 'transparent', color: isPremium ? 'var(--red)' : 'var(--text-3)', fontWeight: 500, fontSize: 12, cursor: isPremium ? 'pointer' : 'not-allowed', opacity: isPremium ? 1 : 0.6 }}>
                   Delete Campaign
                 </button>
                 {!isPremium && <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 6 }}>Deleting a campaign is a Premium feature. <button type="button" onClick={() => { navigate('/premium'); onClose() }} style={{ background: 'none', border: 'none', color: 'var(--gold)', cursor: 'pointer', fontSize: 11, padding: 0 }}>Upgrade →</button></div>}
               </>
             ) : (
               <button type="button" onClick={() => { setConfirmAction('leave'); setConfirmInput(''); setConfirmError('') }}
-                style={{ padding: '6px 12px', borderRadius: 8, border: '1px solid var(--border)', background: 'transparent', color: 'var(--red)', fontWeight: 500, fontSize: 12, cursor: 'pointer' }}>
+                style={{ padding: '6px 12px', borderRadius: 3, border: '1px solid var(--border)', background: 'transparent', color: 'var(--red)', fontWeight: 500, fontSize: 12, cursor: 'pointer' }}>
                 Leave Campaign
               </button>
             )}
@@ -241,7 +241,7 @@ export default function SettingsModal({ onClose }) {
 
         <div style={{ marginTop: 24, paddingTop: 24, borderTop: '1px solid var(--border)' }}>
           <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-2)', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 10 }}>Account</div>
-          <button type="button" onClick={() => { logout(); onClose(); navigate('/login', { replace: true }) }} style={{ width: '100%', padding: '10px 14px', borderRadius: 10, border: '1px solid var(--red)', background: 'transparent', color: 'var(--red)', fontWeight: 600, cursor: 'pointer' }}>
+          <button type="button" onClick={() => { logout(); onClose(); navigate('/login', { replace: true }) }} style={{ width: '100%', padding: '10px 14px', borderRadius: 4, border: '1px solid var(--red)', background: 'transparent', color: 'var(--red)', fontWeight: 600, cursor: 'pointer' }}>
             Logout
           </button>
         </div>

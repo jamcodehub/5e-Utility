@@ -298,7 +298,7 @@ export default function MusicPlayer() {
           alignItems: 'center',
           justifyContent: 'center',
           border: '2px dashed var(--gold)',
-          borderRadius: 12,
+          borderRadius: 5,
           backdropFilter: 'blur(4px)',
           pointerEvents: 'none'
         }}>
@@ -335,7 +335,7 @@ export default function MusicPlayer() {
 
           {uploading && <span style={{ fontSize: 12, color: 'var(--text-3)' }}>Uploading {uploadProgress}%…</span>}
           {atTrackLimit ? (
-            <span style={{ fontSize: 12, color: 'var(--gold)', background: 'var(--gold-bg)', border: '1px solid var(--gold-border)', borderRadius: 8, padding: '6px 12px' }}>
+            <span style={{ fontSize: 12, color: 'var(--gold)', background: 'var(--gold-bg)', border: '1px solid var(--gold-border)', borderRadius: 3, padding: '6px 12px' }}>
               {FREE_TRACK_LIMIT}/{FREE_TRACK_LIMIT} tracks — upgrade for more
             </span>
           ) : (
@@ -439,7 +439,7 @@ export default function MusicPlayer() {
 
               {/* Now playing bar */}
               {isCustomPlaying && activeTrack && (
-                <div style={{ padding: '10px 12px', background: 'var(--gold-bg)', border: '1px solid var(--gold-border)', borderRadius: 8, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <div style={{ padding: '10px 12px', background: 'var(--gold-bg)', border: '1px solid var(--gold-border)', borderRadius: 3, display: 'flex', flexDirection: 'column', gap: 6 }}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                     <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--gold)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '70%' }}>{activeTrack.name}</span>
                     <span style={{ fontSize: 11, color: 'var(--text-3)' }}>{fmt(trackTime)} / {fmt(trackDuration)}</span>
@@ -520,7 +520,7 @@ export default function MusicPlayer() {
                   const isOpen = expandedSessionId === session._id
                   const isEditingName = editingSessionId === session._id
                   return (
-                    <div key={session._id} style={{ border: '1px solid var(--border)', borderRadius: 8, overflow: 'hidden' }}>
+                    <div key={session._id} style={{ border: '1px solid var(--border)', borderRadius: 3, overflow: 'hidden' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px', background: 'var(--surface2)', cursor: 'pointer' }}
                         onClick={() => setExpandedSessionId(isOpen ? null : session._id)}>
                         <span style={{ fontSize: 12, color: 'var(--text-3)', flexShrink: 0 }}>{isOpen ? '▾' : '▸'}</span>

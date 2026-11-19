@@ -87,7 +87,7 @@ export default function Premium() {
   return (
     <div className="page-content">
       {banner && (
-        <div style={{ background: 'var(--gold-bg)', border: '1px solid var(--gold-border)', borderRadius: 8, padding: '12px 16px', marginBottom: 24, fontSize: 14, color: 'var(--gold)' }}>
+        <div style={{ background: 'var(--gold-bg)', border: '1px solid var(--gold-border)', borderRadius: 3, padding: '12px 16px', marginBottom: 24, fontSize: 14, color: 'var(--gold)' }}>
           {banner}
         </div>
       )}

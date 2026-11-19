@@ -43,7 +43,7 @@ function CombatantCard({ c, onChange, onRemove }) {
   return (
     <div style={{
       background: 'var(--surface)', border: `1px solid ${isDead ? 'var(--red)' : 'var(--border)'}`,
-      borderLeft: `4px solid ${tagColor}`, borderRadius: 10, padding: '12px 14px',
+      borderLeft: `4px solid ${tagColor}`, borderRadius: 4, padding: '12px 14px',
       opacity: isDead ? 0.6 : 1,
     }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>

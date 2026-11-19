@@ -40,7 +40,7 @@ function Panel({ title, children, right }) {
 function RollButton({ children, onClick, prof, title }) {
   return (
     <button onClick={onClick} title={title}
-      style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, padding: '6px 10px', fontSize: 12, cursor: 'pointer', borderRadius: 8, textAlign: 'left',
+      style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, padding: '6px 10px', fontSize: 12, cursor: 'pointer', borderRadius: 3, textAlign: 'left',
         background: 'var(--surface2)', border: `1px solid ${prof ? 'var(--gold-border)' : 'var(--border)'}`, color: 'var(--text)' }}>
       {children}
     </button>

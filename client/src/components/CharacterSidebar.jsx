@@ -75,7 +75,7 @@ export default function CharacterOverview({ campaignId, refreshKey }) {
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6, marginTop: 10 }}>
         {[['AC', d.ac], ['Init', signed(d.initiative)], ['Speed', `${d.speed} ft`]].map(([k, v]) => (
-          <div key={k} style={{ textAlign: 'center', padding: '6px 4px', background: 'var(--surface2)', borderRadius: 8, border: '1px solid var(--border)' }}>
+          <div key={k} style={{ textAlign: 'center', padding: '6px 4px', background: 'var(--surface2)', borderRadius: 3, border: '1px solid var(--border)' }}>
             <div style={{ fontSize: 9, color: 'var(--text-3)', textTransform: 'uppercase' }}>{k}</div>
             <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)' }}>{v}</div>
           </div>
@@ -98,7 +98,7 @@ export default function CharacterOverview({ campaignId, refreshKey }) {
       <div style={label}>Abilities</div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6 }}>
         {ABILITIES.map(([id, abbr]) => (
-          <RuleTip key={id} tip={abilityTip(srd.core, id)} as="div" style={{ textAlign: 'center', padding: '6px 2px', background: 'var(--surface2)', borderRadius: 8, border: '1px solid var(--border)' }}>
+          <RuleTip key={id} tip={abilityTip(srd.core, id)} as="div" style={{ textAlign: 'center', padding: '6px 2px', background: 'var(--surface2)', borderRadius: 3, border: '1px solid var(--border)' }}>
             <div style={{ fontSize: 9, color: 'var(--text-3)' }}>{abbr}{id === 'dex' ? ' · agility' : ''}</div>
             <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--text)' }}>{char.stats?.[id] ?? 10}</div>
             <div style={{ fontSize: 11, color: 'var(--gold)' }}>{signed(d.mod(id))}</div>

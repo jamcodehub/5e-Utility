@@ -130,7 +130,7 @@ export function InventoryPanel({ toast, isDM = false }) {
           </div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
             {CURRENCY.map(c => (
-              <div key={c.key} style={{ flex: '1 1 100px', minWidth: 88, background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 12, padding: '12px 14px' }}>
+              <div key={c.key} style={{ flex: '1 1 100px', minWidth: 88, background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 5, padding: '12px 14px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
                   <span style={{ width: 10, height: 10, borderRadius: '50%', background: c.color, flexShrink: 0, border: '1px solid rgba(0,0,0,0.15)' }} />
                   <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text)' }}>{c.label}</span>

@@ -116,6 +116,8 @@ function DemoLanding({ onExplore }) {
       </div>
       <div className="demo-hero-content">
         <img className="demo-hero-logo" src="https://res.cloudinary.com/crcbzpw6/image/upload/v1794483597/5E_UTILITY_Pure_Black_2000.png" alt="5e Utility" />
+        <p className="demo-hero-tagline">Your campaign, bound in one place: maps, lore, dice and the DM's best-kept secrets.</p>
+        <div className="demo-hero-rule" aria-hidden="true"><i /></div>
         <div className="demo-hero-actions">
           <button type="button" className="demo-hero-cta" onClick={onExplore}>Explore the demo <span aria-hidden="true">→</span></button>
         </div>

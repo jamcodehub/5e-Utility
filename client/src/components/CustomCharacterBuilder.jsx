@@ -102,7 +102,7 @@ export default function CustomCharacterBuilder({ onClose, onComplete, draftKey =
               <span style={label}>Which campaign is this character for?</span>
               {realCampaigns.length === 0 && <div style={{ fontSize: 13, color: 'var(--text-2)' }}>You need to join a campaign first.</div>}
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {realCampaigns.map(c => <span key={c._id} style={{ ...chip(campaignId === c._id), borderRadius: 8, fontSize: 13 }} onClick={() => setCampaignId(c._id)}>{c.name}</span>)}
+                {realCampaigns.map(c => <span key={c._id} style={{ ...chip(campaignId === c._id), borderRadius: 3, fontSize: 13 }} onClick={() => setCampaignId(c._id)}>{c.name}</span>)}
               </div>
             </>
           )}

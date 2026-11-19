@@ -3,7 +3,7 @@ import { fmtMod } from '../utils/rules5e'
 
 const label = { fontSize: 10, fontWeight: 600, color: 'var(--text-3)', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 6 }
 const chip = (on, danger) => ({
-  padding: '4px 10px', borderRadius: 8, fontSize: 12, cursor: 'pointer', userSelect: 'none',
+  padding: '4px 10px', borderRadius: 3, fontSize: 12, cursor: 'pointer', userSelect: 'none',
   background: on ? (danger ? 'rgba(220,70,70,0.15)' : 'var(--gold-bg)') : 'var(--surface2)',
   color: on ? (danger ? 'var(--red)' : 'var(--gold)') : 'var(--text-2)',
   border: `1px solid ${on ? (danger ? 'var(--red)' : 'var(--gold-border)') : 'var(--border)'}`,
@@ -23,7 +23,7 @@ function Panel({ title, right, children }) {
 
 function Stat({ name, value, onClick, sub }) {
   return (
-    <div onClick={onClick} style={{ textAlign: 'center', padding: '8px 4px', background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 8, cursor: onClick ? 'pointer' : 'default' }}>
+    <div onClick={onClick} style={{ textAlign: 'center', padding: '8px 4px', background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 3, cursor: onClick ? 'pointer' : 'default' }}>
       <div style={{ fontSize: 9, color: 'var(--text-3)', letterSpacing: '0.06em', textTransform: 'uppercase' }}>{name}</div>
       <div style={{ fontSize: 20, fontFamily: 'var(--font-title)', color: 'var(--gold)' }}>{value}</div>
       {sub && <div style={{ fontSize: 9, color: 'var(--text-3)' }}>{sub}</div>}

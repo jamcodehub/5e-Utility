@@ -987,3 +987,56 @@
 
   .demo-mobile-nav-icon { width: 14px; height: 14px; flex: 0 0 14px; object-fit: contain; }
 }
+
+/* ── Parchment & ink landing ── */
+.demo-hero,
+.demo-hero-backdrop {
+  background:
+    radial-gradient(ellipse at 50% 40%, #f7efd9 0%, #efe3c4 55%, #e3d4ad 100%);
+}
+/* the knight video has a white backdrop; 'darken' lets the parchment show through wherever the video is lighter */
+.demo-hero-video { background: transparent; mix-blend-mode: darken; transform: translate(20%, 16%) scale(0.78); }
+.demo-hero::after {
+  content: '';
+  position: absolute;
+  inset: 14px;
+  z-index: 0;
+  pointer-events: none;
+  border: 1px solid #7a5c1480;
+  outline: 1px solid #7a5c1459;
+  outline-offset: -6px;
+  border-radius: 2px;
+}
+.demo-hero-content { z-index: 2; }
+.demo-hero-tagline {
+  margin: 0 0 6px;
+  max-width: 420px;
+  font-family: var(--font-title);
+  font-size: clamp(18px, 2.2vw, 23px);
+  font-style: italic;
+  line-height: 1.35;
+  color: #4a3b1a;
+}
+.demo-hero-rule {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: min(300px, 70%);
+  margin: 14px 0 4px;
+  color: #7a5c14;
+}
+.demo-hero-rule::before,
+.demo-hero-rule::after { content: ''; flex: 1; height: 1px; background: linear-gradient(90deg, transparent, #7a5c14aa); }
+.demo-hero-rule::after { transform: scaleX(-1); }
+.demo-hero-rule i { width: 7px; height: 7px; background: currentColor; transform: rotate(45deg); }
+.demo-hero-cta {
+  border: 1px solid #5b4310;
+  border-radius: 3px;
+  background: #c9a24b;
+  box-shadow: inset 0 -3px 0 #0000002e, 0 2px 0 #5b4310;
+  color: #1a1917;
+  font-size: 15px;
+  letter-spacing: 0.02em;
+}
+.demo-hero-cta:hover { transform: translateY(-1px); filter: none; background: #d3ad57; }
+.demo-legal-links { color: #5e4a1c; }

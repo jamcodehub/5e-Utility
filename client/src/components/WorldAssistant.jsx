@@ -18,7 +18,7 @@ export default function WorldAssistant({ campaignId, onClose }) {
   const bubble = (m, i) => (
     <div key={i} style={{
       alignSelf: m.role === 'user' ? 'flex-end' : 'flex-start', maxWidth: '92%', whiteSpace: 'pre-wrap',
-      padding: '8px 11px', borderRadius: 10, fontSize: 13, lineHeight: 1.5,
+      padding: '8px 11px', borderRadius: 4, fontSize: 13, lineHeight: 1.5,
       background: m.role === 'user' ? 'var(--gold-bg)' : 'var(--surface2)',
       border: `1px solid ${m.role === 'user' ? 'var(--gold-border)' : 'var(--border)'}`,
       color: 'var(--text)',
