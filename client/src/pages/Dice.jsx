@@ -161,7 +161,7 @@ export default function Dice() {
           .d20-spot { position: absolute; inset: 0; display:flex; align-items:center; justify-content:center; pointer-events:none; }
           .d20 { display:flex; align-items:center; justify-content:center; width:${DIE}px; height:${DIE}px; perspective:700px; filter: drop-shadow(0 14px 10px rgba(0,0,0,0.35)); }
           .die3d { position:relative; width:100%; height:100%; transform-style:preserve-3d; }
-          .die-face { position:absolute; left:0; top:0; width:100%; height:100%; clip-path:${FACE_CLIP}; backface-visibility:hidden; display:flex; align-items:center; justify-content:center; font-family: 'Young Serif',Georgia,serif; font-weight:700; font-size:${Math.round(DIE * 0.34)}px; padding-top:${Math.round(DIE * 0.1)}px; box-sizing:border-box; }
+          .die-face { position:absolute; left:0; top:0; width:100%; height:100%; clip-path:${FACE_CLIP}; backface-visibility:hidden; display:flex; align-items:center; justify-content:center; font-family: 'Alegreya',Georgia,serif; font-weight:700; font-size:${Math.round(DIE * 0.34)}px; padding-top:${Math.round(DIE * 0.1)}px; box-sizing:border-box; }
           .streaks { position:absolute; top:12px; right:16px; z-index:2; max-width:55%; text-align:right; font-size:11px; letter-spacing:.04em; color:var(--text-3); opacity:.8; pointer-events:auto; cursor:default; }
           .streaks b { color:var(--text-2); font-weight:600; }
           .dice-controls { display:flex; justify-content:stretch; align-items:stretch; gap:20px; width:100%; max-width:1280px; margin:0 auto; }

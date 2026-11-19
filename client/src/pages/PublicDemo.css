@@ -18,7 +18,7 @@
     radial-gradient(ellipse at 50% -15%, rgba(133, 105, 57, 0.13), transparent 50%),
     var(--demo-bg);
   color: var(--demo-text);
-  font-family: var(--font-ui, 'Schibsted Grotesk', sans-serif);
+  font-family: var(--font-ui, 'Alegreya Sans', sans-serif);
 }
 
 .demo-app[data-theme="light"] {
