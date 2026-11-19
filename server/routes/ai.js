@@ -27,9 +27,12 @@ const discoverModels = async (key) => {
   return discovered.models
 }
 const newestFirst = (names) => [...names].sort((a, b) => version(b) - version(a) || a.length - b.length)
-const textModels = async (key) => {
-  const found = (await discoverModels(key)).filter(n => /flash/.test(n) && !/image|tts|live|audio|embed|thinking|exp|lite|latest/.test(n))
-  return [process.env.GEMINI_MODEL, ...newestFirst(found).slice(0, 3), 'gemini-flash-latest', 'gemini-2.5-flash'].filter(Boolean)
+// Text replies try a fast, stable model first and never wait on the model list: the newest
+// "flash" previews can be slow or overloaded, and each slow attempt used to cost 20 seconds.
+// Models found by an earlier discovery are only appended as later fallbacks.
+const textModels = async () => {
+  const found = discovered.models.filter(n => /flash/.test(n) && !/image|tts|live|audio|embed|thinking|exp|lite|latest|preview/.test(n))
+  return [process.env.GEMINI_MODEL, 'gemini-2.5-flash', 'gemini-flash-latest', ...newestFirst(found).slice(0, 2)].filter(Boolean)
 }
 const imageModels = async (key) => {
   const found = (await discoverModels(key)).filter(n => /image/.test(n) && !/tts|live|audio|embed/.test(n))
@@ -37,20 +40,20 @@ const imageModels = async (key) => {
 }
 
 // `pickModels` is a function (key) => model names, or a plain list.
-const callGemini = async (pickModels, body) => {
+const callGemini = async (pickModels, body, { textOnly = false } = {}) => {
   const key = (process.env.GEMINI_API_KEY || '').trim()
   if (!key) throw Object.assign(new Error('The AI features are not configured on this server (GEMINI_API_KEY is missing).'), { status: 503 })
   const models = typeof pickModels === 'function' ? await pickModels(key) : pickModels
   let last
-  const deadline = Date.now() + 40000 // finish well inside the browser's wait so the DM sees a real error, not a timeout
+  const deadline = Date.now() + 30000 // finish well inside the browser's wait so the DM sees a real error, not a timeout
   for (const model of [...new Set(models)]) {
     if (Date.now() > deadline) break
     const res = await fetch(`${GEMINI}/${model}:generateContent`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key },
       body: JSON.stringify(typeof body === 'function' ? body(model) : body),
-      signal: AbortSignal.timeout(20000),
-    }).catch(e => ({ ok: false, status: 504, json: async () => ({ error: { message: e.message } }) }))
+      signal: AbortSignal.timeout(textOnly ? 12000 : 25000),
+    }).catch(e => { console.error(`Gemini ${model} request error:`, e.name, e.message, e.cause?.code || ''); return { ok: false, status: 504, json: async () => ({ error: { message: e.message } }) } })
     const data = await res.json().catch(() => ({}))
     if (res.ok) return data
     const detail = String(data?.error?.message || `HTTP ${res.status}`).slice(0, 220)
@@ -59,7 +62,8 @@ const callGemini = async (pickModels, body) => {
       res.status === 429 ? `Google's free AI quota for ${model} is used up or not available on this key. ${detail}`
         : res.status === 504 ? 'The AI service is busy and did not answer in time. Please try again.'
         : `The AI service said: ${detail}`), { status: res.status === 429 ? 429 : 502 })
-    if (![404, 500, 503, 504].includes(res.status)) break // unknown model, overload or timeout: try the next model name
+    // 429 is per model (and image models often have no free quota at all), so other models are still worth a try.
+    if (![404, 429, 500, 503, 504].includes(res.status)) break
   }
   throw last
 }
@@ -140,7 +144,7 @@ router.post('/worldbuild', auth, requireDM, guideLimit, async (req, res) => {
       contents: messages.map(m => ({ role: m.role, parts: [{ text: m.text }] })),
       // 2.5 models "think" before answering; spending the budget on that would leave no reply.
       generationConfig: { temperature: 0.8, maxOutputTokens: 400, ...(/2\.5/.test(model) ? { thinkingConfig: { thinkingBudget: 0 } } : /gemini-3/.test(model) ? { thinkingConfig: { thinkingLevel: 'low' } } : {}) },
-    }))
+    }), { textOnly: true })
     const reply = clip((data.candidates?.[0]?.content?.parts || []).map(p => p.text || '').join(''), 900)
     if (!reply) {
       const why = data.promptFeedback?.blockReason || data.candidates?.[0]?.finishReason || 'no text returned'

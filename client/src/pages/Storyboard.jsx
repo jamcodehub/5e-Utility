@@ -151,7 +151,7 @@ export default function Storyboard() {
   const { activeCampaign } = useCampaign()
   const { toast, ToastContainer } = useToast()
   const [cards, setCards] = useState([])
-  const { user } = useAuth()
+  const { user, isPremium } = useAuth()
   const isDM = user?.role === 'dm'
   const [genFor, setGenFor] = useState(null) // { title, description, onUse } while the image picker is open
   const toastRef = useRef(toast)
@@ -342,7 +342,7 @@ export default function Storyboard() {
                 {imageUploading ? 'Uploading…' : newImage ? 'Image selected ✓' : 'Upload image'}
                 {!imageUploading && <input type="file" accept="image/*" style={{ display: 'none' }} onChange={handleImagePick} />}
               </label>
-              {isDM && <button type="button" disabled={(!newTitle.trim() && !(newDesc || '').trim())} onClick={() => setGenFor({ title: newTitle, description: newDesc, onUse: setNewImage })} title="Paint this scene with AI, using your campaign characters' avatars" style={{ background: 'var(--surface)', border: '1px solid var(--gold-border)', borderRadius: 6, padding: '5px 10px', fontSize: 12, color: 'var(--gold)', cursor: 'pointer' }}>✦ Generate</button>}
+              {isDM && <button type="button" disabled={isPremium && (!newTitle.trim() && !(newDesc || '').trim())} onClick={() => !isPremium ? (window.location.href = '/premium') : setGenFor({ title: newTitle, description: newDesc, onUse: setNewImage })} title="Paint this scene with AI, using your campaign characters' avatars" style={{ background: 'var(--surface)', border: '1px solid var(--gold-border)', borderRadius: 6, padding: '5px 10px', fontSize: 12, color: 'var(--gold)', cursor: 'pointer' }}>{isPremium ? '✦ Generate' : '✦ Generate (Premium)'}</button>}
               {newImage && <button onClick={() => setNewImage(null)} style={{ background: 'none', border: 'none', color: 'var(--text-3)', cursor: 'pointer', fontSize: 12 }}>✕ Remove</button>}
             </div>
           </div>
@@ -450,7 +450,7 @@ export default function Storyboard() {
                   {editImgUploading ? 'Uploading…' : 'Replace image'}
                   {!editImgUploading && <input type="file" accept="image/*" style={{ display: 'none' }} onChange={handleEditImagePick} />}
                 </label>
-                {isDM && <button type="button" disabled={(!editCard.title.trim() && !(editCard.description || '').trim())} onClick={() => setGenFor({ title: editCard.title, description: editCard.description, onUse: (url) => editField(p => ({ ...p, imageUrl: url })) })} title="Paint this scene with AI, using your campaign characters' avatars" style={{ background: 'var(--surface)', border: '1px solid var(--gold-border)', borderRadius: 6, padding: '5px 10px', fontSize: 12, color: 'var(--gold)', cursor: 'pointer' }}>✦ Generate</button>}
+                {isDM && <button type="button" disabled={isPremium && (!editCard.title.trim() && !(editCard.description || '').trim())} onClick={() => !isPremium ? (window.location.href = '/premium') : setGenFor({ title: editCard.title, description: editCard.description, onUse: (url) => editField(p => ({ ...p, imageUrl: url })) })} title="Paint this scene with AI, using your campaign characters' avatars" style={{ background: 'var(--surface)', border: '1px solid var(--gold-border)', borderRadius: 6, padding: '5px 10px', fontSize: 12, color: 'var(--gold)', cursor: 'pointer' }}>{isPremium ? '✦ Generate' : '✦ Generate (Premium)'}</button>}
                 {editCard.imageUrl && <span style={{ fontSize: 11, color: 'var(--green)' }}>Image set ✓</span>}
               </div>
             </div>
