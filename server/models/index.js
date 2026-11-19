@@ -92,6 +92,12 @@ const DMBoardSchema = new Schema({
   version: { type: Number, required: true },
 }, { timestamps: true })
 
+// The DM's running battle (combatants, initiative, turn, round, log) so it survives reloads. One per campaign.
+const BattleStateSchema = new Schema({
+  campaign: { type: Schema.Types.ObjectId, ref: 'Campaign', required: true, unique: true },
+  state:    { type: Schema.Types.Mixed, required: true },
+}, { timestamps: true })
+
 const DMBoardFolderSchema = new Schema({
   campaign: { type: Schema.Types.ObjectId, ref: 'Campaign', required: true, index: true },
   name: { type: String, required: true, trim: true, maxlength: 80 },
@@ -250,6 +256,7 @@ export const Lore          = model('Lore', LoreSchema)
 export const StoryCard     = model('StoryCard', StoryCardSchema)
 export const DMBoard       = model('DMBoard', DMBoardSchema)
 export const DMBoardFolder = model('DMBoardFolder', DMBoardFolderSchema)
+export const BattleState  = model('BattleState', BattleStateSchema)
 export const Character     = model('Character', CharacterSchema)
 export const LevelPlan     = model('LevelPlan', LevelPlanSchema)
 export const Inventory     = model('Inventory', InventorySchema)

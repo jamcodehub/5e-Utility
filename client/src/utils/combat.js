@@ -70,3 +70,18 @@ export function describeAttack(attacker, target, attack, r) {
   if (r.hit) return `${attacker.name} hits ${target.name} with ${attack.name} (${roll}) for ${r.damage}${attack.type ? ' ' + attack.type : ''} damage.`
   return `${attacker.name} misses ${target.name} with ${attack.name} (${roll}).`
 }
+
+// Rebuilds the fight after a reload. `fresh` is the party as just loaded from their character sheets (so sheet
+// changes and HP are current); `saved` is the stored combatants. Party members keep only their saved initiative,
+// anyone no longer in the party is dropped, new party members are added, and monsters/lore/custom come back as saved.
+export function mergeSaved(fresh, saved) {
+  const freshById = Object.fromEntries(fresh.map(c => [c.id, c]))
+  const kept = []
+  for (const s of saved || []) {
+    if (s.source === 'party') {
+      if (freshById[s.id]) kept.push({ ...freshById[s.id], init: s.init ?? null })
+    } else kept.push(s)
+  }
+  const have = new Set(kept.map(c => c.id))
+  return [...kept, ...fresh.filter(c => !have.has(c.id))]
+}

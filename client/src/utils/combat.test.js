@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { sortByInitiative, nextTurn, resolveAttack, applyDamage, applyHeal, parseAmount, rollInitiative, abilityMod } from './combat.js'
+import { sortByInitiative, nextTurn, resolveAttack, applyDamage, applyHeal, parseAmount, rollInitiative, abilityMod, mergeSaved } from './combat.js'
 
 const mk = (id, extra = {}) => ({ id, name: id, type: 'enemy', hp: 10, maxHp: 10, ...extra })
 
@@ -59,4 +59,19 @@ test('parseAmount reads numbers and dice, rejects junk', () => {
   assert.equal(parseAmount('8').total, 8)
   for (let i = 0; i < 100; i++) { const t = parseAmount('2d4+2').total; assert.ok(t >= 4 && t <= 10) }
   assert.equal(parseAmount(''), null); assert.equal(parseAmount('abc'), null); assert.equal(parseAmount('-3'), null)
+})
+
+test('mergeSaved: party stays current, monsters come back as saved, leavers drop, newcomers join', () => {
+  const freshParty = [mk('p1', { source: 'party', type: 'player', hp: 20, ac: 16, init: null }), mk('p3', { source: 'party', type: 'player', hp: 9, init: null })]
+  const saved = [
+    mk('p1', { source: 'party', type: 'player', hp: 3, ac: 10, init: 14 }),
+    mk('p2', { source: 'party', type: 'player', hp: 5, init: 8 }),
+    mk('srd-g', { source: 'srd', hp: 2, init: 11 }),
+  ]
+  const out = mergeSaved(freshParty, saved)
+  assert.deepEqual(out.map(c => c.id), ['p1', 'srd-g', 'p3'])
+  assert.equal(out[0].hp, 20); assert.equal(out[0].ac, 16); assert.equal(out[0].init, 14) // sheet data fresh, initiative kept
+  assert.equal(out[1].hp, 2); assert.equal(out[1].init, 11)                                 // monster exactly as saved
+  assert.equal(out[2].init, null)
+  assert.deepEqual(mergeSaved(freshParty, null).map(c => c.id), ['p1', 'p3'])
 })

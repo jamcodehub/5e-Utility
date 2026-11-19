@@ -11,6 +11,7 @@ import journalRoutes from './routes/journal.js'
 import loreRoutes from './routes/lore.js'
 import storyboardRoutes from './routes/storyboard.js'
 import dmboardRoutes from './routes/dmboard.js'
+import battleRoutes from './routes/battle.js'
 import aiRoutes from './routes/ai.js'
 import paymentRoutes from './routes/payments.js'
 import feedbackRoutes from './routes/feedback.js'
@@ -65,6 +66,7 @@ app.use('/api/journal',   journalRoutes)
 app.use('/api/lore',      loreRoutes)
 app.use('/api/storyboard', storyboardRoutes)
 app.use('/api/dmboard', dmboardRoutes)
+app.use('/api/battle', battleRoutes)
 app.use('/api/ai', aiRoutes)
 app.use('/api/payments',  paymentRoutes)
 app.use('/api/feedback',  feedbackLimiter, feedbackRoutes)

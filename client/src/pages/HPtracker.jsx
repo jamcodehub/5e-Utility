@@ -4,11 +4,12 @@ import { api, useAuth } from '../context/AuthContext'
 import { useCampaign } from '../context/CampaignContext'
 import { useToast } from '../hooks/useToast'
 import { SkeletonBlock } from '../components/Skeleton'
+import { useDebouncedSave } from '../hooks/useDebouncedSave'
 import { loadSrd, loadSrdMany } from '../utils/srd'
 import { derive, weaponStats } from '../utils/sheet'
 import { signed } from '../utils/dice'
 import {
-  abilityMod, rollInitiative, sortByInitiative, nextTurn, resolveAttack, applyDamage, applyHeal, parseAmount, describeAttack,
+  abilityMod, rollInitiative, sortByInitiative, nextTurn, resolveAttack, applyDamage, applyHeal, parseAmount, describeAttack, mergeSaved,
 } from '../utils/combat'
 
 const nanoid = () => Math.random().toString(36).slice(2, 9)
@@ -314,6 +315,11 @@ export default function HpTracker() {
   const [dataLoading, setDataLoading] = useState(true)
   const [monsters, setMonsters] = useState([])
   const srdRef = useRef(null)
+  // The fight is saved per campaign. `hydrated` holds the campaign whose saved battle has been loaded, and nothing
+  // is written until then, so a failed load can never overwrite a good save with an empty one.
+  const hydrated = useRef(null)
+  const [saveStatus, setSaveStatus] = useState('')
+  const { schedule: scheduleSave } = useDebouncedSave(700)
   const logEnd = useRef(null)
 
   // Custom combatant form
@@ -339,11 +345,26 @@ export default function HpTracker() {
       setMonsters(await loadSrd('monsters'))
     } catch { /* the manual tools keep working */ }
 
-    // Load party characters
+    // Load party characters, then restore the saved fight on top of them
+    hydrated.current = null
+    let party = []
     try {
       const members = await api(`/campaigns/${activeCampaign._id}/members/characters`)
-      setCombatants((members || []).filter(m => m.character).map(m => playerCombatant(m, srdRef.current)))
+      party = (members || []).filter(m => m.character).map(m => playerCombatant(m, srdRef.current))
     } catch { /* no party yet */ }
+    let saved = null, savedOk = false
+    try { saved = (await api(`/battle/${activeCampaign._id}`)).state; savedOk = true } catch { /* offline: the fight just won't be restored */ }
+    if (saved) {
+      const merged = mergeSaved(party, saved.combatants)
+      setCombatants(merged)
+      setRound(saved.round || 1)
+      setTurnId(merged.some(c => c.id === saved.turnId) ? saved.turnId : null)
+      setLog(saved.log || [])
+    } else {
+      setCombatants(party); setRound(1); setTurnId(null); setLog([])
+    }
+    setExpandedId(null)
+    if (savedOk) { hydrated.current = activeCampaign._id; setSaveStatus('saved') } else setSaveStatus('error')
 
     // Load lore pool
     try {
@@ -354,6 +375,18 @@ export default function HpTracker() {
   }, [activeCampaign?._id])
 
   useEffect(() => { load() }, [load])
+
+  // Save the whole fight (combatants, initiative, turn, round, log) a moment after any change.
+  useEffect(() => {
+    const cid = activeCampaign?._id
+    if (!cid || hydrated.current !== cid) return
+    const state = { combatants, round, turnId, log }
+    setSaveStatus('saving')
+    scheduleSave(async () => {
+      try { await api(`/battle/${cid}`, { method: 'PUT', body: { state } }); setSaveStatus('saved') }
+      catch { setSaveStatus('error') }
+    })
+  }, [combatants, round, turnId, log]) // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { logEnd.current?.scrollTo?.({ top: logEnd.current.scrollHeight }) }, [log])
 
   const updateCombatant = (updated) => {
@@ -452,7 +485,8 @@ export default function HpTracker() {
 
   const resetAll = () => {
     if (!window.confirm('Reset all HP to max, clear initiative and restart the round counter?')) return
-    setCombatants(cs => cs.map(c => ({ ...c, hp: c.maxHp, init: null })))
+    // updateCombatant also writes the restored HP back to each party member's character and lore entry
+    combatants.forEach(c => updateCombatant({ ...c, hp: c.maxHp, init: null }))
     setRound(1); setTurnId(null); setLog([])
   }
 
@@ -492,6 +526,7 @@ export default function HpTracker() {
             <h2 style={{ fontSize: 18, marginBottom: 2 }}>Battle Tracker</h2>
             <div style={{ fontSize: 12, color: 'var(--text-3)' }}>
               Round {round} · {aliveCount} active{downCount > 0 ? ` · ${downCount} down` : ''}
+              {saveStatus && <span role="status" style={{ marginLeft: 8, color: saveStatus === 'error' ? 'var(--red)' : 'var(--text-3)' }}>· {saveStatus === 'saving' ? 'Saving…' : saveStatus === 'saved' ? 'Saved' : 'Not saved. Check your connection'}</span>}
             </div>
           </div>
           <button className="btn btn-primary btn-sm" onClick={rollAllInitiative} disabled={!combatants.length}>Roll initiative</button>
