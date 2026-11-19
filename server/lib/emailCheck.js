@@ -14,6 +14,27 @@ const DISPOSABLE_DOMAINS = new Set([
   'mohmal.com', 'emailondeck.com', 'spamgourmet.com', 'tempail.com', 'burnermail.io', 'mailcatch.com',
   'discard.email', 'moakt.com', 'tempinbox.com', 'mytemp.email', 'inboxkitten.com',
 ])
+// Email sign-up is limited to the big consumer providers (and their official alias domains).
+// Set ALLOWED_EMAIL_DOMAINS="a.com,b.org" on the server to change the list, or "*" to allow any real domain.
+// Google sign-up is separate and unaffected: Google itself verifies those accounts.
+export const DEFAULT_ALLOWED_EMAIL_DOMAINS = [
+  'gmail.com', 'googlemail.com',
+  'outlook.com', 'hotmail.com', 'live.com', 'msn.com',
+  'icloud.com', 'me.com', 'mac.com',
+]
+export const PROVIDER_MESSAGE = 'Please sign up with a Gmail, Outlook or iCloud address, or continue with Google.'
+const allowedDomains = () => {
+  const raw = (process.env.ALLOWED_EMAIL_DOMAINS || '').trim()
+  if (raw === '*') return null
+  return raw ? raw.toLowerCase().split(',').map(d => d.trim()).filter(Boolean) : DEFAULT_ALLOWED_EMAIL_DOMAINS
+}
+export const emailProviderProblem = (email) => {
+  const allowed = allowedDomains()
+  if (!allowed) return null
+  const domain = String(email).trim().toLowerCase().split('@').pop()
+  return allowed.includes(domain) ? null : PROVIDER_MESSAGE
+}
+
 const RESERVED_TLDS = new Set(['test', 'invalid', 'example', 'localhost', 'local'])
 
 const isListed = (set, domain) => {
@@ -49,6 +70,8 @@ const withTimeout = (promise) => Promise.race([
 export const emailDomainProblem = async (email) => {
   const formatProblem = emailFormatProblem(email)
   if (formatProblem) return formatProblem
+  const providerProblem = emailProviderProblem(email)
+  if (providerProblem) return providerProblem
   const domain = email.split('@')[1].toLowerCase()
   try {
     const mx = await withTimeout(dns.resolveMx(domain))
