@@ -840,8 +840,11 @@ const CSS = `
 .dmb-status.error,.dmb-status.conflict,.dmb-status.load-error{border-color:var(--dmb-danger)}
 .dmb-status button{display:inline-flex;margin-left:8px;text-decoration:underline}
 .dmb-overlay{position:absolute;inset:0;display:grid;place-content:center;padding:24px;text-align:center;background:color-mix(in srgb,var(--dmb-chrome) 90%,transparent);color:var(--dmb-chrome-text);font:20px 'IM Fell English',Georgia,serif;z-index:3}
-.dmb-panel{position:absolute;top:0;right:0;bottom:0;width:min(290px,100%);z-index:6;display:flex;flex-direction:column;gap:8px;padding:12px;box-sizing:border-box;background:var(--dmb-chrome);color:var(--dmb-chrome-text);border-left:1px solid var(--dmb-rim);box-shadow:-6px 0 18px rgba(0,0,0,.25);font:14px 'IM Fell English',Georgia,serif;transform:translateX(105%);transition:transform .22s ease;visibility:hidden}
-.dmb-panel.open{transform:none;visibility:visible}
+.dmb-panel{position:absolute;top:0;right:0;bottom:0;width:min(290px,100%);z-index:6;display:flex;flex-direction:column;gap:8px;padding:12px;box-sizing:border-box;background:var(--dmb-chrome);color:var(--dmb-chrome-text);border-left:1px solid var(--dmb-rim);box-shadow:-6px 0 18px rgba(0,0,0,.25);font:14px 'IM Fell English',Georgia,serif;transform:translateX(105%);visibility:hidden;
+ /* closing: slide out first, and only hide once the slide has finished (visibility is switched after the delay) */
+ transition:transform .26s cubic-bezier(.4,0,.2,1),visibility 0s linear .26s}
+.dmb-panel.open{transform:none;visibility:visible;transition:transform .26s cubic-bezier(.4,0,.2,1),visibility 0s}
+@media (prefers-reduced-motion:reduce){.dmb-panel,.dmb-panel.open{transition:none}}
 .dmb-panel-head{display:flex;align-items:center;justify-content:space-between;font-family:'MedievalSharp',serif;font-size:16px}
 .dmb-panel-actions{display:flex;gap:6px}
 .dmb-panel-actions button{border-color:var(--dmb-rim)}
