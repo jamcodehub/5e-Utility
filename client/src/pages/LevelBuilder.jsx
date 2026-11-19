@@ -954,7 +954,7 @@ export default function LevelBuilder() {
           position: relative;
           display: inline-flex;
           align-items: center;
-          width: 190px;
+          width: 80px;
           height: 34px;
           padding: 3px;
           border: 1px solid var(--border);
@@ -976,6 +976,8 @@ export default function LevelBuilder() {
           letter-spacing: 0.02em;
           transition: color 220ms ease;
         }
+        .level-darkness-toggle-label img { width: 16px; height: 16px; display: block; margin: 0 auto; filter: brightness(0); transition: filter 220ms ease; }
+        .level-darkness-toggle[data-dark="true"] .level-darkness-toggle-label img { filter: brightness(0) invert(1); }
         .level-darkness-toggle-thumb {
           position: absolute;
           top: 3px;
@@ -1035,8 +1037,8 @@ export default function LevelBuilder() {
             title={darkMode ? 'Fog of war is on for players' : 'Fog of war is off for players'}
           >
             <span className="level-darkness-toggle-thumb" aria-hidden="true" />
-            <span className="level-darkness-toggle-label">☀ Fog off</span>
-            <span className="level-darkness-toggle-label">☾ Fog of war</span>
+            <span className="level-darkness-toggle-label" title="Fog of war off"><img src="https://res.cloudinary.com/crcbzpw6/image/upload/v1795083562/sun-regular-full.svg" alt="Fog of war off" /></span>
+            <span className="level-darkness-toggle-label" title="Fog of war on"><img src="https://res.cloudinary.com/crcbzpw6/image/upload/v1795083576/cloud-regular-full.svg" alt="Fog of war on" /></span>
           </button>
         )}
         <div style={{ display: 'flex', gap: 8, flexShrink: 0, marginLeft: 'auto' }}>
@@ -1200,7 +1202,7 @@ export default function LevelBuilder() {
           position: relative;
           display: inline-flex;
           align-items: center;
-          width: 190px;
+          width: 80px;
           height: 34px;
           padding: 3px;
           border: 1px solid var(--border);
@@ -1229,6 +1231,8 @@ export default function LevelBuilder() {
           letter-spacing: 0.02em;
           transition: color 220ms ease;
         }
+        .level-darkness-toggle-label img { width: 16px; height: 16px; display: block; margin: 0 auto; filter: brightness(0); transition: filter 220ms ease; }
+        .level-darkness-toggle[data-dark="true"] .level-darkness-toggle-label img { filter: brightness(0) invert(1); }
         .level-darkness-toggle-thumb {
           position: absolute;
           top: 3px;
@@ -1285,8 +1289,8 @@ export default function LevelBuilder() {
             title={darkMode ? 'Fog of war is on for players' : 'Fog of war is off for players'}
           >
             <span className="level-darkness-toggle-thumb" aria-hidden="true" />
-            <span className="level-darkness-toggle-label">☀ Fog off</span>
-            <span className="level-darkness-toggle-label">☾ Fog of war</span>
+            <span className="level-darkness-toggle-label" title="Fog of war off"><img src="https://res.cloudinary.com/crcbzpw6/image/upload/v1795083562/sun-regular-full.svg" alt="Fog of war off" /></span>
+            <span className="level-darkness-toggle-label" title="Fog of war on"><img src="https://res.cloudinary.com/crcbzpw6/image/upload/v1795083576/cloud-regular-full.svg" alt="Fog of war on" /></span>
           </button>
         )}
         <button className="btn btn-ghost btn-sm" onClick={() => { setTokens([]); setMode('gallery') }}>← Back</button>
