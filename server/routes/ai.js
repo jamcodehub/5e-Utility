@@ -40,32 +40,49 @@ const imageModels = async (key) => {
 }
 
 // `pickModels` is a function (key) => model names, or a plain list.
+// Every failed attempt is recorded with its real reason (timeout, network error code, HTTP status and Google's message)
+// and the final error lists them, so "it doesn't work" always says why. The API key is never included.
 const callGemini = async (pickModels, body, { textOnly = false } = {}) => {
   const key = (process.env.GEMINI_API_KEY || '').trim()
   if (!key) throw Object.assign(new Error('The AI features are not configured on this server (GEMINI_API_KEY is missing).'), { status: 503 })
   const models = typeof pickModels === 'function' ? await pickModels(key) : pickModels
-  let last
+  const timeoutMs = textOnly ? 12000 : 25000
+  const attempts = []
+  let lastStatus = 0
   const deadline = Date.now() + 30000 // finish well inside the browser's wait so the DM sees a real error, not a timeout
   for (const model of [...new Set(models)]) {
     if (Date.now() > deadline) break
-    const res = await fetch(`${GEMINI}/${model}:generateContent`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key },
-      body: JSON.stringify(typeof body === 'function' ? body(model) : body),
-      signal: AbortSignal.timeout(textOnly ? 12000 : 25000),
-    }).catch(e => { console.error(`Gemini ${model} request error:`, e.name, e.message, e.cause?.code || ''); return { ok: false, status: 504, json: async () => ({ error: { message: e.message } }) } })
+    const started = Date.now()
+    let res
+    try {
+      res = await fetch(`${GEMINI}/${model}:generateContent`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key },
+        body: JSON.stringify(typeof body === 'function' ? body(model) : body),
+        signal: AbortSignal.timeout(timeoutMs),
+      })
+    } catch (e) {
+      const timedOut = e.name === 'TimeoutError' || e.name === 'AbortError'
+      const reason = timedOut ? `no answer within ${timeoutMs / 1000}s` : `could not reach Google (${e.cause?.code || e.code || e.message})`
+      console.error(`Gemini ${model} request error after ${Date.now() - started}ms:`, e.name, e.message, e.cause?.code || '')
+      attempts.push(`${model}: ${reason}`)
+      lastStatus = timedOut ? 504 : 502
+      continue
+    }
     const data = await res.json().catch(() => ({}))
     if (res.ok) return data
     const detail = String(data?.error?.message || `HTTP ${res.status}`).slice(0, 220)
-    console.error(`Gemini ${model} failed (${res.status}): ${detail}`)
-    last = Object.assign(new Error(
-      res.status === 429 ? `Google's free AI quota for ${model} is used up or not available on this key. ${detail}`
-        : res.status === 504 ? 'The AI service is busy and did not answer in time. Please try again.'
-        : `The AI service said: ${detail}`), { status: res.status === 429 ? 429 : 502 })
+    console.error(`Gemini ${model} failed (${res.status}) after ${Date.now() - started}ms: ${detail}`)
+    attempts.push(`${model}: HTTP ${res.status} ${detail}`)
+    lastStatus = res.status
     // 429 is per model (and image models often have no free quota at all), so other models are still worth a try.
     if (![404, 429, 500, 503, 504].includes(res.status)) break
   }
-  throw last
+  const summary = attempts.join(' | ')
+  const message = lastStatus === 429 ? `Google's AI quota is used up or not available on this key. ${summary}`
+    : lastStatus === 504 ? `Google's AI did not answer in time. ${summary}`
+    : `The AI service could not answer. ${summary}`
+  throw Object.assign(new Error(message), { status: lastStatus === 429 ? 429 : 502, attempts })
 }
 
 const makeLimiter = (windowMs, max, message) => rateLimit({
@@ -216,10 +233,9 @@ router.post('/storyboard-image', auth, requireDM, imageLimit, async (req, res) =
       console.error('Gemini image failed:', e.message)
       // The free Pollinations service is only used when explicitly enabled (IMAGE_FALLBACK=free).
       if (process.env.IMAGE_FALLBACK !== 'free') {
-        const quota = e.status === 429
-        throw Object.assign(new Error(quota
-          ? 'Image generation has hit the Google AI quota for now. Please try again later.'
-          : 'Image generation failed. Please try again in a moment.'), { status: e.status === 429 ? 429 : 502 })
+        throw Object.assign(new Error(e.status === 429
+          ? `Image generation has hit the Google AI quota for now. ${e.attempts?.join(' | ') || ''}`.trim()
+          : `Image generation failed. ${e.message}`), { status: e.status === 429 ? 429 : 502 })
       }
       const cast = characters.map(c => [c.name, c.appearancePrompt || [c.race, c.class].filter(Boolean).join(' ')].filter(Boolean).join(': ')).filter(Boolean).join('; ')
       const fallback = `Wide fantasy storyboard illustration, painterly, cinematic lighting, no text. Scene: ${prompt}.${cast ? ` Characters: ${cast}.` : ''}`
