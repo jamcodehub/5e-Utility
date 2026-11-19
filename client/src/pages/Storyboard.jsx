@@ -178,11 +178,15 @@ export default function Storyboard() {
   const { schedule: scheduleEditSave, flush: flushEditSave } = useDebouncedSave(1000)
   const editUserChange = useRef(false)
   const editField = (fn) => { editUserChange.current = true; setEditCard(fn) }
+  // Uploads finish later. If the edit window was closed meanwhile `p` is null, and spreading null would leave a
+  // half-empty scene ({ imageUrl } with no title) that crashed the whole page. Only update a scene that is still open.
+  const withImage = (url) => (p) => (p ? { ...p, imageUrl: url } : p)
+  const editRef = useRef(null)
   // Autosave an existing scene 1s after typing stops.
   useEffect(() => {
     if (!editUserChange.current) return
     editUserChange.current = false
-    if (!editCard || !editCard.title.trim()) return
+    if (!editCard || !(editCard.title || '').trim()) return
     const card = editCard
     scheduleEditSave(async () => {
       try {
@@ -191,6 +195,7 @@ export default function Storyboard() {
       } catch (err) { toast(err.message || 'Could not autosave') }
     })
   }, [editCard]) // eslint-disable-line react-hooks/exhaustive-deps
+  editRef.current = editCard
   const [editSaving, setEditSaving] = useState(false)
 
   const load = useCallback(async () => {
@@ -271,7 +276,7 @@ export default function Storyboard() {
     const file = e.target.files[0]; if (!file) return
     if (isPublicDemoPath()) { toast('Image uploads are available after signing in.'); e.target.value = ''; return }
     setEditImgUploading(true)
-    try { const url = await uploadToCloudinary(file, 'lore-ledger/storyboard'); editField(p => ({ ...p, imageUrl: url })) }
+    try { const url = await uploadToCloudinary(file, 'lore-ledger/storyboard'); if (editRef.current) editField(withImage(url)); else toast('The scene was closed before the upload finished. Open it again and re-add the image.') }
     catch (err) { toast(err.message || 'Upload failed') }
     setEditImgUploading(false)
   }
@@ -443,14 +448,14 @@ export default function Storyboard() {
             <div style={{ fontFamily: 'var(--font-title)', fontSize: 16, fontWeight: 600, color: 'var(--gold)', marginBottom: 16 }}>Edit Scene</div>
             
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              <input className="input" placeholder="Title" value={editCard.title} onChange={e => editField(p => ({ ...p, title: e.target.value }))} />
+              <input className="input" placeholder="Title" value={editCard.title ?? ''} onChange={e => editField(p => ({ ...p, title: e.target.value }))} />
               <textarea className="input" rows={4} placeholder="Description" value={editCard.description || ''} onChange={e => editField(p => ({ ...p, description: e.target.value }))} style={{ resize: 'vertical' }} />
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <label style={{ cursor: editImgUploading ? 'wait' : 'pointer', background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 6, padding: '5px 10px', fontSize: 12, color: 'var(--text-2)', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
                   {editImgUploading ? 'Uploading…' : 'Replace image'}
                   {!editImgUploading && <input type="file" accept="image/*" style={{ display: 'none' }} onChange={handleEditImagePick} />}
                 </label>
-                {isDM && <button type="button" disabled={isPremium && (!editCard.title.trim() && !(editCard.description || '').trim())} onClick={() => !isPremium ? (window.location.href = '/premium') : setGenFor({ title: editCard.title, description: editCard.description, onUse: (url) => editField(p => ({ ...p, imageUrl: url })) })} title="Paint this scene with AI, using your campaign characters' avatars" style={{ background: 'var(--surface)', border: '1px solid var(--gold-border)', borderRadius: 6, padding: '5px 10px', fontSize: 12, color: 'var(--gold)', cursor: 'pointer' }}>{isPremium ? '✦ Generate' : '✦ Generate (Premium)'}</button>}
+                {isDM && <button type="button" disabled={isPremium && (!(editCard.title || '').trim() && !(editCard.description || '').trim())} onClick={() => !isPremium ? (window.location.href = '/premium') : setGenFor({ title: editCard.title, description: editCard.description, onUse: (url) => editField(withImage(url)) })} title="Paint this scene with AI, using your campaign characters' avatars" style={{ background: 'var(--surface)', border: '1px solid var(--gold-border)', borderRadius: 6, padding: '5px 10px', fontSize: 12, color: 'var(--gold)', cursor: 'pointer' }}>{isPremium ? '✦ Generate' : '✦ Generate (Premium)'}</button>}
                 {editCard.imageUrl && <span style={{ fontSize: 11, color: 'var(--green)' }}>Image set ✓</span>}
               </div>
             </div>
@@ -473,7 +478,7 @@ export default function Storyboard() {
               <div style={{ flex: 1 }} />
               
               <button className="btn btn-ghost" onClick={() => { flushEditSave(); setEditCard(null) }}>Cancel</button>
-              <button className="btn btn-primary" onClick={saveEdit} disabled={editSaving}>{editSaving ? 'Saving...' : 'Save'}</button>
+              <button className="btn btn-primary" onClick={saveEdit} disabled={editSaving || editImgUploading} title={editImgUploading ? 'Wait for the image to finish uploading' : undefined}>{editSaving ? 'Saving...' : editImgUploading ? 'Uploading image…' : 'Save'}</button>
             </div>
           </div>
         </div>
