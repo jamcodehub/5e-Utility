@@ -368,6 +368,8 @@ export default function LevelBuilder() {
   const themeId = mode === 'editor'
     ? editTheme
     : resolveThemeId(plans.find(p => p._id === selectedPlanId)?.theme)
+  // One theme per map: once any tile has been placed the theme is fixed (an empty map can still change it).
+  const themeLocked = mode === 'editor' && (grid.some(row => row.some(id => id && id !== 'empty')) || objectGrid.some(row => row.some(Boolean)))
   const { TILES, OBJECT_TILES } = getThemeTiles(themeId)
   const objectTile = id => OBJECT_TILES.find(tile => tile.id === id)
   const torchSrc = objectTile('torch')?.imageUrl // the Level Builder's own torch tile, used as the "carrying a light" badge
@@ -1053,12 +1055,14 @@ export default function LevelBuilder() {
           title="Tile theme"
           value={editTheme}
           onChange={e => setEditTheme(resolveThemeId(e.target.value))}
+          disabled={themeLocked}
           style={{ width: 190 }}
         >
           {THEMES.map(theme => (
             <option key={theme.id} value={theme.id} disabled={!theme.available}>{theme.label}</option>
           ))}
         </select>
+        {themeLocked && <span style={{ fontSize: 12, color: 'var(--text-3)' }}>This map uses {THEMES.find(t => t.id === editTheme)?.label}. Clear its tiles or start a new map to use another theme.</span>}
         {isDm && editPlanId && (
           <button
             type="button"
