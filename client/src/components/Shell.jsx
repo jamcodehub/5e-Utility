@@ -1,3 +1,4 @@
+import MediaIcon from './MediaIcon'
 import { NavLink, useNavigate, useLocation } from 'react-router-dom'
 import { useAuth, api } from '../context/AuthContext'
 import { useCampaign } from '../context/CampaignContext'
@@ -130,15 +131,15 @@ function PersistentPlayerBar({ compact }) {
       borderRadius: compact ? 999 : 10,
       margin: compact ? 0 : '0 0 10px',
     }}>
-      <span style={{ fontSize: 14, flexShrink: 0 }}>{isTrack ? '🎵' : '♪'}</span>
+      <span style={{ fontSize: 14, flexShrink: 0 }}>♪</span>
       <span style={{ flex: 1, minWidth: 0, fontSize: 12, color: 'var(--text-2)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{label}</span>
       <div style={{ display: 'flex', alignItems: 'center', gap: 2, flexShrink: 0 }}>
         {canSkip && (
-          <button onClick={skipPrev} title="Previous" style={{ width: 22, height: 22, border: 'none', background: 'none', color: 'var(--text-2)', cursor: 'pointer', fontSize: 13, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>⏮</button>
+          <button onClick={skipPrev} title="Previous" style={{ width: 22, height: 22, border: 'none', background: 'none', color: 'var(--text-2)', cursor: 'pointer', fontSize: 13, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><MediaIcon kind="prev" /></button>
         )}
-        <button onClick={togglePlay} title={playing ? 'Pause' : 'Play'} style={{ width: 24, height: 24, borderRadius: '50%', border: 'none', background: 'var(--gold-fill, var(--gold))', color: '#2a1a00', cursor: 'pointer', fontSize: 11, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{playing ? '⏸' : '▶'}</button>
+        <button onClick={togglePlay} title={playing ? 'Pause' : 'Play'} style={{ width: 24, height: 24, borderRadius: '50%', border: 'none', background: 'var(--gold-fill, var(--gold))', color: '#2a1a00', cursor: 'pointer', fontSize: 11, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><MediaIcon kind={playing ? 'pause' : 'play'} size={11} /></button>
         {canSkip && (
-          <button onClick={skipNext} title="Next" style={{ width: 22, height: 22, border: 'none', background: 'none', color: 'var(--text-2)', cursor: 'pointer', fontSize: 13, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>⏭</button>
+          <button onClick={skipNext} title="Next" style={{ width: 22, height: 22, border: 'none', background: 'none', color: 'var(--text-2)', cursor: 'pointer', fontSize: 13, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><MediaIcon kind="next" /></button>
         )}
       </div>
     </div>
@@ -158,7 +159,7 @@ function MusicMiniPlayer({ bottomOffset }) {
             {MOODS.map(m => (
               <button key={m.id} onClick={() => play(m.id)} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', textAlign: 'left', padding: '6px 8px', borderRadius: 3, border: 'none', cursor: 'pointer', fontSize: 12, background: current === m.id ? 'var(--gold-bg)' : 'transparent', color: current === m.id ? 'var(--gold)' : 'var(--text-2)' }}>
                 <span>{m.label}</span>
-                <span style={{ fontSize: 12, width: 16, textAlign: 'center' }}>{current === m.id ? '⏸' : '▶'}</span>
+                <span style={{ fontSize: 12, width: 16, textAlign: 'center' }}><MediaIcon kind={current === m.id ? 'pause' : 'play'} size={11} /></span>
               </button>
             ))}
           </div>
@@ -559,7 +560,7 @@ export default function Shell({ children }) {
                   <div style={{ marginBottom: 6 }}>
                     <div style={{ fontSize: 11, color: 'var(--text-3)', marginBottom: 6, lineHeight: 1.5 }}>Ask your DM for a join code to enter their campaign.</div>
                     {canJoin
-                      ? <button onClick={() => setJoining(true)} style={{ display: 'flex', alignItems: 'center', gap: 6, width: '100%', padding: '7px 10px', borderRadius: 3, border: '1px solid var(--border)', background: 'transparent', color: 'var(--text-2)', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>⚔ Join a Campaign</button>
+                      ? <button onClick={() => setJoining(true)} style={{ display: 'flex', alignItems: 'center', gap: 6, width: '100%', padding: '7px 10px', borderRadius: 3, border: '1px solid var(--border)', background: 'transparent', color: 'var(--text-2)', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>Join a Campaign</button>
                       : <button onClick={() => navigate('/premium')} style={{ display: 'flex', alignItems: 'center', gap: 6, width: '100%', padding: '7px 10px', borderRadius: 3, border: 'none', background: 'var(--gold-bg)', color: 'var(--gold)', fontSize: 12, cursor: 'pointer', borderLeft: '2px solid var(--gold-border)' }}>✦ Upgrade for more</button>}
                   </div>
                 ) : (

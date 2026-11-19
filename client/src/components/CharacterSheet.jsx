@@ -216,7 +216,7 @@ export function PrintOverlay({ char, srd, onClose }) {
     <div className="sheet-portal" style={{ position: 'fixed', inset: 0, zIndex: 2000, background: '#e9e6df', overflowY: 'auto' }}>
       <div className="no-print" style={{ position: 'sticky', top: 0, zIndex: 1, display: 'flex', gap: 8, justifyContent: 'center', alignItems: 'center', padding: 10, background: '#1c1a17', color: '#ddd', fontSize: 12 }}>
         <span>Print preview · black &amp; white, A4 / Letter, 2 pages</span>
-        <button className="btn btn-primary btn-sm" onClick={() => window.print()}>🖨 Print / save as PDF</button>
+        <button className="btn btn-primary btn-sm" onClick={() => window.print()}>Print / save as PDF</button>
         <button className="btn btn-ghost btn-sm" onClick={onClose}>Close</button>
       </div>
       <CharacterSheet char={char} srd={srd} />

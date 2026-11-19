@@ -355,7 +355,7 @@ export default function Character() {
           </div>
           {editing && (
             <label style={{ position: 'absolute', inset: 0, borderRadius: '50%', background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: avatarUploading ? 'wait' : 'pointer', fontSize: 11, color: '#fff', flexDirection: 'column', gap: 2 }}>
-              <span style={{ fontSize: 16 }}>{avatarUploading ? '⏳' : '📷'}</span>
+              <span style={{ fontSize: 16 }}>{avatarUploading ? '…' : '+'}</span>
               {!avatarUploading && <input type="file" accept="image/*" onChange={handleAvatar} style={{ display: 'none' }} />}
             </label>
           )}

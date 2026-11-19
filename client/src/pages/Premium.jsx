@@ -59,7 +59,7 @@ export default function Premium() {
   useEffect(() => {
     if (searchParams.get('success') === 'true') {
       refreshUser()
-      setBanner('🎉 Welcome to Premium! Your account has been upgraded.')
+      setBanner('Welcome to Premium! Your account has been upgraded.')
     }
     if (searchParams.get('cancelled') === 'true') {
       setBanner('Payment cancelled. You can upgrade anytime.')

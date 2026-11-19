@@ -353,7 +353,7 @@ export default function CampaignGuide() {
         : <div style={{ color: 'var(--text-3)', padding: '8px 24px' }}>Select a campaign.</div>}
     </div>
   )
-  if (!isDM) return <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-3)', flexDirection: 'column', gap: 8 }}><div style={{ fontSize: 28 }}>📖</div><div>Only Dungeon Masters can edit the Campaign Guide.</div></div>
+  if (!isDM) return <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-3)', flexDirection: 'column', gap: 8 }}><div>Only Dungeon Masters can edit the Campaign Guide.</div></div>
 
   const StorySection = (
     <div style={isMobile ? { display: 'flex', flexDirection: 'column', gap: 12 } : { display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gridAutoRows: '1fr', gap: 14, height: '100%' }}>

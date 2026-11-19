@@ -3,10 +3,16 @@ import { api } from "../context/AuthContext";
 import { useNavigate } from "react-router-dom";
 import { useTheme } from "../context/ThemeContext";
 
+// Rounded pointer arrow: the Select tool's icon and the board's mouse cursor. A thick round-joined stroke rounds the corners.
+const ARROW_POINTS = "M38 18 L185 90 L115 115 L68 180 Z";
+const ARROW_ICON = `data:image/svg+xml,${encodeURIComponent(`<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 212 204'><path d='${ARROW_POINTS}' fill='#000' stroke='#000' stroke-width='26' stroke-linejoin='round'/></svg>`)}`;
+// Same arrow as a cursor, with a light outline so it stays visible on dark boards; the hotspot is the tip.
+const ARROW_CURSOR = `url("data:image/svg+xml,${encodeURIComponent(`<svg xmlns='http://www.w3.org/2000/svg' width='28' height='27' viewBox='0 0 212 204'><path d='${ARROW_POINTS}' fill='#1f1f1f' stroke='#f4e8c8' stroke-width='26' stroke-linejoin='round' paint-order='stroke'/></svg>`)}") 5 4, default`;
+
 /* ---------- ASSETS: swap these placeholder URLs for your own icons ---------- */
 export const ICONS = {
   // left tool bar
-  select: "https://res.cloudinary.com/crcbzpw6/image/upload/v1794569910/feather-pointed-solid-full-4.svg", text: "https://res.cloudinary.com/crcbzpw6/image/upload/v1794570299/i-cursor-solid-full.svg", pen: "https://res.cloudinary.com/crcbzpw6/image/upload/v1794570332/pen-nib-solid-full.svg", box: "https://res.cloudinary.com/crcbzpw6/image/upload/v1794570353/square-regular-full.svg", arrow: "https://res.cloudinary.com/crcbzpw6/image/upload/v1794570443/arrow-right-long-solid-full.svg", shapes: "https://res.cloudinary.com/crcbzpw6/image/upload/v1794570543/shapes-solid-full.svg",
+  select: ARROW_ICON, text: "https://res.cloudinary.com/crcbzpw6/image/upload/v1794570299/i-cursor-solid-full.svg", pen: "https://res.cloudinary.com/crcbzpw6/image/upload/v1794569910/feather-pointed-solid-full-4.svg", box: "https://res.cloudinary.com/crcbzpw6/image/upload/v1794570353/square-regular-full.svg", arrow: "https://res.cloudinary.com/crcbzpw6/image/upload/v1794570443/arrow-right-long-solid-full.svg", shapes: "https://res.cloudinary.com/crcbzpw6/image/upload/v1794570543/shapes-solid-full.svg",
   // shape picker
   rect: "https://res.cloudinary.com/crcbzpw6/image/upload/v1794570353/square-regular-full.svg", ellipse: "https://res.cloudinary.com/crcbzpw6/image/upload/v1794570762/circle-regular-full.svg", star: "https://res.cloudinary.com/crcbzpw6/image/upload/v1794570765/star-regular-full.svg",
   // campaign icons / cards
@@ -486,7 +492,7 @@ function BoardCanvas({ campaignId, boardId, style, topRight, children }) {
       <style>{CSS}</style>
       <div
         ref={ref} className="dmb-canvas" data-canvas="1"
-        style={{ cursor: tool === "hand" ? "grab" : QUILL_CURSOR }}
+        style={{ cursor: tool === "hand" ? "grab" : tool === "pen" ? QUILL_CURSOR : ARROW_CURSOR }}
         onPointerDownCapture={panDown} onPointerDown={down} onPointerMove={move} onPointerUp={up}
       >
         {/* world layer: pure DOM + SVG, re-rasterised at every zoom level so it stays sharp */}
@@ -715,7 +721,7 @@ function BoardsPanel({ campaignId, list, setList, activeId, setActiveId, open, o
         {list.folders.map((f) => (
           <div key={f._id} className="dmb-folder">
             <div className="dmb-folder-head">
-              <span className="dmb-row-name" onDoubleClick={() => setRenaming({ kind: "folder", id: f._id, value: f.name })}>📁 {nameField("folder", f._id, f.name)}</span>
+              <span className="dmb-row-name" onDoubleClick={() => setRenaming({ kind: "folder", id: f._id, value: f.name })}>▸ {nameField("folder", f._id, f.name)}</span>
               <button title="New board in folder" aria-label="New board in folder" disabled={atLimit} onClick={() => addBoard(f._id)}>＋</button>
               <button title="Rename folder" aria-label="Rename folder" onClick={() => setRenaming({ kind: "folder", id: f._id, value: f.name })}>✎</button>
               <button title="Delete folder" aria-label="Delete folder" onClick={() => removeFolder(f)}>✕</button>

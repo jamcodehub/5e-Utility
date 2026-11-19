@@ -90,7 +90,7 @@ export function RollPanel({ roller }) {
     return (
       <button className="btn btn-primary btn-sm" onClick={() => setOpen(true)}
         style={{ position: 'fixed', bottom: 20, right: 20, zIndex: 900, boxShadow: 'var(--shadow-md)' }}>
-        🎲 Rolls{history.length ? ` (${history.length})` : ''}
+        Rolls{history.length ? ` (${history.length})` : ''}
       </button>
     )
   }

@@ -346,6 +346,17 @@ export default function LevelBuilder() {
   const [cellSize, setCellSize] = useState(28)
   const gridRef = useRef(null)
   const scrollRef = useRef(null)
+  // Size of the play area. The map is fitted inside it with square cells, so it is never stretched.
+  const [box, setBox] = useState({ w: 0, h: 0 })
+  useEffect(() => {
+    const el = scrollRef.current
+    if (!el) return
+    const measure = () => setBox(b => (b.w === el.clientWidth && b.h === el.clientHeight ? b : { w: el.clientWidth, h: el.clientHeight }))
+    measure()
+    const obs = new ResizeObserver(measure)
+    obs.observe(el)
+    return () => obs.disconnect()
+  }, [mode])
   const playRootRef = useRef(null)
   const panRef = useRef(null)
   const [zoom, setZoom] = useState(1)
@@ -359,6 +370,7 @@ export default function LevelBuilder() {
     : resolveThemeId(plans.find(p => p._id === selectedPlanId)?.theme)
   const { TILES, OBJECT_TILES } = getThemeTiles(themeId)
   const objectTile = id => OBJECT_TILES.find(tile => tile.id === id)
+  const torchSrc = objectTile('torch')?.imageUrl // the Level Builder's own torch tile, used as the "carrying a light" badge
   const dragPreviewRef = useRef(null)
   const remoteUpdateRef = useRef(false)
   const [viewers, setViewers] = useState([]) // who's currently looking at this board
@@ -1113,7 +1125,7 @@ export default function LevelBuilder() {
           setLinkMode(current => !current)
           setPendingStair(null)
           setPainting(false)
-        }} style={{ width: '100%', marginTop: 8, justifyContent: 'center' }}>🔗 Link stairs</button>
+        }} style={{ width: '100%', marginTop: 8, justifyContent: 'center' }}>Link stairs</button>
       </aside>
       <main className="lb-editor-map">
       {linkMode && pendingStair && (
@@ -1178,7 +1190,7 @@ export default function LevelBuilder() {
               >
                 {t.imageUrl && <TileIconPlaceholder tile={t} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />}
                 {t.iconUrl && <TileIconPlaceholder tile={t} style={{ position: 'absolute', inset: '21%', width: '58%', height: '58%' }} />}
-                {stairLinks[r]?.[c] && <span aria-label="Linked stairs" style={{ position: 'absolute', top: 0, right: 1, color: '#fff', fontSize: 8, textShadow: '0 1px 2px #000', pointerEvents: 'none' }}>↗</span>}
+                {stairLinks[r]?.[c] && <span aria-label="Linked stairs" style={{ position: 'absolute', top: 0, right: 1, color: '#fff', fontSize: 8, textShadow: '0 1px 2px #000', pointerEvents: 'none' }}>→</span>}
                 {object && object.id !== 'object-erase' && (object.imageUrl || object.iconUrl || object.id.startsWith('rock-')) && <TileIconPlaceholder tile={object} style={{ position: 'absolute', zIndex: 1 }} />}
                 {darkMode && !visibility.torchlit[r]?.[c] && !visibility.darkvision[r]?.[c] && (
                   <div
@@ -1211,6 +1223,7 @@ export default function LevelBuilder() {
         .level-play-map, .level-play-map * { user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
         .level-play-content { min-height: 0; }
         .level-play-controls { right: 18px; }
+        .level-play-scroll[data-tokens-open="true"] { right: 240px !important; }
         .level-play-controls[data-tokens-open="true"] { right: 258px; }
         .level-play-tokens { border-left: 1px solid var(--border); overflow: hidden; }
         .level-play-token-list { flex: 1; overflow-y: auto; padding: 8px; }
@@ -1285,6 +1298,7 @@ export default function LevelBuilder() {
           .level-play-map > .level-play-controls { left: auto !important; right: 10px !important; bottom: 10px !important; width: max-content !important; max-width: calc(100% - 20px) !important; }
           .level-play-map > .level-play-controls[data-tokens-open="true"] { bottom: calc(max(155px, min(34vh, 270px)) + 10px) !important; }
           .level-play-toolbar > span:first-child { font-size: 15px; }
+          .level-play-scroll[data-tokens-open="true"] { right: 0 !important; bottom: clamp(155px, 34vh, 270px) !important; }
           .level-play-token-list { display: flex; flex: 1 1 auto; flex-direction: row; align-items: stretch; gap: 6px; overflow-x: auto; overflow-y: hidden; padding: 6px 8px; }
           .level-play-token-heading { display: none; }
           .level-play-token-entry { flex: 0 0 148px; margin: 0; }
@@ -1320,12 +1334,13 @@ export default function LevelBuilder() {
 
       <div className="level-play-content" style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
         {/* Map area */}
-        <div className="level-play-map" style={{ flex: 1, minWidth: 0, position: 'relative', overflow: 'hidden', padding: 0, background: '#000' }}>
+        <div className="level-play-map" style={{ flex: 1, minWidth: 0, position: 'relative', overflow: 'hidden', padding: 0, background: isFullscreen ? '#000' : 'var(--surface2, #000)' }}>
           <div
             ref={scrollRef}
             className="level-play-scroll"
             onPointerDown={startPan}
-            style={{ position: 'absolute', inset: 0, overflow: 'auto', cursor: zoom > 1 && !dragTokenId ? 'grab' : undefined, touchAction: dragTokenId ? 'none' : undefined }}
+            data-tokens-open={isDm && showTokens && !isFullscreen}
+            style={{ position: 'absolute', inset: 0, overflow: 'auto', display: 'flex', cursor: zoom > 1 && !dragTokenId ? 'grab' : undefined, touchAction: dragTokenId ? 'none' : undefined }}
           >
           <div
             ref={gridRef}
@@ -1333,8 +1348,11 @@ export default function LevelBuilder() {
               display: 'grid',
               gridTemplateColumns: `repeat(${gridW}, 1fr)`,
               gridTemplateRows: `repeat(${gridH}, 1fr)`,
-              width: `${zoom * 100}%`,
-              height: `${zoom * 100}%`,
+              // largest square-celled grid that fits the play area, times the zoom; centred when it is smaller than the area
+              width: box.w && box.h ? `${Math.min(box.w / gridW, box.h / gridH) * gridW * zoom}px` : `${zoom * 100}%`,
+              height: box.w && box.h ? `${Math.min(box.w / gridW, box.h / gridH) * gridH * zoom}px` : `${zoom * 100}%`,
+              margin: 'auto',
+              flexShrink: 0,
               background: darkMode ? '#000' : '#fff',
               border: 'none',
               borderRadius: 0,
@@ -1402,7 +1420,7 @@ export default function LevelBuilder() {
                       dragging={dragTokenId === token.id}
                     />
                   )}
-                  {token?.lightSource && <span aria-hidden="true" style={{ position: 'absolute', top: -5, right: -3, zIndex: 11, fontSize: 10, pointerEvents: 'none' }}>🔥</span>}
+                  {token?.lightSource && torchSrc && <img src={torchSrc} alt="" aria-hidden="true" draggable={false} style={{ position: 'absolute', top: -7, right: -5, zIndex: 11, width: 14, height: 14, objectFit: 'contain', pointerEvents: 'none' }} />}
                 </div>
               )
             }))}
@@ -1484,7 +1502,7 @@ export default function LevelBuilder() {
                     <div style={{ fontSize: 11, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.name}</div>
                     {isDm && t.type === 'player' && (
                       <div style={{ display: 'flex', gap: 3, marginTop: 3 }}>
-                        <button type="button" aria-pressed={Boolean(t.lightSource)} onClick={() => toggleTokenVision(t.id, 'lightSource')} title="Toggle shared torchlight" style={{ padding: '2px 4px', border: '1px solid var(--border)', borderRadius: 4, background: t.lightSource ? 'var(--gold-bg)' : 'transparent', color: 'var(--text-2)', fontSize: 9 }}>🔥 Light {t.lightSource ? 'On' : 'Off'}</button>
+                        <button type="button" aria-pressed={Boolean(t.lightSource)} onClick={() => toggleTokenVision(t.id, 'lightSource')} title="Toggle shared torchlight" style={{ padding: '2px 4px', border: '1px solid var(--border)', borderRadius: 4, background: t.lightSource ? 'var(--gold-bg)' : 'transparent', color: 'var(--text-2)', fontSize: 9 }}>{torchSrc && <img src={torchSrc} alt="" aria-hidden="true" draggable={false} style={{ width: 12, height: 12, objectFit: 'contain', verticalAlign: '-2px', marginRight: 2 }} />}Light {t.lightSource ? 'On' : 'Off'}</button>
                         <button type="button" aria-pressed={Boolean(t.darkvision)} onClick={() => toggleTokenVision(t.id, 'darkvision')} title="Toggle this character’s darkvision" style={{ padding: '2px 4px', border: '1px solid var(--border)', borderRadius: 4, background: t.darkvision ? 'var(--gold-bg)' : 'transparent', color: 'var(--text-2)', fontSize: 9 }}>◉ Darkvision {t.darkvision ? 'On' : 'Off'}</button>
                       </div>
                     )}

@@ -4,6 +4,7 @@ import { api, useAuth } from '../context/AuthContext'
 import { useCampaign } from '../context/CampaignContext'
 import { useToast } from '../hooks/useToast'
 import { SkeletonBlock } from '../components/Skeleton'
+import MediaIcon from '../components/MediaIcon'
 
 const CLOUD_NAME = 'crcbzpw6'
 const UPLOAD_PRESET = '5e_utility_music'
@@ -302,7 +303,7 @@ export default function MusicPlayer() {
           backdropFilter: 'blur(4px)',
           pointerEvents: 'none'
         }}>
-          <div style={{ fontSize: 48, marginBottom: 12 }}>🎵</div>
+          <div style={{ fontSize: 48, marginBottom: 12 }}>♪</div>
           <div style={{ fontFamily: 'var(--font-title)', fontSize: 22, fontWeight: 700, color: 'var(--gold)', letterSpacing: '0.05em' }}>
             Upload to Tracks
           </div>
@@ -396,7 +397,7 @@ export default function MusicPlayer() {
                   className="btn btn-primary btn-sm"
                   style={{ flex: 1, justifyContent: 'center' }}
                 >
-                  {isCustomPlaying && activeTrack?._id === selectedTrackId ? '⏸ Pause' : 'Play'}
+                  {isCustomPlaying && activeTrack?._id === selectedTrackId ? 'Pause' : 'Play'}
                 </button>
 
                 <button
@@ -549,7 +550,7 @@ export default function MusicPlayer() {
                             <div key={cue._id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 8px', borderRadius: 6, background: 'var(--surface)', border: '1px solid var(--border)' }}>
                               <span style={{ fontSize: 11, color: 'var(--text-3)', width: 18, flexShrink: 0 }}>{i + 1}.</span>
                               <button onClick={() => playCue(cue)} disabled={!cue.track}
-                                style={{ flexShrink: 0, width: 24, height: 24, borderRadius: '50%', border: '1px solid var(--border)', background: 'transparent', color: 'var(--text-2)', cursor: cue.track ? 'pointer' : 'not-allowed', fontSize: 10, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>▶</button>
+                                style={{ flexShrink: 0, width: 24, height: 24, borderRadius: '50%', border: '1px solid var(--border)', background: 'transparent', color: 'var(--text-2)', cursor: cue.track ? 'pointer' : 'not-allowed', fontSize: 10, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><MediaIcon kind="play" size={10} /></button>
                               <div style={{ flex: 1, minWidth: 0 }}>
                                 <div style={{ fontSize: 13, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{cue.label}</div>
                                 <div style={{ fontSize: 10, color: 'var(--text-3)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{cue.track?.name || 'Track removed'}</div>

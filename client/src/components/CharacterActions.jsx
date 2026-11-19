@@ -56,8 +56,8 @@ function TextRow({ name, badge, desc, roller, auto, uses, used = 0, onUse }) {
       <div onClick={() => setOpen(o => !o)} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '7px 0', cursor: 'pointer', gap: 8 }}>
         <span style={{ fontSize: 13 }}>{name}{badge ? <span style={{ fontSize: 10, color: 'var(--text-3)', marginLeft: 8 }}>{badge}</span> : null}</span>
         <span style={{ display: 'flex', gap: 4 }} onClick={e => e.stopPropagation()}>
-          {auto?.rolls?.map(r => <button key={r.label} className="btn btn-ghost btn-sm" style={{ fontSize: 11, padding: '2px 8px' }} onClick={() => roller.rollExpr(`${name}: ${r.label}`, r.expr)}>🎲 {auto.rolls.length > 1 ? `${r.label} ` : ''}{r.expr}</button>)}
-          {dice.map(d => <button key={d} className="btn btn-ghost btn-sm" style={{ fontSize: 11, padding: '2px 8px' }} onClick={() => roller.rollExpr(name, d)}>🎲 {d}</button>)}
+          {auto?.rolls?.map(r => <button key={r.label} className="btn btn-ghost btn-sm" style={{ fontSize: 11, padding: '2px 8px' }} onClick={() => roller.rollExpr(`${name}: ${r.label}`, r.expr)}>{auto.rolls.length > 1 ? `${r.label} ` : ''}{r.expr}</button>)}
+          {dice.map(d => <button key={d} className="btn btn-ghost btn-sm" style={{ fontSize: 11, padding: '2px 8px' }} onClick={() => roller.rollExpr(name, d)}>{d}</button>)}
         </span>
       </div>
       {uses && (
@@ -181,7 +181,7 @@ export default function CharacterActions({ char, srd, roller, onPatch }) {
               </div>
             </div>
             <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-              <button className="btn btn-primary btn-sm" onClick={() => roller.rollAttack(name, bonus, dice ? { expr: damageExpr(dice, mod(a)), type } : null)}>🎲 Attack</button>
+              <button className="btn btn-primary btn-sm" onClick={() => roller.rollAttack(name, bonus, dice ? { expr: damageExpr(dice, mod(a)), type } : null)}>Attack</button>
               {w.twoHandedDamage?.dice && (
                 <button className="btn btn-ghost btn-sm" title="Versatile, held in two hands"
                   onClick={() => roller.rollAttack(`${name} (two-handed)`, bonus, { expr: damageExpr(w.twoHandedDamage.dice, mod(a)), type: w.twoHandedDamage.type })}>2H</button>
@@ -195,7 +195,7 @@ export default function CharacterActions({ char, srd, roller, onPatch }) {
             <div style={{ fontSize: 13 }}>Unarmed Strike</div>
             <div style={{ fontSize: 11, color: 'var(--text-3)' }}>{fmtMod(mod('str') + prof)} to hit · {Math.max(0, 1 + mod('str'))} bludgeoning</div>
           </div>
-          <button className="btn btn-primary btn-sm" onClick={() => roller.rollAttack('Unarmed Strike', mod('str') + prof, { expr: String(Math.max(0, 1 + mod('str'))), type: 'bludgeoning' })}>🎲 Attack</button>
+          <button className="btn btn-primary btn-sm" onClick={() => roller.rollAttack('Unarmed Strike', mod('str') + prof, { expr: String(Math.max(0, 1 + mod('str'))), type: 'bludgeoning' })}>Attack</button>
         </div>
         {!weapons.length && <div style={{ fontSize: 12, color: 'var(--text-3)' }}>Add the weapons you carry to roll attacks and damage with them.</div>}
       </Panel>
@@ -252,7 +252,7 @@ export default function CharacterActions({ char, srd, roller, onPatch }) {
         {STANDARD_ACTIONS.map(([name, text, skill]) => (
           <div key={name} style={{ display: 'flex', justifyContent: 'space-between', gap: 10, padding: '7px 0', borderBottom: '1px solid var(--border)', alignItems: 'center' }}>
             <div><div style={{ fontSize: 13 }}>{name}</div><div style={{ fontSize: 11, color: 'var(--text-3)', lineHeight: 1.5 }}>{text}</div></div>
-            {skill && <button className="btn btn-ghost btn-sm" onClick={() => skillRoll(skill)}>🎲 {skill === 'stealth' ? 'Stealth' : 'Perception'}</button>}
+            {skill && <button className="btn btn-ghost btn-sm" onClick={() => skillRoll(skill)}>{skill === 'stealth' ? 'Stealth' : 'Perception'}</button>}
           </div>
         ))}
       </Panel>

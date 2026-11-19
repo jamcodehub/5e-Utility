@@ -124,7 +124,7 @@ export default function CombatPanel({ char, srd, d, roller, onPatch }) {
       </div>
 
       <Panel title="Hit points" right={combat.concentrating && (
-        <span style={chip(true)} onClick={() => patchCombat({ concentrating: '' })} title="Click to stop concentrating">🧠 Concentrating: {combat.concentrating} ✕</span>
+        <span style={chip(true)} onClick={() => patchCombat({ concentrating: '' })} title="Click to stop concentrating">Concentrating: {combat.concentrating} ✕</span>
       )}>
         <div style={{ display: 'flex', alignItems: 'baseline', gap: 14, flexWrap: 'wrap', marginBottom: 10 }}>
           <span style={{ fontSize: 28, fontFamily: 'var(--font-title)', color: hp.current === 0 ? 'var(--red)' : 'var(--text)' }}>{hp.current}<span style={{ fontSize: 16, color: 'var(--text-3)' }}> / {hp.max}</span></span>
@@ -145,7 +145,7 @@ export default function CombatPanel({ char, srd, d, roller, onPatch }) {
             <div style={{ display: 'flex', gap: 18, alignItems: 'center', flexWrap: 'wrap' }}>
               <span style={{ fontSize: 12, color: 'var(--text-2)' }}>Successes <Pips n={ds.successes} color="var(--green)" onSet={n => patchCombat({ deathSaves: { ...ds, successes: n } })} /></span>
               <span style={{ fontSize: 12, color: 'var(--text-2)' }}>Failures <Pips n={ds.failures} color="var(--red)" onSet={n => patchCombat({ deathSaves: { ...ds, failures: n } })} /></span>
-              <button className="btn btn-primary btn-sm" onClick={deathSave}>🎲 Roll death save</button>
+              <button className="btn btn-primary btn-sm" onClick={deathSave}>Roll death save</button>
             </div>
             <div style={{ fontSize: 10, color: 'var(--text-3)', marginTop: 6 }}>10+ is a success, below 10 a failure. A natural 1 counts as two failures, a natural 20 brings you back with 1 HP.</div>
           </div>

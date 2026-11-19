@@ -72,7 +72,7 @@ export default function RestPanel({ char, srd, roller, onPatch }) {
           </div>
         </div>
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-          {cls && <button className="btn btn-ghost btn-sm" disabled={diceLeft < 1 || hp.current >= hp.max} onClick={spendHitDie} title="Short rest: roll a Hit Die + CON modifier to regain HP">🎲 Spend Hit Die</button>}
+          {cls && <button className="btn btn-ghost btn-sm" disabled={diceLeft < 1 || hp.current >= hp.max} onClick={spendHitDie} title="Short rest: roll a Hit Die + CON modifier to regain HP">Spend Hit Die</button>}
           <button className="btn btn-ghost btn-sm" onClick={shortRest} title="At least 1 hour. Recharges short-rest features.">Short rest</button>
           <button className="btn btn-primary btn-sm" onClick={longRest} title="At least 8 hours. Restores HP, slots, features and half your Hit Dice.">Long rest</button>
         </div>
