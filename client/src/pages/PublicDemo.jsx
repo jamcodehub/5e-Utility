@@ -126,8 +126,8 @@ function DemoLanding({ onExplore }) {
           <button type="button" className="demo-hero-cta" onClick={onExplore}>Explore the demo <span aria-hidden="true">→</span></button>
         </div>
         <div className="demo-hero-auth">
-          <Link to="/login" className="demo-hero-auth-btn">Sign in</Link>
-          <Link to="/register" className="demo-hero-auth-btn">Register</Link>
+          <Link to="/login" className="demo-hero-auth-btn is-signin">Sign in</Link>
+          <Link to="/register" className="demo-hero-auth-btn is-register">Register</Link>
         </div>
       </div>
       <nav className="demo-legal-links" aria-label="Legal">

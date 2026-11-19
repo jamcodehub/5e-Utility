@@ -1050,18 +1050,29 @@
   flex: 1;
   display: flex; align-items: center; justify-content: center;
   min-height: 42px;
-  border: 1px solid var(--gold);
+  border: 1px solid transparent;
   border-radius: 3px;
-  background: transparent;
-  color: var(--text);
   font-weight: 700; font-size: 15px; letter-spacing: 0.02em; text-decoration: none;
-  transition: background 150ms ease;
+  transition: transform 150ms ease, filter 150ms ease;
 }
-.demo-hero-auth-btn:hover { background: color-mix(in srgb, var(--gold) 16%, transparent); }
+.demo-hero-auth-btn:hover { transform: translateY(-1px); filter: brightness(1.1); }
+/* Solid fills, all from the active theme: Sign in is "ink" (the theme's text colour), Register is the theme's red. */
+.demo-hero-auth-btn.is-signin {
+  background: var(--text);
+  color: var(--bg);
+  border-color: color-mix(in srgb, var(--text), #000 30%);
+  box-shadow: inset 0 -3px 0 #00000033, 0 2px 0 color-mix(in srgb, var(--text), #000 45%);
+}
+.demo-hero-auth-btn.is-register {
+  background: var(--red);
+  color: var(--bg);
+  border-color: color-mix(in srgb, var(--red), #000 35%);
+  box-shadow: inset 0 -3px 0 #0000003d, 0 2px 0 color-mix(in srgb, var(--red), #000 50%);
+}
 .demo-hero-cta { width: 100%; max-width: 330px; }
 /* on wide screens keep the text clear of the knight */
 @media (min-width: 1000px) {
-  .demo-app.is-landing .demo-hero-content { margin-right: auto; margin-left: clamp(0px, 9vw, 200px); }
+  .demo-app.is-landing .demo-hero-content { width: min(100%, 440px); margin-right: auto; margin-left: clamp(30px, 8vw, 220px); }
 }
 .demo-hero-actions { width: 100%; max-width: 330px; }
 .demo-hero-actions .demo-hero-cta { width: 100%; }
@@ -1072,4 +1083,8 @@
   --bg: inherit; --surface: inherit; --surface2: inherit; --border: inherit; --border-strong: inherit;
   --text: inherit; --text-2: inherit; --text-3: inherit; --gold: inherit; --gold-bg: inherit; --gold-border: inherit;
   --red: inherit; --green: inherit;
+}
+/* narrower screens: the knight sits behind the text, so soften him to keep the copy readable */
+@media (max-width: 999px) {
+  .demo-app.is-landing .demo-hero-video { opacity: 0.3; }
 }
