@@ -15,47 +15,61 @@ import { THEMES, DEFAULT_THEME, resolveThemeId, getThemeTiles } from '../data/le
 // logic that doesn't depend on artwork. MapThumb and LevelBuilder shadow them with the
 // active theme's tiles (same ids, different art).
 
-// A3 landscape ratio ≈ 420/297
+// A3 landscape ratio ≈ 420/297. Medium (32×22) is the original size; every existing map is Medium.
 const GRID_W = 32
 const GRID_H = 22
+const MAP_SIZES = [
+  { id: 'small', label: 'Small', w: 20, h: 14, blurb: 'A single room or a short corridor' },
+  { id: 'medium', label: 'Medium', w: 32, h: 22, blurb: 'A dungeon floor or a small village' },
+  { id: 'large', label: 'Large', w: 48, h: 33, blurb: 'A big dungeon, town or overland map' },
+]
+// A stored map's size is the size of its saved grid; anything odd falls back to Medium.
+const dimsOf = (grid) => {
+  const h = Array.isArray(grid) ? grid.length : 0
+  const w = h ? Math.max(...grid.map(row => (Array.isArray(row) ? row.length : 0))) : 0
+  return h >= 6 && h <= 60 && w >= 6 && w <= 80 ? { w, h } : { w: GRID_W, h: GRID_H }
+}
 
 const TORCH_LIGHT_RADIUS = OBJECT_TILES.find(tile => tile.id === 'torch').lightRadius
 const DARKVISION_RADIUS = 6
 
-const blankGrid = () => Array.from({ length: GRID_H }, () => Array.from({ length: GRID_W }, () => 'empty'))
-const blankObjectGrid = () => Array.from({ length: GRID_H }, () => Array.from({ length: GRID_W }, () => null))
-const blankDoorStates = () => Array.from({ length: GRID_H }, () => Array.from({ length: GRID_W }, () => false))
-const blankStairLinks = () => Array.from({ length: GRID_H }, () => Array.from({ length: GRID_W }, () => null))
+const blankOf = (value, w = GRID_W, h = GRID_H) => Array.from({ length: h }, () => Array.from({ length: w }, () => value))
+const blankGrid = (w, h) => blankOf('empty', w, h)
+const blankObjectGrid = (w, h) => blankOf(null, w, h)
+const blankDoorStates = (w, h) => blankOf(false, w, h)
+const blankStairLinks = (w, h) => blankOf(null, w, h)
 
-function normalizeGrid(value, fallback) {
-  return Array.from({ length: GRID_H }, (_, r) =>
-    Array.from({ length: GRID_W }, (_, c) => value?.[r]?.[c] ?? fallback)
+function normalizeGrid(value, fallback, { w, h } = { w: GRID_W, h: GRID_H }) {
+  return Array.from({ length: h }, (_, r) =>
+    Array.from({ length: w }, (_, c) => value?.[r]?.[c] ?? fallback)
   )
 }
 
 function parseMapContent(content) {
   try {
     const parsed = JSON.parse(content)
-    if (Array.isArray(parsed)) return {
-      ground: normalizeGrid(parsed, 'empty'),
-      objects: blankObjectGrid(),
-      stairLinks: blankStairLinks(),
+    if (Array.isArray(parsed)) {
+      const dims = dimsOf(parsed)
+      return { ground: normalizeGrid(parsed, 'empty', dims), objects: blankObjectGrid(dims.w, dims.h), stairLinks: blankStairLinks(dims.w, dims.h), dims }
     }
     if (parsed && Array.isArray(parsed.ground)) {
+      const dims = dimsOf(parsed.ground)
       return {
-        ground: normalizeGrid(parsed.ground, 'empty'),
-        objects: normalizeGrid(parsed.objects, null),
-        stairLinks: normalizeGrid(parsed.stairLinks, null),
+        ground: normalizeGrid(parsed.ground, 'empty', dims),
+        objects: normalizeGrid(parsed.objects, null, dims),
+        stairLinks: normalizeGrid(parsed.stairLinks, null, dims),
+        dims,
       }
     }
   } catch {
     // Older maps may have empty or malformed content; use an empty object layer.
   }
-  return { ground: blankGrid(), objects: blankObjectGrid(), stairLinks: blankStairLinks() }
+  const dims = { w: GRID_W, h: GRID_H }
+  return { ground: blankGrid(), objects: blankObjectGrid(), stairLinks: blankStairLinks(), dims }
 }
 
-function normalizeDoorStates(value) {
-  return normalizeGrid(value, false).map(row => row.map(Boolean))
+function normalizeDoorStates(value, dims) {
+  return normalizeGrid(value, false, dims).map(row => row.map(Boolean))
 }
 
 function blocksVision(ground, doorStates, row, col) {
@@ -152,13 +166,13 @@ function MapThumb({ content, theme }) {
 
   return (
     <svg
-      viewBox={`0 0 ${GRID_W} ${GRID_H}`}
+      viewBox={`0 0 ${grid.dims.w} ${grid.dims.h}`}
       preserveAspectRatio="none"
       aria-hidden="true"
       style={{
         display: 'block',
         width: '100%',
-        aspectRatio: `${GRID_W}/${GRID_H}`,
+        aspectRatio: `${grid.dims.w}/${grid.dims.h}`,
         borderRadius: 4,
         background: '#f5f4f1',
         shapeRendering: 'crispEdges',
@@ -199,7 +213,7 @@ function MapThumb({ content, theme }) {
         return <image key={`ground-${r}-${c}`} href={tile.iconUrl} x={c + 0.12} y={r + 0.12} width="0.76" height="0.76" preserveAspectRatio="xMidYMid meet" filter={tile.iconColor ? `url(#${tintId}-${tile.iconColor.slice(1)})` : undefined} />
       }))}
       <path
-        d={[...Array.from({ length: GRID_W + 1 }, (_, x) => `M${x} 0V${GRID_H}`), ...Array.from({ length: GRID_H + 1 }, (_, y) => `M0 ${y}H${GRID_W}`)].join(' ')}
+        d={[...Array.from({ length: grid.dims.w + 1 }, (_, x) => `M${x} 0V${grid.dims.h}`), ...Array.from({ length: grid.dims.h + 1 }, (_, y) => `M0 ${y}H${grid.dims.w}`)].join(' ')}
         fill="none"
         stroke="rgba(0,0,0,0.24)"
         strokeWidth="0.045"
@@ -318,6 +332,12 @@ export default function LevelBuilder() {
   const [tokens, setTokens] = useState([]) // { id, name, avatar, color, row, col, hp, maxHp }
   const [darkMode, setDarkMode] = useState(false)
   const [doorStates, setDoorStates] = useState(blankDoorStates())
+  // The map's size is just the size of its saved grid (Small / Medium / Large templates, or legacy Medium).
+  const gridH = grid.length
+  const gridW = grid[0]?.length ?? GRID_W
+  const dimsRef = useRef({ w: gridW, h: gridH })
+  dimsRef.current = { w: gridW, h: gridH }
+  const [showSizePicker, setShowSizePicker] = useState(false)
   const [availableTokens, setAvailableTokens] = useState([]) // sidebar token pool
   const [dragTokenId, setDragTokenId] = useState(null)
   const [dragPreviewToken, setDragPreviewToken] = useState(null)
@@ -509,7 +529,7 @@ export default function LevelBuilder() {
       frame = requestAnimationFrame(() => {
         const el = gridRef.current
         if (!el || !el.offsetWidth || !el.offsetHeight) return
-        const size = Math.min(el.offsetWidth / GRID_W, el.offsetHeight / GRID_H)
+        const size = Math.min(el.offsetWidth / gridW, el.offsetHeight / gridH)
         setCellSize(prev => Math.abs(prev - size) < 0.5 ? prev : size)
       })
     })
@@ -533,7 +553,7 @@ export default function LevelBuilder() {
       setPlans(current => current.map(plan => plan._id === selectedPlanId ? { ...plan, darkMode: Boolean(enabled) } : plan))
     }
     const onDoorStates = (states) => {
-      const normalized = normalizeDoorStates(states)
+      const normalized = normalizeDoorStates(states, dimsRef.current)
       setDoorStates(normalized)
       setPlans(current => current.map(plan => plan._id === selectedPlanId ? { ...plan, doorStates: normalized } : plan))
     }
@@ -554,16 +574,16 @@ export default function LevelBuilder() {
       setStairLinks(parsed.stairLinks)
       setTokens(Array.isArray(destination.tokens) ? destination.tokens : [])
       setDarkMode(Boolean(destination.darkMode))
-      setDoorStates(normalizeDoorStates(destination.doorStates))
+      setDoorStates(normalizeDoorStates(destination.doorStates, parsed.dims))
     }
     const onDoorState = ({ row, col, open } = {}) => {
-      if (!Number.isInteger(row) || !Number.isInteger(col) || row < 0 || row >= GRID_H || col < 0 || col >= GRID_W || typeof open !== 'boolean') return
+      if (!Number.isInteger(row) || !Number.isInteger(col) || row < 0 || row >= dimsRef.current.h || col < 0 || col >= dimsRef.current.w || typeof open !== 'boolean') return
       setDoorStates(current => current.map((cells, r) => r === row
         ? cells.map((isOpen, c) => c === col ? open : isOpen)
         : cells))
       setPlans(current => current.map(plan => {
         if (plan._id !== selectedPlanId) return plan
-        const states = normalizeDoorStates(plan.doorStates)
+        const states = normalizeDoorStates(plan.doorStates, dimsRef.current)
         states[row][col] = open
         return { ...plan, doorStates: states }
       }))
@@ -599,7 +619,7 @@ export default function LevelBuilder() {
   }, [tokens, mode, selectedPlanId])
 
   // ── Gallery actions ──
-  const openEditor = (plan = null) => {
+  const openEditor = (plan = null, size = null) => {
     if (!isDm) return
     if (plan) {
       setEditPlanId(plan._id)
@@ -609,15 +629,16 @@ export default function LevelBuilder() {
       setGrid(parsed.ground)
       setObjectGrid(parsed.objects)
       setStairLinks(parsed.stairLinks)
-      setDoorStates(normalizeDoorStates(plan.doorStates))
+      setDoorStates(normalizeDoorStates(plan.doorStates, parsed.dims))
     } else {
       setEditPlanId(null)
       setEditTitle('')
       setDarkMode(false)
-      setGrid(blankGrid())
-      setObjectGrid(blankObjectGrid())
-      setStairLinks(blankStairLinks())
-      setDoorStates(blankDoorStates())
+      const { w, h } = size || { w: GRID_W, h: GRID_H }
+      setGrid(blankGrid(w, h))
+      setObjectGrid(blankObjectGrid(w, h))
+      setStairLinks(blankStairLinks(w, h))
+      setDoorStates(blankDoorStates(w, h))
     }
     setEditTheme(resolveThemeId(plan?.theme))
     setEditLayer('ground')
@@ -634,7 +655,7 @@ export default function LevelBuilder() {
     setObjectGrid(parsed.objects)
     setStairLinks(parsed.stairLinks)
     setDarkMode(Boolean(plan.darkMode))
-    setDoorStates(normalizeDoorStates(plan.doorStates))
+    setDoorStates(normalizeDoorStates(plan.doorStates, parsed.dims))
     setTokens(Array.isArray(plan.tokens) ? plan.tokens : [])
     setMode('play')
     if (isDm && activeCampaign && !activeCampaign.isPersonal) {
@@ -891,12 +912,12 @@ export default function LevelBuilder() {
     const torchlit = []
     const darkvision = []
     const lightStrength = []
-    for (let row = 0; row < GRID_H; row++) {
+    for (let row = 0; row < gridH; row++) {
       visible[row] = []
       torchlit[row] = []
       darkvision[row] = []
       lightStrength[row] = []
-      for (let col = 0; col < GRID_W; col++) {
+      for (let col = 0; col < gridW; col++) {
         const nearbyLights = sharedLightSources
           .filter(source => canSeeFrom(grid, doorStates, source, row, col, source.radius))
           .map(source => ({
@@ -1006,7 +1027,7 @@ export default function LevelBuilder() {
           html, body { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
           body * { visibility: hidden; }
           #level-print, #level-print * { visibility: visible; }
-          #level-print { position: fixed; inset: 0; width: 100vw; height: 100vh; display: grid; grid-template-columns: repeat(${GRID_W}, 1fr); background: #fff; }
+          #level-print { position: fixed; inset: 0; width: 100vw; height: 100vh; display: grid; grid-template-columns: repeat(${gridW}, 1fr); background: #fff; }
           #level-print > div { border: 0.3pt solid rgba(0,0,0,0.15); -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
         }
       `}</style>
@@ -1134,9 +1155,9 @@ export default function LevelBuilder() {
           onMouseLeave={() => setPainting(false)}
           style={{
             display: 'grid',
-            gridTemplateColumns: `repeat(${GRID_W}, 1fr)`,
+            gridTemplateColumns: `repeat(${gridW}, 1fr)`,
             width: '100%',
-            maxWidth: `calc((100vh - 120px) * ${GRID_W / GRID_H})`,
+            maxWidth: `calc((100vh - 120px) * ${gridW / gridH})`,
             background: '#fff',
             border: '3px solid #4a3f33',
             borderRadius: 4,
@@ -1310,8 +1331,8 @@ export default function LevelBuilder() {
             ref={gridRef}
             style={{
               display: 'grid',
-              gridTemplateColumns: `repeat(${GRID_W}, 1fr)`,
-              gridTemplateRows: `repeat(${GRID_H}, 1fr)`,
+              gridTemplateColumns: `repeat(${gridW}, 1fr)`,
+              gridTemplateRows: `repeat(${gridH}, 1fr)`,
               width: `${zoom * 100}%`,
               height: `${zoom * 100}%`,
               background: darkMode ? '#000' : '#fff',
@@ -1525,8 +1546,28 @@ export default function LevelBuilder() {
         <div style={{ flex: 1 }}>
           <h2 style={{ fontSize: 20, marginBottom: 2 }}>Battle Map</h2>
         </div>
-        {isDm && <button className="btn btn-primary" onClick={() => openEditor(null)}>+ Create New Map</button>}
+        {isDm && <button className="btn btn-primary" onClick={() => setShowSizePicker(true)}>+ Create New Map</button>}
       </div>
+
+      {showSizePicker && (
+        <div role="dialog" aria-modal="true" aria-label="Choose a map size" onClick={() => setShowSizePicker(false)}
+          style={{ position: 'fixed', inset: 0, zIndex: 1200, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+          <div className="card" onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: 520, padding: 22 }}>
+            <h3 style={{ fontSize: 18, margin: '0 0 4px' }}>Choose a map size</h3>
+            <p style={{ fontSize: 13, color: 'var(--text-2)', margin: '0 0 14px' }}>The size is fixed once the map is created.</p>
+            <div style={{ display: 'grid', gap: 10 }}>
+              {MAP_SIZES.map(sz => (
+                <button key={sz.id} type="button" className="btn btn-ghost" onClick={() => { setShowSizePicker(false); openEditor(null, sz) }}
+                  style={{ justifyContent: 'space-between', padding: '14px 16px', textAlign: 'left' }}>
+                  <span><b style={{ fontSize: 15 }}>{sz.label}</b><br /><span style={{ fontSize: 12, color: 'var(--text-3)', fontWeight: 400 }}>{sz.blurb}</span></span>
+                  <span style={{ fontSize: 12, color: 'var(--text-2)' }}>{sz.w} × {sz.h}</span>
+                </button>
+              ))}
+            </div>
+            <div style={{ textAlign: 'right', marginTop: 14 }}><button className="btn btn-ghost btn-sm" onClick={() => setShowSizePicker(false)}>Cancel</button></div>
+          </div>
+        </div>
+      )}
 
       {plansLoading ? (
         <div style={{ flex: 1, overflowY: 'auto', padding: 24 }}>
