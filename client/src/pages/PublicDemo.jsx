@@ -4,6 +4,7 @@ import { CloudinaryImage } from '@cloudinary/url-gen'
 import { quality, format } from '@cloudinary/url-gen/actions/delivery'
 import { auto as autoQuality } from '@cloudinary/url-gen/qualifiers/quality'
 import { auto as autoFormat } from '@cloudinary/url-gen/qualifiers/format'
+import { useTheme } from '../context/ThemeContext'
 import './PublicDemo.css'
 
 const signInIconUrl = 'https://res.cloudinary.com/crcbzpw6/image/upload/v1792051212/right-to-bracket-solid-full.svg'
@@ -100,6 +101,9 @@ function DemoMobileNav({ active }) {
 }
 
 function DemoLanding({ onExplore }) {
+  const { theme, lightMode } = useTheme()
+  // same rule the shell uses to decide whether the UI is dark
+  const dark = theme !== 'light' && (!lightMode || theme === 'dark')
   const videoRef = useRef(null)
   useEffect(() => {
     if (videoRef.current) videoRef.current.playbackRate = 0.4
@@ -107,7 +111,7 @@ function DemoLanding({ onExplore }) {
   const speedVideo = event => { event.currentTarget.playbackRate = 0.7 }
 
   return (
-    <section className="demo-hero">
+    <section className={`demo-hero${dark ? ' is-dark' : ''}`}>
       <div className="demo-hero-backdrop" aria-hidden="true">
         <video ref={videoRef} className="demo-hero-video" autoPlay muted loop playsInline preload="auto" aria-hidden="true" onLoadedMetadata={speedVideo} onPlay={speedVideo}>
           <source src="https://res.cloudinary.com/crcbzpw6/video/upload/v1794488176/White_Knight_Walk_Loop.mp4" type="video/mp4" />
@@ -120,6 +124,10 @@ function DemoLanding({ onExplore }) {
         <div className="demo-hero-rule" aria-hidden="true"><i /></div>
         <div className="demo-hero-actions">
           <button type="button" className="demo-hero-cta" onClick={onExplore}>Explore the demo <span aria-hidden="true">→</span></button>
+        </div>
+        <div className="demo-hero-auth">
+          <Link to="/login" className="demo-hero-auth-btn">Sign in</Link>
+          <Link to="/register" className="demo-hero-auth-btn">Register</Link>
         </div>
       </div>
       <nav className="demo-legal-links" aria-label="Legal">
@@ -165,10 +173,10 @@ export default function PublicDemo() {
       )
 
   return (
-    <div className="demo-app" data-theme="light">
-      <DemoSidebar active={feature} />
+    <div className={`demo-app${onLanding ? ' is-landing' : ''}`} data-theme="light">
+      {!onLanding && <DemoSidebar active={feature} />}
       <main className="demo-main">
-        <header className="demo-topbar">
+        {!onLanding && <header className="demo-topbar">
           <Link to="/" className="demo-mobile-brand" aria-label="5eUtility home">
             <img src="https://res.cloudinary.com/crcbzpw6/image/upload/v1792054744/house-solid-full.svg" alt="" aria-hidden="true" align="center" className="demo-home-icon" />
           </Link>
@@ -177,7 +185,7 @@ export default function PublicDemo() {
             <img src={signInIconUrl} alt="" aria-hidden="true" />
             <span>Sign up</span>
           </Link>
-        </header>
+        </header>}
         {content}
         {!onLanding && <DemoMobileNav active={feature} />}
       </main>

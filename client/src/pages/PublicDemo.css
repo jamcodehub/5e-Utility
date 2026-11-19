@@ -988,26 +988,26 @@
   .demo-mobile-nav-icon { width: 14px; height: 14px; flex: 0 0 14px; object-fit: contain; }
 }
 
-/* ── Parchment & ink landing ── */
+/* ── Parchment & ink landing (every colour comes from the active theme) ── */
 .demo-hero,
-.demo-hero-backdrop {
-  background:
-    radial-gradient(ellipse at 50% 40%, #f7efd9 0%, #efe3c4 55%, #e3d4ad 100%);
-}
-/* the knight video has a white backdrop; 'darken' lets the parchment show through wherever the video is lighter */
+.demo-hero-backdrop { background: var(--parchment); }
+/* The knight video is black on white. Light themes: 'darken' lets the paper show through the white.
+   Dark themes: invert it and use 'lighten' so the knight is pale on the dark paper. */
 .demo-hero-video { background: transparent; mix-blend-mode: darken; transform: translate(20%, 16%) scale(0.78); }
+.demo-hero.is-dark .demo-hero-video { filter: invert(1); mix-blend-mode: lighten; }
 .demo-hero::after {
   content: '';
   position: absolute;
   inset: 14px;
   z-index: 0;
   pointer-events: none;
-  border: 1px solid #7a5c1480;
-  outline: 1px solid #7a5c1459;
+  border: 1px solid color-mix(in srgb, var(--gold) 55%, transparent);
+  outline: 1px solid color-mix(in srgb, var(--gold) 35%, transparent);
   outline-offset: -6px;
   border-radius: 2px;
 }
 .demo-hero-content { z-index: 2; }
+.demo-hero-logo { filter: var(--logo-filter, none); }
 .demo-hero-tagline {
   margin: 0 0 6px;
   max-width: 420px;
@@ -1015,7 +1015,7 @@
   font-size: clamp(18px, 2.2vw, 23px);
   font-style: italic;
   line-height: 1.35;
-  color: #4a3b1a;
+  color: var(--text);
 }
 .demo-hero-rule {
   display: flex;
@@ -1023,20 +1023,53 @@
   gap: 10px;
   width: min(300px, 70%);
   margin: 14px 0 4px;
-  color: #7a5c14;
+  color: var(--gold);
 }
 .demo-hero-rule::before,
-.demo-hero-rule::after { content: ''; flex: 1; height: 1px; background: linear-gradient(90deg, transparent, #7a5c14aa); }
+.demo-hero-rule::after { content: ''; flex: 1; height: 1px; background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--gold) 70%, transparent)); }
 .demo-hero-rule::after { transform: scaleX(-1); }
 .demo-hero-rule i { width: 7px; height: 7px; background: currentColor; transform: rotate(45deg); }
 .demo-hero-cta {
-  border: 1px solid #5b4310;
+  --cta: var(--gold-fill, var(--gold));
+  border: 1px solid color-mix(in srgb, var(--cta), #000 45%);
   border-radius: 3px;
-  background: #c9a24b;
-  box-shadow: inset 0 -3px 0 #0000002e, 0 2px 0 #5b4310;
+  background: var(--cta);
+  box-shadow: inset 0 -3px 0 #0000002e, 0 2px 0 color-mix(in srgb, var(--cta), #000 45%);
   color: #1a1917;
   font-size: 15px;
   letter-spacing: 0.02em;
 }
-.demo-hero-cta:hover { transform: translateY(-1px); filter: none; background: #d3ad57; }
-.demo-legal-links { color: #5e4a1c; }
+.demo-hero-cta:hover { transform: translateY(-1px); filter: none; background: color-mix(in srgb, var(--cta), #fff 12%); }
+.demo-legal-links { color: var(--text-2); }
+
+/* Landing is a full-bleed page; the sidebar and top bar only appear once the demo is opened. */
+.demo-app.is-landing { grid-template-columns: minmax(0, 1fr); }
+.demo-app.is-landing .demo-hero { min-height: 100vh; min-height: 100dvh; }
+.demo-hero-auth { display: flex; gap: 12px; width: 100%; max-width: 330px; margin-top: 14px; }
+.demo-hero-auth-btn {
+  flex: 1;
+  display: flex; align-items: center; justify-content: center;
+  min-height: 42px;
+  border: 1px solid var(--gold);
+  border-radius: 3px;
+  background: transparent;
+  color: var(--text);
+  font-weight: 700; font-size: 15px; letter-spacing: 0.02em; text-decoration: none;
+  transition: background 150ms ease;
+}
+.demo-hero-auth-btn:hover { background: color-mix(in srgb, var(--gold) 16%, transparent); }
+.demo-hero-cta { width: 100%; max-width: 330px; }
+/* on wide screens keep the text clear of the knight */
+@media (min-width: 1000px) {
+  .demo-app.is-landing .demo-hero-content { margin-right: auto; margin-left: clamp(0px, 9vw, 200px); }
+}
+.demo-hero-actions { width: 100%; max-width: 330px; }
+.demo-hero-actions .demo-hero-cta { width: 100%; }
+
+/* The demo wrapper redefines the theme colours with its own palette. The landing page is not part of the
+   demo, so it takes the user's real theme instead. */
+.demo-app.is-landing[data-theme] {
+  --bg: inherit; --surface: inherit; --surface2: inherit; --border: inherit; --border-strong: inherit;
+  --text: inherit; --text-2: inherit; --text-3: inherit; --gold: inherit; --gold-bg: inherit; --gold-border: inherit;
+  --red: inherit; --green: inherit;
+}

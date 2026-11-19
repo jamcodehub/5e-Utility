@@ -37,7 +37,8 @@ html, body { overflow-x: hidden; }
   --gold-border: #e3cf94;
   --red: #c0392b;
   --green: #2e7d52;
-  --parchment: radial-gradient(ellipse at 50% 35%, #f7efd9 0%, #efe3c4 55%, #e3d4ad 100%);
+  /* Paper background that follows the active theme: the theme's own --bg with a little of its gold. */
+  --parchment: radial-gradient(ellipse at 50% 35%, color-mix(in srgb, var(--bg), var(--gold) 9%) 0%, var(--bg) 52%, color-mix(in srgb, var(--bg), var(--gold) 20%) 100%);
   --font-title: 'Fell Title', 'IM Fell English', Georgia, serif;
   --font-body: 'Alegreya', Georgia, serif;
   --font-ui: 'Alegreya Sans', system-ui, sans-serif;
