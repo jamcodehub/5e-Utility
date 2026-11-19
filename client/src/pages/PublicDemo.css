@@ -993,7 +993,7 @@
 .demo-hero-backdrop { background: var(--bg); }
 /* The knight video is black on white. Light themes: 'darken' lets the paper show through the white.
    Dark themes: invert it and use 'lighten' so the knight is pale on the dark paper. */
-.demo-hero-video { background: transparent; mix-blend-mode: darken; height: calc(100% - 64px); transform: translateX(max(27%, 335px)) scale(0.86); }
+.demo-hero-video { background: transparent; mix-blend-mode: darken; }
 .demo-hero.is-dark .demo-hero-video { filter: invert(1); mix-blend-mode: lighten; }
 
 .demo-hero-content { z-index: 2; }
@@ -1079,7 +1079,18 @@
   --text: inherit; --text-2: inherit; --text-3: inherit; --gold: inherit; --gold-bg: inherit; --gold-border: inherit;
   --red: inherit; --green: inherit;
 }
-/* narrower screens: the knight stands smaller, below the buttons, so he never covers the text */
-@media (max-width: 999px) {
-  .demo-app.is-landing .demo-hero-video { transform: translate(10%, 26%) scale(0.44); }
+/* The knight fills the free space to the right of the centred text column, whatever the window width: his box is sized
+   from that space (the video is 16:9 and he is about 0.63 of the frame's height wide), so he is never hidden behind the buttons. */
+.demo-app.is-landing .demo-hero-video {
+  --kh: min(calc(100dvh - 64px), calc((50vw - 250px) / 0.63)); /* frame height */
+  inset: auto;
+  top: 50%;
+  left: calc(75vw + 105px - var(--kh) * 0.8889);             /* centre him in the space right of the text */
+  width: calc(var(--kh) * 1.7778);
+  height: var(--kh);
+  transform: translateY(calc(-50% - 30px));
+}
+/* narrow windows have no room beside the text: a smaller knight stands below the buttons instead */
+@media (max-width: 819px) {
+  .demo-app.is-landing .demo-hero-video { inset: 0; width: 100%; height: calc(100% - 64px); transform: translate(10%, 26%) scale(0.44); }
 }
