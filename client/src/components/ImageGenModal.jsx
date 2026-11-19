@@ -47,8 +47,8 @@ export default function ImageGenModal({ campaignId, title, description, onUse, o
             : ''}
         </div>
 
-        {busy && <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 10 }}>
-          {[0, 1, 2, 3].map(i => <div key={i} className="skeleton-shimmer" style={{ aspectRatio: '16 / 9', borderRadius: 8 }} />)}
+        {busy && <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 10 }}>
+          {[0].map(i => <div key={i} className="skeleton-shimmer" style={{ aspectRatio: '16 / 9', borderRadius: 8 }} />)}
         </div>}
 
         {!busy && images.length > 0 && (

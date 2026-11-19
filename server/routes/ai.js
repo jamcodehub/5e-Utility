@@ -9,7 +9,7 @@ const router = Router()
 // Gemini retires model names often, so the usable models are discovered from Google's own
 // model list (cached for an hour) and the newest "flash" ones are tried first.
 // GEMINI_MODEL / GEMINI_IMAGE_MODEL (when set) are always tried first; the fixed names are a last resort.
-const GEMINI = 'https://generativelanguage.googleapis.com/v1beta/models'
+const GEMINI = process.env.GEMINI_API_BASE || 'https://generativelanguage.googleapis.com/v1beta/models'
 let discovered = { at: 0, models: [] }
 const version = (name) => { const m = name.match(/gemini-(\d+(?:\.\d+)?)/); return m ? parseFloat(m[1]) : 0 }
 
@@ -42,14 +42,14 @@ const callGemini = async (pickModels, body) => {
   if (!key) throw Object.assign(new Error('The AI features are not configured on this server (GEMINI_API_KEY is missing).'), { status: 503 })
   const models = typeof pickModels === 'function' ? await pickModels(key) : pickModels
   let last
-  const deadline = Date.now() + 55000
+  const deadline = Date.now() + 40000 // finish well inside the browser's wait so the DM sees a real error, not a timeout
   for (const model of [...new Set(models)]) {
     if (Date.now() > deadline) break
     const res = await fetch(`${GEMINI}/${model}:generateContent`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key },
       body: JSON.stringify(typeof body === 'function' ? body(model) : body),
-      signal: AbortSignal.timeout(25000),
+      signal: AbortSignal.timeout(20000),
     }).catch(e => ({ ok: false, status: 504, json: async () => ({ error: { message: e.message } }) }))
     const data = await res.json().catch(() => ({}))
     if (res.ok) return data
@@ -57,6 +57,7 @@ const callGemini = async (pickModels, body) => {
     console.error(`Gemini ${model} failed (${res.status}): ${detail}`)
     last = Object.assign(new Error(
       res.status === 429 ? `Google's free AI quota for ${model} is used up or not available on this key. ${detail}`
+        : res.status === 504 ? 'The AI service is busy and did not answer in time. Please try again.'
         : `The AI service said: ${detail}`), { status: res.status === 429 ? 429 : 502 })
     if (![404, 500, 503, 504].includes(res.status)) break // unknown model, overload or timeout: try the next model name
   }
@@ -125,7 +126,7 @@ router.post('/worldbuild', auth, limiter(60, 'You have reached the hourly limit 
       systemInstruction: { parts: [{ text: `${COACH_PROMPT}\n\nCampaign "${req.campaign.name}"${notes ? `, notes the DM has written:\n${notes}` : ' (no notes written yet)'}` }] },
       contents: messages.map(m => ({ role: m.role, parts: [{ text: m.text }] })),
       // 2.5 models "think" before answering; spending the budget on that would leave no reply.
-      generationConfig: { temperature: 0.8, maxOutputTokens: 400, ...(/2\.5/.test(model) ? { thinkingConfig: { thinkingBudget: 0 } } : {}) },
+      generationConfig: { temperature: 0.8, maxOutputTokens: 400, ...(/2\.5/.test(model) ? { thinkingConfig: { thinkingBudget: 0 } } : /gemini-3/.test(model) ? { thinkingConfig: { thinkingLevel: 'low' } } : {}) },
     }))
     const reply = clip((data.candidates?.[0]?.content?.parts || []).map(p => p.text || '').join(''), 900)
     if (!reply) {
@@ -195,18 +196,20 @@ router.post('/storyboard-image', auth, limiter(20, 'You have reached the hourly 
       images = [`data:${part.inlineData.mimeType || 'image/png'};base64,${part.inlineData.data}`]
     } catch (e) {
       if (e.status === 503) throw e // not configured: say so rather than silently using another service
-      console.error('Gemini image failed, using the free fallback:', e.message)
+      console.error('Gemini image failed:', e.message)
+      // The free Pollinations service is only used when explicitly enabled (IMAGE_FALLBACK=free).
+      if (process.env.IMAGE_FALLBACK !== 'free') {
+        const quota = e.status === 429
+        throw Object.assign(new Error(quota
+          ? 'Image generation has hit the Google AI quota for now. Please try again later.'
+          : 'Image generation failed. Please try again in a moment.'), { status: e.status === 429 ? 429 : 502 })
+      }
       const cast = characters.map(c => [c.name, c.appearancePrompt || [c.race, c.class].filter(Boolean).join(' ')].filter(Boolean).join(': ')).filter(Boolean).join('; ')
       const fallback = `Wide fantasy storyboard illustration, painterly, cinematic lighting, no text. Scene: ${prompt}.${cast ? ` Characters: ${cast}.` : ''}`
       try {
-        // Up to three takes for the DM to choose from, within a time budget.
-        images = []
-        const deadline = Date.now() + 70000
-        while (images.length < 3 && (images.length === 0 || Date.now() < deadline - 20000)) {
-          try { images.push(await pollinationsImage(fallback)) } catch (e3) { if (images.length) break; throw e3 }
-        }
+        images = [await pollinationsImage(fallback)]
         source = 'free'
-      } catch (e2) { console.error('Free image fallback failed:', e2.message); throw Object.assign(new Error(`Image generation is unavailable right now. Gemini: ${e.message} Free service: ${e2.message}`.slice(0, 500)), { status: 502 }) }
+      } catch (e2) { console.error('Free image fallback failed:', e2.message); throw Object.assign(new Error('Image generation is unavailable right now. Please try again later.'), { status: 502 }) }
     }
     res.json({ images, source, usedAvatars: source === 'gemini' ? loaded.length : 0 })
   } catch (e) { fail(res, e) }
