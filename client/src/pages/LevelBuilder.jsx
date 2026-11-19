@@ -11,6 +11,7 @@ import { isPublicDemoPath } from '../utils/demoRuntime'
 import { SkeletonBlock } from '../components/Skeleton'
 import { TILES, OBJECT_TILES } from '../data/levelTiles'
 import { THEMES, DEFAULT_THEME, resolveThemeId, getThemeTiles } from '../data/levelThemes'
+import { avatarSrc } from '../components/ProfileAvatar'
 // Note: module-level TILES / OBJECT_TILES above are the base (Medieval) set, used for
 // logic that doesn't depend on artwork. MapThumb and LevelBuilder shadow them with the
 // active theme's tiles (same ids, different art).
@@ -256,7 +257,7 @@ function PeekingViewers({ viewers }) {
           flexShrink: 0, position: 'relative', zIndex: 5 - i,
         }}>
           {v.avatar
-            ? <img src={v.avatar} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+            ? <img src={avatarSrc(v.avatar, 64)} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
             : <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--gold)', fontFamily: 'var(--font-title)' }}>{v.username?.[0]?.toUpperCase()}</span>
           }
         </div>
@@ -502,14 +503,17 @@ export default function LevelBuilder() {
       const pool = []
 
       const members = membersRes.status === 'fulfilled' ? membersRes.value : []
+      // A player's token shows their character's picture when they have one for this campaign, otherwise their profile photo.
       ;(members || []).forEach(m => {
-        if (m.character) pool.push({
+        const picture = m.character?.avatarUrl || m.avatar || ''
+        if (!m.character && !picture) return
+        pool.push({
           id: `char-${m.userId}`,
-          name: m.character.name || m.username,
-          avatar: m.character.avatarUrl || null,
+          name: m.character?.name || m.username,
+          avatar: picture ? avatarSrc(picture, 96) : null,
           color: '#6366f1',
-          hp: m.character.hp?.current ?? m.character.hp?.max ?? 10,
-          maxHp: m.character.hp?.max ?? 10,
+          hp: m.character?.hp?.current ?? m.character?.hp?.max ?? 10,
+          maxHp: m.character?.hp?.max ?? 10,
           type: 'player',
         })
       })

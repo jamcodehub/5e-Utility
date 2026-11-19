@@ -6,6 +6,7 @@ import { OAuth2Client } from 'google-auth-library'
 import nodemailer from 'nodemailer'
 import { User, PendingSignup } from '../models/index.js'
 import { emailDomainProblem } from '../lib/emailCheck.js'
+import { validAvatarUrl } from '../lib/avatar.js'
 import { primaryClientUrl } from '../lib/clientUrl.js'
 import { perEmailLimiter, requireCaptcha, captchaEnabled } from '../lib/guards.js'
 
@@ -184,7 +185,7 @@ const readGoogle = async (credential) => {
 
 const publicUser = (user) => ({
   id: user._id, username: user.username, email: user.email,
-  phone: user.phone || '', isPremium: user.isPremium,
+  phone: user.phone || '', avatar: user.avatar || '', isPremium: user.isPremium,
   role: user.role || 'player',
   roles: [...new Set([...(user.roles || []), user.role || 'player'])],
   twoFactorEnabled: user.twoFactorEnabled || false,
@@ -501,6 +502,19 @@ router.get('/me', authMiddleware, async (req, res) => {
     if (!user) return res.status(401).json({ error: 'Invalid token' })
     res.json(publicUser(user))
   } catch (e) { res.status(401).json({ error: 'Invalid token' }) }
+})
+
+// Set or remove the profile photo. The browser uploads the image straight to Cloudinary (signed by /api/upload/sign into
+// this user's own folder); this stores the resulting link on the account. Send { avatar: '' } to remove it.
+router.put('/avatar', authMiddleware, async (req, res) => {
+  try {
+    const avatar = asString(req.body?.avatar)
+    if (avatar === null) return res.status(400).json({ error: 'Send the image link.' })
+    if (avatar !== '' && !validAvatarUrl(avatar, req.userId)) return res.status(400).json({ error: 'That image did not come from your own upload. Please try again.' })
+    const user = await User.findByIdAndUpdate(req.userId, { avatar }, { returnDocument: 'after' })
+    if (!user) return res.status(401).json({ error: 'Invalid token' })
+    res.json(publicUser(user))
+  } catch (e) { sendError(res, e) }
 })
 
 // Switch the active identity between player and DM. Both identities are kept

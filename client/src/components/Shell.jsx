@@ -7,6 +7,7 @@ import { useTheme } from '../context/ThemeContext'
 import { getSocket } from '../utils/socket'
 import { useState, useEffect, useRef } from 'react'
 import SettingsModal from './SettingsModal'
+import ProfileAvatar from './ProfileAvatar'
 import CharacterOverview from './CharacterSidebar'
 import { CloudinaryImage } from '@cloudinary/url-gen'
 import { quality, format } from '@cloudinary/url-gen/actions/delivery'
@@ -594,7 +595,7 @@ export default function Shell({ children }) {
             <button onClick={() => navigate('/premium')} className="btn btn-gold" style={{ width: '100%', justifyContent: 'center', marginBottom: 10, fontSize: 12 }}>✦ Upgrade to Premium</button>
           )}
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <div style={{ width: 32, height: 32, borderRadius: '50%', flexShrink: 0, background: 'var(--gold-bg)', border: '1px solid var(--gold-border)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--font-title)', fontSize: 13, color: 'var(--gold)' }}>{user?.username?.[0]?.toUpperCase()}</div>
+            <ProfileAvatar size={32} fontSize={13} />
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontSize: 13, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user?.username}{isPremium && <span style={{ fontSize: 10, color: 'var(--gold)', marginLeft: 4 }}>✦ PRO</span>}</div>
               <div style={{ fontSize: 11, color: 'var(--text-3)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user?.email}</div>

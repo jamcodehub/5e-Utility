@@ -4,10 +4,11 @@ import { useTheme, THEMES } from '../context/ThemeContext'
 import { api, useAuth, useAuthConfig } from '../context/AuthContext'
 import { useCampaign } from '../context/CampaignContext'
 import GoogleButton from './GoogleButton'
+import ProfileAvatar from './ProfileAvatar'
 
 export default function SettingsModal({ onClose }) {
   const { theme, setTheme, lightMode, setLightMode } = useTheme()
-  const { logout, user, linkGoogle, isPremium, switchRole } = useAuth()
+  const { logout, user, linkGoogle, isPremium, switchRole, refreshUser } = useAuth()
   const authConfig = useAuthConfig()
   const googleClientId = authConfig?.googleClientId || import.meta.env.VITE_GOOGLE_CLIENT_ID || ''
   const { activeCampaign, leaveCampaign, deleteCampaign } = useCampaign()
@@ -110,6 +111,18 @@ export default function SettingsModal({ onClose }) {
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
           <h2 style={{ fontSize: 18 }}>Settings</h2>
           <button type="button" onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--text-3)', fontSize: 20, cursor: 'pointer', lineHeight: 1 }}>✕</button>
+        </div>
+
+        {/* Profile photo (also reachable by clicking the circle in the sidebar) */}
+        <div style={{ marginBottom: 24, display: 'flex', alignItems: 'center', gap: 14 }}>
+          <ProfileAvatar size={56} fontSize={22} />
+          <div style={{ minWidth: 0 }}>
+            <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-2)', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 4 }}>Profile photo</div>
+            <div style={{ fontSize: 12, color: 'var(--text-3)' }}>Tap the circle to choose a photo.</div>
+            {user?.avatar && (
+              <button type="button" className="btn btn-ghost btn-sm" style={{ marginTop: 6 }} onClick={async () => { try { await api('/auth/avatar', { method: 'PUT', body: { avatar: '' } }); await refreshUser() } catch { /* ignore */ } }}>Remove photo</button>
+            )}
+          </div>
         </div>
 
         {/* Theme */}

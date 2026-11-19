@@ -55,6 +55,7 @@ const storeUser = (user) => {
     username: user.username,
     email: user.email,
     phone: user.phone || '',
+    avatar: user.avatar || '',
     isPremium: !!user.isPremium,
     role: user.role || 'player',
     roles: user.roles?.length ? user.roles : [user.role || 'player'],

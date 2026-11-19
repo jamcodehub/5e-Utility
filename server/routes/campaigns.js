@@ -328,7 +328,7 @@ router.delete('/:id/characters/:charId', auth, async (req, res) => {
 router.get('/:id/members/characters', auth, async (req, res) => {
   try {
     if (!await isMember(req.params.id, req.userId)) return res.status(403).json({ error: 'Not a campaign member' })
-    const campaign = await Campaign.findById(req.params.id).populate('members', 'username')
+    const campaign = await Campaign.findById(req.params.id).populate('members', 'username avatar')
     if (!campaign) return res.status(404).json({ error: 'Not found' })
     const chars = await Character.find({
       campaign: req.params.id,
@@ -337,7 +337,7 @@ router.get('/:id/members/characters', auth, async (req, res) => {
     const result = campaign.members.map(m => {
       const owned = chars.filter(c => String(c.owner) === String(m._id))
       const character = owned.find(c => c.isPrimary) || owned[0] || null
-      return { userId: m._id, username: m.username, character }
+      return { userId: m._id, username: m.username, avatar: m.avatar || '', character }
     })
     res.json(result)
   } catch { res.status(500).json({ error: 'Failed to load members' }) }
