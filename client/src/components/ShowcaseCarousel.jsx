@@ -2,8 +2,9 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 
 // How long each slide stays on screen. A slide that cross-fades between pictures stays long enough to show all of them.
-const AUTO_MS = 2000
-const FADE_MS = 2000
+// Long enough to read the description (about 40 words), and the Battle Map holds each fog state for 3s.
+const AUTO_MS = 6500
+const FADE_MS = 3200
 
 // Two (or more) screenshots stacked in one slide that cross-fade every few seconds while the slide is showing,
 // with a small label saying which state is on screen. It is an opacity change only (no movement), so it keeps running
