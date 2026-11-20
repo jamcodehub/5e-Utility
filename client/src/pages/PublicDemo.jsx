@@ -1,10 +1,11 @@
-import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
+import { Link, useLocation, useParams } from 'react-router-dom'
 import { lazy, Suspense, useEffect, useRef, useState } from 'react'
 import { CloudinaryImage } from '@cloudinary/url-gen'
 import { quality, format } from '@cloudinary/url-gen/actions/delivery'
 import { auto as autoQuality } from '@cloudinary/url-gen/qualifiers/quality'
 import { auto as autoFormat } from '@cloudinary/url-gen/qualifiers/format'
 import { useTheme } from '../context/ThemeContext'
+import { usePageMeta } from '../hooks/usePageMeta'
 import './PublicDemo.css'
 
 const signInIconUrl = 'https://res.cloudinary.com/crcbzpw6/image/upload/v1792051212/right-to-bracket-solid-full.svg'
@@ -100,7 +101,7 @@ function DemoMobileNav({ active }) {
   )
 }
 
-function DemoLanding({ onExplore }) {
+function DemoLanding() {
   const { theme, lightMode } = useTheme()
   // same rule the shell uses to decide whether the UI is dark
   const dark = theme !== 'light' && (!lightMode || theme === 'dark')
@@ -119,11 +120,11 @@ function DemoLanding({ onExplore }) {
         <div className="demo-hero-shade" />
       </div>
       <div className="demo-hero-content">
-        <img className="demo-hero-logo" src="https://res.cloudinary.com/crcbzpw6/image/upload/v1794483597/5E_UTILITY_Pure_Black_2000.png" alt="5e Utility" />
+        <h1 className="demo-hero-h1"><img className="demo-hero-logo" src="https://res.cloudinary.com/crcbzpw6/image/upload/v1794483597/5E_UTILITY_Pure_Black_2000.png" alt="5e Utility: D&D campaign companion" /></h1>
         <p className="demo-hero-tagline">Your campaign, bound in one place: maps, lore, dice and the DM's best-kept secrets.</p>
         <div className="demo-hero-rule" aria-hidden="true"><i /></div>
         <div className="demo-hero-actions">
-          <button type="button" className="demo-hero-cta" onClick={onExplore}>Explore the demo <span aria-hidden="true">→</span></button>
+          <Link to={`/demo/${FEATURES[0].id}`} className="demo-hero-cta">Explore the demo <span aria-hidden="true">→</span></Link>
         </div>
         <div className="demo-hero-auth">
           <Link to="/login" className="demo-hero-auth-btn is-signin">Sign in</Link>
@@ -143,7 +144,6 @@ export default function PublicDemo() {
   const [showSignupCta, setShowSignupCta] = useState(false)
   const { feature } = useParams()
   const location = useLocation()
-  const navigate = useNavigate()
   const onLanding = location.pathname === '/'
   const activeFeature = FEATURES.find(item => item.id === feature)
   const demoPages = {
@@ -155,9 +155,14 @@ export default function PublicDemo() {
   }
   const DemoPage = demoPages[feature]
 
-  const explore = () => navigate(`/demo/${FEATURES[0].id}`)
+  const LANDING_DESC = 'Free D&D 5e campaign companion: session journal, lore, character sheets, battle maps, initiative tracker, 3D dice and an AI storyteller for players and Dungeon Masters.'
+  usePageMeta(onLanding
+    ? { title: '5e Utility: D&D campaign companion for journals, lore, maps and dice', description: LANDING_DESC, path: '/' }
+    : activeFeature
+      ? { title: `${activeFeature.label} for D&D 5e: try the demo | 5e Utility`, description: `${activeFeature.description} Try the ${activeFeature.label.toLowerCase()} in the free 5e Utility demo, no sign-up needed.`, path: `/demo/${activeFeature.id}` }
+      : { title: 'Page not found | 5e Utility', description: 'That page is not in the 5e Utility preview.', noindex: true })
   const content = onLanding
-    ? <DemoLanding onExplore={explore} />
+    ? <DemoLanding />
     : !activeFeature
       ? <section className="demo-not-found"><h1>That page isn’t in this preview.</h1><Link to={`/demo/${FEATURES[0].id}`}>Explore the demo</Link></section>
       : (

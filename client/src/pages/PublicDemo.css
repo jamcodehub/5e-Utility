@@ -373,7 +373,8 @@
 .demo-hero h1 em { color: #e0c482; font-style: normal; }
 .demo-hero-content > p { max-width: 440px; color: var(--demo-muted); font-size: 13px; line-height: 1.8; }
 .demo-hero-actions { display: flex; align-items: center; gap: 25px; margin-top: 30px; }
-.demo-hero-cta { width: 194px; cursor: pointer; }
+.demo-hero-cta { width: 194px; cursor: pointer; text-decoration: none; box-sizing: border-box; }
+.demo-hero-h1 { display: contents; }
 .demo-hero-signin { color: #ded9cc; font-size: 11px; text-decoration: none; }
 .demo-hero-signin:hover { color: var(--demo-gold-strong); }
 .demo-hero-footnote { display: flex; gap: 12px; align-items: center; margin-top: 60px; color: var(--demo-dim); font-size: 8px; letter-spacing: 0.13em; }

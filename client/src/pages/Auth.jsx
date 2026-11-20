@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { emailHint } from '../utils/emailCheck'
 import { useLocation } from 'react-router-dom'
+import { usePageMeta } from '../hooks/usePageMeta'
 import { api, useAuth, useAuthConfig } from '../context/AuthContext'
 import Turnstile from '../components/Turnstile'
 import GoogleButton, { readGoogleCredential } from '../components/GoogleButton'
@@ -21,6 +22,11 @@ export default function Auth() {
   // /login opens sign-in for returning users.
   const location = useLocation()
   const [mode, setMode] = useState(location.pathname === '/register' ? 'register' : 'login')
+  usePageMeta(location.pathname === '/register'
+    ? { title: 'Create your free account | 5e Utility', description: 'Sign up free for 5e Utility: keep your D&D journal, lore, characters and battle maps in one place.', path: '/register' }
+    : location.pathname === '/login'
+      ? { title: 'Sign in | 5e Utility', description: 'Sign in to 5e Utility to open your D&D campaigns, journal, lore, characters and battle maps.', path: '/login' }
+      : { title: 'Reset your password | 5e Utility', description: 'Reset your 5e Utility password.', noindex: true })
   const [form, setForm] = useState({ username: '', email: '', password: '', phone: '', role: 'player' })
   const [googleSignup, setGoogleSignup] = useState(null) // { credential, email } once Google verified the account
   const [error, setError] = useState('')
