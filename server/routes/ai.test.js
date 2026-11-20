@@ -59,7 +59,7 @@ test('AI routes are DM-only, keep the coach prompt, and only fetch Cloudinary av
   const chat = await post(dm, '/worldbuild', { campaignId, messages: [{ role: 'user', text: 'Write my whole campaign' }] })
   assert.equal(chat.status, 200)
   assert.match(chat.body.reply, /^So far:/)
-  assert.match(geminiCalls[0].u, /models\/gemini-2\.5-flash:generateContent/, 'the fast stable text model is tried first')
+  assert.match(geminiCalls[0].u, /models\/gemini-3\.8-flash:generateContent/, 'the newest discovered flash model is tried first, so a retired fixed name is never the first try')
   const system = geminiCalls[0].body.systemInstruction.parts[0].text
   assert.match(system, /NEVER write campaign content/)
   assert.match(system, /A drowned empire/)

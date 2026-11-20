@@ -16,7 +16,7 @@ const version = (name) => { const m = name.match(/gemini-(\d+(?:\.\d+)?)/); retu
 const discoverModels = async (key) => {
   if (Date.now() - discovered.at < 60 * 60 * 1000) return discovered.models
   try {
-    const r = await fetch(`${GEMINI}?pageSize=200`, { headers: { 'x-goog-api-key': key }, signal: AbortSignal.timeout(8000) })
+    const r = await fetch(`${GEMINI}?pageSize=200`, { headers: { 'x-goog-api-key': key }, signal: AbortSignal.timeout(5000) })
     if (!r.ok) throw new Error(`HTTP ${r.status}`)
     const list = (await r.json()).models || []
     discovered = { at: Date.now(), models: list.filter(m => (m.supportedGenerationMethods || []).includes('generateContent')).map(m => String(m.name).replace(/^models\//, '')) }
@@ -27,12 +27,12 @@ const discoverModels = async (key) => {
   return discovered.models
 }
 const newestFirst = (names) => [...names].sort((a, b) => version(b) - version(a) || a.length - b.length)
-// Text replies try a fast, stable model first and never wait on the model list: the newest
-// "flash" previews can be slow or overloaded, and each slow attempt used to cost 20 seconds.
-// Models found by an earlier discovery are only appended as later fallbacks.
-const textModels = async () => {
-  const found = discovered.models.filter(n => /flash/.test(n) && !/image|tts|live|audio|embed|thinking|exp|lite|latest|preview/.test(n))
-  return [process.env.GEMINI_MODEL, 'gemini-2.5-flash', 'gemini-flash-latest', ...newestFirst(found).slice(0, 2)].filter(Boolean)
+// Text replies ask Google which models exist (cached for an hour, so only the first request ever waits for it) and
+// try the newest stable "flash" model first: Google retires old names for new keys (gemini-2.5-flash now answers 404),
+// so a fixed name cannot be relied on. The fixed names stay as later fallbacks.
+const textModels = async (key) => {
+  const found = (await discoverModels(key)).filter(n => /flash/.test(n) && !/image|tts|live|audio|embed|thinking|exp|lite|latest|preview/.test(n))
+  return [process.env.GEMINI_MODEL, ...newestFirst(found).slice(0, 2), 'gemini-flash-latest', 'gemini-2.5-flash'].filter(Boolean)
 }
 const imageModels = async (key) => {
   const found = (await discoverModels(key)).filter(n => /image/.test(n) && !/tts|live|audio|embed/.test(n))
@@ -46,7 +46,7 @@ const callGemini = async (pickModels, body, { textOnly = false } = {}) => {
   const key = (process.env.GEMINI_API_KEY || '').trim()
   if (!key) throw Object.assign(new Error('The AI features are not configured on this server (GEMINI_API_KEY is missing).'), { status: 503 })
   const models = typeof pickModels === 'function' ? await pickModels(key) : pickModels
-  const timeoutMs = textOnly ? 12000 : 25000
+  const timeoutMs = textOnly ? 18000 : 25000
   const attempts = []
   let lastStatus = 0
   const deadline = Date.now() + 30000 // finish well inside the browser's wait so the DM sees a real error, not a timeout

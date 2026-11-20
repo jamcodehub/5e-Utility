@@ -111,29 +111,6 @@ function RelationNote() {
   return <div style={{ fontSize: 10, color: 'var(--gold)', marginTop: 3 }}>↑ Character Relation — shown in each player's Roleplay Assistant</div>
 }
 
-// ─── NpcCard ──────────────────────────────────────────────────────────────────
-function NpcCard({ npc, onChange, onRemove, activePlayer, onInserted }) {
-  const u = f => e => onChange({ ...npc, [f]: e.target.value })
-  return (
-    <div style={{ border: '1px solid var(--border)', borderRadius: 3, padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 8 }}>
-      <div style={{ display: 'flex', gap: 8 }}>
-        <input className="input" value={npc.name} onChange={u('name')} placeholder="NPC name" style={{ flex: 1, fontSize: 13, fontWeight: 500 }} />
-        <button onClick={onRemove} style={{ background: 'none', border: 'none', color: 'var(--text-3)', cursor: 'pointer', fontSize: 18, lineHeight: 1, padding: '0 2px', flexShrink: 0 }}>✕</button>
-      </div>
-      <DropTextarea value={npc.description} onChange={u('description')} rows={2}
-        placeholder="Who are they? Role, personality, motives…"
-        activePlayer={activePlayer} onInserted={onInserted} />
-      <div>
-        <DropTextarea value={npc.characterRelation} onChange={u('characterRelation')} rows={2}
-          placeholder="How do they personally connect to the characters? History, secrets, hooks, debts?"
-          activePlayer={activePlayer} onInserted={onInserted}
-          style={{ borderColor: 'var(--gold-border)', background: 'var(--gold-bg)' }} />
-        <RelationNote />
-      </div>
-    </div>
-  )
-}
-
 // ─── QuestCard ────────────────────────────────────────────────────────────────
 function QuestCard({ quest, onChange, onRemove, activePlayer, onInserted }) {
   const u = f => e => onChange({ ...quest, [f]: e.target.value })
@@ -302,10 +279,7 @@ export default function CampaignGuide() {
   const upd = f => e => { setGuide(g => ({ ...g, [f]: e.target.value })); setDirty(true) }
   const clearPlayer = () => setActive(null)
 
-  const addNpc   = () => { setGuide(g => ({ ...g, npcs:   [...g.npcs,   { id: nanoid(), name: '', description: '', characterRelation: '' }] })); setDirty(true) }
   const addQuest = () => { setGuide(g => ({ ...g, quests: [...g.quests, { id: nanoid(), title: '', description: '', status: 'active', characterRelation: '' }] })); setDirty(true) }
-  const updNpc   = (id, v) => { setGuide(g => ({ ...g, npcs:   g.npcs.map(n => n.id === id ? v : n) })); setDirty(true) }
-  const rmNpc    = id      => { setGuide(g => ({ ...g, npcs:   g.npcs.filter(n => n.id !== id) })); setDirty(true) }
   const updQuest = (id, v) => { setGuide(g => ({ ...g, quests: g.quests.map(q => q.id === id ? v : q) })); setDirty(true) }
   const rmQuest  = id      => { setGuide(g => ({ ...g, quests: g.quests.filter(q => q.id !== id) })); setDirty(true) }
 
@@ -316,24 +290,6 @@ export default function CampaignGuide() {
     try {
       await api(`/campaigns/${activeCampaign._id}/guide`, { method: 'PUT', body: guide })
       setDirty(false)
-      // Sync named NPCs to Lore board (best-effort, no duplicates)
-      const namedNpcs = guide.npcs.filter(n => n.name.trim())
-      if (namedNpcs.length > 0) {
-        try {
-          const existingLore = await api(`/lore/${activeCampaign._id}`)
-          const existingNpcTitles = new Set(
-            (existingLore || []).filter(e => (e.tags || []).includes('npc')).map(e => e.title)
-          )
-          for (const npc of namedNpcs) {
-            if (!existingNpcTitles.has(npc.name.trim())) {
-              await api(`/lore/${activeCampaign._id}`, {
-                method: 'POST',
-                body: { title: npc.name.trim(), content: npc.description || '', tags: ['npc'] },
-              })
-            }
-          }
-        } catch (_e) { /* lore sync is best-effort */ }
-      }
       toast('Campaign guide saved ✓')
     } catch (_e) { toast('Failed to save — try again') }
     setSaving(false)
@@ -368,25 +324,6 @@ export default function CampaignGuide() {
           <DropTextarea value={guide[key]} onChange={upd(key)} rows={rows} placeholder={ph} activePlayer={activePlayer} onInserted={clearPlayer} fill={!isMobile} />
         </div>
       ))}
-    </div>
-  )
-
-  const NpcsSection = (
-    <div className="card" style={{ padding: '14px 16px' }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-        <SectionLabel style={{ margin: 0 }}>NPCs</SectionLabel>
-        <button className="btn btn-ghost btn-sm" onClick={addNpc}>+ Add NPC</button>
-      </div>
-      {guide.npcs.length === 0
-        ? <div style={{ fontSize: 12, color: 'var(--text-3)', lineHeight: 1.8 }}>No NPCs yet. The <span style={{ color: 'var(--gold)' }}>Character Relation</span> field appears directly in each player's session plan.</div>
-        : <div style={isMobile ? { display: 'flex', flexDirection: 'column', gap: 10 } : { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: 12, alignItems: 'start' }}>
-            {guide.npcs.map(n => <NpcCard key={n.id} npc={n} onChange={v => updNpc(n.id, v)} onRemove={() => rmNpc(n.id)} activePlayer={activePlayer} onInserted={clearPlayer} />)}
-          </div>}
-      {guide.npcs.length > 0 && (
-        <button className="btn btn-primary btn-sm" onClick={save} disabled={saving} style={{ width: '100%', justifyContent: 'center', marginTop: 12, opacity: dirty ? 1 : 0.45 }}>
-          {saving ? 'Saving…' : dirty ? '✦ Save Guide & Sync to Lore' : 'Saved ✓'}
-        </button>
-      )}
     </div>
   )
 
@@ -498,13 +435,12 @@ export default function CampaignGuide() {
       {AvatarRow}
 
       <div role="tablist" style={{ display: 'flex', gap: 4, padding: isMobile ? '0 16px' : '0 24px', marginBottom: 10, flexShrink: 0 }}>
-        {[['story', 'Story & World'], ['npcs', `NPCs${guide.npcs.length ? ` (${guide.npcs.length})` : ''}`], ['quests', `Quests${guide.quests.length ? ` (${guide.quests.length})` : ''}`]].map(([k, lbl]) => (
+        {[['story', 'Story & World'], ['quests', `Quests${guide.quests.length ? ` (${guide.quests.length})` : ''}`]].map(([k, lbl]) => (
           <button key={k} role="tab" aria-selected={mobileTab === k} onClick={() => setMobileTab(k)} className={`btn btn-sm ${mobileTab === k ? 'btn-primary' : 'btn-ghost'}`} style={isMobile ? { flex: 1 } : { minWidth: 120 }}>{lbl}</button>
         ))}
       </div>
       <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: isMobile ? '0 16px 80px' : '0 24px 20px' }}>
         {mobileTab === 'story'  && StorySection}
-        {mobileTab === 'npcs'   && NpcsSection}
         {mobileTab === 'quests' && QuestsSection}
       </div>
 
