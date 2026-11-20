@@ -67,7 +67,7 @@ export default function ShowcaseCarousel({ slides, label }) {
                 </div>
               )}
               <div className="showcase-copy">
-                <p className="showcase-count">{String(i + 1).padStart(2, '0')} / {String(count).padStart(2, '0')}</p>
+                <p className="showcase-count">{String(i + 1).padStart(2, '0')} / {String(count).padStart(2, '0')}{s.badge && <span className="showcase-badge">{s.badge}</span>}</p>
                 <h3>{s.title}</h3>
                 <p>{s.text}</p>
                 <Link to={s.to || `/demo/${s.id}`}>{s.cta || `Try the ${s.title.toLowerCase()} demo`} <span aria-hidden="true">→</span></Link>
