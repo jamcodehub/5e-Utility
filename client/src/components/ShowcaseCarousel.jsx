@@ -18,8 +18,10 @@ function FadeShot({ frames, active }) {
   }, [active, frames.length])
   return (
     <div className="showcase-shot showcase-fade">
-      {frames.map((f, i) => <img key={f.src} className={i === frame ? 'is-on' : ''} src={f.src} alt={f.alt} loading={i === 0 ? 'eager' : 'lazy'} />)}
-      <span className="showcase-fade-label" aria-hidden="true">{frames[frame].label}</span>
+      {/* A true cross-fade: the first picture always stays solid underneath, and each later picture fades in and out over it,
+          so the two never fade at the same moment (which would dip through the background in the middle). */}
+      {frames.map((f, i) => <img key={f.src} className={i === 0 || i <= frame ? 'is-on' : ''} style={{ zIndex: i }} src={f.src} alt={f.alt} loading={i === 0 ? 'eager' : 'lazy'} />)}
+      <span key={frame} className="showcase-fade-label" aria-hidden="true">{frames[frame].label}</span>
     </div>
   )
 }
