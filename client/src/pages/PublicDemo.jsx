@@ -122,8 +122,20 @@ function DemoLanding() {
   // same rule the shell uses to decide whether the UI is dark
   const dark = theme !== 'light' && (!lightMode || theme === 'dark')
   const videoRef = useRef(null)
+  // The knight is a decorative loop, so it must never show a play button. If the browser refuses to autoplay it
+  // (Low Power Mode, data saver, "never autoplay"), the still frame below is shown instead, and playback is retried
+  // on the first tap, click or key press.
   useEffect(() => {
-    if (videoRef.current) videoRef.current.playbackRate = 0.4
+    const v = videoRef.current
+    if (!v) return
+    v.playbackRate = 0.4
+    const tryPlay = () => { v.play?.().catch(() => {}) }
+    tryPlay()
+    v.addEventListener('canplay', tryPlay)
+    const events = ['pointerdown', 'keydown', 'touchstart']
+    const onInteract = () => { tryPlay(); events.forEach(e => window.removeEventListener(e, onInteract)) }
+    events.forEach(e => window.addEventListener(e, onInteract, { passive: true }))
+    return () => { v.removeEventListener('canplay', tryPlay); events.forEach(e => window.removeEventListener(e, onInteract)) }
   }, [])
   const speedVideo = event => { event.currentTarget.playbackRate = 0.7 }
 
@@ -131,7 +143,7 @@ function DemoLanding() {
     <>
     <section className={`demo-hero${dark ? ' is-dark' : ''}`}>
       <div className="demo-hero-backdrop" aria-hidden="true">
-        <video ref={videoRef} className="demo-hero-video" autoPlay muted loop playsInline preload="auto" aria-hidden="true" onLoadedMetadata={speedVideo} onPlay={speedVideo}>
+        <video ref={videoRef} className="demo-hero-video" autoPlay muted loop playsInline preload="auto" aria-hidden="true" tabIndex={-1} disablePictureInPicture disableRemotePlayback controlsList="nodownload nofullscreen noremoteplayback" poster="https://res.cloudinary.com/crcbzpw6/video/upload/so_0,w_1400,q_auto,f_jpg/v1794488176/White_Knight_Walk_Loop.jpg" onLoadedMetadata={speedVideo} onPlay={speedVideo}>
           <source src="https://res.cloudinary.com/crcbzpw6/video/upload/v1794488176/White_Knight_Walk_Loop.mp4" type="video/mp4" />
         </video>
         <div className="demo-hero-shade" />

@@ -1150,7 +1150,6 @@
 .showcase-arrow:hover { border-color: var(--gold); color: var(--gold); }
 .showcase-dots { display: flex; gap: 8px; }
 .showcase-dot { width: 10px; height: 10px; padding: 0; border: 1px solid var(--text-3); border-radius: 50%; background: transparent; cursor: pointer; transition: width 300ms ease, background 300ms ease, border-color 300ms ease; }
-.showcase-pause { margin-left: 4px; }
 .showcase-dot.is-active { width: 28px; border-radius: 5px; border-color: var(--gold); background: var(--gold); }
 .showcase button:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
 @media (max-width: 820px) {
@@ -1160,3 +1159,12 @@
 @media (prefers-reduced-motion: reduce) {
   .showcase-track, .showcase-copy, .showcase-dot { transition: none; }
 }
+
+/* The knight is decoration: never let a browser draw its own play button or controls over it. */
+.demo-hero-video { pointer-events: none; }
+.demo-hero-video::-webkit-media-controls,
+.demo-hero-video::-webkit-media-controls-panel,
+.demo-hero-video::-webkit-media-controls-play-button,
+.demo-hero-video::-webkit-media-controls-start-playback-button,
+.demo-hero-video::-webkit-media-controls-overlay-play-button,
+.demo-hero-video::-webkit-media-controls-enclosure { display: none !important; -webkit-appearance: none; opacity: 0; }
