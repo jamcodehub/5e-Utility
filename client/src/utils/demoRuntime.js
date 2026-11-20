@@ -81,10 +81,12 @@ const demoSceneCards = [
 ]
 
 const demoJournalEntries = [
-  { _id: 'demo-day-3', day: 3, title: 'The bridge at dusk', content: 'We found fresh tracks on the old bridge. Too many for a patrol, too few for an army.' },
+  { _id: 'demo-day-3', day: 3, title: 'The bridge at dusk', content: 'We found fresh tracks on the old bridge. Too many for a patrol, too few for an army.\n\nMara Venn read the prints like a letter: eleven riders, shod in the new Ashen pattern, heading west before the rain. One horse was lame and dragged its left foot, so they cannot be far ahead.\n\nThe bridge itself is wrong. The stones are warm, and a faint grey ash drifts from the arches although nothing is burning. Avery found a courier’s seal pressed into the mortar and left it where it was. We camp beneath the north tower tonight.\n\nThings to ask the innkeeper: who pays the Ashen riders, and why does the village bell ring a half-beat late?' },
   { _id: 'demo-day-2', day: 2, title: 'A stranger at the inn', content: 'The innkeeper recognized our crest, though none of us had shown it. I do not trust the man in the green cloak.' },
   { _id: 'demo-day-1', day: 1, title: 'A promise kept', content: 'We brought the missing courier home. The village bells rang until sunset.' },
 ]
+
+let demoBattleState = null
 
 const demoMembers = [
   {
@@ -226,10 +228,17 @@ export function demoApi(path, options = {}) {
     return Promise.resolve({ ok: true })
   }
 
+  // The battle tracker keeps its fight in memory for the demo (nothing is saved to a server).
+  if (segments[0] === 'battle' && segments.length === 2) {
+    if (method === 'GET') return Promise.resolve({ state: copy(demoBattleState) })
+    if (method === 'PUT') { demoBattleState = copy(body.state ?? null); return Promise.resolve({ ok: true }) }
+  }
+
   return notFound(path, method)
 }
 
 export function resetDemoApi() {
+  demoBattleState = null
   sceneCards = demoSceneCards.map(card => ({ ...card }))
   journalEntries = demoJournalEntries.map(entry => ({ ...entry }))
   loreEntries = demoLore.map(entry => ({ ...entry }))

@@ -6,6 +6,8 @@ import { auto as autoQuality } from '@cloudinary/url-gen/qualifiers/quality'
 import { auto as autoFormat } from '@cloudinary/url-gen/qualifiers/format'
 import { useTheme } from '../context/ThemeContext'
 import { usePageMeta } from '../hooks/usePageMeta'
+import ShowcaseCarousel from '../components/ShowcaseCarousel'
+import SpinningDice from '../components/SpinningDice'
 import './PublicDemo.css'
 
 const signInIconUrl = 'https://res.cloudinary.com/crcbzpw6/image/upload/v1792051212/right-to-bracket-solid-full.svg'
@@ -30,12 +32,13 @@ const FEATURES = [
 
 // What the landing page says about each tool (real text for readers and for search); the demo links are real links.
 const ABOUT = [
-  { id: 'battle-map', title: 'Battle Map', text: 'Build a map from themed tiles, drop in tokens for your party and monsters, and use fog of war to reveal the dungeon as your players explore.' },
-  { id: 'battle-tracker', title: 'Battle Tracker', text: 'Roll initiative for everyone, work out attacks against armour class and keep hit points straight. Search the SRD monster list to add enemies in a click.' },
-  { id: 'journal', title: 'Journal', text: 'Write session notes for each campaign and character, with the date written and last edit saved on every entry.' },
-  { id: 'storyboard', title: 'Storyboard', text: 'Lay out the scenes of your adventure as illustrated pages, then print them for the table.' },
-  { id: 'roleplay', title: 'Roleplay', text: 'Find your character’s voice with prompts drawn from their background and personality.' },
-  { title: 'Lore, characters and dice', text: 'Keep world and NPC lore, build character sheets and roll true 3D d4, d6, d8, d10, d12 and d20 dice.', to: '/register', cta: 'Create a free account' },
+  { id: 'battle-map', image: '/showcase/battle-map.jpg', alt: 'A dungeon room on the Battle Map lit by fog of war, with the party and an enemy token and the token panel on the right', title: 'Battle Map', text: 'Build a map from themed tiles, drop in tokens for your party and monsters, and use fog of war to reveal the dungeon as your players explore.' },
+  { id: 'battle-tracker', image: '/showcase/battle-tracker.jpg', alt: 'The Battle Tracker with a boss, an enemy and a player card in initiative order, each with hit points and attack buttons', title: 'Battle Tracker', text: 'Roll initiative for everyone, work out attacks against armour class and keep hit points straight. Search the SRD monster list to add enemies in a click.' },
+  { id: 'storyboard', image: '/showcase/storyboard.jpg', alt: 'A Storyboard page: an illustration of a party of adventurers beside the scene text', title: 'Storyboard', text: 'Lay out the scenes of your adventure as illustrated pages, then print them for the table.' },
+  { id: 'journal', image: '/showcase/journal.jpg', alt: 'A Journal entry with the list of days on the left and the session notes on the right', title: 'Journal', text: 'Write session notes for each campaign and character, with the date written and last edit saved on every entry.' },
+  { title: 'Campaign Guide', image: '/showcase/campaign-guide.jpg', alt: 'The Campaign Guide with story, current arc, session recap and world notes, and the world-building guide panel on the right', text: 'Keep your story, current arc, session recap and quests in one guide. The optional AI guide only asks questions to help you decide, so the world stays yours.', to: '/register', cta: 'Create a free account' },
+  { id: 'roleplay', image: '/showcase/roleplay.jpg', alt: 'The Roleplay Assistant with character basics and character depth fields filled in', title: 'Roleplay', text: 'Fill in your character’s background, personality and goals, and get a session plan that ties them to the story your DM is telling.' },
+  { title: 'Lore, characters and dice', visual: <SpinningDice />, text: 'Keep world and NPC lore, build character sheets and roll true 3D d4, d6, d8, d10, d12 and d20 dice.', to: '/register', cta: 'Create a free account' },
 ]
 
 function DemoSidebar({ active }) {
@@ -151,15 +154,7 @@ function DemoLanding() {
     <section className="demo-about" aria-labelledby="demo-about-title">
       <h2 id="demo-about-title">A campaign companion for players and Dungeon Masters</h2>
       <p className="demo-about-lead">5e Utility keeps everything for your Dungeons &amp; Dragons 5th Edition table in one place, so you spend less time hunting through notes and more time playing.</p>
-      <div className="demo-about-grid">
-        {ABOUT.map(item => (
-          <article key={item.title} className="demo-about-card">
-            <h3>{item.title}</h3>
-            <p>{item.text}</p>
-            <Link to={item.to || `/demo/${item.id}`}>{item.cta || `Try the ${item.title.toLowerCase()} demo`} <span aria-hidden="true">→</span></Link>
-          </article>
-        ))}
-      </div>
+      <ShowcaseCarousel slides={ABOUT} label="What 5e Utility does" />
     </section>
     </>
   )
