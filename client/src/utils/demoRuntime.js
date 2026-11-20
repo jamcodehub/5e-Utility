@@ -11,47 +11,48 @@ const GRID_HEIGHT = 22
 
 const makeGrid = value => Array.from({ length: GRID_HEIGHT }, () => Array(GRID_WIDTH).fill(value))
 
+// A ruined chapel: a pillared hall with a dais, a flooded corner, a treasure room, a bedroom and a camp outside.
 function makeSampleMap() {
-  const ground = makeGrid('empty')
+  const ground = makeGrid('grass')
   const objects = makeGrid(null)
   const stairLinks = makeGrid(null)
   const doorStates = makeGrid(false)
+  const fill = (r1, r2, c1, c2, tile) => { for (let r = r1; r <= r2; r++) for (let c = c1; c <= c2; c++) ground[r][c] = tile }
+  const put = (list, name) => list.forEach(([r, c]) => { objects[r][c] = name })
 
-  for (let row = 3; row <= 17; row++) {
-    for (let col = 5; col <= 25; col++) ground[row][col] = 'floor'
-  }
-  for (let col = 5; col <= 25; col++) {
-    ground[3][col] = 'wall'
-    ground[17][col] = 'wall'
-  }
-  for (let row = 3; row <= 17; row++) {
-    ground[row][5] = 'wall'
-    ground[row][25] = 'wall'
-  }
-  ground[10][5] = 'door'
-  doorStates[10][5] = true
-  for (let row = 4; row <= 10; row++) ground[row][15] = 'wood-wall'
-  ground[7][15] = 'door'
-  doorStates[7][15] = true
-  ground[8][8] = 'water'
-  ground[8][9] = 'water'
-  ground[9][8] = 'water'
-  ground[9][9] = 'water'
-  ground[7][20] = 'stairs'
-  ground[13][20] = 'stairs-down'
-  ground[10][10] = 'grass'
-  ground[10][11] = 'grass'
+  // the path up to the front door
+  fill(18, 21, 11, 13, 'rocky-dirt')
+  // the building: stone floor, a mossy entrance hall, wood-plank rooms and the dais
+  fill(3, 17, 6, 25, 'floor')
+  fill(14, 16, 7, 17, 'mossy-cobblestone')
+  fill(4, 6, 9, 15, 'wood-planks')
+  fill(11, 16, 19, 24, 'wood-planks')
+  fill(13, 15, 7, 10, 'water')
+  // walls and doors
+  fill(3, 3, 6, 25, 'wall'); fill(17, 17, 6, 25, 'wall'); fill(3, 17, 6, 6, 'wall'); fill(3, 17, 25, 25, 'wall')
+  fill(3, 17, 18, 18, 'wall'); fill(10, 10, 18, 25, 'wall')
+  ground[17][12] = 'door'; ground[10][18] = 'door'; ground[10][22] = 'door'
+  doorStates[17][12] = true; doorStates[10][18] = true; doorStates[10][22] = true
 
-  objects[5][8] = 'bookshelf'
-  objects[5][21] = 'bookshelf'
-  objects[7][11] = 'table'
-  objects[8][11] = 'chair'
-  objects[12][18] = 'treasure'
-  objects[14][8] = 'torch'
-  objects[14][22] = 'brazier'
-  objects[4][3] = 'tree'
-  objects[18][27] = 'tree'
-  objects[19][10] = 'rock-medium'
+  // main hall
+  put([[8, 9], [8, 15], [11, 9], [11, 15], [14, 15]], 'pillar')
+  put([[5, 12]], 'table'); put([[6, 11], [6, 13]], 'chair')
+  put([[4, 9], [4, 15]], 'brazier')
+  put([[4, 7], [16, 7], [4, 17], [16, 17]], 'torch')
+  put([[12, 7], [16, 13]], 'bones')
+  // treasure room
+  put([[6, 22]], 'treasure'); put([[5, 20]], 'open-chest'); put([[8, 23]], 'locked-chest')
+  put([[4, 19]], 'torch'); put([[6, 20]], 'magic-rune')
+  // bedroom and study
+  put([[11, 20], [11, 23]], 'bookshelf'); put([[13, 24]], 'bed'); put([[15, 20], [15, 21]], 'barrel')
+  put([[14, 22]], 'table'); put([[14, 21]], 'chair'); put([[16, 24]], 'cauldron')
+  // outside
+  put([[1, 3], [2, 9], [1, 15], [2, 20], [1, 28], [5, 2], [9, 1], [14, 2], [19, 3], [19, 29], [8, 29], [13, 28], [20, 22], [21, 8], [20, 17]], 'tree')
+  put([[4, 4], [18, 8], [18, 16], [11, 27], [3, 27], [16, 4]], 'bush')
+  put([[19, 10], [19, 14], [2, 12], [12, 3]], 'yellow-flowers')
+  put([[7, 28]], 'rock-small'); put([[17, 2]], 'rock-medium')
+  put([[19, 6]], 'well'); put([[18, 10]], 'signpost')
+  put([[19, 26]], 'tent'); put([[19, 24]], 'campfire'); put([[20, 27]], 'barrel'); put([[20, 15]], 'fallen-log')
 
   return JSON.stringify({ ground, objects, stairLinks, doorStates })
 }
@@ -117,8 +118,8 @@ const demoLore = [
 ]
 
 const DEMO_TOKENS = [
-  { id: 'char-demo-player', name: 'Avery Thornfield', row: 10, col: 10, color: 'var(--green)', hp: 22, maxHp: 28, type: 'player', lightSource: true },
-  { id: 'lore-demo-goblin', loreId: 'demo-goblin', name: 'Roadside Goblin', row: 9, col: 20, color: 'var(--red)', hp: 9, maxHp: 12, type: 'enemy' },
+  { id: 'char-demo-player', name: 'Avery Thornfield', row: 9, col: 12, color: 'var(--green)', hp: 22, maxHp: 28, type: 'player', lightSource: true },
+  { id: 'lore-demo-goblin', loreId: 'demo-goblin', name: 'Roadside Goblin', row: 7, col: 14, color: 'var(--red)', hp: 9, maxHp: 12, type: 'enemy' },
 ]
 
 let sceneCards = demoSceneCards.map(card => ({ ...card }))
