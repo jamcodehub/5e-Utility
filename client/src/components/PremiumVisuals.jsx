@@ -10,7 +10,7 @@ export function ThemeMontage() {
     <div className="theme-montage">
       {THEME_SHOTS.map(t => (
         <figure key={t.id}>
-          <img src={`/showcase/theme-${t.id}.jpg`} alt={`The 5e rules reference in the ${t.label} class theme`} loading="lazy" />
+          <img src={`/showcase/theme-${t.id}-v2.jpg`} alt={`The 5e rules reference in the ${t.label} class theme`} loading="lazy" />
           <figcaption>{t.label}</figcaption>
         </figure>
       ))}
