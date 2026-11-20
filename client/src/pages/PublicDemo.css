@@ -1095,3 +1095,15 @@
 @media (max-width: 819px) {
   .demo-app.is-landing .demo-hero-video { inset: 0; width: 100%; height: calc(100% - 64px); transform: translate(10%, 26%) scale(0.44); }
 }
+
+/* Landing: what the tools do, below the hero (real text for readers and for search) */
+.demo-about { width: 100%; max-width: 1040px; margin: 0 auto; padding: 72px clamp(20px, 5vw, 48px) 96px; color: var(--text); }
+.demo-about h2 { margin: 0 0 12px; font-family: var(--font-title); font-size: clamp(26px, 3.4vw, 36px); font-weight: 500; line-height: 1.2; text-align: center; }
+.demo-about-lead { max-width: 620px; margin: 0 auto 40px; color: var(--text-2); font-size: 16px; line-height: 1.7; text-align: center; }
+.demo-about-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(290px, 1fr)); gap: 16px; }
+.demo-about-card { display: flex; flex-direction: column; padding: 22px 24px; border: 1px solid var(--border); border-top: 3px solid var(--gold); border-radius: 4px; background: var(--surface); }
+.demo-about-card h3 { margin: 0 0 8px; font-family: var(--font-title); font-size: 21px; font-weight: 500; }
+.demo-about-card p { flex: 1; margin: 0 0 14px; color: var(--text-2); font-size: 15px; line-height: 1.65; }
+.demo-about-card a { align-self: flex-start; color: var(--gold); font-size: 14px; font-weight: 600; text-decoration: none; }
+.demo-about-card a:hover { text-decoration: underline; }
+.demo-app.is-landing .demo-main { background: var(--bg); }

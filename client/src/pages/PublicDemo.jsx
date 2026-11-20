@@ -28,6 +28,16 @@ const FEATURES = [
   { id: 'roleplay', label: 'Roleplay', iconUrl: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1791792735/comment-solid-full.svg', description: 'Find your character’s voice.' },
 ]
 
+// What the landing page says about each tool (real text for readers and for search); the demo links are real links.
+const ABOUT = [
+  { id: 'battle-map', title: 'Battle Map', text: 'Build a map from themed tiles, drop in tokens for your party and monsters, and use fog of war to reveal the dungeon as your players explore.' },
+  { id: 'battle-tracker', title: 'Battle Tracker', text: 'Roll initiative for everyone, work out attacks against armour class and keep hit points straight. Search the SRD monster list to add enemies in a click.' },
+  { id: 'journal', title: 'Journal', text: 'Write session notes for each campaign and character, with the date written and last edit saved on every entry.' },
+  { id: 'storyboard', title: 'Storyboard', text: 'Lay out the scenes of your adventure as illustrated pages, then print them for the table.' },
+  { id: 'roleplay', title: 'Roleplay', text: 'Find your character’s voice with prompts drawn from their background and personality.' },
+  { title: 'Lore, characters and dice', text: 'Keep world and NPC lore, build character sheets and roll true 3D d4, d6, d8, d10, d12 and d20 dice.', to: '/register', cta: 'Create a free account' },
+]
+
 function DemoSidebar({ active }) {
   return (
     <aside className="demo-sidebar">
@@ -112,6 +122,7 @@ function DemoLanding() {
   const speedVideo = event => { event.currentTarget.playbackRate = 0.7 }
 
   return (
+    <>
     <section className={`demo-hero${dark ? ' is-dark' : ''}`}>
       <div className="demo-hero-backdrop" aria-hidden="true">
         <video ref={videoRef} className="demo-hero-video" autoPlay muted loop playsInline preload="auto" aria-hidden="true" onLoadedMetadata={speedVideo} onPlay={speedVideo}>
@@ -137,6 +148,20 @@ function DemoLanding() {
         <Link to="/terms">Terms of Service</Link>
       </nav>
     </section>
+    <section className="demo-about" aria-labelledby="demo-about-title">
+      <h2 id="demo-about-title">A campaign companion for players and Dungeon Masters</h2>
+      <p className="demo-about-lead">5e Utility keeps everything for your Dungeons &amp; Dragons 5th Edition table in one place, so you spend less time hunting through notes and more time playing.</p>
+      <div className="demo-about-grid">
+        {ABOUT.map(item => (
+          <article key={item.title} className="demo-about-card">
+            <h3>{item.title}</h3>
+            <p>{item.text}</p>
+            <Link to={item.to || `/demo/${item.id}`}>{item.cta || `Try the ${item.title.toLowerCase()} demo`} <span aria-hidden="true">→</span></Link>
+          </article>
+        ))}
+      </div>
+    </section>
+    </>
   )
 }
 
