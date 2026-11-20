@@ -3,6 +3,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { Navigate } from 'react-router-dom'
 import UpgradeModal from '../components/UpgradeModal'
 import GuideAssistant from '../components/GuideAssistant'
+import { AI_ENABLED } from '../utils/features'
 import { api, useAuth } from '../context/AuthContext'
 import { useCampaign } from '../context/CampaignContext'
 import { useToast } from '../hooks/useToast'
@@ -289,7 +290,7 @@ export default function SessionPlanner() {
         </div>
       </div>
 
-      {activeCampaign && !activeCampaign.isPersonal && <GuideAssistant campaignId={activeCampaign._id} />}
+      {AI_ENABLED && activeCampaign && !activeCampaign.isPersonal && <GuideAssistant campaignId={activeCampaign._id} />}
 
       <ToastContainer />
       {showUpgrade && <UpgradeModal onClose={() => setShowUpgrade(false)} />}

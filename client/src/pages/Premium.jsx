@@ -2,6 +2,9 @@ import { useEffect, useState } from 'react'
 import { useSearchParams, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { api } from '../context/AuthContext'
+import { AI_ENABLED } from '../utils/features'
+
+const visible = f => AI_ENABLED || !/storyboard generation/i.test(f)
 
 const FEATURES = {
   dm: {
@@ -107,7 +110,7 @@ export default function Premium() {
             <span style={{ background: 'var(--gold)', color: '#fff', fontSize: 10, padding: '2px 8px', borderRadius: 20, fontWeight: 600 }}>✦ PRO</span>
           </div>
           <div style={{ fontSize: 28, fontWeight: 600, marginBottom: 20, color: 'var(--gold)' }}>${tier.price} <span style={{ fontSize: 13, fontWeight: 400, color: 'var(--text-2)' }}>/month</span></div>
-          {tier.premium.map(f => (
+          {tier.premium.filter(visible).map(f => (
             <div key={f} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10, fontSize: 13, color: 'var(--text)' }}>
               <span style={{ color: 'var(--gold)' }}>✦</span> {f}
             </div>
@@ -132,7 +135,7 @@ export default function Premium() {
         <div className="card" style={{ padding: 24 }}>
           <div style={{ fontFamily: 'var(--font-title)', fontSize: 16, marginBottom: 4 }}>{isDM ? 'Standard DM Toolkit' : 'Free'}</div>
           <div style={{ fontSize: 28, fontWeight: 600, marginBottom: 20 }}>$0 <span style={{ fontSize: 13, fontWeight: 400, color: 'var(--text-2)' }}>/month</span></div>
-          {tier.free.map(f => (
+          {tier.free.filter(visible).map(f => (
             <div key={f} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10, fontSize: 13, color: 'var(--text-2)' }}>
               <span style={{ color: 'var(--green)' }}>✓</span> {f}
             </div>

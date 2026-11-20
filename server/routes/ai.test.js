@@ -9,7 +9,7 @@ test('AI routes are DM-only, keep the coach prompt, and only fetch Cloudinary av
   const patched = []
   const stub = (target, name, fn) => { patched.push([target, name, target[name]]); target[name] = fn }
   const env = { secret: process.env.JWT_SECRET, key: process.env.GEMINI_API_KEY }
-  process.env.JWT_SECRET = 'test-secret'; process.env.GEMINI_API_KEY = 'test-key'
+  process.env.JWT_SECRET = 'test-secret'; process.env.GEMINI_API_KEY = 'test-key'; process.env.AI_ENABLED = 'true'
   const dm = '507f1f77bcf86cd799439011', player = '507f1f77bcf86cd799439012', freeDm = '507f1f77bcf86cd799439013', campaignId = '507f1f77bcf86cd799439014'
   stub(User, 'findById', id => ({ select: async () => ({ role: id === player ? 'player' : 'dm', roles: [], isPremium: id === dm }) }))
   stub(Campaign, 'findOne', query => ({ select: async () => ((query.owner === dm || query.owner === freeDm) ? { _id: campaignId, name: 'Realm', setting: 'Salt marsh' } : null) }))
