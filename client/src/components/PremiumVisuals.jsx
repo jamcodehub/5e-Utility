@@ -26,6 +26,7 @@ const ROWS = [
   ['Campaigns (players)', '1 campaign', 'Unlimited'],
   ['Journal entries', '15 entries', 'Unlimited'],
   ['Themes', 'Light and Dark', 'Every class theme'],
+  ['AI world-building guide', 'Coming soon', 'Coming soon'],
 ]
 
 export function PlanTable() {

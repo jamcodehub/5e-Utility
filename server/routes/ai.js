@@ -7,7 +7,7 @@ import { auth } from './campaigns.js'
 const router = Router()
 
 // The AI features are switched off until they work reliably. Set AI_ENABLED=true on the server to turn them back on.
-router.use((_req, res, next) => (process.env.AI_ENABLED === 'true' ? next() : res.status(503).json({ error: 'The AI features are switched off for now.' })))
+router.use((_req, res, next) => (process.env.AI_ENABLED === 'true' ? next() : res.status(503).json({ error: 'The AI features are coming soon.' })))
 
 // Gemini retires model names often, so the usable models are discovered from Google's own
 // model list (cached for an hour) and the newest "flash" ones are tried first.

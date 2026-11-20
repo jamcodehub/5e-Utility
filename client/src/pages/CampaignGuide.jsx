@@ -1,5 +1,4 @@
 import GuideAssistant from '../components/GuideAssistant'
-import { AI_ENABLED } from '../utils/features'
 import { useDebouncedSave } from '../hooks/useDebouncedSave'
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { api, useAuth } from '../context/AuthContext'
@@ -448,7 +447,7 @@ export default function CampaignGuide() {
       {charModal && <CharModal player={charModal} onClose={() => setCharModal(null)} />}
       <ToastContainer />
     </div>
-    {AI_ENABLED && <GuideAssistant campaignId={activeCampaign._id} />}
+    <GuideAssistant campaignId={activeCampaign._id} />
     </div>
   )
 }
