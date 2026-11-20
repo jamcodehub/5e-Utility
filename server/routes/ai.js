@@ -31,8 +31,11 @@ const newestFirst = (names) => [...names].sort((a, b) => version(b) - version(a)
 // try the newest stable "flash" model first: Google retires old names for new keys (gemini-2.5-flash now answers 404),
 // so a fixed name cannot be relied on. The fixed names stay as later fallbacks.
 const textModels = async (key) => {
-  const found = (await discoverModels(key)).filter(n => /flash/.test(n) && !/image|tts|live|audio|embed|thinking|exp|lite|latest|preview/.test(n))
-  return [process.env.GEMINI_MODEL, ...newestFirst(found).slice(0, 2), 'gemini-flash-latest', 'gemini-2.5-flash'].filter(Boolean)
+  const all = await discoverModels(key)
+  const bad = /image|tts|live|audio|embed|thinking|exp|latest|preview/
+  const flash = all.filter(n => /flash/.test(n) && !/lite/.test(n) && !bad.test(n))
+  const lite = all.filter(n => /flash-lite/.test(n) && !bad.test(n))
+  return [process.env.GEMINI_MODEL, ...newestFirst(flash).slice(0, 2), ...newestFirst(lite).slice(0, 1), 'gemini-flash-latest', 'gemini-2.5-flash'].filter(Boolean)
 }
 const imageModels = async (key) => {
   const found = (await discoverModels(key)).filter(n => /image/.test(n) && !/tts|live|audio|embed/.test(n))
@@ -42,48 +45,89 @@ const imageModels = async (key) => {
 // `pickModels` is a function (key) => model names, or a plain list.
 // Every failed attempt is recorded with its real reason (timeout, network error code, HTTP status and Google's message)
 // and the final error lists them, so "it doesn't work" always says why. The API key is never included.
-const callGemini = async (pickModels, body, { textOnly = false } = {}) => {
-  const key = (process.env.GEMINI_API_KEY || '').trim()
-  if (!key) throw Object.assign(new Error('The AI features are not configured on this server (GEMINI_API_KEY is missing).'), { status: 503 })
-  const models = typeof pickModels === 'function' ? await pickModels(key) : pickModels
-  const timeoutMs = textOnly ? 18000 : 25000
-  const attempts = []
-  let lastStatus = 0
-  const deadline = Date.now() + 30000 // finish well inside the browser's wait so the DM sees a real error, not a timeout
-  for (const model of [...new Set(models)]) {
-    if (Date.now() > deadline) break
-    const started = Date.now()
-    let res
-    try {
-      res = await fetch(`${GEMINI}/${model}:generateContent`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key },
-        body: JSON.stringify(typeof body === 'function' ? body(model) : body),
-        signal: AbortSignal.timeout(timeoutMs),
-      })
-    } catch (e) {
-      const timedOut = e.name === 'TimeoutError' || e.name === 'AbortError'
-      const reason = timedOut ? `no answer within ${timeoutMs / 1000}s` : `could not reach Google (${e.cause?.code || e.code || e.message})`
-      console.error(`Gemini ${model} request error after ${Date.now() - started}ms:`, e.name, e.message, e.cause?.code || '')
-      attempts.push(`${model}: ${reason}`)
-      lastStatus = timedOut ? 504 : 502
-      continue
-    }
-    const data = await res.json().catch(() => ({}))
-    if (res.ok) return data
-    const detail = String(data?.error?.message || `HTTP ${res.status}`).slice(0, 220)
-    console.error(`Gemini ${model} failed (${res.status}) after ${Date.now() - started}ms: ${detail}`)
-    attempts.push(`${model}: HTTP ${res.status} ${detail}`)
-    lastStatus = res.status
-    // 429 is per model (and image models often have no free quota at all), so other models are still worth a try.
-    if (![404, 429, 500, 503, 504].includes(res.status)) break
+//
+// Text replies are "hedged": the first model is asked at once, and if it has not answered after HEDGE_MS the next
+// model is asked as well (and so on); whichever answers first wins and the rest are cancelled. A slow or overloaded
+// model therefore costs a few seconds, not the whole wait. Image requests stay one model at a time.
+const HEDGE_MS = Number(process.env.AI_HEDGE_MS) || 6000
+const TEXT_TOTAL_MS = Number(process.env.AI_TEXT_TOTAL_MS) || 26000
+
+const tryModel = async (key, model, body, signal) => {
+  const started = Date.now()
+  let res
+  try {
+    res = await fetch(`${GEMINI}/${model}:generateContent`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key },
+      body: JSON.stringify(typeof body === 'function' ? body(model) : body),
+      signal,
+    })
+  } catch (e) {
+    if (signal.reason?.name === 'CancelledByWinner') return { cancelled: true }
+    const timedOut = e.name === 'TimeoutError' || e.name === 'AbortError'
+    console.error(`Gemini ${model} request error after ${Date.now() - started}ms:`, e.name, e.message, e.cause?.code || '')
+    return { note: `${model}: ${timedOut ? `no answer within ${Math.round((Date.now() - started) / 1000)}s` : `could not reach Google (${e.cause?.code || e.code || e.message})`}`, status: timedOut ? 504 : 502 }
   }
+  const data = await res.json().catch(() => ({}))
+  if (res.ok) return { data }
+  const detail = String(data?.error?.message || `HTTP ${res.status}`).slice(0, 220)
+  console.error(`Gemini ${model} failed (${res.status}) after ${Date.now() - started}ms: ${detail}`)
+  return { note: `${model}: HTTP ${res.status} ${detail}`, status: res.status }
+}
+
+const failure = (attempts, lastStatus) => {
   const summary = attempts.join(' | ')
   const message = lastStatus === 429 ? `Google's AI quota is used up or not available on this key. ${summary}`
     : lastStatus === 504 ? `Google's AI did not answer in time. ${summary}`
     : `The AI service could not answer. ${summary}`
-  throw Object.assign(new Error(message), { status: lastStatus === 429 ? 429 : 502, attempts })
+  return Object.assign(new Error(message), { status: lastStatus === 429 ? 429 : 502, attempts })
 }
+
+const callGemini = async (pickModels, body, { textOnly = false } = {}) => {
+  const key = (process.env.GEMINI_API_KEY || '').trim()
+  if (!key) throw Object.assign(new Error('The AI features are not configured on this server (GEMINI_API_KEY is missing).'), { status: 503 })
+  const models = [...new Set(typeof pickModels === 'function' ? await pickModels(key) : pickModels)]
+  const attempts = []
+  let lastStatus = 0
+
+  if (textOnly) {
+    return new Promise((resolve, reject) => {
+      const controllers = []
+      const timers = []
+      let started = 0, finished = 0, settled = false
+      const stop = () => { settled = true; timers.forEach(clearTimeout); controllers.forEach(c => c.abort(Object.assign(new Error('cancelled'), { name: 'CancelledByWinner' }))) }
+      const startNext = () => {
+        if (settled || started >= models.length) return
+        const model = models[started++]
+        const ctl = new AbortController(); controllers.push(ctl)
+        const signal = AbortSignal.any([ctl.signal, AbortSignal.timeout(TEXT_TOTAL_MS)])
+        if (started < models.length) timers.push(setTimeout(startNext, HEDGE_MS))
+        tryModel(key, model, body, signal).then(r => {
+          if (settled || r.cancelled) return
+          if (r.data) { stop(); return resolve(r.data) }
+          attempts.push(r.note); lastStatus = r.status; finished++
+          if (finished >= models.length) { stop(); return reject(failure(attempts, lastStatus)) }
+          startNext() // this model failed outright, so bring in the next one now instead of waiting
+        })
+      }
+      startNext()
+    })
+  }
+
+  const timeoutMs = 25000
+  const deadline = Date.now() + 30000 // finish well inside the browser's wait so the DM sees a real error, not a timeout
+  for (const model of models) {
+    if (Date.now() > deadline) break
+    const r = await tryModel(key, model, body, AbortSignal.timeout(timeoutMs))
+    if (r.data) return r.data
+    attempts.push(r.note); lastStatus = r.status
+    // 429 is per model (and image models often have no free quota at all), so other models are still worth a try.
+    if (![404, 429, 500, 502, 503, 504].includes(r.status)) break
+  }
+  throw failure(attempts, lastStatus)
+}
+
+export { callGemini as callGeminiForTests }
 
 const makeLimiter = (windowMs, max, message) => rateLimit({
   windowMs, max, standardHeaders: true, legacyHeaders: false,
