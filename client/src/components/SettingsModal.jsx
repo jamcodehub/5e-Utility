@@ -116,42 +116,36 @@ export default function SettingsModal({ onClose }) {
           <button type="button" onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--text-3)', fontSize: 20, cursor: 'pointer', lineHeight: 1 }}>✕</button>
         </div>
 
-        {/* Profile photo (also reachable by clicking the circle in the sidebar) */}
-        <div style={{ marginBottom: 24, display: 'flex', alignItems: 'center', gap: 14 }}>
+        {/* Profile photo (also reachable by clicking the circle in the sidebar) with the username beside it. Usernames must be unique, whatever the capitalisation. */}
+        <div style={{ marginBottom: 24, display: 'flex', alignItems: 'flex-start', gap: 14 }}>
           <ProfileAvatar size={56} fontSize={22} />
-          <div style={{ minWidth: 0 }}>
-            <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-2)', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 4 }}>Profile photo</div>
-            <div style={{ fontSize: 12, color: 'var(--text-3)' }}>Tap the circle to choose a photo.</div>
-            {user?.avatar && (
-              <button type="button" className="btn btn-ghost btn-sm" style={{ marginTop: 6 }} onClick={async () => { try { await api('/auth/avatar', { method: 'PUT', body: { avatar: '' } }); await refreshUser() } catch { /* ignore */ } }}>Remove photo</button>
-            )}
-          </div>
+          <form style={{ flex: 1, minWidth: 0 }} onSubmit={async (e) => {
+            e.preventDefault()
+            const next = nameInput.trim()
+            if (!next || next === user?.username) { setNameInput(''); return }
+            setNameWorking(true); setNameMsg(null)
+            try {
+              await api('/auth/username', { method: 'PUT', body: { username: next } })
+              await refreshUser()
+              setNameInput('')
+              setNameMsg({ ok: true, text: 'Username changed.' })
+            } catch (err) { setNameMsg({ ok: false, text: err?.message || 'Could not change the username.' }) }
+            finally { setNameWorking(false) }
+          }}>
+            <label htmlFor="settings-username" style={{ display: 'block', fontSize: 12, fontWeight: 600, color: 'var(--text-2)', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 6 }}>Username</label>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <input id="settings-username" className="input" style={{ flex: 1, minWidth: 0 }} value={nameInput} maxLength={24} autoComplete="off"
+                placeholder={user?.username || 'Username'} onChange={e => { setNameInput(e.target.value); setNameMsg(null) }} />
+              <button type="submit" className="btn btn-sm" disabled={nameWorking || !nameInput.trim() || nameInput.trim() === user?.username}>{nameWorking ? 'Saving…' : 'Change'}</button>
+            </div>
+            <div style={{ fontSize: 12, marginTop: 6, color: nameMsg ? (nameMsg.ok ? 'var(--green)' : 'var(--red)') : 'var(--text-3)' }} role="status">
+              {nameMsg ? nameMsg.text : 'Tap the circle to change your photo.'}
+              {!nameMsg && user?.avatar && (
+                <> <button type="button" onClick={async () => { try { await api('/auth/avatar', { method: 'PUT', body: { avatar: '' } }); await refreshUser() } catch { /* ignore */ } }} style={{ background: 'none', border: 'none', padding: 0, color: 'var(--gold)', cursor: 'pointer', fontSize: 12 }}>Remove photo</button></>
+              )}
+            </div>
+          </form>
         </div>
-
-        {/* Username (must be unique, whatever the capitalisation) */}
-        <form style={{ marginBottom: 24 }} onSubmit={async (e) => {
-          e.preventDefault()
-          const next = nameInput.trim()
-          if (!next || next === user?.username) { setNameInput(''); return }
-          setNameWorking(true); setNameMsg(null)
-          try {
-            await api('/auth/username', { method: 'PUT', body: { username: next } })
-            await refreshUser()
-            setNameInput('')
-            setNameMsg({ ok: true, text: 'Username changed.' })
-          } catch (err) { setNameMsg({ ok: false, text: err?.message || 'Could not change the username.' }) }
-          finally { setNameWorking(false) }
-        }}>
-          <label htmlFor="settings-username" style={{ display: 'block', fontSize: 12, fontWeight: 600, color: 'var(--text-2)', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 6 }}>Username</label>
-          <div style={{ display: 'flex', gap: 8 }}>
-            <input id="settings-username" className="input" style={{ flex: 1, minWidth: 0 }} value={nameInput} maxLength={24} autoComplete="off"
-              placeholder={user?.username || 'Username'} onChange={e => { setNameInput(e.target.value); setNameMsg(null) }} />
-            <button type="submit" className="btn btn-sm" disabled={nameWorking || !nameInput.trim() || nameInput.trim() === user?.username}>{nameWorking ? 'Saving…' : 'Change'}</button>
-          </div>
-          <div style={{ fontSize: 12, marginTop: 6, color: nameMsg ? (nameMsg.ok ? 'var(--green)' : 'var(--red)') : 'var(--text-3)' }} role="status">
-            {nameMsg ? nameMsg.text : 'Your current name is shown in the box. 3 to 24 characters, and nobody else can use the same name.'}
-          </div>
-        </form>
 
         {/* Theme */}
         <div style={{ marginBottom: 24 }}>
@@ -185,7 +179,7 @@ export default function SettingsModal({ onClose }) {
         {/* Player / DM mode */}
         <div style={{ marginBottom: 24 }}>
           <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-2)', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 10 }}>Mode</div>
-          <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
+          <div style={{ display: 'flex', gap: 6 }}>
             {[{ v: 'player', label: 'Player' }, { v: 'dm', label: 'Dungeon Master' }].map(opt => {
               const active = user?.role === opt.v
               return (
@@ -197,10 +191,6 @@ export default function SettingsModal({ onClose }) {
                 }}>{opt.label}</button>
               )
             })}
-          </div>
-          <div style={{ fontSize: 11, color: 'var(--text-3)', lineHeight: 1.5 }}>
-            {user?.roles?.length > 1 ? 'Your account is both a player and a DM. ' : ''}
-            Switching changes your tools and shows the campaigns you {user?.role === 'dm' ? 'joined as a player' : 'run as a DM'}. Nothing is deleted.
           </div>
           {roleError && <div style={{ fontSize: 12, color: 'var(--red)', marginTop: 8 }}>{roleError}</div>}
         </div>
@@ -232,8 +222,8 @@ export default function SettingsModal({ onClose }) {
           }
         </div>
 
-        {/* Only shown to accounts that still need to verify; verified accounts have nothing to manage. */}
-        {!(verifiedWithGoogle || verifiedWithEmail) && (
+        {/* Only shown to accounts that still need to verify and only when Google verification is available, so it is never an empty heading. */}
+        {!(verifiedWithGoogle || verifiedWithEmail) && (googleAvailable || channelOpen || twoFAError) && (
         <div style={{ marginTop: 24, paddingTop: 24, borderTop: '1px solid var(--border)' }}>
           <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-2)', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 12 }}>Security</div>
             <>
