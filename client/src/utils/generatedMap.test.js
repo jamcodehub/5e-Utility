@@ -50,6 +50,14 @@ test('unknown tiles, uneven rows and a missing objects layer are refused', () =>
   assert.match(readGeneratedMap(make({ content: JSON.stringify({ ground: grid(20, 14, 'floor'), objects: grid(20, 10, null) }) })).error, /objects/)
 })
 
+test('ground heights are checked when a map has them', () => {
+  const withHeights = (heights) => make({ content: JSON.stringify({ ground: grid(20, 14, 'floor'), objects: grid(20, 14, null), heights }) })
+  assert.equal(readGeneratedMap(withHeights(grid(20, 14, 3))).error, undefined)
+  for (const bad of [grid(20, 13, 3), grid(19, 14, 3), grid(20, 14, 16), grid(20, 14, -1), grid(20, 14, 1.5), grid(20, 14, '3'), 'tall', {}]) {
+    assert.match(readGeneratedMap(withHeights(bad)).error, /heights/, `should refuse ${JSON.stringify(bad).slice(0, 30)}`)
+  }
+})
+
 test('every tile the Godot generator can make is one the battle map knows', () => {
   const ground = ['floor', 'wall', 'wood-wall', 'door', 'water', 'grass', 'trap', 'stairs', 'stairs-down', 'sand', 'rocky-dirt', 'lava', 'snow', 'mossy-cobblestone', 'wood-planks', 'chest', 'empty']
   const objects = ['torch', 'campfire', 'brazier', 'magic-rune', 'cauldron', 'blue-crystal', 'tree', 'bush', 'yellow-flowers', 'thorny-brambles', 'rock-small', 'rock-medium', 'rock-large', 'table', 'chair', 'bridge', 'treasure', 'well', 'signpost', 'open-chest', 'locked-chest', 'tent', 'bookshelf', 'bed', 'barrel', 'bones', 'mushrooms', 'fallen-log', 'pillar', 'wooden-crate', 'gravestone']

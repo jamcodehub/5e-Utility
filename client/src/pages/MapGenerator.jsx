@@ -6,6 +6,7 @@ import { useToast } from '../hooks/useToast'
 import { TILES } from '../data/levelTiles'
 import { MESSAGE_TYPE, readGeneratedMap } from '../utils/generatedMap'
 import { GAME_URL } from '../utils/godotGame'
+import { heightShadeAlpha } from '../utils/mapHeights'
 
 const GROUND_COLOR = Object.fromEntries(TILES.map(t => [t.id, t.color]))
 
@@ -33,6 +34,11 @@ function MapPreview({ content }) {
         const color = GROUND_COLOR[id]
         ctx.fillStyle = color && color !== 'transparent' ? color : '#888888'
         ctx.fillRect(x * cell, y * cell, cell, cell)
+        if (data.heights) {
+          const a = heightShadeAlpha(data.heights, y, x)
+          ctx.fillStyle = a > 0 ? `rgba(255,255,255,${a})` : `rgba(0,0,0,${-a})`
+          ctx.fillRect(x * cell, y * cell, cell, cell)
+        }
         if (data.objects[y][x]) {
           ctx.fillStyle = 'rgba(255,255,255,0.55)'
           ctx.fillRect(x * cell + cell * 0.3, y * cell + cell * 0.3, cell * 0.4, cell * 0.4)

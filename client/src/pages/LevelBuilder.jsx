@@ -15,6 +15,7 @@ import { avatarSrc } from '../components/ProfileAvatar'
 import { tokenColor } from '../utils/tokenColor'
 import { keyToStep, stepToken, isTypingTarget, bumpedDoor } from '../utils/tokenMove'
 import { classIdFor, viewerLevels } from '../utils/viewer3d'
+import { readHeights, heightShade } from '../utils/mapHeights'
 import Battle3DView from '../components/Battle3DView'
 // Note: module-level TILES / OBJECT_TILES above are the base (Medieval) set, used for
 // logic that doesn't depend on artwork. MapThumb and LevelBuilder shadow them with the
@@ -63,6 +64,7 @@ function parseMapContent(content) {
         ground: normalizeGrid(parsed.ground, 'empty', dims),
         objects: normalizeGrid(parsed.objects, null, dims),
         stairLinks: normalizeGrid(parsed.stairLinks, null, dims),
+        heights: readHeights(parsed.heights, dims.h, dims.w), // ground height (mountains, dunes...), or null for a flat map
         dims,
       }
     }
@@ -337,6 +339,7 @@ export default function LevelBuilder() {
   const [tokens, setTokens] = useState([]) // { id, name, avatar, color, row, col, hp, maxHp }
   const [darkMode, setDarkMode] = useState(false)
   const [doorStates, setDoorStates] = useState(blankDoorStates())
+  const [heights, setHeights] = useState(null) // ground height per square for maps that have it (see utils/mapHeights.js)
   const [doorLocks, setDoorLocks] = useState(blankDoorStates()) // locked doors: only the DM can unlock them (see server/lib/doors.js)
   const [knocks, setKnocks] = useState([]) // DM only: players trying a locked door, waiting for an answer
   const [doorMenu, setDoorMenu] = useState(null) // DM only: the door they clicked, { row, col }
@@ -632,6 +635,7 @@ export default function LevelBuilder() {
       setDarkMode(Boolean(destination.darkMode))
       setDoorStates(normalizeDoorStates(destination.doorStates, parsed.dims))
       setDoorLocks(normalizeDoorStates(destination.doorLocks, parsed.dims))
+      setHeights(parsed.heights)
       setKnocks([])
     }
     const onDoorState = ({ row, col, open } = {}) => {
@@ -731,6 +735,7 @@ export default function LevelBuilder() {
       setGrid(parsed.ground)
       setObjectGrid(parsed.objects)
       setStairLinks(parsed.stairLinks)
+      setHeights(parsed.heights)
       setDoorStates(normalizeDoorStates(plan.doorStates, parsed.dims))
     } else {
       setEditPlanId(null)
@@ -741,6 +746,7 @@ export default function LevelBuilder() {
       setObjectGrid(blankObjectGrid(w, h))
       setStairLinks(blankStairLinks(w, h))
       setDoorStates(blankDoorStates(w, h))
+      setHeights(null)
     }
     setEditTheme(resolveThemeId(plan?.theme))
     setEditLayer('ground')
@@ -759,6 +765,7 @@ export default function LevelBuilder() {
     setDarkMode(Boolean(plan.darkMode))
     setDoorStates(normalizeDoorStates(plan.doorStates, parsed.dims))
     setDoorLocks(normalizeDoorStates(plan.doorLocks, parsed.dims))
+    setHeights(parsed.heights)
     setTokens(Array.isArray(plan.tokens) ? plan.tokens : [])
     setMode('play')
     if (isDm && activeCampaign && !activeCampaign.isPersonal) {
@@ -800,7 +807,7 @@ export default function LevelBuilder() {
     try {
       const body = {
         title,
-        content: JSON.stringify({ ground: grid, objects: objectGrid, stairLinks }),
+        content: JSON.stringify({ ground: grid, objects: objectGrid, stairLinks, ...(heights ? { heights } : {}) }),
         doorStates,
         theme: editTheme,
       }
@@ -825,7 +832,7 @@ export default function LevelBuilder() {
     if (mapBaseline.current.id !== editPlanId) { mapBaseline.current = { id: editPlanId, snap }; return }
     if (mapBaseline.current.snap === snap) return
     const id = editPlanId, title = editTitle.trim()
-    const body = { content: JSON.stringify({ ground: grid, objects: objectGrid, stairLinks }), doorStates, theme: editTheme, ...(title ? { title } : {}) }
+    const body = { content: JSON.stringify({ ground: grid, objects: objectGrid, stairLinks, ...(heights ? { heights } : {}) }), doorStates, theme: editTheme, ...(title ? { title } : {}) }
     scheduleMapSave(async () => {
       try {
         const plan = await api(`/levels/${id}`, { method: 'PUT', body })
@@ -1544,6 +1551,7 @@ export default function LevelBuilder() {
                   {groundTile?.iconUrl && visible && !(isDoor && doorOpen) && (
                     <TileIconPlaceholder tile={groundTile} style={{ position: 'absolute', inset: '21%', width: '58%', height: '58%', filter: darkvision ? 'brightness(0.35)' : undefined }} />
                   )}
+                  {heights && visible && <div aria-hidden="true" style={{ position: 'absolute', inset: 0, pointerEvents: 'none', ...heightShade(heights, r, c) }} />}
                   {object && visible && (
                     <TileIconPlaceholder tile={object} style={{ position: 'absolute', zIndex: 1, filter: darkvision ? 'brightness(0.35)' : undefined }} />
                   )}
@@ -1588,7 +1596,7 @@ export default function LevelBuilder() {
           )}
           {view3d && (
             <Battle3DView
-              ground={grid} objects={objectGrid} doorStates={doorStates} doorLocks={doorLocks} theme={themeId}
+              ground={grid} objects={objectGrid} heights={heights} doorStates={doorStates} doorLocks={doorLocks} theme={themeId}
               tokens={tokens} levels={viewerLevelList} darkMode={darkMode}
               focusId={isDm ? (tapToPlaceTokenId || '') : `char-${user?.id}`} classOf={classOfToken}
               onClick={handleViewerClick} onKey={key => walkRef.current(key)}

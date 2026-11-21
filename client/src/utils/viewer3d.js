@@ -44,7 +44,7 @@ export function viewerLevels({ darkMode, isDm, visibility, rows, cols }) {
   return levels
 }
 
-export function buildMapMessage({ ground, objects, doorStates, doorLocks, theme }) {
+export function buildMapMessage({ ground, objects, doorStates, doorLocks, heights, theme }) {
   return {
     type: VIEWER_MAP,
     map: {
@@ -52,6 +52,7 @@ export function buildMapMessage({ ground, objects, doorStates, doorLocks, theme 
       objects: (objects || []).map(row => (row || []).map(id => id || null)),
       doorStates: (doorStates || []).map(row => (row || []).map(Boolean)),
       doorLocks: (doorLocks || []).map(row => (row || []).map(Boolean)),
+      heights: heights || null, // ground height per square (mountains, dunes...), or null for flat ground
       theme: theme || 'medieval',
     },
   }
