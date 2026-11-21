@@ -16,6 +16,7 @@ import { tokenColor } from '../utils/tokenColor'
 import { keyToStep, stepToken, isTypingTarget, bumpedDoor } from '../utils/tokenMove'
 import { classIdFor, viewerLevels } from '../utils/viewer3d'
 import { readHeights, heightShade } from '../utils/mapHeights'
+import { emptyHistory, endStroke as endHistoryStroke, undo as undoHistory, redo as redoHistory, pushSnapshot } from '../utils/editHistory'
 import { rotationOf, nextRotation, rotationLabel, readRotations, compactRotations, withRotation } from '../utils/tileRotation'
 import Battle3DView from '../components/Battle3DView'
 // Note: module-level TILES / OBJECT_TILES above are the base (Medieval) set, used for
@@ -794,6 +795,8 @@ export default function LevelBuilder() {
   // ── Gallery actions ──
   const openEditor = (plan = null, size = null) => {
     if (!isDm) return
+    setHistory(emptyHistory())
+    strokeRef.current = null
     if (plan) {
       setEditPlanId(plan._id)
       setEditTitle(plan.title)
@@ -928,18 +931,67 @@ export default function LevelBuilder() {
     ...(compactRotations(objectRotations) ? { objectRotations } : {}),
   })
 
-  // R turns the tiles you are about to place.
+  // ── Undo and redo ──
+  // One click, or one click-and-drag, is one step. Ctrl/Cmd+Z takes the last one back, Ctrl/Cmd+Shift+Z (or Ctrl+Y) puts it back.
+  const [history, setHistory] = useState(emptyHistory)
+  const historyRef = useRef(history)
+  historyRef.current = history
+  const latestMap = useRef(null)
+  latestMap.current = { grid, objectGrid, stairLinks, doorStates, rotations, objectRotations }
+  const strokeRef = useRef(null) // the map as it was when the current stroke began
+  const beginStroke = () => { if (!strokeRef.current) strokeRef.current = latestMap.current }
+  const finishStroke = useCallback(() => {
+    const before = strokeRef.current
+    strokeRef.current = null
+    if (before) setHistory(current => endHistoryStroke(current, before, latestMap.current))
+  }, [])
+  // A one-off change (linking stairs) is its own step
+  const recordStep = () => setHistory(current => ({ undo: pushSnapshot(current.undo, latestMap.current), redo: [] }))
+  const applySnapshot = (snapshot) => {
+    setGrid(snapshot.grid)
+    setObjectGrid(snapshot.objectGrid)
+    setStairLinks(snapshot.stairLinks)
+    setDoorStates(snapshot.doorStates)
+    setRotations(snapshot.rotations)
+    setObjectRotations(snapshot.objectRotations)
+  }
+  const stepHistory = (step) => {
+    if (strokeRef.current) return // still drawing
+    const result = step(historyRef.current, latestMap.current)
+    if (!result) return
+    setHistory(result.history)
+    applySnapshot(result.restore)
+  }
+  const runUndo = () => stepHistory(undoHistory)
+  const runRedo = () => stepHistory(redoHistory)
+  const historyActionsRef = useRef({})
+  historyActionsRef.current = { runUndo, runRedo }
+
+  // Keys in the editor: R turns the tiles you are about to place; Ctrl/Cmd+Z and +Shift+Z undo and redo.
   useEffect(() => {
     if (mode !== 'editor') return undefined
     const onKeyDown = (e) => {
-      if ((e.key === 'r' || e.key === 'R') && !e.ctrlKey && !e.metaKey && !e.altKey && !isTypingTarget(e.target)) {
+      if (e.altKey || isTypingTarget(e.target)) return
+      const key = String(e.key).toLowerCase()
+      if ((e.ctrlKey || e.metaKey) && (key === 'z' || key === 'y')) {
+        e.preventDefault()
+        if (key === 'y' || e.shiftKey) historyActionsRef.current.runRedo()
+        else historyActionsRef.current.runUndo()
+        return
+      }
+      if (key === 'r' && !e.ctrlKey && !e.metaKey) {
         e.preventDefault()
         setPaintRotation(nextRotation)
       }
     }
+    // A drag that ends outside the map still ends the stroke
     window.addEventListener('keydown', onKeyDown)
-    return () => window.removeEventListener('keydown', onKeyDown)
-  }, [mode])
+    window.addEventListener('mouseup', finishStroke)
+    return () => {
+      window.removeEventListener('keydown', onKeyDown)
+      window.removeEventListener('mouseup', finishStroke)
+    }
+  }, [mode, finishStroke])
 
   const paint = (r, c) => {
     if (editLayer === 'objects') {
@@ -983,6 +1035,7 @@ export default function LevelBuilder() {
 
   const saveStairLink = () => {
     if (!pendingStair || !linkDestinationId) return
+    recordStep()
     setStairLinks(current => {
       const next = current.map(row => row.slice())
       next[pendingStair.row][pendingStair.col] = linkDestinationId
@@ -994,6 +1047,7 @@ export default function LevelBuilder() {
 
   const removeStairLink = () => {
     if (!pendingStair) return
+    recordStep()
     setStairLinks(current => {
       const next = current.map(row => row.slice())
       next[pendingStair.row][pendingStair.col] = null
@@ -1333,6 +1387,10 @@ export default function LevelBuilder() {
 
       <div className="lb-editor-workspace">
       <aside className="lb-editor-tools" aria-label="Map tile selection">
+        <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
+          <button type="button" className="btn btn-ghost btn-sm" onClick={runUndo} disabled={!history.undo.length} title="Undo the last click or drag (Ctrl or ⌘ + Z)" style={{ flex: 1, justifyContent: 'center' }}>↶ Undo</button>
+          <button type="button" className="btn btn-ghost btn-sm" onClick={runRedo} disabled={!history.redo.length} title="Put back what you undid (Ctrl or ⌘ + Shift + Z)" style={{ flex: 1, justifyContent: 'center' }}>↷ Redo</button>
+        </div>
         <button type="button" className="btn btn-ghost btn-sm" onClick={() => setPaintRotation(nextRotation)}
           title="Turn the tiles you place a quarter turn at a time (or press R). Auto turns natural floors such as grass and stone at random and leaves everything else as drawn."
           style={{ width: '100%', marginBottom: 8, justifyContent: 'center', gap: 6 }}>
@@ -1418,9 +1476,9 @@ export default function LevelBuilder() {
             const [r, c] = el.dataset.lbCell.split('-').map(Number)
             paint(r, c)
           }}
-          onTouchEnd={() => { lastTouchCell.current = null }}
-          onMouseUp={() => setPainting(false)}
-          onMouseLeave={() => setPainting(false)}
+          onTouchEnd={() => { lastTouchCell.current = null; finishStroke() }}
+          onMouseUp={() => { setPainting(false); finishStroke() }}
+          onMouseLeave={() => { setPainting(false); finishStroke() }}
           style={{
             display: 'grid',
             gridTemplateColumns: `repeat(${gridW}, 1fr)`,
@@ -1440,10 +1498,10 @@ export default function LevelBuilder() {
             const objectTurn = rotationOf(objectGrid[r]?.[c], objectRotations[r]?.[c], r, c) * 90
             return (
               <div key={`${r}-${c}`} className="lb-cell" data-lb-cell={`${r}-${c}`}
-                onMouseDown={() => { if (linkMode) return; setPainting(true); paint(r, c) }}
+                onMouseDown={() => { if (linkMode) return; beginStroke(); setPainting(true); paint(r, c) }}
                 onMouseEnter={() => { if (painting && !linkMode) paint(r, c) }}
                 onClick={() => handleEditorCellClick(r, c)}
-                onTouchStart={() => { if (!linkMode) paint(r, c) }}
+                onTouchStart={() => { if (!linkMode) { beginStroke(); paint(r, c) } }}
                 style={{ background: t.color === 'transparent' ? '#f5f4f1' : t.color, display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative' }}
               >
                 {t.imageUrl && <TileIconPlaceholder tile={t} rotate={turn} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />}
