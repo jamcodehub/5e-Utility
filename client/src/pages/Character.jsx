@@ -9,6 +9,7 @@ import CustomCharacterBuilder from '../components/CustomCharacterBuilder'
 import CharacterActions from '../components/CharacterActions'
 import RestPanel from '../components/RestPanel'
 import CombatPanel, { HitPointControls } from '../components/CombatPanel'
+import NewCharacterChooser from '../components/NewCharacterChooser'
 import GearTab from '../components/GearTab'
 import { InventoryPanel } from './Inventory'
 import { PrintOverlay } from '../components/CharacterSheet'
@@ -72,7 +73,7 @@ export default function Character() {
   const [avatarPreview, setAvatarPreview] = useState('')
   const [loaded, setLoaded] = useState(false)
   const [showUpgrade, setShowUpgrade] = useState(false)
-  const [builder, setBuilder] = useState(null) // null | 'custom'
+  const [builder, setBuilder] = useState(null) // null | 'choose' | 'beyond' (chooser) | 'custom' (creator)
   const [ddbUrl, setDdbUrl] = useState('')
   const [ddbBusy, setDdbBusy] = useState(false)
   const [hpOpen, setHpOpen] = useState(false) // hit point / rest popover on the header
@@ -128,11 +129,16 @@ export default function Character() {
   }
 
   const [creatorNew, setCreatorNew] = useState(false) // creator launched from "+ New Character"
-  const openNewChooser = () => {
+  // "+ New Character" first asks how: our creator, or an import from D&D Beyond (`step` can open straight on either).
+  const openNewChooser = (step = 'choose') => {
     if (!activeCampaign) return
     if (atCharLimit) { setShowUpgrade(true); return }
     setCreatorNew(true)
-    setBuilder('custom')
+    setBuilder(step)
+  }
+  const importedCharacter = async (fields, warnings) => {
+    if (!await applyBuild(activeCampaign._id, fields)) return
+    toast(`Imported ${fields.name || 'your character'}. ${warnings.map(w => w + ' ').join('')}`.trim())
   }
 
   // Deleting requires typing the character's exact (case-sensitive) name.
@@ -196,6 +202,7 @@ export default function Character() {
       if (creatorNew) selectCharacter(updated); else { setChar(updated); setForm(updated) }
       setBuilder(null); setCreatorNew(false)
       toast('Character updated')
+      return true
     } catch (e) {
       if (e?.status === 403) { setShowUpgrade(true); return }
       toast(e.message || 'Save failed')
@@ -366,7 +373,7 @@ export default function Character() {
           </div>
         ))}
         <button
-          onClick={openNewChooser}
+          onClick={() => openNewChooser()}
           className="btn btn-ghost btn-sm"
           style={{ fontSize: 12, opacity: atCharLimit ? 0.7 : 1 }}
         >
@@ -493,6 +500,12 @@ export default function Character() {
       {loaded && !form.name && (
         <div style={{ padding: '12px 16px', marginBottom: 12, background: 'var(--gold-bg)', border: '1px solid var(--gold-border)', borderRadius: 4, fontSize: 13, color: 'var(--text)', lineHeight: 1.6 }}>
           <strong>Welcome!</strong> Click <strong>Edit</strong> to set up your character. Your DM and the Roleplay Assistant both read this sheet — the more you fill in, the better your session plans become.
+          {!char && (
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 10 }}>
+              <button type="button" className="btn btn-primary btn-sm" onClick={() => openNewChooser('custom')}>Use our character creator</button>
+              <button type="button" className="btn btn-ghost btn-sm" onClick={() => openNewChooser('beyond')}>Import from D&amp;D Beyond</button>
+            </div>
+          )}
         </div>
       )}
 
@@ -614,6 +627,7 @@ export default function Character() {
           </div>
         </div>
       )}
+      {(builder === 'choose' || builder === 'beyond') && <NewCharacterChooser initial={builder} onClose={() => { setBuilder(null); setCreatorNew(false) }} onCreator={() => setBuilder('custom')} onImported={importedCharacter} />}
       {builder === 'custom' && <CustomCharacterBuilder onClose={() => { setBuilder(null); setCreatorNew(false) }} onComplete={applyBuild} />}
       {showUpgrade && <UpgradeModal onClose={() => setShowUpgrade(false)} message={`Free accounts are limited to ${FREE_CHAR_LIMIT} characters per campaign. Upgrade to Premium for unlimited characters.`} />}
     </div>
