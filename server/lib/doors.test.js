@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { locksFromContent, pruneLocks, isLocked, withLock, canKnock, dimsOf, groundOf, KNOCK_COOLDOWN_MS } from './doors.js'
+import { hasDesignedLocks, locksFromContent, pruneLocks, isLocked, withLock, canKnock, dimsOf, groundOf, KNOCK_COOLDOWN_MS } from './doors.js'
 
 const content = (over = {}) => JSON.stringify({
   ground: [['wall', 'door', 'wall'], ['floor', 'door', 'floor']],
@@ -54,4 +54,11 @@ test('a player can only knock on the same door every few seconds', () => {
   assert.equal(canKnock(last, 'p:1:3:u', 1500), true, 'another door')
   assert.equal(canKnock(last, 'p:1:2:v', 1500), true, 'another player')
   assert.equal(canKnock(last, 'p:1:2:u', 1000 + KNOCK_COOLDOWN_MS), true)
+})
+
+test('a map says whether it carries its own lock layout', () => {
+  assert.equal(hasDesignedLocks(content()), true)
+  assert.equal(hasDesignedLocks(content({ doorLocks: [] })), true, 'an empty layout still means "no locked doors"')
+  assert.equal(hasDesignedLocks(content({ doorLocks: undefined })), false)
+  for (const bad of ['', 'nope', '[]', null, JSON.stringify([['door']])]) assert.equal(hasDesignedLocks(bad), false)
 })

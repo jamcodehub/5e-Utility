@@ -59,7 +59,7 @@ function parseMapContent(content) {
     const parsed = JSON.parse(content)
     if (Array.isArray(parsed)) {
       const dims = dimsOf(parsed)
-      return { ground: normalizeGrid(parsed, 'empty', dims), objects: blankObjectGrid(dims.w, dims.h), stairLinks: blankStairLinks(dims.w, dims.h), rotations: blankRotations(dims.w, dims.h), objectRotations: blankRotations(dims.w, dims.h), dims }
+      return { ground: normalizeGrid(parsed, 'empty', dims), objects: blankObjectGrid(dims.w, dims.h), stairLinks: blankStairLinks(dims.w, dims.h), rotations: blankRotations(dims.w, dims.h), objectRotations: blankRotations(dims.w, dims.h), doorLocks: blankDoorStates(dims.w, dims.h), dims }
     }
     if (parsed && Array.isArray(parsed.ground)) {
       const dims = dimsOf(parsed.ground)
@@ -70,6 +70,7 @@ function parseMapContent(content) {
         heights: readHeights(parsed.heights, dims.h, dims.w), // ground height (mountains, dunes...), or null for a flat map
         rotations: readRotations(parsed.rotations, dims.h, dims.w),
         objectRotations: readRotations(parsed.objectRotations, dims.h, dims.w),
+        doorLocks: normalizeGrid(parsed.doorLocks, false, dims).map(row => row.map(value => value === true)), // locked doors as designed
         dims,
       }
     }
@@ -77,7 +78,7 @@ function parseMapContent(content) {
     // Older maps may have empty or malformed content; use an empty object layer.
   }
   const dims = { w: GRID_W, h: GRID_H }
-  return { ground: blankGrid(), objects: blankObjectGrid(), stairLinks: blankStairLinks(), rotations: blankRotations(), objectRotations: blankRotations(), dims }
+  return { ground: blankGrid(), objects: blankObjectGrid(), stairLinks: blankStairLinks(), rotations: blankRotations(), objectRotations: blankRotations(), doorLocks: blankDoorStates(), dims }
 }
 
 function normalizeDoorStates(value, dims) {
@@ -406,6 +407,7 @@ export default function LevelBuilder() {
   const [doorStates, setDoorStates] = useState(blankDoorStates())
   const [rotations, setRotations] = useState(() => blankRotations()) // quarter turns of ground tiles the author chose
   const [objectRotations, setObjectRotations] = useState(() => blankRotations()) // and of upper-layer objects
+  const [designLocks, setDesignLocks] = useState(() => blankDoorStates()) // doors that start locked, as set in the editor (the Locked Door tile)
   const [paintRotation, setPaintRotation] = useState(null) // the turn given to tiles being placed: null = automatic
   const [heights, setHeights] = useState(null) // ground height per square for maps that have it (see utils/mapHeights.js)
   const [doorLocks, setDoorLocks] = useState(blankDoorStates()) // locked doors: only the DM can unlock them (see server/lib/doors.js)
@@ -703,7 +705,7 @@ export default function LevelBuilder() {
       setDarkMode(Boolean(destination.darkMode))
       setDoorStates(normalizeDoorStates(destination.doorStates, parsed.dims))
       setDoorLocks(normalizeDoorStates(destination.doorLocks, parsed.dims))
-      setHeights(parsed.heights); setRotations(parsed.rotations); setObjectRotations(parsed.objectRotations)
+      setHeights(parsed.heights); setRotations(parsed.rotations); setObjectRotations(parsed.objectRotations); setDesignLocks(parsed.doorLocks)
       setKnocks([])
     }
     const onDoorState = ({ row, col, open } = {}) => {
@@ -805,7 +807,7 @@ export default function LevelBuilder() {
       setGrid(parsed.ground)
       setObjectGrid(parsed.objects)
       setStairLinks(parsed.stairLinks)
-      setHeights(parsed.heights); setRotations(parsed.rotations); setObjectRotations(parsed.objectRotations)
+      setHeights(parsed.heights); setRotations(parsed.rotations); setObjectRotations(parsed.objectRotations); setDesignLocks(parsed.doorLocks)
       setDoorStates(normalizeDoorStates(plan.doorStates, parsed.dims))
     } else {
       setEditPlanId(null)
@@ -819,6 +821,7 @@ export default function LevelBuilder() {
       setHeights(null)
       setRotations(blankRotations(w, h))
       setObjectRotations(blankRotations(w, h))
+      setDesignLocks(blankDoorStates(w, h))
     }
     setEditTheme(resolveThemeId(plan?.theme))
     setEditLayer('ground')
@@ -837,7 +840,7 @@ export default function LevelBuilder() {
     setDarkMode(Boolean(plan.darkMode))
     setDoorStates(normalizeDoorStates(plan.doorStates, parsed.dims))
     setDoorLocks(normalizeDoorStates(plan.doorLocks, parsed.dims))
-    setHeights(parsed.heights); setRotations(parsed.rotations); setObjectRotations(parsed.objectRotations)
+    setHeights(parsed.heights); setRotations(parsed.rotations); setObjectRotations(parsed.objectRotations); setDesignLocks(parsed.doorLocks)
     setTokens(Array.isArray(plan.tokens) ? plan.tokens : [])
     setMode('play')
     if (isDm && activeCampaign && !activeCampaign.isPersonal) {
@@ -929,6 +932,7 @@ export default function LevelBuilder() {
     ...(heights ? { heights } : {}),
     ...(compactRotations(rotations) ? { rotations } : {}),
     ...(compactRotations(objectRotations) ? { objectRotations } : {}),
+    doorLocks: designLocks, // always sent from the editor, so unlocking a door in the editor sticks
   })
 
   // ── Undo and redo ──
@@ -937,7 +941,7 @@ export default function LevelBuilder() {
   const historyRef = useRef(history)
   historyRef.current = history
   const latestMap = useRef(null)
-  latestMap.current = { grid, objectGrid, stairLinks, doorStates, rotations, objectRotations }
+  latestMap.current = { grid, objectGrid, stairLinks, doorStates, rotations, objectRotations, designLocks }
   const strokeRef = useRef(null) // the map as it was when the current stroke began
   const beginStroke = () => { if (!strokeRef.current) strokeRef.current = latestMap.current }
   const finishStroke = useCallback(() => {
@@ -954,6 +958,7 @@ export default function LevelBuilder() {
     setDoorStates(snapshot.doorStates)
     setRotations(snapshot.rotations)
     setObjectRotations(snapshot.objectRotations)
+    setDesignLocks(snapshot.designLocks)
   }
   const stepHistory = (step) => {
     if (strokeRef.current) return // still drawing
@@ -1005,10 +1010,11 @@ export default function LevelBuilder() {
     }
     setGrid(current => {
       const next = current.map(row => row.slice())
-      next[r][c] = tool
+      next[r][c] = tool === 'door-locked' ? 'door' : tool
       return next
     })
     setRotations(current => withRotation(current, r, c, paintRotation))
+    setDesignLocks(current => current.map((row, index) => (index === r ? row.map((locked, col) => (col === c ? tool === 'door-locked' : locked)) : row)))
     if (!['stairs', 'stairs-down'].includes(tool)) {
       setStairLinks(current => {
         const next = current.map(row => row.slice())
@@ -1016,7 +1022,7 @@ export default function LevelBuilder() {
         return next
       })
     }
-    if (tool !== 'door') {
+    if (tool !== 'door' && tool !== 'door-locked') {
       setDoorStates(current => current.map((row, index) =>
         index === r ? row.map((isOpen, col) => col === c ? false : isOpen) : row
       ))
@@ -1399,7 +1405,7 @@ export default function LevelBuilder() {
         </button>
         <div className="lb-tool-palettes">
           {[
-            { layer: 'ground', title: 'Ground Tiles', tiles: TILES.filter(tile => tile.id !== 'chest') },
+            { layer: 'ground', title: 'Ground Tiles', tiles: TILES.filter(tile => tile.id !== 'chest').flatMap(tile => (tile.id === 'door' ? [tile, { ...tile, id: 'door-locked', label: 'Locked Door' }] : [tile])) },
             { layer: 'objects', title: 'Upper Layer Objects', tiles: OBJECT_TILES },
           ].map(palette => (
             <div key={palette.layer} className="lb-tool-palette" style={{
@@ -1506,6 +1512,7 @@ export default function LevelBuilder() {
               >
                 {t.imageUrl && <TileIconPlaceholder tile={t} rotate={turn} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />}
                 {t.iconUrl && <TileIconPlaceholder tile={t} rotate={turn} style={{ position: 'absolute', inset: '21%', width: '58%', height: '58%' }} />}
+                {cellId === 'door' && designLocks[r]?.[c] && <span aria-label="Locked door" title="Locked door" style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, pointerEvents: 'none', zIndex: 2, textShadow: '0 1px 2px #000' }}>🔒</span>}
                 {stairLinks[r]?.[c] && <span aria-label="Linked stairs" style={{ position: 'absolute', top: 0, right: 1, color: '#fff', fontSize: 8, textShadow: '0 1px 2px #000', pointerEvents: 'none' }}>→</span>}
                 {object && object.id !== 'object-erase' && (object.imageUrl || object.iconUrl || object.id.startsWith('rock-')) && <TileIconPlaceholder tile={object} rotate={objectTurn} style={{ position: 'absolute', zIndex: 1 }} />}
                 {darkMode && !visibility.torchlit[r]?.[c] && !visibility.darkvision[r]?.[c] && (
@@ -1764,7 +1771,7 @@ export default function LevelBuilder() {
         {isDm && showTokens && !isFullscreen && (
         <div className="level-play-tokens" style={{ position: 'absolute', top: 0, right: 0, bottom: 0, zIndex: 15, width: 240, display: 'flex', flexDirection: 'column', background: 'var(--surface)', borderLeft: '1px solid var(--border)', overflow: 'hidden' }}>
         <div className="level-play-token-list">
-            <div style={{ padding: '6px 10px', fontSize: 11, color: 'var(--text-3)' }}>Players walk their own token with WASD or the arrow keys. Press Move on a token here to walk it yourself.</div>
+            <div style={{ padding: '6px 10px', fontSize: 11, color: 'var(--text-3)' }}>Players walk their own token with WASD or the arrow keys. Press Move on a token here to walk it yourself. Click a door to open, close, lock or unlock it.</div>
             {/* Section: Players */}
             {availableTokens.filter(t => t.type === 'player').length > 0 && (
               <>

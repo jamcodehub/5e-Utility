@@ -3,7 +3,7 @@
 
 export const HISTORY_LIMIT = 50
 
-const PARTS = ['grid', 'objectGrid', 'stairLinks', 'doorStates', 'rotations', 'objectRotations']
+const PARTS = ['grid', 'objectGrid', 'stairLinks', 'doorStates', 'rotations', 'objectRotations', 'designLocks']
 
 // The same map? (Grids are compared by their contents, since painting always makes new arrays.)
 export function sameSnapshot(a, b) {

@@ -31,6 +31,12 @@ export function locksFromContent(content) {
   return ground.map((row, r) => (Array.isArray(row) ? row.map((tile, c) => tile === 'door' && designed[r]?.[c] === true) : []))
 }
 
+// Does this saved map carry its own lock layout (the editor and the map generator write one)?
+export function hasDesignedLocks(content) {
+  const map = parse(content)
+  return !!map && !Array.isArray(map) && Array.isArray(map.doorLocks)
+}
+
 // After the map is edited: keep a lock only where there is still a door.
 export function pruneLocks(locks, content) {
   const ground = groundOf(content)
