@@ -2,6 +2,7 @@ import { Router } from 'express'
 import { auth, isMember } from './campaigns.js'
 import { MusicTrack } from '../models/index.js'
 import { User } from '../models/index.js'
+import { hasPremium, hasPremiumAs } from '../lib/premium.js'
 
 const FREE_TRACK_LIMIT = 5
 
@@ -24,7 +25,7 @@ router.post('/:campaignId', auth, async (req, res) => {
       return res.status(403).json({ error: 'Not a campaign member' })
     // Free tier paywall — max 5 tracks per campaign
     const user = await User.findById(req.userId)
-    if (!user?.isPremium) {
+    if (!hasPremium(user)) {
       const count = await MusicTrack.countDocuments({ campaign: req.params.campaignId })
       if (count >= FREE_TRACK_LIMIT)
         return res.status(403).json({ error: `Free accounts are limited to ${FREE_TRACK_LIMIT} tracks. Upgrade to Premium for unlimited uploads.` })

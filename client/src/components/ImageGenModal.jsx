@@ -47,14 +47,14 @@ export default function ImageGenModal({ campaignId, title, description, onUse, o
             : ''}
         </div>
 
-        {busy && <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 10 }}>
-          {[0, 1, 2, 3].map(i => <div key={i} className="skeleton-shimmer" style={{ aspectRatio: '16 / 9', borderRadius: 8 }} />)}
+        {busy && <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 10 }}>
+          {[0].map(i => <div key={i} className="skeleton-shimmer" style={{ aspectRatio: '16 / 9', borderRadius: 3 }} />)}
         </div>}
 
         {!busy && images.length > 0 && (
           <div style={{ display: 'grid', gridTemplateColumns: images.length === 1 ? '1fr' : 'repeat(auto-fill, minmax(260px, 1fr))', gap: 10 }}>
             {images.map((src, i) => (
-              <button key={i} type="button" onClick={() => setPicked(i)} aria-pressed={picked === i} style={{ padding: 0, border: `3px solid ${picked === i ? 'var(--gold)' : 'transparent'}`, borderRadius: 10, overflow: 'hidden', cursor: 'pointer', background: 'var(--surface2)', lineHeight: 0 }}>
+              <button key={i} type="button" onClick={() => setPicked(i)} aria-pressed={picked === i} style={{ padding: 0, border: `3px solid ${picked === i ? 'var(--gold)' : 'transparent'}`, borderRadius: 4, overflow: 'hidden', cursor: 'pointer', background: 'var(--surface2)', lineHeight: 0 }}>
                 <img src={src} alt={`Option ${i + 1}`} style={{ width: '100%', aspectRatio: '16 / 9', objectFit: 'cover', display: 'block' }} />
               </button>
             ))}

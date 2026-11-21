@@ -42,6 +42,7 @@ const loadIdeaGenerator = () => import('./pages/IdeaGenerator')
 const loadRulesReference = () => import('./pages/RulesReference')
 const loadMusicPlayer = () => import('./pages/MusicPlayer')
 const loadLevelBuilder = () => import('./pages/LevelBuilder')
+const loadMapGenerator = () => import('./pages/MapGenerator')
 const loadRoleplayAssistant = () => import('./pages/RoleplayAssistant')
 const loadCampaignGuide = () => import('./pages/CampaignGuide')
 const loadHpTracker = () => import('./pages/HPtracker')
@@ -77,6 +78,7 @@ const Privacy = lazy(() => import('./pages/legal/Privacy'))
 const Terms = lazy(() => import('./pages/legal/Terms'))
 const MusicPlayer = lazy(loadMusicPlayer)
 const LevelBuilder = lazy(loadLevelBuilder)
+const MapGenerator = lazy(loadMapGenerator)
 const RoleplayAssistant = lazy(loadRoleplayAssistant)
 const CampaignGuide = lazy(loadCampaignGuide)
 const HpTracker = lazy(loadHpTracker)
@@ -89,7 +91,7 @@ function PageLoader() {
     return (
       <div style={{ height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden', background: 'var(--sb-outer)', color: 'var(--text)' }}>
         <div style={{ padding: '8px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'var(--sb-bar)', borderBottom: '1px solid var(--sb-bar-border)', flexShrink: 0 }}>
-          <div style={{ fontFamily: 'Cinzel, serif', fontSize: 12, color: 'var(--sb-page-meta)' }}>{activeCampaign?.name || 'Storyboard'}</div>
+          <div style={{ fontFamily: 'var(--font-title)', fontSize: 12, color: 'var(--sb-page-meta)' }}>{activeCampaign?.name || 'Storyboard'}</div>
           <button className="btn btn-primary btn-sm" disabled>+ Add Scene</button>
         </div>
         <div style={{ flex: 1 }} />
@@ -260,6 +262,7 @@ function Guard() {
               <Route path="/rules"      element={<RulesReference />} />
               <Route path="/music"      element={<MusicPlayer />} />
               <Route path="/levels"     element={<LevelBuilder />} />
+              <Route path="/map-generator" element={<MapGenerator />} />
               <Route path="/roleplay"   element={<RoleplayAssistant />} />
               <Route path="/campaign-guide" element={<CampaignGuide />} />
               <Route path="/combat"     element={<HpTracker />} />

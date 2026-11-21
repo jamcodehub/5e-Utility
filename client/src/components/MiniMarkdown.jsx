@@ -35,7 +35,7 @@ export default function MiniMarkdown({ text, compact }) {
     const h = line.match(/^(#{1,6})\s+(.*)$/)
     if (h) {
       const size = h[1].length <= 2 ? 15 : 13
-      out.push(<div key={key++} style={{ fontFamily: 'Cinzel, serif', fontSize: size, color: 'var(--gold)', margin: '14px 0 6px' }}>{h[2]}</div>)
+      out.push(<div key={key++} style={{ fontFamily: 'var(--font-title)', fontSize: size, color: 'var(--gold)', margin: '14px 0 6px' }}>{h[2]}</div>)
       i++; continue
     }
 

@@ -207,7 +207,7 @@ export default function Lore() {
           <div key={l._id} className="card" style={{ padding: 16, borderLeft: (l.tag === 'boss') ? '3px solid #f59e0b' : (l.tag === 'enemy') ? '3px solid #ef4444' : undefined }}>
             <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, marginBottom: 8 }}>
               <div style={{ flex: 1 }}>
-                <div style={{ fontFamily: 'Cinzel, serif', fontSize: 14, fontWeight: 600, marginBottom: 4 }}>{l.title}</div>
+                <div style={{ fontFamily: 'var(--font-title)', fontSize: 14, fontWeight: 600, marginBottom: 4 }}>{l.title}</div>
                 <TagBadge tag={l.tag} />
                 {l.maxHp > 0 && (
                   <span style={{ marginLeft: 8, fontSize: 11, color: 'var(--text-3)' }}>

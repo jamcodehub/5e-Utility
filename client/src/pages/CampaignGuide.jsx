@@ -91,7 +91,7 @@ function DropTextarea({ value, onChange, activePlayer, onInserted, style = {}, r
         }}
       />
       {activePlayer && (
-        <div style={{ position: 'absolute', top: 4, right: 4, background: 'var(--gold)', color: '#2a1a00', borderRadius: 4, padding: '1px 5px', fontSize: 9, fontWeight: 700, pointerEvents: 'none', lineHeight: 1.6 }}>
+        <div style={{ position: 'absolute', top: 4, right: 4, background: 'var(--gold-fill, var(--gold))', color: '#2a1a00', borderRadius: 4, padding: '1px 5px', fontSize: 9, fontWeight: 700, pointerEvents: 'none', lineHeight: 1.6 }}>
           tap → {activePlayer.name}
         </div>
       )}
@@ -101,7 +101,7 @@ function DropTextarea({ value, onChange, activePlayer, onInserted, style = {}, r
 
 function SectionLabel({ children, style = {} }) {
   return (
-    <div style={{ fontFamily: 'Cinzel, serif', fontSize: 11, fontWeight: 600, color: 'var(--gold)', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 10, ...style }}>
+    <div style={{ fontFamily: 'var(--font-title)', fontSize: 11, fontWeight: 600, color: 'var(--gold)', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 10, ...style }}>
       {children}
     </div>
   )
@@ -111,35 +111,12 @@ function RelationNote() {
   return <div style={{ fontSize: 10, color: 'var(--gold)', marginTop: 3 }}>↑ Character Relation — shown in each player's Roleplay Assistant</div>
 }
 
-// ─── NpcCard ──────────────────────────────────────────────────────────────────
-function NpcCard({ npc, onChange, onRemove, activePlayer, onInserted }) {
-  const u = f => e => onChange({ ...npc, [f]: e.target.value })
-  return (
-    <div style={{ border: '1px solid var(--border)', borderRadius: 8, padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 8 }}>
-      <div style={{ display: 'flex', gap: 8 }}>
-        <input className="input" value={npc.name} onChange={u('name')} placeholder="NPC name" style={{ flex: 1, fontSize: 13, fontWeight: 500 }} />
-        <button onClick={onRemove} style={{ background: 'none', border: 'none', color: 'var(--text-3)', cursor: 'pointer', fontSize: 18, lineHeight: 1, padding: '0 2px', flexShrink: 0 }}>✕</button>
-      </div>
-      <DropTextarea value={npc.description} onChange={u('description')} rows={2}
-        placeholder="Who are they? Role, personality, motives…"
-        activePlayer={activePlayer} onInserted={onInserted} />
-      <div>
-        <DropTextarea value={npc.characterRelation} onChange={u('characterRelation')} rows={2}
-          placeholder="How do they personally connect to the characters? History, secrets, hooks, debts?"
-          activePlayer={activePlayer} onInserted={onInserted}
-          style={{ borderColor: 'var(--gold-border)', background: 'var(--gold-bg)' }} />
-        <RelationNote />
-      </div>
-    </div>
-  )
-}
-
 // ─── QuestCard ────────────────────────────────────────────────────────────────
 function QuestCard({ quest, onChange, onRemove, activePlayer, onInserted }) {
   const u = f => e => onChange({ ...quest, [f]: e.target.value })
   const SC = { active: '#1d6a3a', completed: '#9a7c3a', failed: '#b03030' }
   return (
-    <div style={{ border: '1px solid var(--border)', borderRadius: 8, padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+    <div style={{ border: '1px solid var(--border)', borderRadius: 3, padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 8 }}>
       <div style={{ display: 'flex', gap: 8 }}>
         <input className="input" value={quest.title} onChange={u('title')} placeholder="Quest title" style={{ flex: 1, fontSize: 13, fontWeight: 500 }} />
         <select value={quest.status} onChange={u('status')} style={{ fontSize: 11, border: '1px solid var(--border)', borderRadius: 6, padding: '4px 6px', background: 'var(--surface)', color: SC[quest.status], cursor: 'pointer', flexShrink: 0 }}>
@@ -168,7 +145,7 @@ function CharModal({ player, onClose }) {
   const char = player.character
   const Row = ({ label, val }) => val ? (
     <div style={{ marginBottom: 12 }}>
-      <div style={{ fontSize: 10, fontFamily: 'Cinzel, serif', fontWeight: 600, color: 'var(--gold)', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 3 }}>{label}</div>
+      <div style={{ fontSize: 10, fontFamily: 'var(--font-title)', fontWeight: 600, color: 'var(--gold)', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 3 }}>{label}</div>
       <div style={{ fontSize: 13, color: 'var(--text)', lineHeight: 1.65, whiteSpace: 'pre-wrap' }}>{val}</div>
     </div>
   ) : null
@@ -181,10 +158,10 @@ function CharModal({ player, onClose }) {
           <div style={{ width: 48, height: 48, borderRadius: '50%', flexShrink: 0, overflow: 'hidden', background: 'var(--gold-bg)', border: '2px solid var(--gold-border)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             {char?.avatarUrl
               ? <img src={char.avatarUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-              : <span style={{ fontFamily: 'Cinzel, serif', fontSize: 18, color: 'var(--gold)', fontWeight: 600 }}>{(char?.name || player.username)?.[0]?.toUpperCase()}</span>}
+              : <span style={{ fontFamily: 'var(--font-title)', fontSize: 18, color: 'var(--gold)', fontWeight: 600 }}>{(char?.name || player.username)?.[0]?.toUpperCase()}</span>}
           </div>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontFamily: 'Cinzel, serif', fontSize: 16, fontWeight: 600 }}>{char?.name || player.username}</div>
+            <div style={{ fontFamily: 'var(--font-title)', fontSize: 16, fontWeight: 600 }}>{char?.name || player.username}</div>
             {char && <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 1 }}>{[char.race, char.class, char.level ? `Lvl ${char.level}` : null, char.hp ? `${char.hp.current}/${char.hp.max} HP` : null, char.ac ? `AC ${char.ac}` : null].filter(Boolean).join(' · ')}</div>}
             <div style={{ fontSize: 11, color: 'var(--text-3)' }}>@{player.username}</div>
           </div>
@@ -203,7 +180,7 @@ function CharModal({ player, onClose }) {
                   return (
                     <div key={s} style={{ textAlign: 'center', padding: '5px 2px', border: '1px solid var(--border)', borderRadius: 6 }}>
                       <div style={{ fontSize: 9, color: 'var(--text-3)', textTransform: 'uppercase' }}>{s}</div>
-                      <div style={{ fontSize: 13, fontWeight: 700, fontFamily: 'Cinzel, serif' }}>{v}</div>
+                      <div style={{ fontSize: 13, fontWeight: 700, fontFamily: 'var(--font-title)' }}>{v}</div>
                       <div style={{ fontSize: 10, color: 'var(--text-3)' }}>{m >= 0 ? '+' : ''}{m}</div>
                     </div>
                   )
@@ -216,7 +193,7 @@ function CharModal({ player, onClose }) {
             <Row label="Lore / Secrets"       val={char.lore} />
             {char.notes && <Row label="Notes" val={char.notes} />}
             {!char.background && !char.personality && !char.goals && !char.lore && (
-              <div style={{ fontSize: 12, color: 'var(--text-3)', lineHeight: 1.7, background: 'var(--surface2)', borderRadius: 8, padding: '10px 12px' }}>
+              <div style={{ fontSize: 12, color: 'var(--text-3)', lineHeight: 1.7, background: 'var(--surface2)', borderRadius: 3, padding: '10px 12px' }}>
                 No character depth filled in yet. Ask {player.username} to complete their <strong>Backstory</strong> tab on the Character sheet, or generate a Roleplay Assistant plan — both save this data.
               </div>
             )}
@@ -302,10 +279,7 @@ export default function CampaignGuide() {
   const upd = f => e => { setGuide(g => ({ ...g, [f]: e.target.value })); setDirty(true) }
   const clearPlayer = () => setActive(null)
 
-  const addNpc   = () => { setGuide(g => ({ ...g, npcs:   [...g.npcs,   { id: nanoid(), name: '', description: '', characterRelation: '' }] })); setDirty(true) }
   const addQuest = () => { setGuide(g => ({ ...g, quests: [...g.quests, { id: nanoid(), title: '', description: '', status: 'active', characterRelation: '' }] })); setDirty(true) }
-  const updNpc   = (id, v) => { setGuide(g => ({ ...g, npcs:   g.npcs.map(n => n.id === id ? v : n) })); setDirty(true) }
-  const rmNpc    = id      => { setGuide(g => ({ ...g, npcs:   g.npcs.filter(n => n.id !== id) })); setDirty(true) }
   const updQuest = (id, v) => { setGuide(g => ({ ...g, quests: g.quests.map(q => q.id === id ? v : q) })); setDirty(true) }
   const rmQuest  = id      => { setGuide(g => ({ ...g, quests: g.quests.filter(q => q.id !== id) })); setDirty(true) }
 
@@ -316,24 +290,6 @@ export default function CampaignGuide() {
     try {
       await api(`/campaigns/${activeCampaign._id}/guide`, { method: 'PUT', body: guide })
       setDirty(false)
-      // Sync named NPCs to Lore board (best-effort, no duplicates)
-      const namedNpcs = guide.npcs.filter(n => n.name.trim())
-      if (namedNpcs.length > 0) {
-        try {
-          const existingLore = await api(`/lore/${activeCampaign._id}`)
-          const existingNpcTitles = new Set(
-            (existingLore || []).filter(e => (e.tags || []).includes('npc')).map(e => e.title)
-          )
-          for (const npc of namedNpcs) {
-            if (!existingNpcTitles.has(npc.name.trim())) {
-              await api(`/lore/${activeCampaign._id}`, {
-                method: 'POST',
-                body: { title: npc.name.trim(), content: npc.description || '', tags: ['npc'] },
-              })
-            }
-          }
-        } catch (_e) { /* lore sync is best-effort */ }
-      }
       toast('Campaign guide saved ✓')
     } catch (_e) { toast('Failed to save — try again') }
     setSaving(false)
@@ -353,7 +309,7 @@ export default function CampaignGuide() {
         : <div style={{ color: 'var(--text-3)', padding: '8px 24px' }}>Select a campaign.</div>}
     </div>
   )
-  if (!isDM) return <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-3)', flexDirection: 'column', gap: 8 }}><div style={{ fontSize: 28 }}>📖</div><div>Only Dungeon Masters can edit the Campaign Guide.</div></div>
+  if (!isDM) return <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-3)', flexDirection: 'column', gap: 8 }}><div>Only Dungeon Masters can edit the Campaign Guide.</div></div>
 
   const StorySection = (
     <div style={isMobile ? { display: 'flex', flexDirection: 'column', gap: 12 } : { display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gridAutoRows: '1fr', gap: 14, height: '100%' }}>
@@ -368,25 +324,6 @@ export default function CampaignGuide() {
           <DropTextarea value={guide[key]} onChange={upd(key)} rows={rows} placeholder={ph} activePlayer={activePlayer} onInserted={clearPlayer} fill={!isMobile} />
         </div>
       ))}
-    </div>
-  )
-
-  const NpcsSection = (
-    <div className="card" style={{ padding: '14px 16px' }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-        <SectionLabel style={{ margin: 0 }}>NPCs</SectionLabel>
-        <button className="btn btn-ghost btn-sm" onClick={addNpc}>+ Add NPC</button>
-      </div>
-      {guide.npcs.length === 0
-        ? <div style={{ fontSize: 12, color: 'var(--text-3)', lineHeight: 1.8 }}>No NPCs yet. The <span style={{ color: 'var(--gold)' }}>Character Relation</span> field appears directly in each player's session plan.</div>
-        : <div style={isMobile ? { display: 'flex', flexDirection: 'column', gap: 10 } : { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: 12, alignItems: 'start' }}>
-            {guide.npcs.map(n => <NpcCard key={n.id} npc={n} onChange={v => updNpc(n.id, v)} onRemove={() => rmNpc(n.id)} activePlayer={activePlayer} onInserted={clearPlayer} />)}
-          </div>}
-      {guide.npcs.length > 0 && (
-        <button className="btn btn-primary btn-sm" onClick={save} disabled={saving} style={{ width: '100%', justifyContent: 'center', marginTop: 12, opacity: dirty ? 1 : 0.45 }}>
-          {saving ? 'Saving…' : dirty ? '✦ Save Guide & Sync to Lore' : 'Saved ✓'}
-        </button>
-      )}
     </div>
   )
 
@@ -446,7 +383,7 @@ export default function CampaignGuide() {
             >
               {p.character?.avatarUrl
                 ? <img src={p.character.avatarUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                : <span style={{ fontFamily: 'Cinzel, serif', fontSize: 15, color: 'var(--gold)', fontWeight: 600 }}>{name[0]?.toUpperCase()}</span>}
+                : <span style={{ fontFamily: 'var(--font-title)', fontSize: 15, color: 'var(--gold)', fontWeight: 600 }}>{name[0]?.toUpperCase()}</span>}
             </div>
             <div style={{ fontSize: 9, color: selected ? 'var(--gold)' : 'var(--text-3)', fontWeight: selected ? 700 : 400, maxWidth: 44, textAlign: 'center', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{name}</div>
             <button
@@ -498,13 +435,12 @@ export default function CampaignGuide() {
       {AvatarRow}
 
       <div role="tablist" style={{ display: 'flex', gap: 4, padding: isMobile ? '0 16px' : '0 24px', marginBottom: 10, flexShrink: 0 }}>
-        {[['story', 'Story & World'], ['npcs', `NPCs${guide.npcs.length ? ` (${guide.npcs.length})` : ''}`], ['quests', `Quests${guide.quests.length ? ` (${guide.quests.length})` : ''}`]].map(([k, lbl]) => (
+        {[['story', 'Story & World'], ['quests', `Quests${guide.quests.length ? ` (${guide.quests.length})` : ''}`]].map(([k, lbl]) => (
           <button key={k} role="tab" aria-selected={mobileTab === k} onClick={() => setMobileTab(k)} className={`btn btn-sm ${mobileTab === k ? 'btn-primary' : 'btn-ghost'}`} style={isMobile ? { flex: 1 } : { minWidth: 120 }}>{lbl}</button>
         ))}
       </div>
       <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: isMobile ? '0 16px 80px' : '0 24px 20px' }}>
         {mobileTab === 'story'  && StorySection}
-        {mobileTab === 'npcs'   && NpcsSection}
         {mobileTab === 'quests' && QuestsSection}
       </div>
 

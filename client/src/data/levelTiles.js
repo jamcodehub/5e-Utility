@@ -3,7 +3,7 @@ const TILE_IMAGE_URLS = {
   stoneWall: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1791981270/stone_wall.png',
   woodWall: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1791981269/timber_wall.png',
   stoneDoor: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1791981273/stone_door.png',
-  water: 'https://res.cloudinary.com/crcbzpw6/video/upload/v1792050394/tmpsx5uiyo3.mp4',
+  water: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1793015363/water.png',
   grass: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1791981265/grass.png',
   spikeTrap: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1791981276/spike_trap.png',
   stairsUp: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1791981266/stairs_up.png',

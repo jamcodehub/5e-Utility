@@ -1,5 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
+import { emailHint } from '../utils/emailCheck'
 import { useLocation } from 'react-router-dom'
+import { usePageMeta } from '../hooks/usePageMeta'
 import { api, useAuth, useAuthConfig } from '../context/AuthContext'
 import Turnstile from '../components/Turnstile'
 import GoogleButton, { readGoogleCredential } from '../components/GoogleButton'
@@ -7,7 +9,7 @@ import GoogleButton, { readGoogleCredential } from '../components/GoogleButton'
 const FALLBACK_GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID
 
 const labelStyle = { display: 'block', fontSize: 12, fontWeight: 500, color: 'var(--text-2)', marginBottom: 5 }
-const errorBox = { background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 8, padding: '10px 14px', fontSize: 13, color: 'var(--red)', marginBottom: 16 }
+const errorBox = { background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 3, padding: '10px 14px', fontSize: 13, color: 'var(--red)', marginBottom: 16 }
 
 export default function Auth() {
   const { login, register, verifyTwoFactor, resendTwoFactor, confirmSignup, resendSignup, loginWithGoogle, forgotPassword, resetPassword } = useAuth()
@@ -20,9 +22,15 @@ export default function Auth() {
   // /login opens sign-in for returning users.
   const location = useLocation()
   const [mode, setMode] = useState(location.pathname === '/register' ? 'register' : 'login')
+  usePageMeta(location.pathname === '/register'
+    ? { title: 'Create your free account | 5e Utility', description: 'Sign up free for 5e Utility: keep your D&D journal, lore, characters and battle maps in one place.', path: '/register' }
+    : location.pathname === '/login'
+      ? { title: 'Sign in | 5e Utility', description: 'Sign in to 5e Utility to open your D&D campaigns, journal, lore, characters and battle maps.', path: '/login' }
+      : { title: 'Reset your password | 5e Utility', description: 'Reset your 5e Utility password.', noindex: true })
   const [form, setForm] = useState({ username: '', email: '', password: '', phone: '', role: 'player' })
   const [googleSignup, setGoogleSignup] = useState(null) // { credential, email } once Google verified the account
   const [error, setError] = useState('')
+  const [emailTouched, setEmailTouched] = useState(false)
   const [loading, setLoading] = useState(false)
   const [serverStatus, setServerStatus] = useState('connecting')
 
@@ -72,6 +80,7 @@ export default function Auth() {
         const result = await login(form.email, form.password, captchaToken)
         if (result?.requires2FA) { setTwoFA(result); setCode(''); setNotice('') }
       } else {
+        if (method === 'email') { const h = emailHint(form.email); if (h) { setEmailTouched(true); throw new Error(h) } }
         if (form.password.length < 8) throw new Error('Password must be at least 8 characters')
         if (method === 'google' && !googleSignup) throw new Error('Verify your Gmail account with Google first')
         const result = await register({
@@ -148,17 +157,17 @@ export default function Auth() {
 
   if (mode === 'forgot') {
     return (
-      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg)', padding: 20 }}>
+      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--parchment)', padding: 20 }}>
         <div className="card" style={{ width: '100%', maxWidth: 380, padding: 32 }}>
           <div style={{ marginBottom: 20, textAlign: 'center' }}>
-            <div style={{ fontFamily: 'Cinzel, serif', fontSize: 20, fontWeight: 600, color: 'var(--gold)', marginBottom: 6 }}>Forgot your password?</div>
+            <div style={{ fontFamily: 'var(--font-title)', fontSize: 20, fontWeight: 600, color: 'var(--gold)', marginBottom: 6 }}>Forgot your password?</div>
             <div style={{ fontSize: 13, color: 'var(--text-2)' }}>Enter your account email and we'll send you a reset link.</div>
           </div>
           {error && (
-            <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 8, padding: '10px 14px', fontSize: 13, color: 'var(--red)', marginBottom: 16 }}>{error}</div>
+            <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 3, padding: '10px 14px', fontSize: 13, color: 'var(--red)', marginBottom: 16 }}>{error}</div>
           )}
           {forgotSent ? (
-            <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 8, padding: '10px 14px', fontSize: 13, color: 'var(--green)', marginBottom: 16 }}>
+            <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 3, padding: '10px 14px', fontSize: 13, color: 'var(--green)', marginBottom: 16 }}>
               If that email is registered, a reset link has been sent. Check your inbox.
             </div>
           ) : (
@@ -183,19 +192,19 @@ export default function Auth() {
 
   if (mode === 'reset') {
     return (
-      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg)', padding: 20 }}>
+      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--parchment)', padding: 20 }}>
         <div className="card" style={{ width: '100%', maxWidth: 380, padding: 32 }}>
           <div style={{ marginBottom: 20, textAlign: 'center' }}>
-            <div style={{ fontFamily: 'Cinzel, serif', fontSize: 20, fontWeight: 600, color: 'var(--gold)', marginBottom: 6 }}>Choose a new password</div>
+            <div style={{ fontFamily: 'var(--font-title)', fontSize: 20, fontWeight: 600, color: 'var(--gold)', marginBottom: 6 }}>Choose a new password</div>
             {!resetDone && <div style={{ fontSize: 13, color: 'var(--text-2)' }}>Your reset link is valid for 1 hour.</div>}
           </div>
           {error && (
-            <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 8, padding: '10px 14px', fontSize: 13, color: 'var(--red)', marginBottom: 16 }}>{error}</div>
+            <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 3, padding: '10px 14px', fontSize: 13, color: 'var(--red)', marginBottom: 16 }}>{error}</div>
           )}
           {!resetParams ? (
             <div style={{ fontSize: 13, color: 'var(--text-2)', textAlign: 'center' }}>This reset link is missing or invalid. Please request a new one.</div>
           ) : resetDone ? (
-            <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 8, padding: '10px 14px', fontSize: 13, color: 'var(--green)' }}>
+            <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 3, padding: '10px 14px', fontSize: 13, color: 'var(--green)' }}>
               Password updated — you're now signed in!
             </div>
           ) : (
@@ -224,10 +233,10 @@ export default function Auth() {
   if (twoFA) {
     const isGoogle = twoFA.method === 'google'
     return (
-      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg)', padding: 20 }}>
+      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--parchment)', padding: 20 }}>
         <div className="card" style={{ width: '100%', maxWidth: 380, padding: 32 }}>
           <div style={{ marginBottom: 20, textAlign: 'center' }}>
-            <div style={{ fontFamily: 'Cinzel, serif', fontSize: 20, fontWeight: 600, color: 'var(--gold)', marginBottom: 6 }}>
+            <div style={{ fontFamily: 'var(--font-title)', fontSize: 20, fontWeight: 600, color: 'var(--gold)', marginBottom: 6 }}>
               {twoFA.signup ? 'Confirm your email' : 'Verify this device'}
             </div>
             <div style={{ fontSize: 13, color: 'var(--text-2)' }}>
@@ -238,7 +247,7 @@ export default function Auth() {
             </div>
           </div>
           {error && <div style={errorBox}>{error}</div>}
-          {notice && <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 8, padding: '10px 14px', fontSize: 13, color: 'var(--green)', marginBottom: 16 }}>{notice}</div>}
+          {notice && <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 3, padding: '10px 14px', fontSize: 13, color: 'var(--green)', marginBottom: 16 }}>{notice}</div>}
           {isGoogle ? (
             <div style={{ marginBottom: 16 }}>
               <GoogleButton clientId={googleClientId} onCredential={handleTwoFactorGoogle} />
@@ -270,7 +279,7 @@ export default function Auth() {
   }
 
 return (
-    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg)', padding: 20 }}>
+    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--parchment)', padding: 20 }}>
       <div className="card" style={{ width: '100%', maxWidth: 380, padding: 32 }}>
         <div style={{ marginBottom: 32, textAlign: 'center', display: 'flex', justifyContent: 'center' }}>
           <img 
@@ -287,7 +296,7 @@ return (
         </div>
 
         {error && (
-          <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 8, padding: '10px 14px', fontSize: 13, color: 'var(--red)', marginBottom: 16 }}>
+          <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 3, padding: '10px 14px', fontSize: 13, color: 'var(--red)', marginBottom: 16 }}>
             {error}
           </div>
         )}
@@ -315,13 +324,18 @@ return (
           {mode === 'register' && (
             <div style={{ marginBottom: 12 }}>
               <label style={labelStyle}>Username</label>
-              <input className="input" placeholder="Boroos" value={form.username} onChange={set('username')} required />
+              <input className="input" placeholder="Username" value={form.username} onChange={set('username')} required />
             </div>
           )}
           {!(mode === 'register' && method === 'google') && (
             <div style={{ marginBottom: 12 }}>
               <label style={labelStyle}>Email</label>
-              <input className="input" type="email" placeholder="adventurer@realm.com" value={form.email} onChange={set('email')} required />
+              <input className="input" type="email" placeholder="adventurer@realm.com" value={form.email} onChange={set('email')} onBlur={() => setEmailTouched(true)} required
+                aria-invalid={mode === 'register' && emailTouched && !!emailHint(form.email)} aria-describedby="email-hint"
+                style={mode === 'register' && emailTouched && emailHint(form.email) ? { borderColor: 'var(--red)' } : undefined} />
+              {mode === 'register' && emailTouched && emailHint(form.email) && (
+                <div id="email-hint" role="alert" style={{ fontSize: 12, color: 'var(--red)', marginTop: 5 }}>{emailHint(form.email)}</div>
+              )}
             </div>
           )}
           {mode === 'register' && (
@@ -330,7 +344,7 @@ return (
               <div style={{ display: 'flex', gap: 8 }}>
                 {[{ v: 'player', label: 'Player' }, { v: 'dm', label: 'Dungeon Master' }].map(opt => (
                   <button key={opt.v} type="button" onClick={() => setForm(p => ({ ...p, role: opt.v }))} style={{
-                    flex: 1, padding: '9px 10px', borderRadius: 8, cursor: 'pointer', fontSize: 13,
+                    flex: 1, padding: '9px 10px', borderRadius: 3, cursor: 'pointer', fontSize: 13,
                     border: `2px solid ${form.role === opt.v ? 'var(--gold)' : 'var(--border)'}`,
                     background: form.role === opt.v ? 'var(--gold-bg)' : 'transparent',
                     color: form.role === opt.v ? 'var(--gold)' : 'var(--text-2)',
@@ -350,7 +364,7 @@ return (
                 <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
                   {methods.map(m => (
                     <button key={m} type="button" onClick={() => { setPickedMethod(m); setError('') }} style={{
-                      flex: 1, padding: '9px 10px', borderRadius: 8, cursor: 'pointer', fontSize: 13,
+                      flex: 1, padding: '9px 10px', borderRadius: 3, cursor: 'pointer', fontSize: 13,
                       border: `2px solid ${method === m ? 'var(--gold)' : 'var(--border)'}`,
                       background: method === m ? 'var(--gold-bg)' : 'transparent',
                       color: method === m ? 'var(--gold)' : 'var(--text-2)',
@@ -360,7 +374,7 @@ return (
                 </div>
               )}
               {method === 'google' && (googleSignup ? (
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, padding: '9px 12px', borderRadius: 8, background: '#f0fdf4', border: '1px solid #bbf7d0', fontSize: 13, color: 'var(--green)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, padding: '9px 12px', borderRadius: 3, background: '#f0fdf4', border: '1px solid #bbf7d0', fontSize: 13, color: 'var(--green)' }}>
                   <span>✓ {googleSignup.email}</span>
                   <button type="button" onClick={() => setGoogleSignup(null)} style={{ background: 'none', border: 'none', color: 'var(--text-3)', fontSize: 12, cursor: 'pointer' }}>Change</button>
                 </div>
