@@ -1,7 +1,7 @@
 import { useDebouncedSave } from '../hooks/useDebouncedSave'
 import { useState, useEffect, useCallback, useMemo, useRef, useId } from 'react'
 import { createPortal } from 'react-dom'
-import { useSearchParams } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { api } from '../context/AuthContext'
 import { useCampaign } from '../context/CampaignContext'
 import { useAuth } from '../context/AuthContext'
@@ -1573,6 +1573,7 @@ export default function LevelBuilder() {
         <div style={{ flex: 1 }}>
           <h2 style={{ fontSize: 20, marginBottom: 2 }}>Battle Map</h2>
         </div>
+        {isDm && <Link className="btn btn-ghost" to="/map-generator">Generate a map</Link>}
         {isDm && <button className="btn btn-primary" onClick={() => setShowSizePicker(true)}>+ Create New Map</button>}
       </div>
 

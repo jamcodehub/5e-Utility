@@ -42,6 +42,7 @@ const loadIdeaGenerator = () => import('./pages/IdeaGenerator')
 const loadRulesReference = () => import('./pages/RulesReference')
 const loadMusicPlayer = () => import('./pages/MusicPlayer')
 const loadLevelBuilder = () => import('./pages/LevelBuilder')
+const loadMapGenerator = () => import('./pages/MapGenerator')
 const loadRoleplayAssistant = () => import('./pages/RoleplayAssistant')
 const loadCampaignGuide = () => import('./pages/CampaignGuide')
 const loadHpTracker = () => import('./pages/HPtracker')
@@ -77,6 +78,7 @@ const Privacy = lazy(() => import('./pages/legal/Privacy'))
 const Terms = lazy(() => import('./pages/legal/Terms'))
 const MusicPlayer = lazy(loadMusicPlayer)
 const LevelBuilder = lazy(loadLevelBuilder)
+const MapGenerator = lazy(loadMapGenerator)
 const RoleplayAssistant = lazy(loadRoleplayAssistant)
 const CampaignGuide = lazy(loadCampaignGuide)
 const HpTracker = lazy(loadHpTracker)
@@ -260,6 +262,7 @@ function Guard() {
               <Route path="/rules"      element={<RulesReference />} />
               <Route path="/music"      element={<MusicPlayer />} />
               <Route path="/levels"     element={<LevelBuilder />} />
+              <Route path="/map-generator" element={<MapGenerator />} />
               <Route path="/roleplay"   element={<RoleplayAssistant />} />
               <Route path="/campaign-guide" element={<CampaignGuide />} />
               <Route path="/combat"     element={<HpTracker />} />
