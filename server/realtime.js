@@ -3,6 +3,7 @@ import jwt from 'jsonwebtoken'
 import { LevelPlan, User } from './models/index.js'
 import { isMember } from './routes/campaigns.js'
 import { clientOrigins } from './lib/clientUrl.js'
+import { applyPlayerTokenUpdate, mapDims, sameTokens } from './lib/tokenRules.js'
 
 // Real-time collaborative Level Builder "Play mode" board — everyone viewing
 // the same map (DM + players) sees token moves live and the board persists
@@ -113,18 +114,15 @@ export function attachRealtime(httpServer) {
         const plan = await LevelPlan.findById(planId)
         if (!plan || !await isMember(plan.campaign, socket.userId)) return
         let next = Array.isArray(tokens) ? tokens : []
-        if (String(plan.owner) !== socket.userId) {
-          // Non-DMs may only move existing tokens; hp and membership are DM-controlled.
-          const existing = new Map((plan.tokens || []).map(t => [t.id, t]))
-          next = next.filter(t => existing.has(t.id)).map(t => {
-            const prev = existing.get(t.id)
-            return { ...t, hp: prev.hp, maxHp: prev.maxHp }
-          })
-          if (next.length !== existing.size) next = (plan.tokens || []).map(prev => next.find(t => t.id === prev.id) || prev)
-        }
+        const isOwner = String(plan.owner) === socket.userId
+        // The map's owner (the DM) controls the whole board. Everyone else can only move their own character's token.
+        if (!isOwner) next = applyPlayerTokenUpdate(plan.tokens, next, socket.userId, mapDims(plan.content))
         plan.tokens = next
+        plan.markModified('tokens')
         await plan.save()
         socket.to(`level:${planId}`).emit('level:tokens', plan.tokens)
+        // A player who tried to move someone else's token (or edit one) is sent the real board, so their screen snaps back.
+        if (!isOwner && !sameTokens(plan.tokens, tokens)) socket.emit('level:tokens', plan.tokens)
       } catch { /* ignore persist failure, clients stay locally in sync */ }
     })
 

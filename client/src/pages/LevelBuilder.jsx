@@ -388,6 +388,8 @@ export default function LevelBuilder() {
   toastRef.current = toast
 
   const startTokenDrag = (e, tokenId) => {
+    // Players can only move their own character's token (the server enforces this too); the DM moves anything.
+    if (!isDm && tokenId !== `char-${user?.id}`) return
     e.preventDefault?.()
     e.stopPropagation?.()
     setDragTokenId(tokenId)
