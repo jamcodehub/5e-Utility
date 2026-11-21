@@ -32,6 +32,11 @@ export default function SettingsModal({ onClose }) {
   const [removeInput, setRemoveInput] = useState('')
   const [removeError, setRemoveError] = useState('')
   const [removeWorking, setRemoveWorking] = useState(false)
+  // "Add a test player": a placeholder player with a ready-made character, to try the campaign and use as a token
+  const [testOpen, setTestOpen] = useState(false)
+  const [testForm, setTestForm] = useState({ name: '', classId: 'fighter', level: 3 })
+  const [testError, setTestError] = useState('')
+  const [testWorking, setTestWorking] = useState(false)
   const [roleWorking, setRoleWorking] = useState(false)
   const [roleError, setRoleError] = useState('')
   const [nameInput, setNameInput] = useState('')
@@ -64,6 +69,17 @@ export default function SettingsModal({ onClose }) {
 
   // The name the DM must type: the player's character, or their username if they have not made one yet.
   const rosterLabel = (m) => (m.character?.name?.trim() ? m.character.name : m.username)
+  const addTestPlayer = async (e) => {
+    e?.preventDefault()
+    if (!activeCampaign || testWorking) return
+    setTestWorking(true); setTestError('')
+    try {
+      await api(`/campaigns/${activeCampaign._id}/test-players`, { method: 'POST', body: { name: testForm.name, classId: testForm.classId, level: Number(testForm.level) || 1 } })
+      setTestOpen(false); setTestForm(f => ({ ...f, name: '' }))
+      await loadRoster()
+    } catch (err) { setTestError(err?.message || 'Could not add the test player.') }
+    setTestWorking(false)
+  }
   const removePlayer = async () => {
     if (!removeTarget || !activeCampaign) return
     if (removeInput !== removeTarget.label) { setRemoveError('Name did not match. Check the capitalisation.'); return }
@@ -300,13 +316,17 @@ export default function SettingsModal({ onClose }) {
                       <div key={m.userId} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, padding: '6px 0', borderBottom: '1px solid var(--border)' }}>
                         <div style={{ minWidth: 0, fontSize: 13 }}>
                           <span style={{ color: 'var(--text)' }}>{rosterLabel(m)}</span>
-                          <span style={{ fontSize: 11, color: 'var(--text-3)' }}>{m.character?.name?.trim() ? ` · ${m.username}` : ' · no character yet'}{isMe ? ' (you, as a player)' : ''}</span>
+                          <span style={{ fontSize: 11, color: 'var(--text-3)' }}>{m.isTest ? ' · test player' : m.character?.name?.trim() ? ` · ${m.username}` : ' · no character yet'}{isMe ? ' (you, as a player)' : ''}</span>
                         </div>
-                        <button type="button" onClick={() => { setRemoveTarget({ userId: m.userId, label: rosterLabel(m), username: m.username }); setRemoveInput(''); setRemoveError('') }}
+                        <button type="button" onClick={() => { setRemoveTarget({ userId: m.userId, label: rosterLabel(m), username: m.username, isTest: !!m.isTest }); setRemoveInput(''); setRemoveError('') }}
                           style={{ background: 'none', border: 'none', color: 'var(--red)', fontSize: 12, cursor: 'pointer', padding: '2px 4px', flexShrink: 0 }}>Remove</button>
                       </div>
                     )
                   })}
+                  <div style={{ marginTop: 8 }}>
+                    <button type="button" className="btn btn-ghost btn-sm" onClick={() => { setTestOpen(true); setTestError('') }}>+ Add a test player</button>
+                    <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 4 }}>A placeholder player with a ready-made character, to try your campaign or use as a token on the battle map.</div>
+                  </div>
                 </div>
                 <button type="button" onClick={() => { setConfirmAction('delete'); setConfirmInput(''); setConfirmError('') }}
                   disabled={!isPremium}
@@ -332,13 +352,44 @@ export default function SettingsModal({ onClose }) {
         </div>
       </div>
 
+      {/* Add a test player */}
+      {testOpen && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.65)', zIndex: 1100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }} onClick={() => setTestOpen(false)}>
+          <form className="card" style={{ width: '100%', maxWidth: 380, padding: 22 }} onClick={e => e.stopPropagation()} onSubmit={addTestPlayer} role="dialog" aria-label="Add a test player">
+            <div style={{ fontFamily: 'var(--font-title)', fontSize: 16, fontWeight: 600, marginBottom: 10 }}>Add a test player</div>
+            <div style={{ fontSize: 13, color: 'var(--text-2)', marginBottom: 14, lineHeight: 1.6 }}>They join this campaign straight away with a ready-made character, and show up in the token tray, battle tracker and player list. You can remove them any time.</div>
+            <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text-3)', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 4 }}>Character name (optional)</label>
+            <input autoFocus className="input" maxLength={40} placeholder="Test Fighter" value={testForm.name} onChange={e => setTestForm(f => ({ ...f, name: e.target.value }))} style={{ marginBottom: 10 }} />
+            <div style={{ display: 'flex', gap: 10, marginBottom: 12 }}>
+              <div style={{ flex: 1 }}>
+                <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text-3)', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 4 }}>Class</label>
+                <select className="input" value={testForm.classId} onChange={e => setTestForm(f => ({ ...f, classId: e.target.value }))} aria-label="Class">
+                  <option value="fighter">Fighter</option><option value="rogue">Rogue</option><option value="wizard">Wizard</option><option value="cleric">Cleric</option>
+                </select>
+              </div>
+              <div style={{ width: 90 }}>
+                <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text-3)', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 4 }}>Level</label>
+                <input className="input" type="number" min="1" max="20" value={testForm.level} onChange={e => setTestForm(f => ({ ...f, level: e.target.value }))} aria-label="Level" />
+              </div>
+            </div>
+            {testError && <div style={{ fontSize: 12, color: 'var(--red)', marginBottom: 10 }} role="alert">{testError}</div>}
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button type="submit" className="btn btn-primary btn-sm" disabled={testWorking} style={{ flex: 1 }}>{testWorking ? 'Adding…' : 'Add test player'}</button>
+              <button type="button" className="btn btn-ghost btn-sm" onClick={() => setTestOpen(false)}>Cancel</button>
+            </div>
+          </form>
+        </div>
+      )}
+
       {/* Type-to-confirm: removing a player from the campaign */}
       {removeTarget && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.65)', zIndex: 1100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }} onClick={() => setRemoveTarget(null)}>
           <div className="card" style={{ width: '100%', maxWidth: 380, padding: 22 }} onClick={e => e.stopPropagation()} role="dialog" aria-label="Remove player">
             <div style={{ fontFamily: 'var(--font-title)', fontSize: 16, fontWeight: 600, color: 'var(--red)', marginBottom: 10 }}>Remove player</div>
             <div style={{ fontSize: 13, color: 'var(--text-2)', marginBottom: 14, lineHeight: 1.6 }}>
-              {removeTarget.username} loses access to this campaign. Their characters are kept, and you can let them back in later.
+              {removeTarget.isTest
+                ? 'This test player and their character are deleted.'
+                : `${removeTarget.username} loses access to this campaign. Their characters are kept, and you can let them back in later.`}
               {' '}Type <strong style={{ color: 'var(--text)' }}>{removeTarget.label}</strong> exactly to confirm.
             </div>
             <input autoFocus className="input" placeholder={removeTarget.label} value={removeInput} onChange={e => { setRemoveInput(e.target.value); setRemoveError('') }}

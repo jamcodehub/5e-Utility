@@ -560,7 +560,7 @@ router.post('/forgot-password', forgotEmailLimiter, requireCaptcha, async (req, 
     const email = asString(req.body.email)?.trim().toLowerCase()
     if (!email) return res.status(400).json({ error: 'Email required' })
     const user = await User.findOne({ email })
-    if (user) {
+    if (user && !user.placeholderOf) {
       const token = crypto.randomBytes(32).toString('hex')
       user.resetPasswordToken = crypto.createHash('sha256').update(token).digest('hex')
       user.resetPasswordExpires = new Date(Date.now() + 60 * 60 * 1000) // 1 hour

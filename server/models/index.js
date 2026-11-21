@@ -14,6 +14,9 @@ const UserSchema = new Schema({
   isPremium:        { type: Boolean, default: false },
   // Which role the subscription was bought for ('player' or 'dm'); '' on accounts made premium before this existed (= player).
   premiumRole:      { type: String, enum: ['', 'player', 'dm'], default: '' },
+  // A DM's "test player": a placeholder account that cannot sign in (no password). Set on the DM's campaign it belongs to.
+  placeholderOf:       { type: Schema.Types.ObjectId, ref: 'User', default: null },
+  placeholderCampaign: { type: Schema.Types.ObjectId, ref: 'Campaign', default: null, index: true },
   stripeCustomerId: { type: String, default: '' },
   stripeSubId:      { type: String, default: '' },
   // Failed-payment grace period: premium stays on until graceEndsAt.

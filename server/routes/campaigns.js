@@ -3,6 +3,7 @@ import crypto from 'crypto'
 import jwt from 'jsonwebtoken'
 import { Campaign, Character, User, CampaignGuide, DMBoard, DMBoardFolder } from '../models/index.js'
 import { hasPremium, hasPremiumAs } from '../lib/premium.js'
+import { buildTestCharacter, MAX_TEST_PLAYERS } from '../lib/testPlayer.js'
 
 const router = Router()
 
@@ -184,6 +185,27 @@ const memberLabel = async (campaignId, userId) => {
   return user?.username || ''
 }
 
+// DM adds a "test player": a placeholder player (an account that cannot sign in) with a ready-made character, so the DM can
+// try the campaign, use them as a token on the battle map, in the battle tracker and so on. Removing them deletes them.
+router.post('/:id/test-players', auth, async (req, res) => {
+  try {
+    const campaign = await Campaign.findOne({ _id: req.params.id, owner: req.userId, isPersonal: { $ne: true } })
+    if (!campaign) return res.status(403).json({ error: 'Only the DM of a campaign can add test players.' })
+    if (await User.countDocuments({ placeholderCampaign: campaign._id }) >= MAX_TEST_PLAYERS)
+      return res.status(400).json({ error: `A campaign can have up to ${MAX_TEST_PLAYERS} test players. Remove one first.` })
+    const sheet = buildTestCharacter({ name: req.body?.name, classId: req.body?.classId, level: req.body?.level })
+    const tag = crypto.randomBytes(3).toString('hex')
+    const user = await User.create({
+      username: `Test player ${tag}`, email: `test-player-${tag}-${crypto.randomBytes(4).toString('hex')}@placeholder.invalid`,
+      role: 'player', roles: ['player'], placeholderOf: req.userId, placeholderCampaign: campaign._id,
+    })
+    const character = await Character.create({ ...sheet, campaign: campaign._id, owner: user._id, isPrimary: true })
+    campaign.members.push(user._id)
+    await campaign.save()
+    res.json({ userId: user._id, username: user.username, character, isTest: true })
+  } catch { res.status(500).json({ error: 'Failed to add the test player' }) }
+})
+
 router.delete('/:id/members/:userId', auth, async (req, res) => {
   try {
     const campaign = await Campaign.findOne({ _id: req.params.id, owner: req.userId })
@@ -194,6 +216,8 @@ router.delete('/:id/members/:userId', auth, async (req, res) => {
     if (!expected || req.body?.confirmName !== expected) return res.status(400).json({ error: 'Name did not match.' })
     campaign.members = campaign.members.filter(m => String(m) !== uid)
     await campaign.save()
+    // A test player has no one behind it, so it is deleted together with its character instead of being left behind.
+    if (await User.findOneAndDelete({ _id: uid, placeholderOf: req.userId })) await Character.deleteMany({ campaign: campaign._id, owner: uid })
     res.json({ ok: true })
   } catch { res.status(500).json({ error: 'Failed to remove the player' }) }
 })
@@ -241,6 +265,11 @@ router.delete('/:id', auth, async (req, res) => {
     return res.status(400).json({ error: 'Campaign name did not match.' })
   }
   await campaign.deleteOne()
+  const testPlayers = await User.find({ placeholderCampaign: campaign._id }).select('_id')
+  if (testPlayers.length) {
+    await Character.deleteMany({ campaign: campaign._id, owner: { $in: testPlayers.map(u => u._id) } })
+    await User.deleteMany({ _id: { $in: testPlayers.map(u => u._id) } })
+  }
   await DMBoard.deleteMany({ campaign: campaign._id })
   await DMBoardFolder.deleteMany({ campaign: campaign._id })
   res.json({ ok: true })
@@ -362,7 +391,7 @@ router.delete('/:id/characters/:charId', auth, async (req, res) => {
 router.get('/:id/members/characters', auth, async (req, res) => {
   try {
     if (!await isMember(req.params.id, req.userId)) return res.status(403).json({ error: 'Not a campaign member' })
-    const campaign = await Campaign.findById(req.params.id).populate('members', 'username avatar')
+    const campaign = await Campaign.findById(req.params.id).populate('members', 'username avatar placeholderOf')
     if (!campaign) return res.status(404).json({ error: 'Not found' })
     const chars = await Character.find({
       campaign: req.params.id,
@@ -371,7 +400,7 @@ router.get('/:id/members/characters', auth, async (req, res) => {
     const result = campaign.members.map(m => {
       const owned = chars.filter(c => String(c.owner) === String(m._id))
       const character = owned.find(c => c.isPrimary) || owned[0] || null
-      return { userId: m._id, username: m.username, avatar: m.avatar || '', character }
+      return { userId: m._id, username: m.username, avatar: m.avatar || '', character, isTest: !!m.placeholderOf }
     })
     res.json(result)
   } catch { res.status(500).json({ error: 'Failed to load members' }) }

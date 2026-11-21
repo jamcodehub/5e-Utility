@@ -10,14 +10,16 @@ test('a DM removes a player only by typing their character name (username if non
   const stub = (target, name, fn) => { patched.push([target, name, target[name]]); target[name] = fn }
   const secret = process.env.JWT_SECRET
   process.env.JWT_SECRET = 'test-secret'
-  const dm = '507f1f77bcf86cd799439011', p1 = '507f1f77bcf86cd799439012', p2 = '507f1f77bcf86cd799439013', stranger = '507f1f77bcf86cd799439019'
+  const dm = '507f1f77bcf86cd799439011', p1 = '507f1f77bcf86cd799439012', p2 = '507f1f77bcf86cd799439013', stranger = '507f1f77bcf86cd799439019', tester = '507f1f77bcf86cd799439018'
   const id = '507f1f77bcf86cd799439014'
-  const doc = { _id: id, owner: dm, members: [p1, p2, dm], saved: 0, async save() { this.saved += 1 } }
-  const chars = { [p1]: [{ name: 'Brannoc', isPrimary: true }], [p2]: [], [dm]: [{ name: 'Test Hero', isPrimary: false }] }
-  const deleted = []
+  const doc = { _id: id, owner: dm, members: [p1, p2, dm, tester], saved: 0, async save() { this.saved += 1 } }
+  const chars = { [p1]: [{ name: 'Brannoc', isPrimary: true }], [p2]: [], [dm]: [{ name: 'Test Hero', isPrimary: false }], [tester]: [{ name: 'Pip', isPrimary: true }] }
+  const deleted = [], deletedUsers = []
   stub(Campaign, 'findOne', async q => (String(q.owner) === dm && String(q._id) === id ? doc : null))
   stub(Character, 'find', async q => chars[String(q.owner)] || [])
   stub(Character, 'deleteMany', async q => { deleted.push(q) })
+  // only the test player (a placeholder of this DM) is a deletable account
+  stub(User, 'findOneAndDelete', async q => { if (String(q._id) === tester && String(q.placeholderOf) === dm) { deletedUsers.push(String(q._id)); return { _id: tester } } return null })
   stub(User, 'findById', userId => ({ select: async () => ({ username: userId === p2 ? 'Quietplayer' : 'x' }) }))
   const app = express()
   app.use(express.json())
@@ -38,14 +40,21 @@ test('a DM removes a player only by typing their character name (username if non
   assert.equal((await remove(dm, p1, 'brannoc')).status, 400, 'the name is case-sensitive')
   assert.equal((await remove(dm, p1, '')).status, 400)
   assert.equal((await remove(dm, p1, 'Quietplayer')).status, 400, 'the username does not work when they have a character')
-  assert.equal(doc.members.length, 3); assert.equal(doc.saved, 0)
+  assert.equal(doc.members.length, 4); assert.equal(doc.saved, 0)
 
   assert.equal((await remove(dm, p1, 'Brannoc')).status, 200)
-  assert.deepEqual(doc.members.map(String), [p2, dm])
+  assert.deepEqual(doc.members.map(String), [p2, dm, tester])
   assert.equal((await remove(dm, p1, 'Brannoc')).status, 404, 'already gone')
   assert.equal((await remove(dm, p2, 'Quietplayer')).status, 200, 'no character: the username is the name to type')
   assert.equal((await remove(dm, dm, 'Test Hero')).status, 200, 'the DM can remove their own placeholder player')
-  assert.deepEqual(doc.members.map(String), [])
+  assert.deepEqual(doc.members.map(String), [tester])
   assert.equal(String(doc.owner), dm, 'ownership is untouched')
-  assert.deepEqual(deleted, [], 'characters are never deleted')
+  assert.deepEqual(deleted, [], 'a real player\'s characters are never deleted')
+  assert.deepEqual(deletedUsers, [])
+
+  // a test player has no one behind it, so removing it deletes the placeholder account and its character
+  assert.equal((await remove(dm, tester, 'Pip')).status, 200)
+  assert.deepEqual(doc.members.map(String), [])
+  assert.deepEqual(deletedUsers, [tester])
+  assert.deepEqual(deleted.map(q => String(q.owner)), [tester], 'only the test player\'s character is deleted')
 })
