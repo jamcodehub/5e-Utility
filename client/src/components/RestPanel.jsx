@@ -17,7 +17,7 @@ export function limitedFeatures(char, srd) {
   return { cls, list }
 }
 
-export default function RestPanel({ char, srd, roller, onPatch }) {
+export default function RestPanel({ char, srd, roller, onPatch, bare = false }) {
   const { cls, list } = limitedFeatures(char, srd)
   const level = char.level || 1
   const hp = char.hp || { current: 10, max: 10 }
@@ -61,7 +61,7 @@ export default function RestPanel({ char, srd, roller, onPatch }) {
   }
 
   return (
-    <div className="card" style={{ padding: '12px 18px', marginBottom: 16 }}>
+    <div className={bare ? undefined : 'card'} style={bare ? undefined : { padding: '12px 18px', marginBottom: 16 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
         <div>
           <div style={label}>Rest</div>

@@ -8,7 +8,7 @@ import UpgradeModal from '../components/UpgradeModal'
 import CustomCharacterBuilder from '../components/CustomCharacterBuilder'
 import CharacterActions from '../components/CharacterActions'
 import RestPanel from '../components/RestPanel'
-import CombatPanel from '../components/CombatPanel'
+import CombatPanel, { HitPointControls } from '../components/CombatPanel'
 import GearTab from '../components/GearTab'
 import { InventoryPanel } from './Inventory'
 import { PrintOverlay } from '../components/CharacterSheet'
@@ -75,6 +75,8 @@ export default function Character() {
   const [builder, setBuilder] = useState(null) // null | 'custom'
   const [ddbUrl, setDdbUrl] = useState('')
   const [ddbBusy, setDdbBusy] = useState(false)
+  const [hpOpen, setHpOpen] = useState(false) // hit point / rest popover on the header
+  const hpRef = useRef(null)
   const roller = useRoller()
   const [srdData, setSrdData] = useState(null)
   const [printing, setPrinting] = useState(false)
@@ -82,10 +84,20 @@ export default function Character() {
 
   // Rules data is only fetched once the Actions / Gear tabs are opened
   useEffect(() => {
-    if ((tab === 'actions' || tab === 'gear' || printing || sharing) && !srdData) {
+    if ((tab === 'actions' || tab === 'gear' || hpOpen || printing || sharing) && !srdData) {
       loadSrdMany('core', 'classes', 'races', 'traits', 'features', 'equipment', 'spells').then(setSrdData).catch(() => toast('Could not load the rules data'))
     }
-  }, [tab]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [tab, hpOpen]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // The popover closes on a click outside it or Escape (and while the sheet is being edited).
+  useEffect(() => {
+    if (!hpOpen) return
+    const onDown = (e) => { if (hpRef.current && !hpRef.current.contains(e.target)) setHpOpen(false) }
+    const onKey = (e) => { if (e.key === 'Escape') setHpOpen(false) }
+    document.addEventListener('mousedown', onDown); document.addEventListener('keydown', onKey)
+    return () => { document.removeEventListener('mousedown', onDown); document.removeEventListener('keydown', onKey) }
+  }, [hpOpen])
+  useEffect(() => { if (editing) setHpOpen(false) }, [editing])
 
   const FREE_CHAR_LIMIT = 2
   const atCharLimit = !isPremium && characters.length >= FREE_CHAR_LIMIT
@@ -363,7 +375,7 @@ export default function Character() {
       </div>
 
       {/* Header card */}
-      <div className="card" style={{ padding: '16px 20px', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
+      <div className="card" style={{ position: 'relative', padding: '16px 20px', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
         {/* Avatar */}
         <div style={{ position: 'relative', flexShrink: 0 }}>
           <div style={{ width: 56, height: 56, borderRadius: '50%', overflow: 'hidden', background: 'var(--gold-bg)', border: '2px solid var(--gold-border)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24 }}>
@@ -423,9 +435,20 @@ export default function Character() {
                     onChange={e => setForm(p => ({ ...p, [label === 'AC' ? 'ac' : 'profBonus']: +e.target.value }))} />
                 )
               ) : (
-                <div style={{ fontFamily: 'var(--font-title)', fontSize: 18, fontWeight: 600, color }}>
-                  {label === 'HP' ? `${F.hp?.current ?? 10}/${F.hp?.max ?? 10}` : label === 'AC' ? F.ac ?? 10 : label === 'Prof' ? `+${F.profBonus ?? 2}` : mod(F.stats?.dex ?? 10)}
-                </div>
+                label === 'HP' && char ? (
+                  <button type="button" onClick={() => setHpOpen(o => !o)} aria-expanded={hpOpen} aria-label="Manage hit points" title="Manage hit points: damage, healing, temp HP and rests"
+                    style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontFamily: 'var(--font-title)', fontSize: 18, fontWeight: 600, color, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                    {F.hp?.current ?? 10}/{F.hp?.max ?? 10}
+                    <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true" focusable="false" style={{ opacity: 0.6, transform: hpOpen ? 'rotate(180deg)' : 'none', transition: 'transform .15s' }}><path d="M2 3.5 5 6.5 8 3.5" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                  </button>
+                ) : (
+                  <div style={{ fontFamily: 'var(--font-title)', fontSize: 18, fontWeight: 600, color }}>
+                    {label === 'HP' ? `${F.hp?.current ?? 10}/${F.hp?.max ?? 10}` : label === 'AC' ? F.ac ?? 10 : label === 'Prof' ? `+${F.profBonus ?? 2}` : mod(F.stats?.dex ?? 10)}
+                  </div>
+                )
+              )}
+              {label === 'HP' && !editing && char?.combat?.tempHp > 0 && (
+                <div style={{ fontSize: 10, color: 'var(--gold)', marginTop: 1 }}>+{char.combat.tempHp} temp</div>
               )}
               {label === 'HP' && !editing && (
                 <div style={{ display: 'flex', gap: 4, justifyContent: 'center', marginTop: 4 }}>
@@ -446,6 +469,24 @@ export default function Character() {
                 {char && <button className="btn btn-ghost btn-sm" onClick={() => setSharing(true)}>Share</button>}
               </>}
         </div>
+
+        {hpOpen && char && !editing && (
+          <div ref={hpRef} className="card" role="dialog" aria-label="Hit points and rest"
+            style={{ position: 'absolute', top: 'calc(100% + 8px)', right: 0, zIndex: 60, width: 'min(480px, 100%)', padding: 16, boxShadow: 'var(--shadow-md)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+              <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-3)', letterSpacing: '0.06em', textTransform: 'uppercase' }}>Hit points</div>
+              <button type="button" className="btn btn-ghost btn-sm" onClick={() => setHpOpen(false)}>Done</button>
+            </div>
+            {srdData ? (
+              <>
+                <HitPointControls char={char} d={derive(char, srdData)} roller={roller} onPatch={patchChar} />
+                <div style={{ marginTop: 14, paddingTop: 12, borderTop: '1px solid var(--border)' }}>
+                  <RestPanel bare char={char} srd={srdData} roller={roller} onPatch={patchChar} />
+                </div>
+              </>
+            ) : <div style={{ color: 'var(--text-3)', fontSize: 13 }}>Loading rules…</div>}
+          </div>
+        )}
       </div>
 
       {/* Onboarding banner for new players */}
@@ -468,11 +509,11 @@ export default function Character() {
         !char ? <div className="card" style={{ padding: 20, fontSize: 13, color: 'var(--text-2)' }}>Save your character first, then your actions will show up here.</div>
         : !srdData ? <div style={{ color: 'var(--text-3)', fontSize: 13 }}>Loading rules…</div>
         : tab === 'actions'
-          ? <><RestPanel char={char} srd={srdData} roller={roller} onPatch={patchChar} /><CombatPanel char={char} srd={srdData} d={derive(char, srdData)} roller={roller} onPatch={patchChar} /><CharacterActions char={char} srd={srdData} roller={roller} onPatch={patchChar} /></>
+          ? <><CombatPanel char={char} srd={srdData} d={derive(char, srdData)} roller={roller} onPatch={patchChar} /><CharacterActions char={char} srd={srdData} roller={roller} onPatch={patchChar} /></>
           : <GearTab char={char} srd={srdData} d={derive(char, srdData)} onPatch={patchChar} />
       )}
       {tab === 'inventory' && <InventoryPanel toast={toast} />}
-      {tab === 'actions' && char && <RollPanel roller={roller} />}
+      {char && (tab === 'actions' || roller.history.length > 0) && <RollPanel roller={roller} />}
 
       {tab === 'stats' && (
         <div className="stat-grid-6">

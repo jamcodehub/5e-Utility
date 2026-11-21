@@ -41,15 +41,12 @@ function Pips({ n, max = 3, color, onSet }) {
   )
 }
 
-// Table-play state: HP with temp HP, death saves, concentration, conditions, exhaustion, companions.
-export default function CombatPanel({ char, srd, d, roller, onPatch }) {
+// Hit points, temp HP, concentration and death saves. Lives in the popover on the character header's HP box.
+export function HitPointControls({ char, d, roller, onPatch }) {
   const [amount, setAmount] = useState('')
-  const [openCond, setOpenCond] = useState(null)
-  const [newPet, setNewPet] = useState('')
   const combat = { tempHp: 0, conditions: [], exhaustion: 0, inspiration: false, concentrating: '', deathSaves: { successes: 0, failures: 0 }, ...(char.combat || {}) }
   const hp = { current: 10, max: 10, ...(char.hp || {}) }
   const ds = combat.deathSaves
-  const conditions = srd.core.conditions.filter(c => c.id !== 'exhaustion')
   const patchCombat = (p, extra = {}) => onPatch({ combat: { ...combat, ...p }, ...extra })
   const note = (title, text) => roller.push({ title, lines: [{ label: text, total: null, detail: '' }] })
 
@@ -100,32 +97,13 @@ export default function CombatPanel({ char, srd, d, roller, onPatch }) {
     if (failures >= 3) note('Dead', 'Three failed death saves.')
     else if (successes >= 3) note('Stable', 'Three successes — you are stable at 0 HP and stop making death saves.')
   }
-  const toggleCond = (id) => patchCombat({ conditions: combat.conditions.includes(id) ? combat.conditions.filter(c => c !== id) : [...combat.conditions, id] })
-
-  const companions = char.companions || []
-  const setCompanions = (next) => onPatch({ companions: next })
-  const addPet = () => {
-    if (!newPet.trim()) return
-    setCompanions([...companions, { id: `c-${Date.now()}`, name: newPet.trim(), hp: { current: 10, max: 10 }, ac: 10, notes: '' }])
-    setNewPet('')
-  }
-  const editPet = (id, p) => setCompanions(companions.map(c => (c.id === id ? { ...c, ...p } : c)))
-
   return (
-    <>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(84px, 1fr))', gap: 8, marginBottom: 16 }}>
-        <Stat name="Armor class" value={char.ac ?? d.ac} />
-        <Stat name="Initiative" value={fmtMod(d.initiative)} onClick={() => roller.rollCheck('Initiative', d.initiative)} sub="tap to roll" />
-        <Stat name="Speed" value={`${d.speed} ft`} sub={d.speed !== d.baseSpeed ? `base ${d.baseSpeed}` : ''} />
-        <Stat name="Passive Perc." value={d.passive} />
-        <Stat name="Proficiency" value={fmtMod(d.prof)} />
-        {d.spellDc != null && <Stat name="Spell save DC" value={d.spellDc} sub={`${d.castAbility?.toUpperCase()} · atk ${fmtMod(d.spellAtk)}`} />}
-        <Stat name="Inspiration" value={combat.inspiration ? '★' : '☆'} onClick={() => patchCombat({ inspiration: !combat.inspiration })} sub={combat.inspiration ? 'spend it' : 'none'} />
-      </div>
-
-      <Panel title="Hit points" right={combat.concentrating && (
-        <span style={chip(true)} onClick={() => patchCombat({ concentrating: '' })} title="Click to stop concentrating">Concentrating: {combat.concentrating} ✕</span>
-      )}>
+    <div>
+      {combat.concentrating && (
+        <div style={{ marginBottom: 8 }}>
+          <span style={chip(true)} onClick={() => patchCombat({ concentrating: '' })} title="Click to stop concentrating">Concentrating: {combat.concentrating} ✕</span>
+        </div>
+      )}
         <div style={{ display: 'flex', alignItems: 'baseline', gap: 14, flexWrap: 'wrap', marginBottom: 10 }}>
           <span style={{ fontSize: 28, fontFamily: 'var(--font-title)', color: hp.current === 0 ? 'var(--red)' : 'var(--text)' }}>{hp.current}<span style={{ fontSize: 16, color: 'var(--text-3)' }}> / {hp.max}</span></span>
           {combat.tempHp > 0 && <span style={{ fontSize: 14, color: 'var(--gold)' }}>+{combat.tempHp} temp</span>}
@@ -150,7 +128,43 @@ export default function CombatPanel({ char, srd, d, roller, onPatch }) {
             <div style={{ fontSize: 10, color: 'var(--text-3)', marginTop: 6 }}>10+ is a success, below 10 a failure. A natural 1 counts as two failures, a natural 20 brings you back with 1 HP.</div>
           </div>
         )}
-      </Panel>
+    </div>
+  )
+}
+
+// Table-play state: HP with temp HP, death saves, concentration, conditions, exhaustion, companions.
+export default function CombatPanel({ char, srd, d, roller, onPatch }) {
+  const [openCond, setOpenCond] = useState(null)
+  const [newPet, setNewPet] = useState('')
+  const combat = { tempHp: 0, conditions: [], exhaustion: 0, inspiration: false, concentrating: '', deathSaves: { successes: 0, failures: 0 }, ...(char.combat || {}) }
+  const hp = { current: 10, max: 10, ...(char.hp || {}) }
+  const ds = combat.deathSaves
+  const conditions = srd.core.conditions.filter(c => c.id !== 'exhaustion')
+  const patchCombat = (p, extra = {}) => onPatch({ combat: { ...combat, ...p }, ...extra })
+  const note = (title, text) => roller.push({ title, lines: [{ label: text, total: null, detail: '' }] })
+
+  const toggleCond = (id) => patchCombat({ conditions: combat.conditions.includes(id) ? combat.conditions.filter(c => c !== id) : [...combat.conditions, id] })
+
+  const companions = char.companions || []
+  const setCompanions = (next) => onPatch({ companions: next })
+  const addPet = () => {
+    if (!newPet.trim()) return
+    setCompanions([...companions, { id: `c-${Date.now()}`, name: newPet.trim(), hp: { current: 10, max: 10 }, ac: 10, notes: '' }])
+    setNewPet('')
+  }
+  const editPet = (id, p) => setCompanions(companions.map(c => (c.id === id ? { ...c, ...p } : c)))
+
+  return (
+    <>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(84px, 1fr))', gap: 8, marginBottom: 16 }}>
+        <Stat name="Armor class" value={char.ac ?? d.ac} />
+        <Stat name="Initiative" value={fmtMod(d.initiative)} onClick={() => roller.rollCheck('Initiative', d.initiative)} sub="tap to roll" />
+        <Stat name="Speed" value={`${d.speed} ft`} sub={d.speed !== d.baseSpeed ? `base ${d.baseSpeed}` : ''} />
+        <Stat name="Passive Perc." value={d.passive} />
+        <Stat name="Proficiency" value={fmtMod(d.prof)} />
+        {d.spellDc != null && <Stat name="Spell save DC" value={d.spellDc} sub={`${d.castAbility?.toUpperCase()} · atk ${fmtMod(d.spellAtk)}`} />}
+        <Stat name="Inspiration" value={combat.inspiration ? '★' : '☆'} onClick={() => patchCombat({ inspiration: !combat.inspiration })} sub={combat.inspiration ? 'spend it' : 'none'} />
+      </div>
 
       <Panel title="Conditions" right={combat.conditions.length ? <button className="btn btn-ghost btn-sm" onClick={() => patchCombat({ conditions: [] })}>Clear all</button> : null}>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>

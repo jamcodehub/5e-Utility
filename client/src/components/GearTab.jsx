@@ -39,7 +39,7 @@ export default function GearTab({ char, srd, d, onPatch }) {
     const needle = q.trim().toLowerCase()
     return srd.equipment
       .filter(e => (cat === 'all' || e.category === cat) && (!needle || e.name.toLowerCase().includes(needle)))
-      .sort((a, b) => a.name.localeCompare(b.name)).slice(0, 40)
+      .sort((a, b) => a.name.localeCompare(b.name))
   }, [srd.equipment, cat, q])
 
   // Saves the inventory and keeps Armor Class in step when armor or a shield changes.
