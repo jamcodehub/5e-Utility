@@ -5,9 +5,8 @@ import { useCampaign } from '../context/CampaignContext'
 import { useToast } from '../hooks/useToast'
 import { TILES } from '../data/levelTiles'
 import { MESSAGE_TYPE, readGeneratedMap } from '../utils/generatedMap'
+import { GAME_URL } from '../utils/godotGame'
 
-// The Godot game (web export). Set VITE_GODOT_MAP_URL to host it somewhere else; otherwise it is served from this site.
-const GAME_URL = import.meta.env.VITE_GODOT_MAP_URL || '/godot/map-generator/index.html'
 const GROUND_COLOR = Object.fromEntries(TILES.map(t => [t.id, t.color]))
 
 // A small flat picture of the map that was just generated, so the DM can see what they are about to save.

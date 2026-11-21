@@ -14,6 +14,8 @@ import { THEMES, DEFAULT_THEME, resolveThemeId, getThemeTiles } from '../data/le
 import { avatarSrc } from '../components/ProfileAvatar'
 import { tokenColor } from '../utils/tokenColor'
 import { keyToStep, stepToken, isTypingTarget } from '../utils/tokenMove'
+import { classIdFor, viewerLevels } from '../utils/viewer3d'
+import Battle3DView from '../components/Battle3DView'
 // Note: module-level TILES / OBJECT_TILES above are the base (Medieval) set, used for
 // logic that doesn't depend on artwork. MapThumb and LevelBuilder shadow them with the
 // active theme's tiles (same ids, different art).
@@ -346,6 +348,7 @@ export default function LevelBuilder() {
   const [dragPreviewToken, setDragPreviewToken] = useState(null)
   const dragPosRef = useRef({ x: 0, y: 0 })
   const [tapToPlaceTokenId, setTapToPlaceTokenId] = useState(null)
+  const [view3d, setView3d] = useState(false) // true: the live 3D view (the Godot game) instead of the flat board
   const [cellSize, setCellSize] = useState(28)
   const gridRef = useRef(null)
   const scrollRef = useRef(null)
@@ -517,6 +520,7 @@ export default function LevelBuilder() {
           hp: m.character?.hp?.current ?? m.character?.hp?.max ?? 10,
           maxHp: m.character?.hp?.max ?? 10,
           type: 'player',
+          classId: classIdFor(m.character?.class), // for the 3D miniature
         })
       })
 
@@ -640,23 +644,30 @@ export default function LevelBuilder() {
 
   // Walk with WASD or the arrow keys. A player moves their own character's token; the DM moves the token selected in the side
   // list. Steps are limited to about 8 a second, so holding a key walks smoothly without flooding the server with saves.
+  // Keys come from this page, or from the 3D view (the game in a frame has its own keyboard focus and passes them on).
   const lastStepRef = useRef(0)
+  const walkToken = (key) => {
+    const step = keyToStep(key)
+    if (!step) return false
+    const movingId = isDm ? tapToPlaceTokenId : `char-${user?.id}`
+    if (!movingId || !tokens.some(t => t.id === movingId && Number.isInteger(t.row))) return false
+    const now = Date.now()
+    if (now - lastStepRef.current < 120) return true
+    lastStepRef.current = now
+    setTokens(current => stepToken(current, movingId, step, grid, objectGrid, doorStates))
+    return true
+  }
+  const walkRef = useRef(walkToken)
+  walkRef.current = walkToken
   useEffect(() => {
     if (mode !== 'play' || !selectedPlanId) return undefined
     const onKeyDown = (e) => {
-      const step = keyToStep(e.key)
-      if (!step || e.ctrlKey || e.metaKey || e.altKey || isTypingTarget(e.target)) return
-      const movingId = isDm ? tapToPlaceTokenId : `char-${user?.id}`
-      if (!movingId || !tokens.some(t => t.id === movingId && Number.isInteger(t.row))) return
-      e.preventDefault()
-      const now = Date.now()
-      if (now - lastStepRef.current < 120) return
-      lastStepRef.current = now
-      setTokens(current => stepToken(current, movingId, step, grid, objectGrid, doorStates))
+      if (e.ctrlKey || e.metaKey || e.altKey || isTypingTarget(e.target)) return
+      if (walkRef.current(e.key)) e.preventDefault()
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [mode, selectedPlanId, isDm, user?.id, tapToPlaceTokenId, tokens, grid, objectGrid, doorStates])
+  }, [mode, selectedPlanId])
 
   // ── Gallery actions ──
   const openEditor = (plan = null, size = null) => {
@@ -983,6 +994,18 @@ export default function LevelBuilder() {
     }
     return { visible, torchlit, darkvision, lightStrength }
   }, [darkMode, doorStates, grid, isDm, darkvisionSources, sharedLightSources])
+
+  // What the 3D view is sent: how lit each square is (same as the 2D board shows), and each token's class.
+  const viewerLevelList = useMemo(
+    () => viewerLevels({ darkMode, isDm, visibility, rows: gridH, cols: gridW }),
+    [darkMode, isDm, visibility, gridH, gridW],
+  )
+  const classOfToken = useCallback((t) => availableTokens.find(a => a.id === t.id)?.classId || '', [availableTokens])
+  const handleViewerClick = ({ row, col, tokenId }) => {
+    // The DM picks a token to walk (like Move in the side list); everything else is a click on a square, as on the flat board.
+    if (tokenId && isDm) { setTapToPlaceTokenId(current => current === tokenId ? null : tokenId); return }
+    handlePlayCellClick({ target: null, currentTarget: null }, row, col)
+  }
 
   if (!activeCampaign && !campaignsLoading) return (
     <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-3)' }}>
@@ -1456,12 +1479,24 @@ export default function LevelBuilder() {
             }))}
           </div>
           </div>
+          {view3d && (
+            <Battle3DView
+              ground={grid} objects={objectGrid} doorStates={doorStates} theme={themeId}
+              tokens={tokens} levels={viewerLevelList} darkMode={darkMode}
+              focusId={isDm ? (tapToPlaceTokenId || '') : `char-${user?.id}`} classOf={classOfToken}
+              onClick={handleViewerClick} onKey={key => walkRef.current(key)}
+              tokensOpen={isDm && showTokens && !isFullscreen}
+            />
+          )}
           <div className="level-play-controls" data-tokens-open={isDm && showTokens && !isFullscreen} style={{ position: 'absolute', bottom: 18, display: 'flex', gap: 4, opacity: 0.35, transition: 'opacity .15s', zIndex: 20 }} onMouseEnter={e => { e.currentTarget.style.opacity = 0.95 }} onMouseLeave={e => { e.currentTarget.style.opacity = 0.35 }}>
             {[
               ...(isDm && !isFullscreen ? [{ label: '☰', title: showTokens ? 'Hide tokens panel' : 'Show tokens panel', onClick: () => setShowTokens(v => !v) }] : []),
-              { label: '−', title: 'Zoom out', onClick: () => changeZoom(-0.5), disabled: zoom <= 1 },
-              { label: `${Math.round(zoom * 100)}%`, title: 'Reset zoom', onClick: () => changeZoom(0, true), disabled: zoom === 1 },
-              { label: '+', title: 'Zoom in', onClick: () => changeZoom(0.5), disabled: zoom >= 4 },
+              { label: view3d ? '2D' : '3D', title: view3d ? 'Back to the flat board' : 'See the map in 3D', onClick: () => setView3d(v => !v) },
+              ...(view3d ? [] : [
+                { label: '−', title: 'Zoom out', onClick: () => changeZoom(-0.5), disabled: zoom <= 1 },
+                { label: `${Math.round(zoom * 100)}%`, title: 'Reset zoom', onClick: () => changeZoom(0, true), disabled: zoom === 1 },
+                { label: '+', title: 'Zoom in', onClick: () => changeZoom(0.5), disabled: zoom >= 4 },
+              ]),
               { label: isFullscreen ? '⤡' : '⤢', title: isFullscreen ? 'Exit fullscreen' : 'Fullscreen', onClick: toggleFullscreen },
             ].map(b => (
               <button key={b.title} type="button" title={b.title} aria-label={b.title} disabled={b.disabled} onClick={b.onClick}
