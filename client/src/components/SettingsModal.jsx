@@ -28,6 +28,9 @@ export default function SettingsModal({ onClose }) {
   const [confirmWorking, setConfirmWorking] = useState(false)
   const [roleWorking, setRoleWorking] = useState(false)
   const [roleError, setRoleError] = useState('')
+  const [nameInput, setNameInput] = useState('')
+  const [nameWorking, setNameWorking] = useState(false)
+  const [nameMsg, setNameMsg] = useState(null) // { ok, text }
 
   const changeRole = async (role) => {
     if (role === user?.role || roleWorking) return
@@ -124,6 +127,31 @@ export default function SettingsModal({ onClose }) {
             )}
           </div>
         </div>
+
+        {/* Username (must be unique, whatever the capitalisation) */}
+        <form style={{ marginBottom: 24 }} onSubmit={async (e) => {
+          e.preventDefault()
+          const next = nameInput.trim()
+          if (!next || next === user?.username) { setNameInput(''); return }
+          setNameWorking(true); setNameMsg(null)
+          try {
+            await api('/auth/username', { method: 'PUT', body: { username: next } })
+            await refreshUser()
+            setNameInput('')
+            setNameMsg({ ok: true, text: 'Username changed.' })
+          } catch (err) { setNameMsg({ ok: false, text: err?.message || 'Could not change the username.' }) }
+          finally { setNameWorking(false) }
+        }}>
+          <label htmlFor="settings-username" style={{ display: 'block', fontSize: 12, fontWeight: 600, color: 'var(--text-2)', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 6 }}>Username</label>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <input id="settings-username" className="input" style={{ flex: 1, minWidth: 0 }} value={nameInput} maxLength={24} autoComplete="off"
+              placeholder={user?.username || 'Username'} onChange={e => { setNameInput(e.target.value); setNameMsg(null) }} />
+            <button type="submit" className="btn btn-sm" disabled={nameWorking || !nameInput.trim() || nameInput.trim() === user?.username}>{nameWorking ? 'Saving…' : 'Change'}</button>
+          </div>
+          <div style={{ fontSize: 12, marginTop: 6, color: nameMsg ? (nameMsg.ok ? 'var(--green)' : 'var(--red)') : 'var(--text-3)' }} role="status">
+            {nameMsg ? nameMsg.text : 'Your current name is shown in the box. 3 to 24 characters, and nobody else can use the same name.'}
+          </div>
+        </form>
 
         {/* Theme */}
         <div style={{ marginBottom: 24 }}>
