@@ -16,6 +16,7 @@ import { tokenColor } from '../utils/tokenColor'
 import { keyToStep, stepToken, isTypingTarget, bumpedDoor } from '../utils/tokenMove'
 import { classIdFor, viewerLevels } from '../utils/viewer3d'
 import { readHeights, heightShade } from '../utils/mapHeights'
+import { rotationOf, nextRotation, rotationLabel, readRotations, compactRotations, withRotation } from '../utils/tileRotation'
 import Battle3DView from '../components/Battle3DView'
 // Note: module-level TILES / OBJECT_TILES above are the base (Medieval) set, used for
 // logic that doesn't depend on artwork. MapThumb and LevelBuilder shadow them with the
@@ -44,6 +45,7 @@ const blankGrid = (w, h) => blankOf('empty', w, h)
 const blankObjectGrid = (w, h) => blankOf(null, w, h)
 const blankDoorStates = (w, h) => blankOf(false, w, h)
 const blankStairLinks = (w, h) => blankOf(null, w, h)
+const blankRotations = (w, h) => blankOf(null, w, h) // quarter turns chosen by the author; null = automatic (see utils/tileRotation.js)
 
 function normalizeGrid(value, fallback, { w, h } = { w: GRID_W, h: GRID_H }) {
   return Array.from({ length: h }, (_, r) =>
@@ -56,7 +58,7 @@ function parseMapContent(content) {
     const parsed = JSON.parse(content)
     if (Array.isArray(parsed)) {
       const dims = dimsOf(parsed)
-      return { ground: normalizeGrid(parsed, 'empty', dims), objects: blankObjectGrid(dims.w, dims.h), stairLinks: blankStairLinks(dims.w, dims.h), dims }
+      return { ground: normalizeGrid(parsed, 'empty', dims), objects: blankObjectGrid(dims.w, dims.h), stairLinks: blankStairLinks(dims.w, dims.h), rotations: blankRotations(dims.w, dims.h), objectRotations: blankRotations(dims.w, dims.h), dims }
     }
     if (parsed && Array.isArray(parsed.ground)) {
       const dims = dimsOf(parsed.ground)
@@ -65,6 +67,8 @@ function parseMapContent(content) {
         objects: normalizeGrid(parsed.objects, null, dims),
         stairLinks: normalizeGrid(parsed.stairLinks, null, dims),
         heights: readHeights(parsed.heights, dims.h, dims.w), // ground height (mountains, dunes...), or null for a flat map
+        rotations: readRotations(parsed.rotations, dims.h, dims.w),
+        objectRotations: readRotations(parsed.objectRotations, dims.h, dims.w),
         dims,
       }
     }
@@ -72,7 +76,7 @@ function parseMapContent(content) {
     // Older maps may have empty or malformed content; use an empty object layer.
   }
   const dims = { w: GRID_W, h: GRID_H }
-  return { ground: blankGrid(), objects: blankObjectGrid(), stairLinks: blankStairLinks(), dims }
+  return { ground: blankGrid(), objects: blankObjectGrid(), stairLinks: blankStairLinks(), rotations: blankRotations(), objectRotations: blankRotations(), dims }
 }
 
 function normalizeDoorStates(value, dims) {
@@ -122,14 +126,15 @@ function objectTile(id) {
   return OBJECT_TILES.find(tile => tile.id === id)
 }
 
-function TileIconPlaceholder({ tile, style = {} }) {
+function TileIconPlaceholder({ tile, style = {}, rotate = 0 }) {
+  // `rotate` is in degrees, a quarter turn at a time (see utils/tileRotation.js)
   if (tile.imageUrl) {
     return <img
       src={tile.imageUrl}
       alt=""
       aria-hidden="true"
       draggable="false"
-      style={{ width: '94%', height: '94%', objectFit: 'contain', pointerEvents: 'none', ...style }}
+      style={{ width: '94%', height: '94%', objectFit: 'contain', pointerEvents: 'none', transform: rotate ? `rotate(${rotate}deg)` : undefined, ...style }}
     />
   }
 
@@ -146,7 +151,7 @@ function TileIconPlaceholder({ tile, style = {} }) {
         WebkitMaskRepeat: 'no-repeat',
         WebkitMaskPosition: 'center',
         WebkitMaskSize: 'contain',
-        transform: tile.id === 'stairs-down' ? 'rotate(180deg)' : undefined,
+        transform: [tile.id === 'stairs-down' && 'rotate(180deg)', rotate && `rotate(${rotate}deg)`].filter(Boolean).join(' ') || undefined,
         pointerEvents: 'none',
         ...style,
       }} />
@@ -158,6 +163,7 @@ function TileIconPlaceholder({ tile, style = {} }) {
         border: '1px dashed rgba(0,0,0,0.32)',
         boxSizing: 'border-box',
         pointerEvents: 'none',
+        transform: rotate ? `rotate(${rotate}deg)` : undefined,
         ...style,
       }} />
 }
@@ -279,7 +285,7 @@ const dragPreviewTransform = ({ x, y }) => `translate3d(${x}px, ${y}px, 0) trans
 
 // One square of the play board. Memoised, so a token taking a step redraws only the squares it left and entered, not the whole
 // board (a 48 by 33 map has 1,584 squares: drawing them all on every step took about 0.3 seconds and made walking lag).
-const PlayCell = memo(function PlayCell({ r, c, cellId, groundTile, object, visible, torchlit, darkvision, lightStrength, doorOpen, locked, shade, token, dragging, darkMode, isDm, cellSize, torchSrc, onCellClick, onDragStart }) {
+const PlayCell = memo(function PlayCell({ r, c, cellId, groundTile, object, turn, objectTurn, visible, torchlit, darkvision, lightStrength, doorOpen, locked, shade, token, dragging, darkMode, isDm, cellSize, torchSrc, onCellClick, onDragStart }) {
   const isDoor = cellId === 'door'
   const isStair = cellId === 'stairs' || cellId === 'stairs-down'
   const cellBase = isDoor && doorOpen ? 'floor' : cellId
@@ -311,15 +317,15 @@ const PlayCell = memo(function PlayCell({ r, c, cellId, groundTile, object, visi
           alt=""
           aria-hidden="true"
           draggable="false"
-          style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', pointerEvents: 'none' }}
+          style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', pointerEvents: 'none', transform: turn ? `rotate(${turn}deg)` : undefined }}
         />
       )}
       {groundTile?.iconUrl && visible && !(isDoor && doorOpen) && (
-        <TileIconPlaceholder tile={groundTile} style={{ position: 'absolute', inset: '21%', width: '58%', height: '58%', filter: darkvision ? 'brightness(0.35)' : undefined }} />
+        <TileIconPlaceholder tile={groundTile} rotate={turn} style={{ position: 'absolute', inset: '21%', width: '58%', height: '58%', filter: darkvision ? 'brightness(0.35)' : undefined }} />
       )}
       {shade && visible && <div aria-hidden="true" style={{ position: 'absolute', inset: 0, pointerEvents: 'none', ...shade }} />}
       {object && visible && (
-        <TileIconPlaceholder tile={object} style={{ position: 'absolute', zIndex: 1, filter: darkvision ? 'brightness(0.35)' : undefined }} />
+        <TileIconPlaceholder tile={object} rotate={objectTurn} style={{ position: 'absolute', zIndex: 1, filter: darkvision ? 'brightness(0.35)' : undefined }} />
       )}
       {token && (
         <Token
@@ -397,6 +403,9 @@ export default function LevelBuilder() {
   const [tokens, setTokens] = useState([]) // { id, name, avatar, color, row, col, hp, maxHp }
   const [darkMode, setDarkMode] = useState(false)
   const [doorStates, setDoorStates] = useState(blankDoorStates())
+  const [rotations, setRotations] = useState(() => blankRotations()) // quarter turns of ground tiles the author chose
+  const [objectRotations, setObjectRotations] = useState(() => blankRotations()) // and of upper-layer objects
+  const [paintRotation, setPaintRotation] = useState(null) // the turn given to tiles being placed: null = automatic
   const [heights, setHeights] = useState(null) // ground height per square for maps that have it (see utils/mapHeights.js)
   const [doorLocks, setDoorLocks] = useState(blankDoorStates()) // locked doors: only the DM can unlock them (see server/lib/doors.js)
   const [knocks, setKnocks] = useState([]) // DM only: players trying a locked door, waiting for an answer
@@ -693,7 +702,7 @@ export default function LevelBuilder() {
       setDarkMode(Boolean(destination.darkMode))
       setDoorStates(normalizeDoorStates(destination.doorStates, parsed.dims))
       setDoorLocks(normalizeDoorStates(destination.doorLocks, parsed.dims))
-      setHeights(parsed.heights)
+      setHeights(parsed.heights); setRotations(parsed.rotations); setObjectRotations(parsed.objectRotations)
       setKnocks([])
     }
     const onDoorState = ({ row, col, open } = {}) => {
@@ -793,7 +802,7 @@ export default function LevelBuilder() {
       setGrid(parsed.ground)
       setObjectGrid(parsed.objects)
       setStairLinks(parsed.stairLinks)
-      setHeights(parsed.heights)
+      setHeights(parsed.heights); setRotations(parsed.rotations); setObjectRotations(parsed.objectRotations)
       setDoorStates(normalizeDoorStates(plan.doorStates, parsed.dims))
     } else {
       setEditPlanId(null)
@@ -805,6 +814,8 @@ export default function LevelBuilder() {
       setStairLinks(blankStairLinks(w, h))
       setDoorStates(blankDoorStates(w, h))
       setHeights(null)
+      setRotations(blankRotations(w, h))
+      setObjectRotations(blankRotations(w, h))
     }
     setEditTheme(resolveThemeId(plan?.theme))
     setEditLayer('ground')
@@ -823,7 +834,7 @@ export default function LevelBuilder() {
     setDarkMode(Boolean(plan.darkMode))
     setDoorStates(normalizeDoorStates(plan.doorStates, parsed.dims))
     setDoorLocks(normalizeDoorStates(plan.doorLocks, parsed.dims))
-    setHeights(parsed.heights)
+    setHeights(parsed.heights); setRotations(parsed.rotations); setObjectRotations(parsed.objectRotations)
     setTokens(Array.isArray(plan.tokens) ? plan.tokens : [])
     setMode('play')
     if (isDm && activeCampaign && !activeCampaign.isPersonal) {
@@ -865,7 +876,7 @@ export default function LevelBuilder() {
     try {
       const body = {
         title,
-        content: JSON.stringify({ ground: grid, objects: objectGrid, stairLinks, ...(heights ? { heights } : {}) }),
+        content: JSON.stringify({ ground: grid, objects: objectGrid, stairLinks, ...extraContent() }),
         doorStates,
         theme: editTheme,
       }
@@ -890,7 +901,7 @@ export default function LevelBuilder() {
     if (mapBaseline.current.id !== editPlanId) { mapBaseline.current = { id: editPlanId, snap }; return }
     if (mapBaseline.current.snap === snap) return
     const id = editPlanId, title = editTitle.trim()
-    const body = { content: JSON.stringify({ ground: grid, objects: objectGrid, stairLinks, ...(heights ? { heights } : {}) }), doorStates, theme: editTheme, ...(title ? { title } : {}) }
+    const body = { content: JSON.stringify({ ground: grid, objects: objectGrid, stairLinks, ...extraContent() }), doorStates, theme: editTheme, ...(title ? { title } : {}) }
     scheduleMapSave(async () => {
       try {
         const plan = await api(`/levels/${id}`, { method: 'PUT', body })
@@ -910,6 +921,26 @@ export default function LevelBuilder() {
   }
 
   // ── Paint ──
+  // What a saved map carries beyond the tiles themselves: ground heights and any turns the author chose.
+  const extraContent = () => ({
+    ...(heights ? { heights } : {}),
+    ...(compactRotations(rotations) ? { rotations } : {}),
+    ...(compactRotations(objectRotations) ? { objectRotations } : {}),
+  })
+
+  // R turns the tiles you are about to place.
+  useEffect(() => {
+    if (mode !== 'editor') return undefined
+    const onKeyDown = (e) => {
+      if ((e.key === 'r' || e.key === 'R') && !e.ctrlKey && !e.metaKey && !e.altKey && !isTypingTarget(e.target)) {
+        e.preventDefault()
+        setPaintRotation(nextRotation)
+      }
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [mode])
+
   const paint = (r, c) => {
     if (editLayer === 'objects') {
       setObjectGrid(current => {
@@ -917,6 +948,7 @@ export default function LevelBuilder() {
         next[r][c] = tool === 'object-erase' ? null : tool
         return next
       })
+      setObjectRotations(current => withRotation(current, r, c, tool === 'object-erase' ? null : paintRotation))
       return
     }
     setGrid(current => {
@@ -924,6 +956,7 @@ export default function LevelBuilder() {
       next[r][c] = tool
       return next
     })
+    setRotations(current => withRotation(current, r, c, paintRotation))
     if (!['stairs', 'stairs-down'].includes(tool)) {
       setStairLinks(current => {
         const next = current.map(row => row.slice())
@@ -1300,6 +1333,12 @@ export default function LevelBuilder() {
 
       <div className="lb-editor-workspace">
       <aside className="lb-editor-tools" aria-label="Map tile selection">
+        <button type="button" className="btn btn-ghost btn-sm" onClick={() => setPaintRotation(nextRotation)}
+          title="Turn the tiles you place a quarter turn at a time (or press R). Auto turns natural floors such as grass and stone at random and leaves everything else as drawn."
+          style={{ width: '100%', marginBottom: 8, justifyContent: 'center', gap: 6 }}>
+          <span aria-hidden="true" style={{ display: 'inline-block', transform: paintRotation ? `rotate(${paintRotation * 90}deg)` : undefined, transition: 'transform 120ms' }}>↑</span>
+          Rotate: {rotationLabel(paintRotation)} <kbd style={{ fontSize: 9, opacity: 0.7 }}>R</kbd>
+        </button>
         <div className="lb-tool-palettes">
           {[
             { layer: 'ground', title: 'Ground Tiles', tiles: TILES.filter(tile => tile.id !== 'chest') },
@@ -1325,7 +1364,7 @@ export default function LevelBuilder() {
                       background: selected ? 'var(--gold-bg)' : 'var(--surface)', color: 'var(--text)',
                     }}>
                       {tile.imageUrl || tile.iconUrl || tile.id.startsWith('rock-')
-                        ? <TileIconPlaceholder tile={tile} style={{ width: 14, height: 14, flexShrink: 0 }} />
+                        ? <TileIconPlaceholder tile={tile} rotate={selected && paintRotation ? paintRotation * 90 : 0} style={{ width: 14, height: 14, flexShrink: 0 }} />
                         : <span style={{ width: 12, height: 12, borderRadius: 2, background: tile.color === 'transparent' || !tile.color ? 'repeating-conic-gradient(#ccc 0% 25%, #fff 0% 50%) 50%/6px 6px' : tile.color, border: '1px solid rgba(0,0,0,0.2)', flexShrink: 0 }} />
                       }
                       <span title={tile.label} style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{tile.label}</span>
@@ -1397,6 +1436,8 @@ export default function LevelBuilder() {
           {grid.map((row, r) => row.map((cellId, c) => {
             const t = TILES.find(x => x.id === cellId) || TILES[TILES.length - 1]
             const object = objectTile(objectGrid[r]?.[c])
+            const turn = rotationOf(cellId, rotations[r]?.[c], r, c) * 90
+            const objectTurn = rotationOf(objectGrid[r]?.[c], objectRotations[r]?.[c], r, c) * 90
             return (
               <div key={`${r}-${c}`} className="lb-cell" data-lb-cell={`${r}-${c}`}
                 onMouseDown={() => { if (linkMode) return; setPainting(true); paint(r, c) }}
@@ -1405,10 +1446,10 @@ export default function LevelBuilder() {
                 onTouchStart={() => { if (!linkMode) paint(r, c) }}
                 style={{ background: t.color === 'transparent' ? '#f5f4f1' : t.color, display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative' }}
               >
-                {t.imageUrl && <TileIconPlaceholder tile={t} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />}
-                {t.iconUrl && <TileIconPlaceholder tile={t} style={{ position: 'absolute', inset: '21%', width: '58%', height: '58%' }} />}
+                {t.imageUrl && <TileIconPlaceholder tile={t} rotate={turn} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />}
+                {t.iconUrl && <TileIconPlaceholder tile={t} rotate={turn} style={{ position: 'absolute', inset: '21%', width: '58%', height: '58%' }} />}
                 {stairLinks[r]?.[c] && <span aria-label="Linked stairs" style={{ position: 'absolute', top: 0, right: 1, color: '#fff', fontSize: 8, textShadow: '0 1px 2px #000', pointerEvents: 'none' }}>→</span>}
-                {object && object.id !== 'object-erase' && (object.imageUrl || object.iconUrl || object.id.startsWith('rock-')) && <TileIconPlaceholder tile={object} style={{ position: 'absolute', zIndex: 1 }} />}
+                {object && object.id !== 'object-erase' && (object.imageUrl || object.iconUrl || object.id.startsWith('rock-')) && <TileIconPlaceholder tile={object} rotate={objectTurn} style={{ position: 'absolute', zIndex: 1 }} />}
                 {darkMode && !visibility.torchlit[r]?.[c] && !visibility.darkvision[r]?.[c] && (
                   <div
                     aria-hidden="true"
@@ -1591,6 +1632,8 @@ export default function LevelBuilder() {
                   cellId={cellId}
                   groundTile={TILES.find(tile => tile.id === (cellId === 'door' && doorOpen ? 'floor' : cellId))}
                   object={objectTile(objectGrid[r]?.[c])}
+                  turn={rotationOf(cellId === 'door' && doorOpen ? 'floor' : cellId, rotations[r]?.[c], r, c) * 90}
+                  objectTurn={rotationOf(objectGrid[r]?.[c], objectRotations[r]?.[c], r, c) * 90}
                   visible={visibility.visible[r]?.[c]}
                   torchlit={visibility.torchlit[r]?.[c]}
                   darkvision={visibility.darkvision[r]?.[c]}
