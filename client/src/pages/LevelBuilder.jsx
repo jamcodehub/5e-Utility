@@ -130,7 +130,7 @@ function objectTile(id) {
   return OBJECT_TILES.find(tile => tile.id === id)
 }
 
-function TileIconPlaceholder({ tile, style = {}, rotate = 0 }) {
+function TileIconPlaceholder({ tile, style = {}, rotate = 0, bleed = false }) {
   // `rotate` is in degrees, a quarter turn at a time (see utils/tileRotation.js)
   if (tile.imageUrl) {
     return <img
@@ -138,7 +138,7 @@ function TileIconPlaceholder({ tile, style = {}, rotate = 0 }) {
       alt=""
       aria-hidden="true"
       draggable="false"
-      style={{ width: '94%', height: '94%', objectFit: 'contain', pointerEvents: 'none', transform: rotate ? `rotate(${rotate}deg)` : undefined, ...style }}
+      style={{ width: '94%', height: '94%', objectFit: 'contain', pointerEvents: 'none', transform: [rotate && `rotate(${rotate}deg)`, bleed && 'scale(1.06)'].filter(Boolean).join(' ') || undefined, ...style }}
     />
   }
 
@@ -287,6 +287,9 @@ function PeekingViewers({ viewers }) {
 
 const dragPreviewTransform = ({ x, y }) => `translate3d(${x}px, ${y}px, 0) translate(-50%, -50%) scale(1.08)`
 
+// What a moonlit square looks like: dark, in blue-grey monochrome.
+const MOON_FILTER = 'sepia(1) hue-rotate(185deg) saturate(1.3) brightness(0.32)'
+
 // One square of the play board. Memoised, so a token taking a step redraws only the squares it left and entered, not the whole
 // board (a 48 by 33 map has 1,584 squares: drawing them all on every step took about 0.3 seconds and made walking lag).
 const PlayCell = memo(function PlayCell({ r, c, cellId, groundTile, object, turn, objectTurn, visible, moon, fade, torchlit, darkvision, lightStrength, doorOpen, locked, shade, token, dragging, darkMode, isDm, cellSize, torchSrc, onCellClick, onDragStart }) {
@@ -295,6 +298,18 @@ const PlayCell = memo(function PlayCell({ r, c, cellId, groundTile, object, turn
   const isDoor = cellId === 'door'
   const isStair = cellId === 'stairs' || cellId === 'stairs-down'
   const cellBase = isDoor && doorOpen ? 'floor' : cellId
+  // Dimming is applied to the pictures, not to the square's box: the pictures run a hair past the square's edges so neighbours
+  // overlap, which leaves no seams for light lines to show through.
+  const lightFilter = moon
+    ? MOON_FILTER
+    : darkvision
+      ? 'brightness(0.35)'
+      : fade !== null && fade !== undefined && torchlit
+        // outdoors at night: torch light fades smoothly out into the moonlight (1 at the torch, 0 at the edge of its reach)
+        ? `brightness(${(0.3 + 0.7 * fade * fade * (3 - 2 * fade)).toFixed(3)})`
+        : !isDm && darkMode && torchlit && lightStrength
+          ? `brightness(${0.45 + lightStrength * 0.55})`
+          : undefined
   return (
     <div
       data-map-cell
@@ -305,18 +320,9 @@ const PlayCell = memo(function PlayCell({ r, c, cellId, groundTile, object, turn
       style={{
         minWidth: 0,
         minHeight: 0,
-        background: darkMode && !shown ? '#000' : tileColor(cellBase),
-        border: `0.5px solid ${darkMode && !shown ? 'transparent' : 'rgba(0,0,0,0.08)'}`,
+        background: darkMode && !shown ? '#000' : moon ? '#0a1020' : tileColor(cellBase),
         position: 'relative',
         contain: 'layout style', // a change inside one square does not make the browser lay out the whole board again
-        filter: darkvision
-          ? 'brightness(0.35)'
-          : fade !== null && fade !== undefined && torchlit
-            // outdoors at night: torch light fades smoothly out into the moonlight (1 at the torch, 0 at the edge of its reach)
-            ? `brightness(${(0.3 + 0.7 * fade * fade * (3 - 2 * fade)).toFixed(3)})`
-            : !isDm && darkMode && torchlit && lightStrength
-            ? `brightness(${0.45 + lightStrength * 0.55})`
-            : undefined,
         cursor: visible && (isDoor || isStair) ? 'pointer' : undefined,
       }}
     >
@@ -326,17 +332,16 @@ const PlayCell = memo(function PlayCell({ r, c, cellId, groundTile, object, turn
           alt=""
           aria-hidden="true"
           draggable="false"
-          style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', pointerEvents: 'none', transform: turn ? `rotate(${turn}deg)` : undefined }}
+          style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', pointerEvents: 'none', transform: `rotate(${turn || 0}deg) scale(1.06)`, filter: lightFilter }}
         />
       )}
       {groundTile?.iconUrl && shown && !(isDoor && doorOpen) && (
-        <TileIconPlaceholder tile={groundTile} rotate={turn} style={{ position: 'absolute', inset: '21%', width: '58%', height: '58%', filter: darkvision ? 'brightness(0.35)' : undefined }} />
+        <TileIconPlaceholder tile={groundTile} rotate={turn} style={{ position: 'absolute', inset: '21%', width: '58%', height: '58%', filter: lightFilter }} />
       )}
       {shade && shown && <div aria-hidden="true" style={{ position: 'absolute', inset: 0, pointerEvents: 'none', ...shade }} />}
       {object && shown && (
-        <TileIconPlaceholder tile={object} rotate={objectTurn} style={{ position: 'absolute', zIndex: 1, filter: darkvision ? 'brightness(0.35)' : undefined }} />
+        <TileIconPlaceholder tile={object} rotate={objectTurn} style={{ position: 'absolute', zIndex: 1, filter: lightFilter }} />
       )}
-      {moon && <div aria-hidden="true" style={{ position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 3, background: 'rgba(6,10,30,0.74)' }} />}
       {token && (
         <Token
           token={token}
@@ -1299,7 +1304,7 @@ export default function LevelBuilder() {
   if (mode === 'editor') return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
       <style>{`
-        .lb-cell { aspect-ratio: 1; border: 0.5px solid rgba(0,0,0,0.1); cursor: crosshair; touch-action: none; }
+        .lb-cell { aspect-ratio: 1; border: 0; cursor: crosshair; touch-action: none; }
         .lb-editor-canvas-wrap, .lb-editor-canvas-wrap * { user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
         .lb-editor-workspace { display: flex; flex: 1; min-height: 0; overflow: hidden; }
         .lb-editor-tools { width: 248px; flex: 0 0 248px; padding: 10px; overflow-y: auto; background: var(--surface); border-right: 1px solid var(--border); }
@@ -1514,7 +1519,7 @@ export default function LevelBuilder() {
             gridTemplateColumns: `repeat(${gridW}, 1fr)`,
             width: '100%',
             maxWidth: `calc((100vh - 120px) * ${gridW / gridH})`,
-            background: '#fff',
+            background: '#24201a',
             border: '3px solid #4a3f33',
             borderRadius: 4,
             overflow: 'hidden',
@@ -1534,7 +1539,7 @@ export default function LevelBuilder() {
                 onTouchStart={() => { if (!linkMode) { beginStroke(); paint(r, c) } }}
                 style={{ background: t.color === 'transparent' ? '#f5f4f1' : t.color, display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative' }}
               >
-                {t.imageUrl && <TileIconPlaceholder tile={t} rotate={turn} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />}
+                {t.imageUrl && <TileIconPlaceholder tile={t} rotate={turn} bleed style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />}
                 {t.iconUrl && <TileIconPlaceholder tile={t} rotate={turn} style={{ position: 'absolute', inset: '21%', width: '58%', height: '58%' }} />}
                 {cellId === 'door' && designLocks[r]?.[c] && <span aria-label="Locked door" title="Locked door" style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, pointerEvents: 'none', zIndex: 2, textShadow: '0 1px 2px #000' }}>🔒</span>}
                 {stairLinks[r]?.[c] && <span aria-label="Linked stairs" style={{ position: 'absolute', top: 0, right: 1, color: '#fff', fontSize: 8, textShadow: '0 1px 2px #000', pointerEvents: 'none' }}>→</span>}
@@ -1700,7 +1705,7 @@ export default function LevelBuilder() {
               height: box.w && box.h ? `${Math.min(box.w / gridW, box.h / gridH) * gridH * zoom}px` : `${zoom * 100}%`,
               margin: 'auto',
               flexShrink: 0,
-              background: darkMode ? '#000' : '#fff',
+              background: darkMode ? '#000' : '#24201a',
               border: 'none',
               borderRadius: 0,
               overflow: 'hidden',
