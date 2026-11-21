@@ -62,15 +62,19 @@ test('payments: auth, portal guard, and webhook signature + premium updates', as
 
   const completed = await webhook({ type: 'checkout.session.completed', data: { object: { metadata: { userId }, subscription: 'sub_1' } } })
   assert.equal(completed.status, 200)
-  assert.deepEqual(updates.at(-1), ['byId', userId, { isPremium: true, stripeSubId: 'sub_1', graceEndsAt: null, graceReminderSent: false }])
+  assert.deepEqual(updates.at(-1), ['byId', userId, { isPremium: true, premiumRole: 'player', stripeSubId: 'sub_1', graceEndsAt: null, graceReminderSent: false }])
+
+  // Premium bought while acting as a DM is stamped for the DM role
+  await webhook({ type: 'checkout.session.completed', data: { object: { metadata: { userId, role: 'dm' }, subscription: 'sub_2' } } })
+  assert.equal(updates.at(-1)[2].premiumRole, 'dm')
 
   const deleted = await webhook({ type: 'customer.subscription.deleted', data: { object: { id: 'sub_1' } } })
   assert.equal(deleted.status, 200)
-  assert.deepEqual(updates.at(-1), ['one', { stripeSubId: 'sub_1' }, { isPremium: false, stripeSubId: '', graceEndsAt: null, graceReminderSent: false }])
+  assert.deepEqual(updates.at(-1), ['one', { stripeSubId: 'sub_1' }, { isPremium: false, premiumRole: '', stripeSubId: '', graceEndsAt: null, graceReminderSent: false }])
 
   const ignored = await webhook({ type: 'charge.succeeded', data: { object: {} } })
   assert.equal(ignored.status, 200)
-  assert.equal(updates.length, 2)
+  assert.equal(updates.length, 3)
 
   // Failed payment: premium stays on, a 5-day grace period starts, user is emailed once.
   const before = updates.length
@@ -100,5 +104,5 @@ test('payments: auth, portal guard, and webhook signature + premium updates', as
   await webhook({ type: 'customer.subscription.updated', data: { object: { id: 'sub_1', status: 'active' } } })
   assert.deepEqual(updates.at(-1)[2], { graceEndsAt: null, graceReminderSent: false, isPremium: true })
   await webhook({ type: 'customer.subscription.updated', data: { object: { id: 'sub_1', status: 'unpaid' } } })
-  assert.deepEqual(updates.at(-1)[2], { isPremium: false, graceEndsAt: null, graceReminderSent: false })
+  assert.deepEqual(updates.at(-1)[2], { isPremium: false, premiumRole: '', graceEndsAt: null, graceReminderSent: false })
 })

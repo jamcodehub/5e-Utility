@@ -2,6 +2,7 @@ import { Router } from 'express'
 import crypto from 'crypto'
 import jwt from 'jsonwebtoken'
 import { Campaign, Character, User, CampaignGuide, DMBoard, DMBoardFolder } from '../models/index.js'
+import { hasPremium, hasPremiumAs } from '../lib/premium.js'
 
 const router = Router()
 
@@ -119,7 +120,7 @@ router.post('/join', auth, async (req, res) => {
       return res.json({ pending: true })
 
     const user = await User.findById(req.userId)
-    if (user.role === 'player' && !user.isPremium) {
+    if (user.role === 'player' && !hasPremiumAs(user, 'player')) {
       const already = await Campaign.countDocuments({ members: req.userId })
       if (already >= 1) return res.status(403).json({ error: 'Free players can join 1 campaign. Upgrade to Premium for unlimited campaigns.' })
     }
@@ -200,7 +201,7 @@ router.delete('/:id', auth, async (req, res) => {
   const campaign = await Campaign.findOne({ _id: req.params.id, owner: req.userId })
   if (!campaign) return res.status(404).json({ error: 'Campaign not found' })
   const user = await User.findById(req.userId)
-  if (!user.isPremium) {
+  if (!hasPremiumAs(user, 'dm')) {
     return res.status(403).json({ error: 'Deleting a campaign is a Premium feature. Upgrade to Premium to delete campaigns.' })
   }
   if (req.body?.confirmName !== campaign.name) {
@@ -218,7 +219,7 @@ router.post('/:id/roleplay-session', auth, async (req, res) => {
     const user = await User.findById(req.userId)
     let char = await ensurePrimary(req.params.id, req.userId)
     if (!char) return res.status(404).json({ error: 'Create a character first before using the Roleplay Assistant.' })
-    if (!user.isPremium && (char.roleplaySessionCount || 0) >= 1) {
+    if (!hasPremiumAs(user, 'player') && (char.roleplaySessionCount || 0) >= 1) {
       return res.status(403).json({ error: 'Your first session plan is free. Upgrade to Premium for unlimited roleplay sessions.' })
     }
     char.roleplaySessionCount = (char.roleplaySessionCount || 0) + 1
@@ -265,7 +266,7 @@ router.post('/:id/characters', auth, async (req, res) => {
     if (!await isMember(req.params.id, req.userId)) return res.status(403).json({ error: 'Not a campaign member' })
     const user = await User.findById(req.userId)
     const count = await Character.countDocuments({ campaign: req.params.id, owner: req.userId })
-    if (!user.isPremium && count >= 2) {
+    if (!hasPremiumAs(user, 'player') && count >= 2) {
       return res.status(403).json({ error: 'Free accounts are limited to 2 characters per campaign. Upgrade to Premium for unlimited characters.' })
     }
     const char = await Character.create({ ...stripServerFields(req.body), campaign: req.params.id, owner: req.userId, isPrimary: count === 0 })

@@ -123,6 +123,15 @@ export default function Premium() {
                   {portalLoading ? 'Loading...' : 'Manage subscription'}
                 </button>
               </div>
+            ) : user?.hasSubscription ? (
+              <div>
+                <div style={{ fontSize: 13, color: 'var(--text-2)', lineHeight: 1.5, marginBottom: 10 }}>
+                  You have {user.premiumRole === 'dm' ? 'DM' : 'Player'} Premium, which only covers your {user.premiumRole === 'dm' ? 'DM' : 'player'} account. Switch to {user.premiumRole === 'dm' ? 'DM' : 'player'} mode in Settings to use it, or manage or cancel it below.
+                </div>
+                <button className="btn btn-ghost" style={{ width: '100%', justifyContent: 'center' }} onClick={portal} disabled={portalLoading}>
+                  {portalLoading ? 'Loading...' : 'Manage subscription'}
+                </button>
+              </div>
             ) : (
               <button className="btn btn-primary" style={{ width: '100%', justifyContent: 'center' }} onClick={checkout} disabled={loading}>
                 {loading ? 'Loading...' : 'Upgrade now →'}

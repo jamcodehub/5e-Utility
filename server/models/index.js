@@ -12,6 +12,8 @@ const UserSchema = new Schema({
   googleId:         { type: String, default: '', index: true, sparse: true },
   avatar:           { type: String, default: '' },
   isPremium:        { type: Boolean, default: false },
+  // Which role the subscription was bought for ('player' or 'dm'); '' on accounts made premium before this existed (= player).
+  premiumRole:      { type: String, enum: ['', 'player', 'dm'], default: '' },
   stripeCustomerId: { type: String, default: '' },
   stripeSubId:      { type: String, default: '' },
   // Failed-payment grace period: premium stays on until graceEndsAt.

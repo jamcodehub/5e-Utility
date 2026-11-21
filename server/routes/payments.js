@@ -4,6 +4,7 @@ import { User } from '../models/index.js'
 import { auth } from './campaigns.js'
 import { primaryClientUrl } from '../lib/clientUrl.js'
 import { startGrace, clearGrace, sendGraceEmail } from '../lib/grace.js'
+import { premiumRoleOf } from '../lib/premium.js'
 
 const router = Router()
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY)
@@ -12,6 +13,11 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY)
 router.post('/checkout', auth, async (req, res) => {
   try {
     const user = await User.findById(req.userId)
+    // One subscription per account (its Premium covers the role it was bought in), so never start a second one.
+    if (user.isPremium) {
+      const mine = premiumRoleOf(user) === 'dm' ? 'DM' : 'Player'
+      return res.status(400).json({ error: `You already have ${mine} Premium. Manage or cancel it from your billing page before subscribing again.` })
+    }
 
     let customerId = user.stripeCustomerId
     if (!customerId) {
@@ -30,7 +36,8 @@ router.post('/checkout', auth, async (req, res) => {
       }],
       success_url: `${primaryClientUrl()}/premium?success=true`,
       cancel_url:  `${primaryClientUrl()}/premium?cancelled=true`,
-      metadata: { userId: req.userId.toString() },
+      // The role the player is acting as now is the role this Premium is for.
+      metadata: { userId: req.userId.toString(), role: user.role === 'dm' ? 'dm' : 'player' },
     })
 
     res.json({ url: session.url })
@@ -68,6 +75,7 @@ router.post('/webhook', async (req, res) => {
       if (userId) {
         await User.findByIdAndUpdate(userId, {
           isPremium: true,
+          premiumRole: session.metadata?.role === 'dm' ? 'dm' : 'player',
           stripeSubId: session.subscription,
           graceEndsAt: null,
           graceReminderSent: false,
@@ -77,7 +85,7 @@ router.post('/webhook', async (req, res) => {
     }
     case 'customer.subscription.deleted': {
       const sub = event.data.object
-      await User.findOneAndUpdate({ stripeSubId: sub.id }, { isPremium: false, stripeSubId: '', graceEndsAt: null, graceReminderSent: false })
+      await User.findOneAndUpdate({ stripeSubId: sub.id }, { isPremium: false, premiumRole: '', stripeSubId: '', graceEndsAt: null, graceReminderSent: false })
       break
     }
     // A renewal went through: premium stays/returns and any grace period ends.
@@ -104,7 +112,7 @@ router.post('/webhook', async (req, res) => {
         const user = await startGrace(sub.id)
         if (user) await sendGraceEmail(user, 'failed')
       } else if (sub.status === 'canceled' || sub.status === 'unpaid' || sub.status === 'incomplete_expired') {
-        await User.findOneAndUpdate({ stripeSubId: sub.id }, { isPremium: false, graceEndsAt: null, graceReminderSent: false })
+        await User.findOneAndUpdate({ stripeSubId: sub.id }, { isPremium: false, premiumRole: '', graceEndsAt: null, graceReminderSent: false })
       }
       break
     }

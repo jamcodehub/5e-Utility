@@ -21,7 +21,7 @@ test('create and update store the chosen theme and ignore unknown ones', async t
   let created = null, updated = null
   // used both directly (`await Campaign.findById(id)`) and chained (`.select(...)` in the membership check)
   stub(Campaign, 'findById', () => ({ owner, members: [], select: async () => ({ owner, members: [] }), then: resolve => resolve({ owner }) }))
-  stub(User, 'findById', async () => ({ isPremium: true }))
+  stub(User, 'findById', async () => ({ isPremium: true, premiumRole: 'dm' }))
   stub(LevelPlan, 'create', async doc => { created = doc; return doc })
   stub(LevelPlan, 'findOneAndUpdate', async (_q, update) => { updated = update; return update })
   const app = express()

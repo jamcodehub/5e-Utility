@@ -2,6 +2,7 @@ import { Router } from 'express'
 import mongoose from 'mongoose'
 import { rateLimit } from 'express-rate-limit'
 import { Campaign, CampaignGuide, Character, User } from '../models/index.js'
+import { hasPremium, hasPremiumAs } from '../lib/premium.js'
 import { auth } from './campaigns.js'
 
 const router = Router()
@@ -157,13 +158,13 @@ const requireDM = async (req, res, next) => {
     const campaignId = req.body?.campaignId
     if (!mongoose.isValidObjectId(campaignId)) return res.status(400).json({ error: 'Invalid campaign' })
     const [user, campaign] = await Promise.all([
-      User.findById(req.userId).select('role roles isPremium'),
+      User.findById(req.userId).select('role roles isPremium premiumRole'),
       Campaign.findOne({ _id: campaignId, owner: req.userId, isPersonal: { $ne: true } }).select('name description setting'),
     ])
     const isDM = user?.role === 'dm' || (user?.roles || []).includes('dm')
     if (!isDM || !campaign) return res.status(403).json({ error: 'Only the campaign DM can use this.' })
     req.campaign = campaign
-    req.isPremium = !!user.isPremium
+    req.isPremium = hasPremiumAs(user, 'dm')
     next()
   } catch (e) {
     console.error('AI authorisation failed', e)
