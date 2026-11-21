@@ -4,7 +4,7 @@ import { User } from '../models/index.js'
 import { auth } from './campaigns.js'
 import { primaryClientUrl } from '../lib/clientUrl.js'
 import { startGrace, clearGrace, sendGraceEmail } from '../lib/grace.js'
-import { premiumRoleOf } from '../lib/premium.js'
+import { premiumRoleOf, priceFor, planForPrice } from '../lib/premium.js'
 
 const router = Router()
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY)
@@ -13,10 +13,23 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY)
 router.post('/checkout', auth, async (req, res) => {
   try {
     const user = await User.findById(req.userId)
-    // One subscription per account (its Premium covers the role it was bought in), so never start a second one.
+    // Which plan: asked for explicitly, otherwise the one that matches the role they are acting as.
+    const plan = req.body?.plan === 'dm' || req.body?.plan === 'player' ? req.body.plan : (user.role === 'dm' ? 'dm' : 'player')
+    // One subscription per account. DM Premium includes Player Premium, so a Player subscriber who wants the DM tools has
+    // their existing subscription switched to the DM price (the difference is prorated); nothing else can start a second one.
     if (user.isPremium) {
-      const mine = premiumRoleOf(user) === 'dm' ? 'DM' : 'Player'
-      return res.status(400).json({ error: `You already have ${mine} Premium. Manage or cancel it from your billing page before subscribing again.` })
+      const have = premiumRoleOf(user)
+      if (have === 'dm' || plan === 'player') {
+        const name = have === 'dm' ? 'DM Premium, which includes Player Premium' : 'Player Premium'
+        return res.status(400).json({ error: `You already have ${name}. Manage or cancel it from your billing page.` })
+      }
+      if (!user.stripeSubId) return res.status(400).json({ error: 'We could not find your subscription. Please use your billing page to change plan.' })
+      const sub = await stripe.subscriptions.retrieve(user.stripeSubId)
+      const item = sub.items?.data?.[0]
+      if (!item) return res.status(400).json({ error: 'We could not find your subscription. Please use your billing page to change plan.' })
+      await stripe.subscriptions.update(user.stripeSubId, { items: [{ id: item.id, price: priceFor('dm') }], proration_behavior: 'create_prorations', metadata: { userId: req.userId.toString(), role: 'dm' } })
+      await User.findByIdAndUpdate(req.userId, { premiumRole: 'dm' })
+      return res.json({ upgraded: true })
     }
 
     let customerId = user.stripeCustomerId
@@ -31,13 +44,12 @@ router.post('/checkout', auth, async (req, res) => {
       payment_method_types: ['card'],
       mode: 'subscription',
       line_items: [{
-        price: process.env.STRIPE_PRICE_ID,
+        price: priceFor(plan),
         quantity: 1,
       }],
       success_url: `${primaryClientUrl()}/premium?success=true`,
       cancel_url:  `${primaryClientUrl()}/premium?cancelled=true`,
-      // The role the player is acting as now is the role this Premium is for.
-      metadata: { userId: req.userId.toString(), role: user.role === 'dm' ? 'dm' : 'player' },
+      metadata: { userId: req.userId.toString(), role: plan },
     })
 
     res.json({ url: session.url })
@@ -108,6 +120,9 @@ router.post('/webhook', async (req, res) => {
       const sub = event.data.object
       if (sub.status === 'active' || sub.status === 'trialing') {
         await clearGrace({ stripeSubId: sub.id })
+        // A plan change made in Stripe's billing page: follow the price the subscription is on now.
+        const plan = planForPrice(sub.items?.data?.[0]?.price?.id)
+        if (plan) await User.findOneAndUpdate({ stripeSubId: sub.id }, { premiumRole: plan })
       } else if (sub.status === 'past_due') {
         const user = await startGrace(sub.id)
         if (user) await sendGraceEmail(user, 'failed')

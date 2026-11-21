@@ -17,6 +17,7 @@ const FEATURES = {
       'x5 level builder',
     ],
     premium: [
+      'Everything in Player Premium',
       'NPC / World Lore ledger',
       'Character Builder — unlimited',
       'Idea generator',
@@ -26,7 +27,7 @@ const FEATURES = {
       'Unlimited storyboard generations',
       '11 exclusive class themes',
     ],
-    price: 20,
+    price: 15,
   },
   player: {
     free: [
@@ -69,11 +70,13 @@ export default function Premium() {
     }
   }, [])
 
-  const checkout = async () => {
+  // plan: 'player' or 'dm'. A Player subscriber choosing DM has their subscription switched in place (no Stripe page).
+  const checkout = async (plan) => {
     setLoading(true)
     try {
-      const { url } = await api('/payments/checkout', { method: 'POST' })
-      window.location.href = url
+      const r = await api('/payments/checkout', { method: 'POST', body: { plan } })
+      if (r.upgraded) { await refreshUser(); setBanner('You are now on DM Premium, which includes Player Premium. The price difference is prorated on your next invoice.') }
+      else window.location.href = r.url
     } catch (e) { alert(e.message) }
     setLoading(false)
   }
@@ -118,7 +121,8 @@ export default function Premium() {
           <div style={{ marginTop: 20 }}>
             {isPremium ? (
               <div>
-                <div style={{ fontSize: 13, color: 'var(--gold)', fontWeight: 500, marginBottom: 10 }}>✦ Active — you're on Premium</div>
+                <div style={{ fontSize: 13, color: 'var(--gold)', fontWeight: 500, marginBottom: 10 }}>✦ Active — you're on {user?.premiumRole === 'dm' ? 'DM Premium (includes Player Premium)' : 'Player Premium'}
+                </div>
                 <button className="btn btn-ghost" style={{ width: '100%', justifyContent: 'center' }} onClick={portal} disabled={portalLoading}>
                   {portalLoading ? 'Loading...' : 'Manage subscription'}
                 </button>
@@ -126,18 +130,26 @@ export default function Premium() {
             ) : user?.hasSubscription ? (
               <div>
                 <div style={{ fontSize: 13, color: 'var(--text-2)', lineHeight: 1.5, marginBottom: 10 }}>
-                  You have {user.premiumRole === 'dm' ? 'DM' : 'Player'} Premium, which only covers your {user.premiumRole === 'dm' ? 'DM' : 'player'} account. Switch to {user.premiumRole === 'dm' ? 'DM' : 'player'} mode in Settings to use it, or manage or cancel it below.
+                  You have Player Premium, which covers your player account. DM Premium includes it, so upgrading switches your subscription to ${FEATURES.dm.price}/month and only charges the difference.
                 </div>
+                <button className="btn btn-primary" style={{ width: '100%', justifyContent: 'center', marginBottom: 8 }} onClick={() => checkout('dm')} disabled={loading}>
+                  {loading ? 'Loading...' : 'Upgrade to DM Premium →'}
+                </button>
                 <button className="btn btn-ghost" style={{ width: '100%', justifyContent: 'center' }} onClick={portal} disabled={portalLoading}>
                   {portalLoading ? 'Loading...' : 'Manage subscription'}
                 </button>
               </div>
             ) : (
-              <button className="btn btn-primary" style={{ width: '100%', justifyContent: 'center' }} onClick={checkout} disabled={loading}>
+              <button className="btn btn-primary" style={{ width: '100%', justifyContent: 'center' }} onClick={() => checkout(isDM ? 'dm' : 'player')} disabled={loading}>
                 {loading ? 'Loading...' : 'Upgrade now →'}
               </button>
             )}
           </div>
+          {!isDM && user?.premiumRole !== 'dm' && (
+            <div style={{ marginTop: 14, paddingTop: 12, borderTop: '1px solid var(--gold-border)', fontSize: 12, color: 'var(--text-2)', lineHeight: 1.5 }}>
+              Run campaigns too? DM Premium (${FEATURES.dm.price}/month) includes everything in Player Premium. Switch to DM mode in Settings to see it.
+            </div>
+          )}
         </div>
 
         {/* Free */}
