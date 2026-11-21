@@ -112,8 +112,15 @@ router.post('/join', auth, async (req, res) => {
     if (!campaign) return res.status(404).json({ error: 'Invalid join code' })
 
     const uid = String(req.userId)
+    // The DM using their own campaign's code (to play it, or to try the player view): no approval is needed, but they must be
+    // recorded as a member. The player list only shows campaigns you are a member of, so without this the campaign
+    // looked joined and then disappeared the next time the role was switched.
+    if (String(campaign.owner) === uid) {
+      if (!campaign.members.some(m => String(m) === uid)) { campaign.members.push(req.userId); await campaign.save() }
+      return res.json({ pending: false, campaign })
+    }
     // Already a member
-    if (String(campaign.owner) === uid || campaign.members.some(m => String(m) === uid))
+    if (campaign.members.some(m => String(m) === uid))
       return res.json({ pending: false, campaign })
     // Already pending
     if (campaign.pendingMembers.some(m => String(m) === uid))
