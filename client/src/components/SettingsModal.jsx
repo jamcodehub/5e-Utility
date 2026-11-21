@@ -30,7 +30,8 @@ export default function SettingsModal({ onClose }) {
   const [roleError, setRoleError] = useState('')
   const [nameInput, setNameInput] = useState('')
   const [nameWorking, setNameWorking] = useState(false)
-  const [nameMsg, setNameMsg] = useState(null) // { ok, text }
+  const [nameMsg, setNameMsg] = useState('') // error text
+  const [editingName, setEditingName] = useState(false)
 
   const changeRole = async (role) => {
     if (role === user?.role || roleWorking) return
@@ -116,35 +117,45 @@ export default function SettingsModal({ onClose }) {
           <button type="button" onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--text-3)', fontSize: 20, cursor: 'pointer', lineHeight: 1 }}>✕</button>
         </div>
 
-        {/* Profile photo (also reachable by clicking the circle in the sidebar) with the username beside it. Usernames must be unique, whatever the capitalisation. */}
-        <div style={{ marginBottom: 24, display: 'flex', alignItems: 'flex-start', gap: 14 }}>
+        {/* Profile photo (click the circle to change it) with the username beside it: shown as plain text, a pencil edits it.
+            Usernames must be unique, whatever the capitalisation. */}
+        <div style={{ marginBottom: 24, display: 'flex', alignItems: 'center', gap: 14 }}>
           <ProfileAvatar size={56} fontSize={22} />
-          <form style={{ flex: 1, minWidth: 0 }} onSubmit={async (e) => {
-            e.preventDefault()
-            const next = nameInput.trim()
-            if (!next || next === user?.username) { setNameInput(''); return }
-            setNameWorking(true); setNameMsg(null)
-            try {
-              await api('/auth/username', { method: 'PUT', body: { username: next } })
-              await refreshUser()
-              setNameInput('')
-              setNameMsg({ ok: true, text: 'Username changed.' })
-            } catch (err) { setNameMsg({ ok: false, text: err?.message || 'Could not change the username.' }) }
-            finally { setNameWorking(false) }
-          }}>
-            <label htmlFor="settings-username" style={{ display: 'block', fontSize: 12, fontWeight: 600, color: 'var(--text-2)', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 6 }}>Username</label>
-            <div style={{ display: 'flex', gap: 8 }}>
-              <input id="settings-username" className="input" style={{ flex: 1, minWidth: 0 }} value={nameInput} maxLength={24} autoComplete="off"
-                placeholder={user?.username || 'Username'} onChange={e => { setNameInput(e.target.value); setNameMsg(null) }} />
-              <button type="submit" className="btn btn-sm" disabled={nameWorking || !nameInput.trim() || nameInput.trim() === user?.username}>{nameWorking ? 'Saving…' : 'Change'}</button>
-            </div>
-            <div style={{ fontSize: 12, marginTop: 6, color: nameMsg ? (nameMsg.ok ? 'var(--green)' : 'var(--red)') : 'var(--text-3)' }} role="status">
-              {nameMsg ? nameMsg.text : 'Tap the circle to change your photo.'}
-              {!nameMsg && user?.avatar && (
-                <> <button type="button" onClick={async () => { try { await api('/auth/avatar', { method: 'PUT', body: { avatar: '' } }); await refreshUser() } catch { /* ignore */ } }} style={{ background: 'none', border: 'none', padding: 0, color: 'var(--gold)', cursor: 'pointer', fontSize: 12 }}>Remove photo</button></>
-              )}
-            </div>
-          </form>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            {!editingName ? (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+                <span style={{ fontFamily: 'var(--font-title)', fontSize: 20, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user?.username}</span>
+                <button type="button" onClick={() => { setNameInput(user?.username || ''); setNameMsg(''); setEditingName(true) }} aria-label="Change username" title="Change username"
+                  style={{ background: 'none', border: 'none', padding: 4, cursor: 'pointer', color: 'var(--text-3)', display: 'flex', flexShrink: 0 }}>
+                  <svg width="15" height="15" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M11.5 2.5 13.5 4.5 5.5 12.5 2.5 13.5 3.5 10.5Z" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" /><path d="M10 4l2 2" stroke="currentColor" strokeWidth="1.4" /></svg>
+                </button>
+              </div>
+            ) : (
+              <form onSubmit={async (e) => {
+                e.preventDefault()
+                const next = nameInput.trim()
+                if (!next || next === user?.username) { setEditingName(false); setNameMsg(''); return }
+                setNameWorking(true); setNameMsg('')
+                try {
+                  await api('/auth/username', { method: 'PUT', body: { username: next } })
+                  await refreshUser()
+                  setEditingName(false)
+                } catch (err) { setNameMsg(err?.message || 'Could not change the username.') }
+                finally { setNameWorking(false) }
+              }}>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <input id="settings-username" className="input" style={{ flex: 1, minWidth: 0 }} value={nameInput} maxLength={24} autoComplete="off" autoFocus onFocus={e => e.target.select()} aria-label="Username"
+                    onChange={e => { setNameInput(e.target.value); setNameMsg('') }} onKeyDown={e => { if (e.key === 'Escape') { e.stopPropagation(); setEditingName(false); setNameMsg('') } }} />
+                  <button type="submit" className="btn btn-sm" disabled={nameWorking || !nameInput.trim()}>{nameWorking ? 'Saving…' : 'Save'}</button>
+                  <button type="button" className="btn btn-ghost btn-sm" onClick={() => { setEditingName(false); setNameMsg('') }}>Cancel</button>
+                </div>
+                {nameMsg && <div style={{ fontSize: 12, marginTop: 6, color: 'var(--red)' }} role="alert">{nameMsg}</div>}
+              </form>
+            )}
+            {user?.avatar && !editingName && (
+              <button type="button" onClick={async () => { try { await api('/auth/avatar', { method: 'PUT', body: { avatar: '' } }); await refreshUser() } catch { /* ignore */ } }} style={{ background: 'none', border: 'none', padding: 0, marginTop: 2, color: 'var(--text-3)', cursor: 'pointer', fontSize: 12 }}>Remove photo</button>
+            )}
+          </div>
         </div>
 
         {/* Theme */}

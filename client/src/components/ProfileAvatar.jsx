@@ -11,7 +11,7 @@ export const avatarSrc = (url, px = 96) => (/^https:\/\/res\.cloudinary\.com\/.+
   : url)
 
 // The account's profile photo (or its first letter). Click it to choose a new photo: it is uploaded to Cloudinary and the
-// link is saved on the account. On hover a faint camera icon says it can be changed.
+// link is saved on the account. On hover a 50% camera icon says it can be changed.
 export default function ProfileAvatar({ size = 32, fontSize = 13, style }) {
   const { user, refreshUser } = useAuth()
   const { toast, ToastContainer } = useToast()
@@ -48,10 +48,10 @@ export default function ProfileAvatar({ size = 32, fontSize = 13, style }) {
       >
         {user?.avatar
           ? <img src={avatarSrc(user.avatar, size * 3)} alt="" referrerPolicy="no-referrer" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
-          : user?.username?.[0]?.toUpperCase()}
+          : (hover || busy ? null : user?.username?.[0]?.toUpperCase())}
         {(hover || busy) && (
           <span aria-hidden="true" style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: user?.avatar ? 'rgba(255,255,255,0.25)' : 'transparent', fontSize: size * 0.4, fontFamily: 'var(--font-ui)' }}>
-            {busy ? '…' : <img src={CAMERA} alt="" style={{ width: size * 0.5, height: size * 0.5, opacity: 0.3, filter: 'var(--logo-filter, none)', pointerEvents: 'none' }} />}
+            {busy ? '…' : <img src={CAMERA} alt="" style={{ width: size * 0.5, height: size * 0.5, opacity: 0.5, filter: 'var(--logo-filter, none)', pointerEvents: 'none' }} />}
           </span>
         )}
       </button>
