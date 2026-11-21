@@ -73,6 +73,8 @@ export default function Character() {
   const [loaded, setLoaded] = useState(false)
   const [showUpgrade, setShowUpgrade] = useState(false)
   const [builder, setBuilder] = useState(null) // null | 'custom'
+  const [ddbUrl, setDdbUrl] = useState('')
+  const [ddbBusy, setDdbBusy] = useState(false)
   const roller = useRoller()
   const [srdData, setSrdData] = useState(null)
   const [printing, setPrinting] = useState(false)
@@ -205,6 +207,19 @@ export default function Character() {
       toast(err.message || 'Avatar upload failed')
     }
     setAvatarUploading(false)
+  }
+
+  // Fills the form from a public D&D Beyond character. Nothing is saved until the player presses Save.
+  const importFromBeyond = async () => {
+    if (!ddbUrl.trim() || ddbBusy) return
+    setDdbBusy(true)
+    try {
+      const { fields, warnings } = await api('/dndbeyond/preview', { method: 'POST', body: { url: ddbUrl.trim() } })
+      setForm(p => ({ ...p, ...fields }))
+      setDdbUrl('')
+      toast(`Imported ${fields.name || 'your character'}. ${warnings?.[0] ? warnings[0] + ' ' : ''}Review it, then press Save.`)
+    } catch (e) { toast(e.message || 'Import failed') }
+    setDdbBusy(false)
   }
 
   const save = async () => {
@@ -363,12 +378,18 @@ export default function Character() {
 
         <div style={{ flex: 1, minWidth: 200 }}>
           {editing ? (
+            <>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
               <input className="input" placeholder="Name" value={F.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} style={{ width: 150 }} />
               <input className="input" placeholder="Race" value={F.race} onChange={e => setForm(p => ({ ...p, race: e.target.value }))} style={{ width: 110 }} />
               <input className="input" placeholder="Class" value={F.class} onChange={e => setForm(p => ({ ...p, class: e.target.value }))} style={{ width: 110 }} />
               <input className="input" type="number" placeholder="Level" value={F.level} onChange={e => setForm(p => ({ ...p, level: +e.target.value }))} style={{ width: 65 }} />
             </div>
+            <form style={{ display: 'flex', gap: 8, marginTop: 8, flexWrap: 'wrap' }} onSubmit={e => { e.preventDefault(); importFromBeyond() }}>
+              <input className="input" placeholder="Or paste a D&D Beyond character link to import it" value={ddbUrl} onChange={e => setDdbUrl(e.target.value)} aria-label="D&D Beyond character link" style={{ flex: 1, minWidth: 220 }} />
+              <button type="submit" className="btn btn-ghost btn-sm" disabled={ddbBusy || !ddbUrl.trim()}>{ddbBusy ? 'Importing…' : 'Import'}</button>
+            </form>
+            </>
           ) : (
             <>
               <div style={{ fontFamily: 'var(--font-title)', fontSize: 18, fontWeight: 600 }}>{F.name || 'Unnamed Hero'}</div>

@@ -15,6 +15,7 @@ import battleRoutes from './routes/battle.js'
 import aiRoutes from './routes/ai.js'
 import paymentRoutes from './routes/payments.js'
 import feedbackRoutes from './routes/feedback.js'
+import dndBeyondRoutes from './routes/dndbeyond.js'
 import levelRoutes from './routes/levels.js'
 import inventoryRoutes from './routes/inventory.js'
 import uploadRoutes from './routes/upload.js'
@@ -44,6 +45,8 @@ const apiLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 600, standardHeade
 
 // Feedback is intentionally open to logged-out visitors, which also makes
 // it the easiest unauthenticated spam target — keep it tight.
+// Each import asks D&D Beyond for a character, so keep it modest per person/IP.
+const importLimiter = rateLimit({ windowMs: 60 * 60 * 1000, max: 30, standardHeaders: true, legacyHeaders: false, message: { error: 'Too many imports, please try again later.' } })
 const feedbackLimiter = rateLimit({ windowMs: 60 * 60 * 1000, max: 10, standardHeaders: true, legacyHeaders: false, message: { error: 'Too many submissions, please try again later.' } })
 
 app.use('/api/payments/webhook', express.raw({ type: 'application/json', verify: (req, res, buf) => { req.rawBody = buf } }))
@@ -70,6 +73,7 @@ app.use('/api/battle', battleRoutes)
 app.use('/api/ai', aiRoutes)
 app.use('/api/payments',  paymentRoutes)
 app.use('/api/feedback',  feedbackLimiter, feedbackRoutes)
+app.use('/api/dndbeyond', importLimiter, dndBeyondRoutes)
 app.use('/api/levels',    levelRoutes)
 app.use('/api/inventory', inventoryRoutes)
 app.use('/api/upload',    uploadRoutes)
