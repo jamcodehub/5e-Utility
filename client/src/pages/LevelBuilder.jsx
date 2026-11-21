@@ -1,5 +1,5 @@
 import { useDebouncedSave } from '../hooks/useDebouncedSave'
-import { useState, useEffect, useCallback, useMemo, useRef, useId } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef, useId, memo } from 'react'
 import { createPortal } from 'react-dom'
 import { Link, useSearchParams } from 'react-router-dom'
 import { api } from '../context/AuthContext'
@@ -276,6 +276,64 @@ function PeekingViewers({ viewers }) {
 }
 
 const dragPreviewTransform = ({ x, y }) => `translate3d(${x}px, ${y}px, 0) translate(-50%, -50%) scale(1.08)`
+
+// One square of the play board. Memoised, so a token taking a step redraws only the squares it left and entered, not the whole
+// board (a 48 by 33 map has 1,584 squares: drawing them all on every step took about 0.3 seconds and made walking lag).
+const PlayCell = memo(function PlayCell({ r, c, cellId, groundTile, object, visible, torchlit, darkvision, lightStrength, doorOpen, locked, shade, token, dragging, darkMode, isDm, cellSize, torchSrc, onCellClick, onDragStart }) {
+  const isDoor = cellId === 'door'
+  const isStair = cellId === 'stairs' || cellId === 'stairs-down'
+  const cellBase = isDoor && doorOpen ? 'floor' : cellId
+  return (
+    <div
+      data-map-cell
+      data-row={r}
+      data-col={c}
+      onClick={event => onCellClick(event, r, c)}
+      title={visible && isDoor ? (doorOpen ? 'Click to close door' : 'Click to open door') : visible && isStair ? 'Click to use stairs' : undefined}
+      style={{
+        minWidth: 0,
+        minHeight: 0,
+        background: darkMode && !visible ? '#000' : tileColor(cellBase),
+        border: `0.5px solid ${darkMode && !visible ? 'transparent' : 'rgba(0,0,0,0.08)'}`,
+        position: 'relative',
+        contain: 'layout style', // a change inside one square does not make the browser lay out the whole board again
+        filter: darkvision
+          ? 'brightness(0.35)'
+          : !isDm && darkMode && torchlit && lightStrength
+            ? `brightness(${0.45 + lightStrength * 0.55})`
+            : undefined,
+        cursor: visible && (isDoor || isStair) ? 'pointer' : undefined,
+      }}
+    >
+      {groundTile?.imageUrl && visible && (
+        <img
+          src={groundTile.imageUrl}
+          alt=""
+          aria-hidden="true"
+          draggable="false"
+          style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', pointerEvents: 'none' }}
+        />
+      )}
+      {groundTile?.iconUrl && visible && !(isDoor && doorOpen) && (
+        <TileIconPlaceholder tile={groundTile} style={{ position: 'absolute', inset: '21%', width: '58%', height: '58%', filter: darkvision ? 'brightness(0.35)' : undefined }} />
+      )}
+      {shade && visible && <div aria-hidden="true" style={{ position: 'absolute', inset: 0, pointerEvents: 'none', ...shade }} />}
+      {object && visible && (
+        <TileIconPlaceholder tile={object} style={{ position: 'absolute', zIndex: 1, filter: darkvision ? 'brightness(0.35)' : undefined }} />
+      )}
+      {token && (
+        <Token
+          token={token}
+          cellSize={cellSize}
+          onDragStart={onDragStart}
+          dragging={dragging}
+        />
+      )}
+      {isDoor && !doorOpen && locked && visible && <span aria-label="Locked door" title="Locked door" style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: Math.max(8, cellSize * 0.5), pointerEvents: 'none', zIndex: 2, textShadow: '0 1px 2px #000' }}>🔒</span>}
+      {token?.lightSource && torchSrc && <img src={torchSrc} alt="" aria-hidden="true" draggable={false} style={{ position: 'absolute', top: -7, right: -5, zIndex: 11, width: 14, height: 14, objectFit: 'contain', pointerEvents: 'none' }} />}
+    </div>
+  )
+})
 
 function Token({ token, cellSize, onDragStart, dragging }) {
   const initials = token.name?.[0]?.toUpperCase() || '?'
@@ -700,7 +758,7 @@ export default function LevelBuilder() {
     const movingId = isDm ? tapToPlaceTokenId : `char-${user?.id}`
     if (!movingId || !tokens.some(t => t.id === movingId && Number.isInteger(t.row))) return false
     const now = Date.now()
-    if (now - lastStepRef.current < 120) return true
+    if (now - lastStepRef.current < 100) return true
     lastStepRef.current = now
     // Walking into a closed door opens it. If it is locked a player asks the DM; the DM can open it without unlocking.
     const door = bumpedDoor(tokens, movingId, step, grid, doorStates)
@@ -1036,17 +1094,19 @@ export default function LevelBuilder() {
     })),
     [isDemo, objectGrid],
   )
+  // The fog only depends on where light and darkvision come from, so it is worked out again only when one of those moves, not
+  // every time any token takes a step.
+  const placed = token => Number.isInteger(token.row) && Number.isInteger(token.col)
+  const lightCarriers = tokens.filter(token => token.lightSource && placed(token))
+  const lightKey = lightCarriers.map(token => `${token.row}:${token.col}`).join('|')
   const sharedLightSources = useMemo(() => [
     ...mapLightSources,
-    ...tokens
-      .filter(token => token.lightSource && Number.isInteger(token.row) && Number.isInteger(token.col))
-      .map(token => ({ ...token, radius: TORCH_LIGHT_RADIUS })),
-  ], [mapLightSources, tokens])
+    ...lightCarriers.map(token => ({ ...token, radius: TORCH_LIGHT_RADIUS })),
+  ], [mapLightSources, lightKey]) // eslint-disable-line react-hooks/exhaustive-deps
   const localPlayerToken = tokens.find(token => token.id === `char-${user?.id}`)
-  const darkvisionSources = useMemo(() => isDm
-    ? tokens.filter(token => token.darkvision && Number.isInteger(token.row) && Number.isInteger(token.col))
-    : localPlayerToken?.darkvision ? [localPlayerToken] : [],
-  [isDm, localPlayerToken, tokens])
+  const visionCarriers = isDm ? tokens.filter(token => token.darkvision && placed(token)) : (localPlayerToken?.darkvision ? [localPlayerToken] : [])
+  const visionKey = visionCarriers.map(token => `${token.row}:${token.col}`).join('|')
+  const darkvisionSources = useMemo(() => visionCarriers, [isDm, visionKey]) // eslint-disable-line react-hooks/exhaustive-deps
   const visibility = useMemo(() => {
     const visible = []
     const torchlit = []
@@ -1083,6 +1143,21 @@ export default function LevelBuilder() {
     }
     return { visible, torchlit, darkvision, lightStrength }
   }, [darkMode, doorStates, grid, isDm, darkvisionSources, sharedLightSources])
+
+  // Where each token stands (one lookup for the whole board instead of a search per square), and each square's height shading.
+  const tokenAtCell = useMemo(() => {
+    const byCell = new Map()
+    tokens.forEach(token => { if (Number.isInteger(token.row)) byCell.set(`${token.row}:${token.col}`, token) })
+    return byCell
+  }, [tokens])
+  const shadeGrid = useMemo(() => (heights ? grid.map((row, r) => row.map((_, c) => heightShade(heights, r, c))) : null), [heights, grid])
+  // Squares are memoised, so they must get the same functions every time; these call whatever the latest versions are.
+  const cellClickRef = useRef(null)
+  cellClickRef.current = handlePlayCellClick
+  const dragStartRef = useRef(null)
+  dragStartRef.current = startTokenDrag
+  const onCellClick = useCallback((event, r, c) => cellClickRef.current(event, r, c), [])
+  const onTokenDragStart = useCallback((e, id) => dragStartRef.current(e, id), [])
 
   // What the 3D view is sent: how lit each square is (same as the 2D board shows), and each token's class.
   const viewerLevelList = useMemo(
@@ -1505,67 +1580,33 @@ export default function LevelBuilder() {
               WebkitTouchCallout: 'none',
             }}
           >
-            {grid.map((row, r) => row.map((cellId, c) => {
-              const token = tokens.find(t => t.row === r && t.col === c)
-              const object = objectTile(objectGrid[r]?.[c])
-              const visible = visibility.visible[r]?.[c]
-              const torchlit = visibility.torchlit[r]?.[c]
-              const darkvision = visibility.darkvision[r]?.[c]
+            {!view3d && grid.map((row, r) => row.map((cellId, c) => {
+              const token = tokenAtCell.get(`${r}:${c}`)
               const doorOpen = Boolean(doorStates[r]?.[c])
-              const isDoor = cellId === 'door'
-              const isStair = cellId === 'stairs' || cellId === 'stairs-down'
-              const cellBase = isDoor && doorOpen ? 'floor' : cellId
-              const lightStrength = visibility.lightStrength[r]?.[c] || 0
-              const groundTile = TILES.find(tile => tile.id === cellBase)
               return (
-                <div
+                <PlayCell
                   key={`${r}-${c}`}
-                  data-map-cell
-                  data-row={r}
-                  data-col={c}
-                  onClick={event => handlePlayCellClick(event, r, c)}
-                  title={visible && isDoor ? (doorOpen ? 'Click to close door' : 'Click to open door') : visible && isStair ? 'Click to use stairs' : undefined}
-                  style={{
-                    minWidth: 0,
-                    minHeight: 0,
-                    background: darkMode && !visible ? '#000' : tileColor(cellBase),
-                    border: `0.5px solid ${darkMode && !visible ? 'transparent' : 'rgba(0,0,0,0.08)'}`,
-                    position: 'relative',
-                    filter: darkvision
-                      ? 'brightness(0.35)'
-                      : !isDm && darkMode && torchlit && lightStrength
-                        ? `brightness(${0.45 + lightStrength * 0.55})`
-                        : undefined,
-                    cursor: visible && (isDoor || isStair) ? 'pointer' : undefined,
-                  }}
-                >
-                  {groundTile?.imageUrl && visible && (
-                    <img
-                      src={groundTile.imageUrl}
-                      alt=""
-                      aria-hidden="true"
-                      draggable="false"
-                      style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', pointerEvents: 'none' }}
-                    />
-                  )}
-                  {groundTile?.iconUrl && visible && !(isDoor && doorOpen) && (
-                    <TileIconPlaceholder tile={groundTile} style={{ position: 'absolute', inset: '21%', width: '58%', height: '58%', filter: darkvision ? 'brightness(0.35)' : undefined }} />
-                  )}
-                  {heights && visible && <div aria-hidden="true" style={{ position: 'absolute', inset: 0, pointerEvents: 'none', ...heightShade(heights, r, c) }} />}
-                  {object && visible && (
-                    <TileIconPlaceholder tile={object} style={{ position: 'absolute', zIndex: 1, filter: darkvision ? 'brightness(0.35)' : undefined }} />
-                  )}
-                  {token && (
-                    <Token
-                      token={token}
-                      cellSize={cellSize}
-                      onDragStart={startTokenDrag}
-                      dragging={dragTokenId === token.id}
-                    />
-                  )}
-                  {isDoor && !doorOpen && doorLocks[r]?.[c] && visible && <span aria-label="Locked door" title="Locked door" style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: Math.max(8, cellSize * 0.5), pointerEvents: 'none', zIndex: 2, textShadow: '0 1px 2px #000' }}>🔒</span>}
-                  {token?.lightSource && torchSrc && <img src={torchSrc} alt="" aria-hidden="true" draggable={false} style={{ position: 'absolute', top: -7, right: -5, zIndex: 11, width: 14, height: 14, objectFit: 'contain', pointerEvents: 'none' }} />}
-                </div>
+                  r={r}
+                  c={c}
+                  cellId={cellId}
+                  groundTile={TILES.find(tile => tile.id === (cellId === 'door' && doorOpen ? 'floor' : cellId))}
+                  object={objectTile(objectGrid[r]?.[c])}
+                  visible={visibility.visible[r]?.[c]}
+                  torchlit={visibility.torchlit[r]?.[c]}
+                  darkvision={visibility.darkvision[r]?.[c]}
+                  lightStrength={visibility.lightStrength[r]?.[c] || 0}
+                  doorOpen={doorOpen}
+                  locked={Boolean(doorLocks[r]?.[c])}
+                  shade={shadeGrid?.[r]?.[c]}
+                  token={token}
+                  dragging={Boolean(token) && dragTokenId === token.id}
+                  darkMode={darkMode}
+                  isDm={isDm}
+                  cellSize={cellSize}
+                  torchSrc={torchSrc}
+                  onCellClick={onCellClick}
+                  onDragStart={onTokenDragStart}
+                />
               )
             }))}
           </div>
