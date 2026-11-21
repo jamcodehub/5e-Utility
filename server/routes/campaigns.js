@@ -172,6 +172,32 @@ router.delete('/:id/pending/:userId', auth, async (req, res) => {
   } catch { res.status(500).json({ error: 'Failed to reject' }) }
 })
 
+// DM removes a player from the campaign. To guard against a stray tap the DM must type the player's character name exactly
+// (their username if they have no character yet), enforced here as well as in the UI. Only their access ends: their
+// characters are kept, so they are all still there if the player is let back in. The DM can also remove themselves from the
+// player list (a placeholder test player), which never touches their ownership of the campaign.
+const memberLabel = async (campaignId, userId) => {
+  const chars = await Character.find({ campaign: campaignId, owner: userId })
+  const character = chars.find(c => c.isPrimary) || chars[0]
+  if (character?.name?.trim()) return character.name
+  const user = await User.findById(userId).select('username')
+  return user?.username || ''
+}
+
+router.delete('/:id/members/:userId', auth, async (req, res) => {
+  try {
+    const campaign = await Campaign.findOne({ _id: req.params.id, owner: req.userId })
+    if (!campaign) return res.status(403).json({ error: 'Only the DM can remove players.' })
+    const uid = String(req.params.userId)
+    if (!campaign.members.some(m => String(m) === uid)) return res.status(404).json({ error: 'That player is not in this campaign.' })
+    const expected = await memberLabel(campaign._id, uid)
+    if (!expected || req.body?.confirmName !== expected) return res.status(400).json({ error: 'Name did not match.' })
+    campaign.members = campaign.members.filter(m => String(m) !== uid)
+    await campaign.save()
+    res.json({ ok: true })
+  } catch { res.status(500).json({ error: 'Failed to remove the player' }) }
+})
+
 router.put('/:id', auth, async (req, res) => {
   try {
     const campaign = await Campaign.findOneAndUpdate(

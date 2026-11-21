@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useTheme, THEMES } from '../context/ThemeContext'
 import { api, useAuth, useAuthConfig } from '../context/AuthContext'
@@ -26,6 +26,12 @@ export default function SettingsModal({ onClose }) {
   const [confirmInput, setConfirmInput] = useState('')
   const [confirmError, setConfirmError] = useState('')
   const [confirmWorking, setConfirmWorking] = useState(false)
+  // The DM's player list for this campaign, and the "type their name to remove them" flow
+  const [roster, setRoster] = useState([])
+  const [removeTarget, setRemoveTarget] = useState(null) // { userId, label, username }
+  const [removeInput, setRemoveInput] = useState('')
+  const [removeError, setRemoveError] = useState('')
+  const [removeWorking, setRemoveWorking] = useState(false)
   const [roleWorking, setRoleWorking] = useState(false)
   const [roleError, setRoleError] = useState('')
   const [nameInput, setNameInput] = useState('')
@@ -49,6 +55,26 @@ export default function SettingsModal({ onClose }) {
   }
 
   const isOwner = activeCampaign && String(activeCampaign.owner) === String(user?._id || user?.id)
+
+  const loadRoster = async () => {
+    if (!isOwner || !activeCampaign || activeCampaign.isPersonal) { setRoster([]); return }
+    try { setRoster(await api(`/campaigns/${activeCampaign._id}/members/characters`)) } catch { setRoster([]) }
+  }
+  useEffect(() => { loadRoster() }, [activeCampaign?._id, isOwner]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // The name the DM must type: the player's character, or their username if they have not made one yet.
+  const rosterLabel = (m) => (m.character?.name?.trim() ? m.character.name : m.username)
+  const removePlayer = async () => {
+    if (!removeTarget || !activeCampaign) return
+    if (removeInput !== removeTarget.label) { setRemoveError('Name did not match. Check the capitalisation.'); return }
+    setRemoveWorking(true); setRemoveError('')
+    try {
+      await api(`/campaigns/${activeCampaign._id}/members/${removeTarget.userId}`, { method: 'DELETE', body: { confirmName: removeInput } })
+      setRemoveTarget(null); setRemoveInput('')
+      await loadRoster()
+    } catch (err) { setRemoveError(err?.message || 'Could not remove that player.') }
+    setRemoveWorking(false)
+  }
 
   const runConfirmedAction = async () => {
     if (!activeCampaign) return
@@ -265,6 +291,23 @@ export default function SettingsModal({ onClose }) {
             <div style={{ fontSize: 13, color: 'var(--text-2)', marginBottom: 10 }}>{activeCampaign.name}</div>
             {isOwner ? (
               <>
+                <div style={{ marginBottom: 14 }}>
+                  <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-3)', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 6 }}>Players</div>
+                  {roster.length === 0 && <div style={{ fontSize: 12, color: 'var(--text-3)' }}>No players have joined yet. Share the join code from the sidebar.</div>}
+                  {roster.map(m => {
+                    const isMe = String(m.userId) === String(user?._id || user?.id)
+                    return (
+                      <div key={m.userId} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, padding: '6px 0', borderBottom: '1px solid var(--border)' }}>
+                        <div style={{ minWidth: 0, fontSize: 13 }}>
+                          <span style={{ color: 'var(--text)' }}>{rosterLabel(m)}</span>
+                          <span style={{ fontSize: 11, color: 'var(--text-3)' }}>{m.character?.name?.trim() ? ` · ${m.username}` : ' · no character yet'}{isMe ? ' (you, as a player)' : ''}</span>
+                        </div>
+                        <button type="button" onClick={() => { setRemoveTarget({ userId: m.userId, label: rosterLabel(m), username: m.username }); setRemoveInput(''); setRemoveError('') }}
+                          style={{ background: 'none', border: 'none', color: 'var(--red)', fontSize: 12, cursor: 'pointer', padding: '2px 4px', flexShrink: 0 }}>Remove</button>
+                      </div>
+                    )
+                  })}
+                </div>
                 <button type="button" onClick={() => { setConfirmAction('delete'); setConfirmInput(''); setConfirmError('') }}
                   disabled={!isPremium}
                   style={{ padding: '6px 12px', borderRadius: 3, border: '1px solid var(--border)', background: 'transparent', color: isPremium ? 'var(--red)' : 'var(--text-3)', fontWeight: 500, fontSize: 12, cursor: isPremium ? 'pointer' : 'not-allowed', opacity: isPremium ? 1 : 0.6 }}>
@@ -288,6 +331,28 @@ export default function SettingsModal({ onClose }) {
           </button>
         </div>
       </div>
+
+      {/* Type-to-confirm: removing a player from the campaign */}
+      {removeTarget && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.65)', zIndex: 1100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }} onClick={() => setRemoveTarget(null)}>
+          <div className="card" style={{ width: '100%', maxWidth: 380, padding: 22 }} onClick={e => e.stopPropagation()} role="dialog" aria-label="Remove player">
+            <div style={{ fontFamily: 'var(--font-title)', fontSize: 16, fontWeight: 600, color: 'var(--red)', marginBottom: 10 }}>Remove player</div>
+            <div style={{ fontSize: 13, color: 'var(--text-2)', marginBottom: 14, lineHeight: 1.6 }}>
+              {removeTarget.username} loses access to this campaign. Their characters are kept, and you can let them back in later.
+              {' '}Type <strong style={{ color: 'var(--text)' }}>{removeTarget.label}</strong> exactly to confirm.
+            </div>
+            <input autoFocus className="input" placeholder={removeTarget.label} value={removeInput} onChange={e => { setRemoveInput(e.target.value); setRemoveError('') }}
+              onKeyDown={e => { if (e.key === 'Enter') removePlayer(); if (e.key === 'Escape') setRemoveTarget(null) }} style={{ marginBottom: 10 }} />
+            {removeError && <div style={{ fontSize: 12, color: 'var(--red)', marginBottom: 10 }} role="alert">{removeError}</div>}
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button className="btn btn-sm" onClick={removePlayer} disabled={removeWorking || removeInput !== removeTarget.label} style={{ background: 'var(--red)', color: '#fff', border: 'none', flex: 1 }}>
+                {removeWorking ? 'Removing…' : 'Remove player'}
+              </button>
+              <button className="btn btn-ghost btn-sm" onClick={() => setRemoveTarget(null)}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Type-to-confirm modal for Leave/Delete campaign — case-sensitive
           exact name match required, to guard against accidental taps. */}
