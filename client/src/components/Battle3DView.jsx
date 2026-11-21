@@ -4,7 +4,7 @@ import { viewerUrl, buildMapMessage, buildStateMessage, readViewerMessage } from
 
 // The live 3D view of the battle map: the Godot game in viewer mode, fed by this page (see utils/viewer3d.js). Only loaded when
 // someone switches to 3D, so it adds nothing for everyone else.
-export default function Battle3DView({ ground, objects, heights, doorStates, doorLocks, theme, tokens, levels, darkMode, focusId, classOf, onClick, onKey, tokensOpen }) {
+export default function Battle3DView({ ground, objects, heights, doorStates, doorLocks, theme, tokens, levels, darkMode, night, focusId, classOf, onClick, onKey, tokensOpen }) {
   const frame = useRef(null)
   const [installed, setInstalled] = useState(null) // null while checking
   const [ready, setReady] = useState(false)
@@ -46,8 +46,8 @@ export default function Battle3DView({ ground, objects, heights, doorStates, doo
     if (ready) post(buildMapMessage({ ground, objects, doorStates, doorLocks, heights, theme }))
   }, [ready, syncKey, ground, objects, heights, doorStates, doorLocks, theme]) // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
-    if (ready) post(buildStateMessage({ tokens, levels, darkMode, focusId, classOf }))
-  }, [ready, syncKey, tokens, levels, darkMode, focusId]) // eslint-disable-line react-hooks/exhaustive-deps
+    if (ready) post(buildStateMessage({ tokens, levels, darkMode, night, focusId, classOf }))
+  }, [ready, syncKey, tokens, levels, darkMode, night, focusId]) // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div className="level-play-scroll" data-tokens-open={Boolean(tokensOpen)} style={{ position: 'absolute', inset: 0, zIndex: 10, background: '#14110d' }}>

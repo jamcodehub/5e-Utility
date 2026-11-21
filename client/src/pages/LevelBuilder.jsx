@@ -17,6 +17,7 @@ import { keyToStep, stepToken, isTypingTarget, bumpedDoor } from '../utils/token
 import { classIdFor, viewerLevels } from '../utils/viewer3d'
 import { readHeights, heightShade } from '../utils/mapHeights'
 import { emptyHistory, endStroke as endHistoryStroke, undo as undoHistory, redo as redoHistory, pushSnapshot } from '../utils/editHistory'
+import { isOutdoorMap } from '../utils/outdoor'
 import { rotationOf, nextRotation, rotationLabel, readRotations, compactRotations, withRotation } from '../utils/tileRotation'
 import Battle3DView from '../components/Battle3DView'
 // Note: module-level TILES / OBJECT_TILES above are the base (Medieval) set, used for
@@ -59,7 +60,7 @@ function parseMapContent(content) {
     const parsed = JSON.parse(content)
     if (Array.isArray(parsed)) {
       const dims = dimsOf(parsed)
-      return { ground: normalizeGrid(parsed, 'empty', dims), objects: blankObjectGrid(dims.w, dims.h), stairLinks: blankStairLinks(dims.w, dims.h), rotations: blankRotations(dims.w, dims.h), objectRotations: blankRotations(dims.w, dims.h), doorLocks: blankDoorStates(dims.w, dims.h), dims }
+      return { ground: normalizeGrid(parsed, 'empty', dims), objects: blankObjectGrid(dims.w, dims.h), stairLinks: blankStairLinks(dims.w, dims.h), rotations: blankRotations(dims.w, dims.h), objectRotations: blankRotations(dims.w, dims.h), doorLocks: blankDoorStates(dims.w, dims.h), outdoor: null, dims }
     }
     if (parsed && Array.isArray(parsed.ground)) {
       const dims = dimsOf(parsed.ground)
@@ -71,6 +72,7 @@ function parseMapContent(content) {
         rotations: readRotations(parsed.rotations, dims.h, dims.w),
         objectRotations: readRotations(parsed.objectRotations, dims.h, dims.w),
         doorLocks: normalizeGrid(parsed.doorLocks, false, dims).map(row => row.map(value => value === true)), // locked doors as designed
+        outdoor: typeof parsed.outdoor === 'boolean' ? parsed.outdoor : null, // null = not said (guessed from the ground)
         dims,
       }
     }
@@ -78,7 +80,7 @@ function parseMapContent(content) {
     // Older maps may have empty or malformed content; use an empty object layer.
   }
   const dims = { w: GRID_W, h: GRID_H }
-  return { ground: blankGrid(), objects: blankObjectGrid(), stairLinks: blankStairLinks(), rotations: blankRotations(), objectRotations: blankRotations(), doorLocks: blankDoorStates(), dims }
+  return { ground: blankGrid(), objects: blankObjectGrid(), stairLinks: blankStairLinks(), rotations: blankRotations(), objectRotations: blankRotations(), doorLocks: blankDoorStates(), outdoor: null, dims }
 }
 
 function normalizeDoorStates(value, dims) {
@@ -287,7 +289,9 @@ const dragPreviewTransform = ({ x, y }) => `translate3d(${x}px, ${y}px, 0) trans
 
 // One square of the play board. Memoised, so a token taking a step redraws only the squares it left and entered, not the whole
 // board (a 48 by 33 map has 1,584 squares: drawing them all on every step took about 0.3 seconds and made walking lag).
-const PlayCell = memo(function PlayCell({ r, c, cellId, groundTile, object, turn, objectTurn, visible, torchlit, darkvision, lightStrength, doorOpen, locked, shade, token, dragging, darkMode, isDm, cellSize, torchSrc, onCellClick, onDragStart }) {
+const PlayCell = memo(function PlayCell({ r, c, cellId, groundTile, object, turn, objectTurn, visible, moon, fade, torchlit, darkvision, lightStrength, doorOpen, locked, shade, token, dragging, darkMode, isDm, cellSize, torchSrc, onCellClick, onDragStart }) {
+  // `shown`: drawn at all. A moonlit square (outdoors at night, nobody can see it) is drawn, dimmed under a blue wash.
+  const shown = visible || moon
   const isDoor = cellId === 'door'
   const isStair = cellId === 'stairs' || cellId === 'stairs-down'
   const cellBase = isDoor && doorOpen ? 'floor' : cellId
@@ -301,19 +305,22 @@ const PlayCell = memo(function PlayCell({ r, c, cellId, groundTile, object, turn
       style={{
         minWidth: 0,
         minHeight: 0,
-        background: darkMode && !visible ? '#000' : tileColor(cellBase),
-        border: `0.5px solid ${darkMode && !visible ? 'transparent' : 'rgba(0,0,0,0.08)'}`,
+        background: darkMode && !shown ? '#000' : tileColor(cellBase),
+        border: `0.5px solid ${darkMode && !shown ? 'transparent' : 'rgba(0,0,0,0.08)'}`,
         position: 'relative',
         contain: 'layout style', // a change inside one square does not make the browser lay out the whole board again
         filter: darkvision
           ? 'brightness(0.35)'
-          : !isDm && darkMode && torchlit && lightStrength
+          : fade !== null && fade !== undefined && torchlit
+            // outdoors at night: torch light fades smoothly out into the moonlight (1 at the torch, 0 at the edge of its reach)
+            ? `brightness(${(0.3 + 0.7 * fade * fade * (3 - 2 * fade)).toFixed(3)})`
+            : !isDm && darkMode && torchlit && lightStrength
             ? `brightness(${0.45 + lightStrength * 0.55})`
             : undefined,
         cursor: visible && (isDoor || isStair) ? 'pointer' : undefined,
       }}
     >
-      {groundTile?.imageUrl && visible && (
+      {groundTile?.imageUrl && shown && (
         <img
           src={groundTile.imageUrl}
           alt=""
@@ -322,13 +329,14 @@ const PlayCell = memo(function PlayCell({ r, c, cellId, groundTile, object, turn
           style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', pointerEvents: 'none', transform: turn ? `rotate(${turn}deg)` : undefined }}
         />
       )}
-      {groundTile?.iconUrl && visible && !(isDoor && doorOpen) && (
+      {groundTile?.iconUrl && shown && !(isDoor && doorOpen) && (
         <TileIconPlaceholder tile={groundTile} rotate={turn} style={{ position: 'absolute', inset: '21%', width: '58%', height: '58%', filter: darkvision ? 'brightness(0.35)' : undefined }} />
       )}
-      {shade && visible && <div aria-hidden="true" style={{ position: 'absolute', inset: 0, pointerEvents: 'none', ...shade }} />}
-      {object && visible && (
+      {shade && shown && <div aria-hidden="true" style={{ position: 'absolute', inset: 0, pointerEvents: 'none', ...shade }} />}
+      {object && shown && (
         <TileIconPlaceholder tile={object} rotate={objectTurn} style={{ position: 'absolute', zIndex: 1, filter: darkvision ? 'brightness(0.35)' : undefined }} />
       )}
+      {moon && <div aria-hidden="true" style={{ position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 3, background: 'rgba(6,10,30,0.74)' }} />}
       {token && (
         <Token
           token={token}
@@ -337,7 +345,7 @@ const PlayCell = memo(function PlayCell({ r, c, cellId, groundTile, object, turn
           dragging={dragging}
         />
       )}
-      {isDoor && !doorOpen && locked && visible && <span aria-label="Locked door" title="Locked door" style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: Math.max(8, cellSize * 0.5), pointerEvents: 'none', zIndex: 2, textShadow: '0 1px 2px #000' }}>🔒</span>}
+      {isDoor && !doorOpen && locked && shown && <span aria-label="Locked door" title="Locked door" style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: Math.max(8, cellSize * 0.5), pointerEvents: 'none', zIndex: 2, textShadow: '0 1px 2px #000' }}>🔒</span>}
       {token?.lightSource && torchSrc && <img src={torchSrc} alt="" aria-hidden="true" draggable={false} style={{ position: 'absolute', top: -7, right: -5, zIndex: 11, width: 14, height: 14, objectFit: 'contain', pointerEvents: 'none' }} />}
     </div>
   )
@@ -408,6 +416,7 @@ export default function LevelBuilder() {
   const [rotations, setRotations] = useState(() => blankRotations()) // quarter turns of ground tiles the author chose
   const [objectRotations, setObjectRotations] = useState(() => blankRotations()) // and of upper-layer objects
   const [designLocks, setDesignLocks] = useState(() => blankDoorStates()) // doors that start locked, as set in the editor (the Locked Door tile)
+  const [outdoorFlag, setOutdoorFlag] = useState(null) // true/false if the map says whether it is open air; null = guess from the ground
   const [paintRotation, setPaintRotation] = useState(null) // the turn given to tiles being placed: null = automatic
   const [heights, setHeights] = useState(null) // ground height per square for maps that have it (see utils/mapHeights.js)
   const [doorLocks, setDoorLocks] = useState(blankDoorStates()) // locked doors: only the DM can unlock them (see server/lib/doors.js)
@@ -705,7 +714,7 @@ export default function LevelBuilder() {
       setDarkMode(Boolean(destination.darkMode))
       setDoorStates(normalizeDoorStates(destination.doorStates, parsed.dims))
       setDoorLocks(normalizeDoorStates(destination.doorLocks, parsed.dims))
-      setHeights(parsed.heights); setRotations(parsed.rotations); setObjectRotations(parsed.objectRotations); setDesignLocks(parsed.doorLocks)
+      setHeights(parsed.heights); setRotations(parsed.rotations); setObjectRotations(parsed.objectRotations); setDesignLocks(parsed.doorLocks); setOutdoorFlag(parsed.outdoor)
       setKnocks([])
     }
     const onDoorState = ({ row, col, open } = {}) => {
@@ -807,7 +816,7 @@ export default function LevelBuilder() {
       setGrid(parsed.ground)
       setObjectGrid(parsed.objects)
       setStairLinks(parsed.stairLinks)
-      setHeights(parsed.heights); setRotations(parsed.rotations); setObjectRotations(parsed.objectRotations); setDesignLocks(parsed.doorLocks)
+      setHeights(parsed.heights); setRotations(parsed.rotations); setObjectRotations(parsed.objectRotations); setDesignLocks(parsed.doorLocks); setOutdoorFlag(parsed.outdoor)
       setDoorStates(normalizeDoorStates(plan.doorStates, parsed.dims))
     } else {
       setEditPlanId(null)
@@ -822,6 +831,7 @@ export default function LevelBuilder() {
       setRotations(blankRotations(w, h))
       setObjectRotations(blankRotations(w, h))
       setDesignLocks(blankDoorStates(w, h))
+      setOutdoorFlag(null)
     }
     setEditTheme(resolveThemeId(plan?.theme))
     setEditLayer('ground')
@@ -840,7 +850,7 @@ export default function LevelBuilder() {
     setDarkMode(Boolean(plan.darkMode))
     setDoorStates(normalizeDoorStates(plan.doorStates, parsed.dims))
     setDoorLocks(normalizeDoorStates(plan.doorLocks, parsed.dims))
-    setHeights(parsed.heights); setRotations(parsed.rotations); setObjectRotations(parsed.objectRotations); setDesignLocks(parsed.doorLocks)
+    setHeights(parsed.heights); setRotations(parsed.rotations); setObjectRotations(parsed.objectRotations); setDesignLocks(parsed.doorLocks); setOutdoorFlag(parsed.outdoor)
     setTokens(Array.isArray(plan.tokens) ? plan.tokens : [])
     setMode('play')
     if (isDm && activeCampaign && !activeCampaign.isPersonal) {
@@ -933,6 +943,7 @@ export default function LevelBuilder() {
     ...(compactRotations(rotations) ? { rotations } : {}),
     ...(compactRotations(objectRotations) ? { objectRotations } : {}),
     doorLocks: designLocks, // always sent from the editor, so unlocking a door in the editor sticks
+    ...(outdoorFlag === null ? {} : { outdoor: outdoorFlag }),
   })
 
   // ── Undo and redo ──
@@ -1200,16 +1211,21 @@ export default function LevelBuilder() {
   const visionCarriers = isDm ? tokens.filter(token => token.darkvision && placed(token)) : (localPlayerToken?.darkvision ? [localPlayerToken] : [])
   const visionKey = visionCarriers.map(token => `${token.row}:${token.col}`).join('|')
   const darkvisionSources = useMemo(() => visionCarriers, [isDm, visionKey]) // eslint-disable-line react-hooks/exhaustive-deps
+  const outdoor = isOutdoorMap(outdoorFlag, grid)
   const visibility = useMemo(() => {
     const visible = []
     const torchlit = []
     const darkvision = []
     const lightStrength = []
+    const lightFade = []
+    const moonlit = []
     for (let row = 0; row < gridH; row++) {
       visible[row] = []
       torchlit[row] = []
       darkvision[row] = []
       lightStrength[row] = []
+      lightFade[row] = []
+      moonlit[row] = []
       for (let col = 0; col < gridW; col++) {
         const nearbyLights = sharedLightSources
           .filter(source => canSeeFrom(grid, doorStates, source, row, col, source.radius))
@@ -1224,6 +1240,10 @@ export default function LevelBuilder() {
         visible[row][col] = !darkMode || sharedLight || hasDarkvision
         torchlit[row][col] = !darkMode || sharedLight
         darkvision[row][col] = darkMode && hasDarkvision && !sharedLight
+        // Outdoors with the lighting on it is night: squares nobody can see are moonlit (dim), not black. And a torch's light fades
+        // out smoothly over its whole reach.
+        moonlit[row][col] = darkMode && outdoor && !visible[row][col]
+        lightFade[row][col] = nearbyLights.length ? Math.max(...nearbyLights.map(({ distance, radius }) => Math.max(0, 1 - distance / (radius + 1)))) : 0
         lightStrength[row][col] = sharedLight
           ? Math.max(...nearbyLights.map(({ distance, radius }) => {
               const coreRadius = Math.floor(radius * 0.6)
@@ -1234,8 +1254,8 @@ export default function LevelBuilder() {
           : 0
       }
     }
-    return { visible, torchlit, darkvision, lightStrength }
-  }, [darkMode, doorStates, grid, isDm, darkvisionSources, sharedLightSources])
+    return { visible, torchlit, darkvision, lightStrength, lightFade, moonlit }
+  }, [darkMode, doorStates, grid, isDm, darkvisionSources, sharedLightSources, outdoor])
 
   // Where each token stands (one lookup for the whole board instead of a search per square), and each square's height shading.
   const tokenAtCell = useMemo(() => {
@@ -1254,8 +1274,8 @@ export default function LevelBuilder() {
 
   // What the 3D view is sent: how lit each square is (same as the 2D board shows), and each token's class.
   const viewerLevelList = useMemo(
-    () => viewerLevels({ darkMode, isDm, visibility, rows: gridH, cols: gridW }),
-    [darkMode, isDm, visibility, gridH, gridW],
+    () => viewerLevels({ darkMode, isDm, visibility, rows: gridH, cols: gridW, outdoor }),
+    [darkMode, isDm, visibility, gridH, gridW, outdoor],
   )
   const classOfToken = useCallback((t) => availableTokens.find(a => a.id === t.id)?.classId || '', [availableTokens])
   const handleViewerClick = ({ row, col, tokenId }) => {
@@ -1393,6 +1413,10 @@ export default function LevelBuilder() {
 
       <div className="lb-editor-workspace">
       <aside className="lb-editor-tools" aria-label="Map tile selection">
+        <label title="Open-air maps are lit by the night sky when fog of war is on: dim blue moonlight instead of pitch black. Leave it unticked for dungeons and caves."
+          style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: 'var(--text-2)', margin: '0 0 8px', cursor: 'pointer' }}>
+          <input type="checkbox" checked={outdoor} onChange={e => setOutdoorFlag(e.target.checked)} /> Outdoor map (night, not darkness, with fog)
+        </label>
         <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
           <button type="button" className="btn btn-ghost btn-sm" onClick={runUndo} disabled={!history.undo.length} title="Undo the last click or drag (Ctrl or ⌘ + Z)" style={{ flex: 1, justifyContent: 'center' }}>↶ Undo</button>
           <button type="button" className="btn btn-ghost btn-sm" onClick={runRedo} disabled={!history.redo.length} title="Put back what you undid (Ctrl or ⌘ + Shift + Z)" style={{ flex: 1, justifyContent: 'center' }}>↷ Redo</button>
@@ -1700,6 +1724,8 @@ export default function LevelBuilder() {
                   turn={rotationOf(cellId === 'door' && doorOpen ? 'floor' : cellId, rotations[r]?.[c], r, c) * 90}
                   objectTurn={rotationOf(objectGrid[r]?.[c], objectRotations[r]?.[c], r, c) * 90}
                   visible={visibility.visible[r]?.[c]}
+                  moon={Boolean(visibility.moonlit[r]?.[c])}
+                  fade={darkMode && outdoor ? Math.min(1, visibility.lightFade[r]?.[c] || 0) : null}
                   torchlit={visibility.torchlit[r]?.[c]}
                   darkvision={visibility.darkvision[r]?.[c]}
                   lightStrength={visibility.lightStrength[r]?.[c] || 0}
@@ -1746,7 +1772,7 @@ export default function LevelBuilder() {
           {view3d && (
             <Battle3DView
               ground={grid} objects={objectGrid} heights={heights} doorStates={doorStates} doorLocks={doorLocks} theme={themeId}
-              tokens={tokens} levels={viewerLevelList} darkMode={darkMode}
+              tokens={tokens} levels={viewerLevelList} darkMode={darkMode} night={darkMode && outdoor}
               focusId={isDm ? (tapToPlaceTokenId || '') : `char-${user?.id}`} classOf={classOfToken}
               onClick={handleViewerClick} onKey={key => walkRef.current(key)}
               tokensOpen={isDm && showTokens && !isFullscreen}

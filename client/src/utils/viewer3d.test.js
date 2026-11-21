@@ -1,5 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
+import { NIGHT_LEVEL } from './outdoor.js'
 import { classIdFor, CLASS_IDS, viewerLevels, buildMapMessage, buildStateMessage, readViewerMessage, viewerUrl, VIEWER_MAP, VIEWER_STATE } from './viewer3d.js'
 
 test('a class is found in whatever the player typed, otherwise nothing', () => {
@@ -90,4 +91,33 @@ test('messages from the game are checked', () => {
     assert.equal(readViewerMessage(bad, 5, 5), null, `should refuse ${JSON.stringify(bad)}`)
   }
   assert.equal(readViewerMessage({ type: '5eutility-viewer-click', row: 0, col: 0, tokenId: 5 }, 5, 5).tokenId, '')
+})
+
+test('outdoors with fog it is night: moonlight where nothing is lit, and torch light fades out into it', () => {
+  const vis = {
+    visible: [[true, true, true, false]],
+    torchlit: [[true, true, true, false]],
+    darkvision: [[false, false, false, false]],
+    lightStrength: [[1, 0.8, 0.45, 0]],
+    lightFade: [[1, 0.6, 0.2, 0]],
+  }
+  const night = viewerLevels({ darkMode: true, isDm: false, visibility: vis, rows: 1, cols: 4, outdoor: true })
+  assert.equal(night[0], 1, 'at the torch: full light')
+  assert.equal(night[3], NIGHT_LEVEL, 'far from any light: moonlit, not black')
+  assert.ok(night[0] > night[1] && night[1] > night[2] && night[2] > night[3], 'it fades steadily')
+  assert.ok(night.every(n => n >= NIGHT_LEVEL && n <= 1))
+  const indoor = viewerLevels({ darkMode: true, isDm: false, visibility: vis, rows: 1, cols: 4, outdoor: false })
+  assert.equal(indoor[3], 0, 'the same map indoors is pitch black out of reach')
+  assert.deepEqual(viewerLevels({ darkMode: false, isDm: false, visibility: vis, rows: 1, cols: 4, outdoor: true }), [1, 1, 1, 1], 'no fog, no night')
+})
+
+test('darkvision outdoors never makes a square darker than it would be', () => {
+  const vis = { visible: [[true]], torchlit: [[false]], darkvision: [[true]], lightStrength: [[0]], lightFade: [[0]] }
+  assert.equal(viewerLevels({ darkMode: true, isDm: false, visibility: vis, rows: 1, cols: 1, outdoor: true })[0], 0.35)
+})
+
+test('the state message says when it is night', () => {
+  assert.equal(buildStateMessage({ tokens: [], levels: [], darkMode: true, night: true }).night, true)
+  assert.equal(buildStateMessage({ tokens: [], levels: [], darkMode: false, night: true }).night, false, 'no fog, no night')
+  assert.equal(buildStateMessage({ tokens: [], levels: [], darkMode: true }).night, false)
 })
