@@ -13,6 +13,7 @@ import { TILES, OBJECT_TILES } from '../data/levelTiles'
 import { THEMES, DEFAULT_THEME, resolveThemeId, getThemeTiles } from '../data/levelThemes'
 import { avatarSrc } from '../components/ProfileAvatar'
 import { tokenColor } from '../utils/tokenColor'
+import { keyToStep, stepToken, isTypingTarget } from '../utils/tokenMove'
 // Note: module-level TILES / OBJECT_TILES above are the base (Medieval) set, used for
 // logic that doesn't depend on artwork. MapThumb and LevelBuilder shadow them with the
 // active theme's tiles (same ids, different art).
@@ -636,6 +637,26 @@ export default function LevelBuilder() {
     }
     getSocket().emit('level:tokens', { planId: selectedPlanId, tokens })
   }, [tokens, mode, selectedPlanId])
+
+  // Walk with WASD or the arrow keys. A player moves their own character's token; the DM moves the token selected in the side
+  // list. Steps are limited to about 8 a second, so holding a key walks smoothly without flooding the server with saves.
+  const lastStepRef = useRef(0)
+  useEffect(() => {
+    if (mode !== 'play' || !selectedPlanId) return undefined
+    const onKeyDown = (e) => {
+      const step = keyToStep(e.key)
+      if (!step || e.ctrlKey || e.metaKey || e.altKey || isTypingTarget(e.target)) return
+      const movingId = isDm ? tapToPlaceTokenId : `char-${user?.id}`
+      if (!movingId || !tokens.some(t => t.id === movingId && Number.isInteger(t.row))) return
+      e.preventDefault()
+      const now = Date.now()
+      if (now - lastStepRef.current < 120) return
+      lastStepRef.current = now
+      setTokens(current => stepToken(current, movingId, step, grid, objectGrid, doorStates))
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [mode, selectedPlanId, isDm, user?.id, tapToPlaceTokenId, tokens, grid, objectGrid, doorStates])
 
   // ── Gallery actions ──
   const openEditor = (plan = null, size = null) => {
@@ -1451,6 +1472,7 @@ export default function LevelBuilder() {
         {isDm && showTokens && !isFullscreen && (
         <div className="level-play-tokens" style={{ position: 'absolute', top: 0, right: 0, bottom: 0, zIndex: 15, width: 240, display: 'flex', flexDirection: 'column', background: 'var(--surface)', borderLeft: '1px solid var(--border)', overflow: 'hidden' }}>
         <div className="level-play-token-list">
+            <div style={{ padding: '6px 10px', fontSize: 11, color: 'var(--text-3)' }}>Players walk their own token with WASD or the arrow keys. Press Move on a token here to walk it yourself.</div>
             {/* Section: Players */}
             {availableTokens.filter(t => t.type === 'player').length > 0 && (
               <>
