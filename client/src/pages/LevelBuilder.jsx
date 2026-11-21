@@ -1827,7 +1827,7 @@ export default function LevelBuilder() {
       {/* Header */}
       <div style={{ padding: '16px 24px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0, background: 'var(--surface)' }}>
         <div style={{ flex: 1 }}>
-          <h2 style={{ fontSize: 20, marginBottom: 2 }}>Battle Map</h2>
+          <h2 style={{ fontSize: 20, marginBottom: 2 }}>Maps</h2>
         </div>
         {isDm && <Link className="btn btn-ghost" to="/map-generator">Generate a map</Link>}
         {isDm && <button className="btn btn-primary" onClick={() => setShowSizePicker(true)}>+ Create New Map</button>}
