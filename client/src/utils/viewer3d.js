@@ -4,7 +4,6 @@
 //
 // Messages to the game: VIEWER_MAP, VIEWER_STATE. Messages from the game: VIEWER_READY, VIEWER_CLICK, VIEWER_KEY.
 import { keyToStep } from './tokenMove.js'
-import { NIGHT_LEVEL } from './outdoor.js'
 
 export const VIEWER_MAP = '5eutility-viewer-map'
 export const VIEWER_STATE = '5eutility-viewer-state'
@@ -31,8 +30,8 @@ export function viewerUrl(gameUrl) {
 
 // How lit each square is, 0 (pitch black) to 1, row by row, matching what the 2D board shows: full light without fog; with fog,
 // black where the player cannot see, dim where only darkvision reaches, and fading with distance from a torch for players.
-// Outdoors it is night instead: where no light reaches is dim moonlight (NIGHT_LEVEL), not black, and a torch's light fades smoothly
-// out into it (`visibility.lightFade`, 1 at the torch down to 0 at the edge of its reach).
+// Outdoors a torch's light fades smoothly out to nothing (`visibility.lightFade`, 1 at the torch down to 0 at the edge of its reach)
+// instead of ending in a ring. Where no light reaches is pitch black, indoors and out.
 export function viewerLevels({ darkMode, isDm, visibility, rows, cols, outdoor = false }) {
   const levels = []
   for (let r = 0; r < rows; r++) {
@@ -40,8 +39,7 @@ export function viewerLevels({ darkMode, isDm, visibility, rows, cols, outdoor =
       if (!darkMode) { levels.push(1); continue }
       if (outdoor) {
         const fade = Math.max(0, Math.min(1, visibility?.lightFade?.[r]?.[c] || 0))
-        const smooth = fade * fade * (3 - 2 * fade) // eases in and out, so there is no visible ring
-        let level = NIGHT_LEVEL + (1 - NIGHT_LEVEL) * smooth
+        let level = fade * fade * (3 - 2 * fade) // eases in and out, so there is no visible ring
         if (visibility?.darkvision?.[r]?.[c]) level = Math.max(level, 0.35)
         levels.push(Math.round(level * 100) / 100)
         continue
@@ -70,7 +68,7 @@ export function buildMapMessage({ ground, objects, doorStates, doorLocks, height
 }
 
 // `classOf(token)` gives a token's class when the token itself does not carry one (older saved maps).
-export function buildStateMessage({ tokens, levels, darkMode, focusId, classOf, night = false }) {
+export function buildStateMessage({ tokens, levels, darkMode, focusId, classOf }) {
   return {
     type: VIEWER_STATE,
     tokens: (tokens || [])
@@ -84,7 +82,6 @@ export function buildStateMessage({ tokens, levels, darkMode, focusId, classOf, 
         col: t.col,
       })),
     dark: Boolean(darkMode),
-    night: Boolean(darkMode && night), // an open-air map with the lighting on: moonlit instead of pitch black
     levels,
     focusId: focusId || '',
   }

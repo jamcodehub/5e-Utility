@@ -287,29 +287,23 @@ function PeekingViewers({ viewers }) {
 
 const dragPreviewTransform = ({ x, y }) => `translate3d(${x}px, ${y}px, 0) translate(-50%, -50%) scale(1.08)`
 
-// What a moonlit square looks like: dark, in blue-grey monochrome.
-const MOON_FILTER = 'sepia(1) hue-rotate(185deg) saturate(1.3) brightness(0.32)'
-
 // One square of the play board. Memoised, so a token taking a step redraws only the squares it left and entered, not the whole
 // board (a 48 by 33 map has 1,584 squares: drawing them all on every step took about 0.3 seconds and made walking lag).
-const PlayCell = memo(function PlayCell({ r, c, cellId, groundTile, object, turn, objectTurn, visible, moon, fade, torchlit, darkvision, lightStrength, doorOpen, locked, shade, token, dragging, darkMode, isDm, cellSize, torchSrc, onCellClick, onDragStart }) {
-  // `shown`: drawn at all. A moonlit square (outdoors at night, nobody can see it) is drawn, dimmed under a blue wash.
-  const shown = visible || moon
+const PlayCell = memo(function PlayCell({ r, c, cellId, groundTile, object, turn, objectTurn, visible, fade, torchlit, darkvision, lightStrength, doorOpen, locked, shade, token, dragging, darkMode, isDm, cellSize, torchSrc, onCellClick, onDragStart }) {
+  const shown = visible
   const isDoor = cellId === 'door'
   const isStair = cellId === 'stairs' || cellId === 'stairs-down'
   const cellBase = isDoor && doorOpen ? 'floor' : cellId
   // Dimming is applied to the pictures, not to the square's box: the pictures run a hair past the square's edges so neighbours
   // overlap, which leaves no seams for light lines to show through.
-  const lightFilter = moon
-    ? MOON_FILTER
-    : darkvision
-      ? 'brightness(0.35)'
-      : fade !== null && fade !== undefined && torchlit
-        // outdoors at night: torch light fades smoothly out into the moonlight (1 at the torch, 0 at the edge of its reach)
-        ? `brightness(${(0.3 + 0.7 * fade * fade * (3 - 2 * fade)).toFixed(3)})`
-        : !isDm && darkMode && torchlit && lightStrength
-          ? `brightness(${0.45 + lightStrength * 0.55})`
-          : undefined
+  const lightFilter = darkvision
+    ? 'brightness(0.35)'
+    : fade !== null && fade !== undefined && torchlit
+      // outdoors: torch light fades smoothly out to nothing (1 at the torch, 0 at the edge of its reach)
+      ? `brightness(${(fade * fade * (3 - 2 * fade)).toFixed(3)})`
+      : !isDm && darkMode && torchlit && lightStrength
+        ? `brightness(${0.45 + lightStrength * 0.55})`
+        : undefined
   return (
     <div
       data-map-cell
@@ -320,7 +314,7 @@ const PlayCell = memo(function PlayCell({ r, c, cellId, groundTile, object, turn
       style={{
         minWidth: 0,
         minHeight: 0,
-        background: darkMode && !shown ? '#000' : moon ? '#0a1020' : tileColor(cellBase),
+        background: darkMode && !shown ? '#000' : tileColor(cellBase),
         position: 'relative',
         contain: 'layout style', // a change inside one square does not make the browser lay out the whole board again
         cursor: visible && (isDoor || isStair) ? 'pointer' : undefined,
@@ -1223,14 +1217,12 @@ export default function LevelBuilder() {
     const darkvision = []
     const lightStrength = []
     const lightFade = []
-    const moonlit = []
     for (let row = 0; row < gridH; row++) {
       visible[row] = []
       torchlit[row] = []
       darkvision[row] = []
       lightStrength[row] = []
       lightFade[row] = []
-      moonlit[row] = []
       for (let col = 0; col < gridW; col++) {
         const nearbyLights = sharedLightSources
           .filter(source => canSeeFrom(grid, doorStates, source, row, col, source.radius))
@@ -1245,9 +1237,7 @@ export default function LevelBuilder() {
         visible[row][col] = !darkMode || sharedLight || hasDarkvision
         torchlit[row][col] = !darkMode || sharedLight
         darkvision[row][col] = darkMode && hasDarkvision && !sharedLight
-        // Outdoors with the lighting on it is night: squares nobody can see are moonlit (dim), not black. And a torch's light fades
-        // out smoothly over its whole reach.
-        moonlit[row][col] = darkMode && outdoor && !visible[row][col]
+        // Outdoors a torch's light fades out smoothly over its whole reach.
         lightFade[row][col] = nearbyLights.length ? Math.max(...nearbyLights.map(({ distance, radius }) => Math.max(0, 1 - distance / (radius + 1)))) : 0
         lightStrength[row][col] = sharedLight
           ? Math.max(...nearbyLights.map(({ distance, radius }) => {
@@ -1259,7 +1249,7 @@ export default function LevelBuilder() {
           : 0
       }
     }
-    return { visible, torchlit, darkvision, lightStrength, lightFade, moonlit }
+    return { visible, torchlit, darkvision, lightStrength, lightFade }
   }, [darkMode, doorStates, grid, isDm, darkvisionSources, sharedLightSources, outdoor])
 
   // Where each token stands (one lookup for the whole board instead of a search per square), and each square's height shading.
@@ -1418,9 +1408,9 @@ export default function LevelBuilder() {
 
       <div className="lb-editor-workspace">
       <aside className="lb-editor-tools" aria-label="Map tile selection">
-        <label title="Open-air maps are lit by the night sky when fog of war is on: dim blue moonlight instead of pitch black. Leave it unticked for dungeons and caves."
+        <label title="On an outdoor map a torch's light fades out smoothly into the dark instead of ending in a ring. Where no light reaches is pitch black either way. Leave it unticked for dungeons and caves."
           style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: 'var(--text-2)', margin: '0 0 8px', cursor: 'pointer' }}>
-          <input type="checkbox" checked={outdoor} onChange={e => setOutdoorFlag(e.target.checked)} /> Outdoor map (night, not darkness, with fog)
+          <input type="checkbox" checked={outdoor} onChange={e => setOutdoorFlag(e.target.checked)} /> Outdoor map (torch light fades out smoothly)
         </label>
         <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
           <button type="button" className="btn btn-ghost btn-sm" onClick={runUndo} disabled={!history.undo.length} title="Undo the last click or drag (Ctrl or ⌘ + Z)" style={{ flex: 1, justifyContent: 'center' }}>↶ Undo</button>
@@ -1729,7 +1719,6 @@ export default function LevelBuilder() {
                   turn={rotationOf(cellId === 'door' && doorOpen ? 'floor' : cellId, rotations[r]?.[c], r, c) * 90}
                   objectTurn={rotationOf(objectGrid[r]?.[c], objectRotations[r]?.[c], r, c) * 90}
                   visible={visibility.visible[r]?.[c]}
-                  moon={Boolean(visibility.moonlit[r]?.[c])}
                   fade={darkMode && outdoor ? Math.min(1, visibility.lightFade[r]?.[c] || 0) : null}
                   torchlit={visibility.torchlit[r]?.[c]}
                   darkvision={visibility.darkvision[r]?.[c]}
@@ -1777,7 +1766,7 @@ export default function LevelBuilder() {
           {view3d && (
             <Battle3DView
               ground={grid} objects={objectGrid} heights={heights} doorStates={doorStates} doorLocks={doorLocks} theme={themeId}
-              tokens={tokens} levels={viewerLevelList} darkMode={darkMode} night={darkMode && outdoor}
+              tokens={tokens} levels={viewerLevelList} darkMode={darkMode}
               focusId={isDm ? (tapToPlaceTokenId || '') : `char-${user?.id}`} classOf={classOfToken}
               onClick={handleViewerClick} onKey={key => walkRef.current(key)}
               tokensOpen={isDm && showTokens && !isFullscreen}

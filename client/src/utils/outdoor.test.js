@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { guessOutdoor, isOutdoorMap, NIGHT_LEVEL } from './outdoor.js'
+import { guessOutdoor, isOutdoorMap } from './outdoor.js'
 
 const rows = (...tiles) => tiles.map(t => t.split(' '))
 
@@ -26,5 +26,3 @@ test('a map that says what it is wins over the guess', () => {
   assert.equal(isOutdoorMap(true, rows('floor floor')), true, 'the author said outdoors')
   assert.equal(isOutdoorMap('yes', rows('floor floor')), false, 'only true or false count')
 })
-
-test('night is dim but not black', () => assert.ok(NIGHT_LEVEL > 0 && NIGHT_LEVEL < 0.5))
