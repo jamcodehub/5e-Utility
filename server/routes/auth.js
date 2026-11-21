@@ -6,6 +6,9 @@ import { OAuth2Client } from 'google-auth-library'
 import nodemailer from 'nodemailer'
 import { User, PendingSignup } from '../models/index.js'
 import { emailDomainProblem } from '../lib/emailCheck.js'
+import { validAvatarUrl } from '../lib/avatar.js'
+import { checkUsername } from '../lib/username.js'
+import { hasPremium, premiumRoleOf } from '../lib/premium.js'
 import { primaryClientUrl } from '../lib/clientUrl.js'
 import { perEmailLimiter, requireCaptcha, captchaEnabled } from '../lib/guards.js'
 
@@ -184,7 +187,7 @@ const readGoogle = async (credential) => {
 
 const publicUser = (user) => ({
   id: user._id, username: user.username, email: user.email,
-  phone: user.phone || '', isPremium: user.isPremium,
+  phone: user.phone || '', avatar: user.avatar || '', isPremium: hasPremium(user), hasSubscription: !!user.isPremium, premiumRole: user.isPremium ? premiumRoleOf(user) : '',
   role: user.role || 'player',
   roles: [...new Set([...(user.roles || []), user.role || 'player'])],
   twoFactorEnabled: user.twoFactorEnabled || false,
@@ -254,7 +257,7 @@ router.post('/register', registerEmailLimiter, requireCaptcha, async (req, res) 
       const google = await readGoogle(credential)
       if (!google) return res.status(400).json({ error: 'Google could not verify that account. Please try again.' })
       const email = google.email.toLowerCase()
-      if (await User.exists({ $or: [{ email }, { username }, { googleId: google.sub }] }))
+      if (await User.exists({ $or: [{ email }, { googleId: google.sub }] }) || await usernameTaken(username))
         return res.status(400).json({ error: 'Email or username already taken' })
       const user = await User.create({
         username, email, password: await bcrypt.hash(password, 12), role,
@@ -272,7 +275,7 @@ router.post('/register', registerEmailLimiter, requireCaptcha, async (req, res) 
     if (!EMAIL_RE.test(email)) return res.status(400).json({ error: 'Invalid email address' })
     const emailProblem = await emailDomainProblem(email)
     if (emailProblem) return res.status(400).json({ error: emailProblem })
-    if (await User.exists({ $or: [{ email }, { username }] })) return res.status(400).json({ error: 'Email or username already taken' })
+    if (await User.exists({ email }) || await usernameTaken(username)) return res.status(400).json({ error: 'Email or username already taken' })
 
     const hashed = await bcrypt.hash(password, 12)
 
@@ -320,7 +323,7 @@ router.post('/register/confirm', async (req, res) => {
     if (pending.codeExpiresAt < new Date() || !safeEqual(pending.codeHash, hashCode(code)))
       return res.status(401).json({ error: 'Invalid or expired code' })
 
-    if (await User.exists({ $or: [{ email: pending.email }, { username: pending.username }] })) {
+    if (await User.exists({ email: pending.email }) || await usernameTaken(pending.username)) {
       await pending.deleteOne()
       return res.status(400).json({ error: 'Email or username already taken' })
     }
@@ -503,6 +506,37 @@ router.get('/me', authMiddleware, async (req, res) => {
   } catch (e) { res.status(401).json({ error: 'Invalid token' }) }
 })
 
+// Set or remove the profile photo. The browser uploads the image straight to Cloudinary (signed by /api/upload/sign into
+// this user's own folder); this stores the resulting link on the account. Send { avatar: '' } to remove it.
+// A username counts as taken however it is capitalised ("Bob" and "bob" are the same name), apart from the account asking.
+const usernameTaken = (name, exceptId) =>
+  User.exists({ username: name, ...(exceptId ? { _id: { $ne: exceptId } } : {}) }).collation({ locale: 'en', strength: 2 })
+
+router.put('/username', authMiddleware, async (req, res) => {
+  try {
+    const checked = checkUsername(req.body?.username)
+    if (checked.error) return res.status(400).json({ error: checked.error })
+    if (await usernameTaken(checked.name, req.userId)) return res.status(400).json({ error: 'That username is already taken.' })
+    const user = await User.findByIdAndUpdate(req.userId, { username: checked.name }, { returnDocument: 'after' })
+    if (!user) return res.status(401).json({ error: 'Invalid token' })
+    res.json(publicUser(user))
+  } catch (e) {
+    if (e?.code === 11000) return res.status(400).json({ error: 'That username is already taken.' })
+    sendError(res, e)
+  }
+})
+
+router.put('/avatar', authMiddleware, async (req, res) => {
+  try {
+    const avatar = asString(req.body?.avatar)
+    if (avatar === null) return res.status(400).json({ error: 'Send the image link.' })
+    if (avatar !== '' && !validAvatarUrl(avatar, req.userId)) return res.status(400).json({ error: 'That image did not come from your own upload. Please try again.' })
+    const user = await User.findByIdAndUpdate(req.userId, { avatar }, { returnDocument: 'after' })
+    if (!user) return res.status(401).json({ error: 'Invalid token' })
+    res.json(publicUser(user))
+  } catch (e) { sendError(res, e) }
+})
+
 // Switch the active identity between player and DM. Both identities are kept
 // on the account; every role-based check reads `role`, so only that changes.
 router.post('/role', authMiddleware, async (req, res) => {
@@ -526,7 +560,7 @@ router.post('/forgot-password', forgotEmailLimiter, requireCaptcha, async (req, 
     const email = asString(req.body.email)?.trim().toLowerCase()
     if (!email) return res.status(400).json({ error: 'Email required' })
     const user = await User.findOne({ email })
-    if (user) {
+    if (user && !user.placeholderOf) {
       const token = crypto.randomBytes(32).toString('hex')
       user.resetPasswordToken = crypto.createHash('sha256').update(token).digest('hex')
       user.resetPasswordExpires = new Date(Date.now() + 60 * 60 * 1000) // 1 hour

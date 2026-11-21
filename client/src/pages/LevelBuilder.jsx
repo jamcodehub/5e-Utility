@@ -11,51 +11,67 @@ import { isPublicDemoPath } from '../utils/demoRuntime'
 import { SkeletonBlock } from '../components/Skeleton'
 import { TILES, OBJECT_TILES } from '../data/levelTiles'
 import { THEMES, DEFAULT_THEME, resolveThemeId, getThemeTiles } from '../data/levelThemes'
+import { avatarSrc } from '../components/ProfileAvatar'
+import { tokenColor } from '../utils/tokenColor'
 // Note: module-level TILES / OBJECT_TILES above are the base (Medieval) set, used for
 // logic that doesn't depend on artwork. MapThumb and LevelBuilder shadow them with the
 // active theme's tiles (same ids, different art).
 
-// A3 landscape ratio ≈ 420/297
+// A3 landscape ratio ≈ 420/297. Medium (32×22) is the original size; every existing map is Medium.
 const GRID_W = 32
 const GRID_H = 22
+const MAP_SIZES = [
+  { id: 'small', label: 'Small', w: 20, h: 14, blurb: 'A single room or a short corridor' },
+  { id: 'medium', label: 'Medium', w: 32, h: 22, blurb: 'A dungeon floor or a small village' },
+  { id: 'large', label: 'Large', w: 48, h: 33, blurb: 'A big dungeon, town or overland map' },
+]
+// A stored map's size is the size of its saved grid; anything odd falls back to Medium.
+const dimsOf = (grid) => {
+  const h = Array.isArray(grid) ? grid.length : 0
+  const w = h ? Math.max(...grid.map(row => (Array.isArray(row) ? row.length : 0))) : 0
+  return h >= 6 && h <= 60 && w >= 6 && w <= 80 ? { w, h } : { w: GRID_W, h: GRID_H }
+}
 
 const TORCH_LIGHT_RADIUS = OBJECT_TILES.find(tile => tile.id === 'torch').lightRadius
 const DARKVISION_RADIUS = 6
 
-const blankGrid = () => Array.from({ length: GRID_H }, () => Array.from({ length: GRID_W }, () => 'empty'))
-const blankObjectGrid = () => Array.from({ length: GRID_H }, () => Array.from({ length: GRID_W }, () => null))
-const blankDoorStates = () => Array.from({ length: GRID_H }, () => Array.from({ length: GRID_W }, () => false))
-const blankStairLinks = () => Array.from({ length: GRID_H }, () => Array.from({ length: GRID_W }, () => null))
+const blankOf = (value, w = GRID_W, h = GRID_H) => Array.from({ length: h }, () => Array.from({ length: w }, () => value))
+const blankGrid = (w, h) => blankOf('empty', w, h)
+const blankObjectGrid = (w, h) => blankOf(null, w, h)
+const blankDoorStates = (w, h) => blankOf(false, w, h)
+const blankStairLinks = (w, h) => blankOf(null, w, h)
 
-function normalizeGrid(value, fallback) {
-  return Array.from({ length: GRID_H }, (_, r) =>
-    Array.from({ length: GRID_W }, (_, c) => value?.[r]?.[c] ?? fallback)
+function normalizeGrid(value, fallback, { w, h } = { w: GRID_W, h: GRID_H }) {
+  return Array.from({ length: h }, (_, r) =>
+    Array.from({ length: w }, (_, c) => value?.[r]?.[c] ?? fallback)
   )
 }
 
 function parseMapContent(content) {
   try {
     const parsed = JSON.parse(content)
-    if (Array.isArray(parsed)) return {
-      ground: normalizeGrid(parsed, 'empty'),
-      objects: blankObjectGrid(),
-      stairLinks: blankStairLinks(),
+    if (Array.isArray(parsed)) {
+      const dims = dimsOf(parsed)
+      return { ground: normalizeGrid(parsed, 'empty', dims), objects: blankObjectGrid(dims.w, dims.h), stairLinks: blankStairLinks(dims.w, dims.h), dims }
     }
     if (parsed && Array.isArray(parsed.ground)) {
+      const dims = dimsOf(parsed.ground)
       return {
-        ground: normalizeGrid(parsed.ground, 'empty'),
-        objects: normalizeGrid(parsed.objects, null),
-        stairLinks: normalizeGrid(parsed.stairLinks, null),
+        ground: normalizeGrid(parsed.ground, 'empty', dims),
+        objects: normalizeGrid(parsed.objects, null, dims),
+        stairLinks: normalizeGrid(parsed.stairLinks, null, dims),
+        dims,
       }
     }
   } catch {
     // Older maps may have empty or malformed content; use an empty object layer.
   }
-  return { ground: blankGrid(), objects: blankObjectGrid(), stairLinks: blankStairLinks() }
+  const dims = { w: GRID_W, h: GRID_H }
+  return { ground: blankGrid(), objects: blankObjectGrid(), stairLinks: blankStairLinks(), dims }
 }
 
-function normalizeDoorStates(value) {
-  return normalizeGrid(value, false).map(row => row.map(Boolean))
+function normalizeDoorStates(value, dims) {
+  return normalizeGrid(value, false, dims).map(row => row.map(Boolean))
 }
 
 function blocksVision(ground, doorStates, row, col) {
@@ -152,13 +168,13 @@ function MapThumb({ content, theme }) {
 
   return (
     <svg
-      viewBox={`0 0 ${GRID_W} ${GRID_H}`}
+      viewBox={`0 0 ${grid.dims.w} ${grid.dims.h}`}
       preserveAspectRatio="none"
       aria-hidden="true"
       style={{
         display: 'block',
         width: '100%',
-        aspectRatio: `${GRID_W}/${GRID_H}`,
+        aspectRatio: `${grid.dims.w}/${grid.dims.h}`,
         borderRadius: 4,
         background: '#f5f4f1',
         shapeRendering: 'crispEdges',
@@ -199,7 +215,7 @@ function MapThumb({ content, theme }) {
         return <image key={`ground-${r}-${c}`} href={tile.iconUrl} x={c + 0.12} y={r + 0.12} width="0.76" height="0.76" preserveAspectRatio="xMidYMid meet" filter={tile.iconColor ? `url(#${tintId}-${tile.iconColor.slice(1)})` : undefined} />
       }))}
       <path
-        d={[...Array.from({ length: GRID_W + 1 }, (_, x) => `M${x} 0V${GRID_H}`), ...Array.from({ length: GRID_H + 1 }, (_, y) => `M0 ${y}H${GRID_W}`)].join(' ')}
+        d={[...Array.from({ length: grid.dims.w + 1 }, (_, x) => `M${x} 0V${grid.dims.h}`), ...Array.from({ length: grid.dims.h + 1 }, (_, y) => `M0 ${y}H${grid.dims.w}`)].join(' ')}
         fill="none"
         stroke="rgba(0,0,0,0.24)"
         strokeWidth="0.045"
@@ -242,8 +258,8 @@ function PeekingViewers({ viewers }) {
           flexShrink: 0, position: 'relative', zIndex: 5 - i,
         }}>
           {v.avatar
-            ? <img src={v.avatar} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-            : <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--gold)', fontFamily: 'Cinzel, serif' }}>{v.username?.[0]?.toUpperCase()}</span>
+            ? <img src={avatarSrc(v.avatar, 64)} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+            : <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--gold)', fontFamily: 'var(--font-title)' }}>{v.username?.[0]?.toUpperCase()}</span>
           }
         </div>
       ))}
@@ -267,7 +283,7 @@ function Token({ token, cellSize, onDragStart, dragging }) {
         inset: 2,
         borderRadius: '50%',
         overflow: 'hidden',
-        background: token.color || '#6366f1',
+        background: tokenColor(token),
         border: '2px solid rgba(255,255,255,0.8)',
         boxShadow: '0 2px 6px rgba(0,0,0,0.4)',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -280,7 +296,7 @@ function Token({ token, cellSize, onDragStart, dragging }) {
     >
       {token.avatar
         ? <img src={token.avatar} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-        : <span style={{ fontSize: Math.max(8, cellSize * 0.35), color: '#fff', fontWeight: 700, fontFamily: 'Cinzel, serif' }}>{initials}</span>
+        : <span style={{ fontSize: Math.max(8, cellSize * 0.35), color: '#fff', fontWeight: 700, fontFamily: 'var(--font-title)' }}>{initials}</span>
       }
     </div>
   )
@@ -312,11 +328,18 @@ export default function LevelBuilder() {
   const [linkDestinationId, setLinkDestinationId] = useState('')
   const [tool, setTool] = useState('wall')
   const [painting, setPainting] = useState(false)
+  const lastTouchCell = useRef(null)
 
   // ── Play mode state ──
   const [tokens, setTokens] = useState([]) // { id, name, avatar, color, row, col, hp, maxHp }
   const [darkMode, setDarkMode] = useState(false)
   const [doorStates, setDoorStates] = useState(blankDoorStates())
+  // The map's size is just the size of its saved grid (Small / Medium / Large templates, or legacy Medium).
+  const gridH = grid.length
+  const gridW = grid[0]?.length ?? GRID_W
+  const dimsRef = useRef({ w: gridW, h: gridH })
+  dimsRef.current = { w: gridW, h: gridH }
+  const [showSizePicker, setShowSizePicker] = useState(false)
   const [availableTokens, setAvailableTokens] = useState([]) // sidebar token pool
   const [dragTokenId, setDragTokenId] = useState(null)
   const [dragPreviewToken, setDragPreviewToken] = useState(null)
@@ -325,6 +348,17 @@ export default function LevelBuilder() {
   const [cellSize, setCellSize] = useState(28)
   const gridRef = useRef(null)
   const scrollRef = useRef(null)
+  // Size of the play area. The map is fitted inside it with square cells, so it is never stretched.
+  const [box, setBox] = useState({ w: 0, h: 0 })
+  useEffect(() => {
+    const el = scrollRef.current
+    if (!el) return
+    const measure = () => setBox(b => (b.w === el.clientWidth && b.h === el.clientHeight ? b : { w: el.clientWidth, h: el.clientHeight }))
+    measure()
+    const obs = new ResizeObserver(measure)
+    obs.observe(el)
+    return () => obs.disconnect()
+  }, [mode])
   const playRootRef = useRef(null)
   const panRef = useRef(null)
   const [zoom, setZoom] = useState(1)
@@ -336,8 +370,11 @@ export default function LevelBuilder() {
   const themeId = mode === 'editor'
     ? editTheme
     : resolveThemeId(plans.find(p => p._id === selectedPlanId)?.theme)
+  // One theme per map: once any tile has been placed the theme is fixed (an empty map can still change it).
+  const themeLocked = mode === 'editor' && (grid.some(row => row.some(id => id && id !== 'empty')) || objectGrid.some(row => row.some(Boolean)))
   const { TILES, OBJECT_TILES } = getThemeTiles(themeId)
   const objectTile = id => OBJECT_TILES.find(tile => tile.id === id)
+  const torchSrc = objectTile('torch')?.imageUrl // the Level Builder's own torch tile, used as the "carrying a light" badge
   const dragPreviewRef = useRef(null)
   const remoteUpdateRef = useRef(false)
   const [viewers, setViewers] = useState([]) // who's currently looking at this board
@@ -467,14 +504,17 @@ export default function LevelBuilder() {
       const pool = []
 
       const members = membersRes.status === 'fulfilled' ? membersRes.value : []
+      // A player's token shows their character's picture when they have one for this campaign, otherwise their profile photo.
       ;(members || []).forEach(m => {
-        if (m.character) pool.push({
+        const picture = m.character?.avatarUrl || m.avatar || ''
+        if (!m.character && !picture) return
+        pool.push({
           id: `char-${m.userId}`,
-          name: m.character.name || m.username,
-          avatar: m.character.avatarUrl || null,
-          color: '#6366f1',
-          hp: m.character.hp?.current ?? m.character.hp?.max ?? 10,
-          maxHp: m.character.hp?.max ?? 10,
+          name: m.character?.name || m.username,
+          avatar: picture ? avatarSrc(picture, 96) : null,
+          color: tokenColor({ type: 'player' }),
+          hp: m.character?.hp?.current ?? m.character?.hp?.max ?? 10,
+          maxHp: m.character?.hp?.max ?? 10,
           type: 'player',
         })
       })
@@ -486,7 +526,7 @@ export default function LevelBuilder() {
           loreId: l._id,
           name: l.title,
           avatar: null,
-          color: l.tag === 'boss' ? '#f59e0b' : l.tag === 'enemy' ? '#ef4444' : '#10b981',
+          color: tokenColor({ type: l.tag }),
           hp: l.hp ?? l.maxHp ?? 10,
           maxHp: l.maxHp ?? 10,
           type: l.tag,
@@ -508,7 +548,7 @@ export default function LevelBuilder() {
       frame = requestAnimationFrame(() => {
         const el = gridRef.current
         if (!el || !el.offsetWidth || !el.offsetHeight) return
-        const size = Math.min(el.offsetWidth / GRID_W, el.offsetHeight / GRID_H)
+        const size = Math.min(el.offsetWidth / gridW, el.offsetHeight / gridH)
         setCellSize(prev => Math.abs(prev - size) < 0.5 ? prev : size)
       })
     })
@@ -532,7 +572,7 @@ export default function LevelBuilder() {
       setPlans(current => current.map(plan => plan._id === selectedPlanId ? { ...plan, darkMode: Boolean(enabled) } : plan))
     }
     const onDoorStates = (states) => {
-      const normalized = normalizeDoorStates(states)
+      const normalized = normalizeDoorStates(states, dimsRef.current)
       setDoorStates(normalized)
       setPlans(current => current.map(plan => plan._id === selectedPlanId ? { ...plan, doorStates: normalized } : plan))
     }
@@ -553,16 +593,16 @@ export default function LevelBuilder() {
       setStairLinks(parsed.stairLinks)
       setTokens(Array.isArray(destination.tokens) ? destination.tokens : [])
       setDarkMode(Boolean(destination.darkMode))
-      setDoorStates(normalizeDoorStates(destination.doorStates))
+      setDoorStates(normalizeDoorStates(destination.doorStates, parsed.dims))
     }
     const onDoorState = ({ row, col, open } = {}) => {
-      if (!Number.isInteger(row) || !Number.isInteger(col) || row < 0 || row >= GRID_H || col < 0 || col >= GRID_W || typeof open !== 'boolean') return
+      if (!Number.isInteger(row) || !Number.isInteger(col) || row < 0 || row >= dimsRef.current.h || col < 0 || col >= dimsRef.current.w || typeof open !== 'boolean') return
       setDoorStates(current => current.map((cells, r) => r === row
         ? cells.map((isOpen, c) => c === col ? open : isOpen)
         : cells))
       setPlans(current => current.map(plan => {
         if (plan._id !== selectedPlanId) return plan
-        const states = normalizeDoorStates(plan.doorStates)
+        const states = normalizeDoorStates(plan.doorStates, dimsRef.current)
         states[row][col] = open
         return { ...plan, doorStates: states }
       }))
@@ -598,7 +638,7 @@ export default function LevelBuilder() {
   }, [tokens, mode, selectedPlanId])
 
   // ── Gallery actions ──
-  const openEditor = (plan = null) => {
+  const openEditor = (plan = null, size = null) => {
     if (!isDm) return
     if (plan) {
       setEditPlanId(plan._id)
@@ -608,15 +648,16 @@ export default function LevelBuilder() {
       setGrid(parsed.ground)
       setObjectGrid(parsed.objects)
       setStairLinks(parsed.stairLinks)
-      setDoorStates(normalizeDoorStates(plan.doorStates))
+      setDoorStates(normalizeDoorStates(plan.doorStates, parsed.dims))
     } else {
       setEditPlanId(null)
       setEditTitle('')
       setDarkMode(false)
-      setGrid(blankGrid())
-      setObjectGrid(blankObjectGrid())
-      setStairLinks(blankStairLinks())
-      setDoorStates(blankDoorStates())
+      const { w, h } = size || { w: GRID_W, h: GRID_H }
+      setGrid(blankGrid(w, h))
+      setObjectGrid(blankObjectGrid(w, h))
+      setStairLinks(blankStairLinks(w, h))
+      setDoorStates(blankDoorStates(w, h))
     }
     setEditTheme(resolveThemeId(plan?.theme))
     setEditLayer('ground')
@@ -633,7 +674,7 @@ export default function LevelBuilder() {
     setObjectGrid(parsed.objects)
     setStairLinks(parsed.stairLinks)
     setDarkMode(Boolean(plan.darkMode))
-    setDoorStates(normalizeDoorStates(plan.doorStates))
+    setDoorStates(normalizeDoorStates(plan.doorStates, parsed.dims))
     setTokens(Array.isArray(plan.tokens) ? plan.tokens : [])
     setMode('play')
     if (isDm && activeCampaign && !activeCampaign.isPersonal) {
@@ -890,12 +931,12 @@ export default function LevelBuilder() {
     const torchlit = []
     const darkvision = []
     const lightStrength = []
-    for (let row = 0; row < GRID_H; row++) {
+    for (let row = 0; row < gridH; row++) {
       visible[row] = []
       torchlit[row] = []
       darkvision[row] = []
       lightStrength[row] = []
-      for (let col = 0; col < GRID_W; col++) {
+      for (let col = 0; col < gridW; col++) {
         const nearbyLights = sharedLightSources
           .filter(source => canSeeFrom(grid, doorStates, source, row, col, source.radius))
           .map(source => ({
@@ -953,7 +994,7 @@ export default function LevelBuilder() {
           position: relative;
           display: inline-flex;
           align-items: center;
-          width: 132px;
+          width: 80px;
           height: 34px;
           padding: 3px;
           border: 1px solid var(--border);
@@ -975,6 +1016,8 @@ export default function LevelBuilder() {
           letter-spacing: 0.02em;
           transition: color 220ms ease;
         }
+        .level-darkness-toggle-label img { width: 16px; height: 16px; display: block; margin: 0 auto; filter: brightness(0); transition: filter 220ms ease; }
+        .level-darkness-toggle[data-dark="true"] .level-darkness-toggle-label img { filter: brightness(0) invert(1); }
         .level-darkness-toggle-thumb {
           position: absolute;
           top: 3px;
@@ -1003,7 +1046,7 @@ export default function LevelBuilder() {
           html, body { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
           body * { visibility: hidden; }
           #level-print, #level-print * { visibility: visible; }
-          #level-print { position: fixed; inset: 0; width: 100vw; height: 100vh; display: grid; grid-template-columns: repeat(${GRID_W}, 1fr); background: #fff; }
+          #level-print { position: fixed; inset: 0; width: 100vw; height: 100vh; display: grid; grid-template-columns: repeat(${gridW}, 1fr); background: #fff; }
           #level-print > div { border: 0.3pt solid rgba(0,0,0,0.15); -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
         }
       `}</style>
@@ -1017,25 +1060,27 @@ export default function LevelBuilder() {
           title="Tile theme"
           value={editTheme}
           onChange={e => setEditTheme(resolveThemeId(e.target.value))}
+          disabled={themeLocked}
           style={{ width: 190 }}
         >
           {THEMES.map(theme => (
             <option key={theme.id} value={theme.id} disabled={!theme.available}>{theme.label}</option>
           ))}
         </select>
+        {themeLocked && <span style={{ fontSize: 12, color: 'var(--text-3)' }}>This map uses {THEMES.find(t => t.id === editTheme)?.label}. Clear its tiles or start a new map to use another theme.</span>}
         {isDm && editPlanId && (
           <button
             type="button"
             className="level-darkness-toggle"
             data-dark={darkMode}
             onClick={() => toggleDarkMode(editPlanId)}
-            aria-label="Map lighting"
+            aria-label="Fog of war (map darkness for players)"
             aria-pressed={darkMode}
-            title={darkMode ? 'Darkness is on for players' : 'Darkness is off for players'}
+            title={darkMode ? 'Fog of war is on for players' : 'Fog of war is off for players'}
           >
             <span className="level-darkness-toggle-thumb" aria-hidden="true" />
-            <span className="level-darkness-toggle-label">☀ Light</span>
-            <span className="level-darkness-toggle-label">☾ Dark</span>
+            <span className="level-darkness-toggle-label" title="Fog of war off"><img src="https://res.cloudinary.com/crcbzpw6/image/upload/v1795083562/sun-regular-full.svg" alt="Fog of war off" /></span>
+            <span className="level-darkness-toggle-label" title="Fog of war on"><img src="https://res.cloudinary.com/crcbzpw6/image/upload/v1795083576/cloud-regular-full.svg" alt="Fog of war on" /></span>
           </button>
         )}
         <div style={{ display: 'flex', gap: 8, flexShrink: 0, marginLeft: 'auto' }}>
@@ -1089,7 +1134,7 @@ export default function LevelBuilder() {
           setLinkMode(current => !current)
           setPendingStair(null)
           setPainting(false)
-        }} style={{ width: '100%', marginTop: 8, justifyContent: 'center' }}>🔗 Link stairs</button>
+        }} style={{ width: '100%', marginTop: 8, justifyContent: 'center' }}>Link stairs</button>
       </aside>
       <main className="lb-editor-map">
       {linkMode && pendingStair && (
@@ -1116,13 +1161,24 @@ export default function LevelBuilder() {
       <div className="lb-editor-canvas-wrap">
         <div
           id="level-print"
+          onTouchMove={e => {
+            // Finger-drag painting: paint every cell the finger passes over.
+            if (linkMode) return
+            const t = e.touches[0]
+            const el = t && document.elementFromPoint(t.clientX, t.clientY)?.closest('[data-lb-cell]')
+            if (!el || el.dataset.lbCell === lastTouchCell.current) return
+            lastTouchCell.current = el.dataset.lbCell
+            const [r, c] = el.dataset.lbCell.split('-').map(Number)
+            paint(r, c)
+          }}
+          onTouchEnd={() => { lastTouchCell.current = null }}
           onMouseUp={() => setPainting(false)}
           onMouseLeave={() => setPainting(false)}
           style={{
             display: 'grid',
-            gridTemplateColumns: `repeat(${GRID_W}, 1fr)`,
+            gridTemplateColumns: `repeat(${gridW}, 1fr)`,
             width: '100%',
-            maxWidth: `calc((100vh - 120px) * ${GRID_W / GRID_H})`,
+            maxWidth: `calc((100vh - 120px) * ${gridW / gridH})`,
             background: '#fff',
             border: '3px solid #4a3f33',
             borderRadius: 4,
@@ -1134,7 +1190,7 @@ export default function LevelBuilder() {
             const t = TILES.find(x => x.id === cellId) || TILES[TILES.length - 1]
             const object = objectTile(objectGrid[r]?.[c])
             return (
-              <div key={`${r}-${c}`} className="lb-cell"
+              <div key={`${r}-${c}`} className="lb-cell" data-lb-cell={`${r}-${c}`}
                 onMouseDown={() => { if (linkMode) return; setPainting(true); paint(r, c) }}
                 onMouseEnter={() => { if (painting && !linkMode) paint(r, c) }}
                 onClick={() => handleEditorCellClick(r, c)}
@@ -1143,7 +1199,7 @@ export default function LevelBuilder() {
               >
                 {t.imageUrl && <TileIconPlaceholder tile={t} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />}
                 {t.iconUrl && <TileIconPlaceholder tile={t} style={{ position: 'absolute', inset: '21%', width: '58%', height: '58%' }} />}
-                {stairLinks[r]?.[c] && <span aria-label="Linked stairs" style={{ position: 'absolute', top: 0, right: 1, color: '#fff', fontSize: 8, textShadow: '0 1px 2px #000', pointerEvents: 'none' }}>↗</span>}
+                {stairLinks[r]?.[c] && <span aria-label="Linked stairs" style={{ position: 'absolute', top: 0, right: 1, color: '#fff', fontSize: 8, textShadow: '0 1px 2px #000', pointerEvents: 'none' }}>→</span>}
                 {object && object.id !== 'object-erase' && (object.imageUrl || object.iconUrl || object.id.startsWith('rock-')) && <TileIconPlaceholder tile={object} style={{ position: 'absolute', zIndex: 1 }} />}
                 {darkMode && !visibility.torchlit[r]?.[c] && !visibility.darkvision[r]?.[c] && (
                   <div
@@ -1176,6 +1232,7 @@ export default function LevelBuilder() {
         .level-play-map, .level-play-map * { user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
         .level-play-content { min-height: 0; }
         .level-play-controls { right: 18px; }
+        .level-play-scroll[data-tokens-open="true"] { right: 240px !important; }
         .level-play-controls[data-tokens-open="true"] { right: 258px; }
         .level-play-tokens { border-left: 1px solid var(--border); overflow: hidden; }
         .level-play-token-list { flex: 1; overflow-y: auto; padding: 8px; }
@@ -1188,7 +1245,7 @@ export default function LevelBuilder() {
           position: relative;
           display: inline-flex;
           align-items: center;
-          width: 132px;
+          width: 80px;
           height: 34px;
           padding: 3px;
           border: 1px solid var(--border);
@@ -1217,6 +1274,8 @@ export default function LevelBuilder() {
           letter-spacing: 0.02em;
           transition: color 220ms ease;
         }
+        .level-darkness-toggle-label img { width: 16px; height: 16px; display: block; margin: 0 auto; filter: brightness(0); transition: filter 220ms ease; }
+        .level-darkness-toggle[data-dark="true"] .level-darkness-toggle-label img { filter: brightness(0) invert(1); }
         .level-darkness-toggle-thumb {
           position: absolute;
           top: 3px;
@@ -1244,8 +1303,11 @@ export default function LevelBuilder() {
           .level-play-content { flex-direction: column; }
           .level-play-map { min-height: 0; flex: 1 1 auto !important; padding: 0 !important; }
           .level-play-map > div { width: 100% !important; max-width: 100% !important; }
-          .level-play-tokens { top: auto !important; left: 0 !important; right: 0 !important; width: 100% !important; height: 38%; min-height: 155px; max-height: 270px; border-left: 0 !important; border-top: 1px solid var(--border); }
-          .level-play-controls[data-tokens-open="true"] { right: 18px; bottom: calc(38% + 10px); }
+          .level-play-tokens { top: auto !important; left: 0 !important; right: 0 !important; bottom: 0 !important; width: 100% !important; height: 34vh; min-height: 155px; max-height: 270px; border-left: 0 !important; border-top: 1px solid var(--border); }
+          .level-play-map > .level-play-controls { left: auto !important; right: 10px !important; bottom: 10px !important; width: max-content !important; max-width: calc(100% - 20px) !important; }
+          .level-play-map > .level-play-controls[data-tokens-open="true"] { bottom: calc(max(155px, min(34vh, 270px)) + 10px) !important; }
+          .level-play-toolbar > span:first-child { font-size: 15px; }
+          .level-play-scroll[data-tokens-open="true"] { right: 0 !important; bottom: clamp(155px, 34vh, 270px) !important; }
           .level-play-token-list { display: flex; flex: 1 1 auto; flex-direction: row; align-items: stretch; gap: 6px; overflow-x: auto; overflow-y: hidden; padding: 6px 8px; }
           .level-play-token-heading { display: none; }
           .level-play-token-entry { flex: 0 0 148px; margin: 0; }
@@ -1258,7 +1320,7 @@ export default function LevelBuilder() {
       `}</style>
       {/* Play toolbar */}
       {!isFullscreen && <div className="level-play-toolbar" style={{ padding: '10px 16px', background: 'var(--surface)', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
-        <span style={{ fontFamily: 'Cinzel, serif', fontSize: 14, fontWeight: 600, flex: 1 }}>{selectedPlan?.title}</span>
+        <span style={{ fontFamily: 'var(--font-title)', fontSize: 14, fontWeight: 600, flex: 1 }}>{selectedPlan?.title}</span>
         <PeekingViewers viewers={viewers} />
         {isDm && (
           <button
@@ -1266,13 +1328,13 @@ export default function LevelBuilder() {
             className="level-darkness-toggle"
             data-dark={darkMode}
             onClick={() => toggleDarkMode(selectedPlanId)}
-            aria-label="Map lighting"
+            aria-label="Fog of war (map darkness for players)"
             aria-pressed={darkMode}
-            title={darkMode ? 'Darkness is on for players' : 'Darkness is off for players'}
+            title={darkMode ? 'Fog of war is on for players' : 'Fog of war is off for players'}
           >
             <span className="level-darkness-toggle-thumb" aria-hidden="true" />
-            <span className="level-darkness-toggle-label">☀ Light</span>
-            <span className="level-darkness-toggle-label">☾ Dark</span>
+            <span className="level-darkness-toggle-label" title="Fog of war off"><img src="https://res.cloudinary.com/crcbzpw6/image/upload/v1795083562/sun-regular-full.svg" alt="Fog of war off" /></span>
+            <span className="level-darkness-toggle-label" title="Fog of war on"><img src="https://res.cloudinary.com/crcbzpw6/image/upload/v1795083576/cloud-regular-full.svg" alt="Fog of war on" /></span>
           </button>
         )}
         <button className="btn btn-ghost btn-sm" onClick={() => { setTokens([]); setMode('gallery') }}>← Back</button>
@@ -1281,21 +1343,25 @@ export default function LevelBuilder() {
 
       <div className="level-play-content" style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
         {/* Map area */}
-        <div className="level-play-map" style={{ flex: 1, minWidth: 0, position: 'relative', overflow: 'hidden', padding: 0, background: '#000' }}>
+        <div className="level-play-map" style={{ flex: 1, minWidth: 0, position: 'relative', overflow: 'hidden', padding: 0, background: isFullscreen ? '#000' : 'var(--surface2, #000)' }}>
           <div
             ref={scrollRef}
             className="level-play-scroll"
             onPointerDown={startPan}
-            style={{ position: 'absolute', inset: 0, overflow: 'auto', cursor: zoom > 1 && !dragTokenId ? 'grab' : undefined, touchAction: dragTokenId ? 'none' : undefined }}
+            data-tokens-open={isDm && showTokens && !isFullscreen}
+            style={{ position: 'absolute', inset: 0, overflow: 'auto', display: 'flex', cursor: zoom > 1 && !dragTokenId ? 'grab' : undefined, touchAction: dragTokenId ? 'none' : undefined }}
           >
           <div
             ref={gridRef}
             style={{
               display: 'grid',
-              gridTemplateColumns: `repeat(${GRID_W}, 1fr)`,
-              gridTemplateRows: `repeat(${GRID_H}, 1fr)`,
-              width: `${zoom * 100}%`,
-              height: `${zoom * 100}%`,
+              gridTemplateColumns: `repeat(${gridW}, 1fr)`,
+              gridTemplateRows: `repeat(${gridH}, 1fr)`,
+              // largest square-celled grid that fits the play area, times the zoom; centred when it is smaller than the area
+              width: box.w && box.h ? `${Math.min(box.w / gridW, box.h / gridH) * gridW * zoom}px` : `${zoom * 100}%`,
+              height: box.w && box.h ? `${Math.min(box.w / gridW, box.h / gridH) * gridH * zoom}px` : `${zoom * 100}%`,
+              margin: 'auto',
+              flexShrink: 0,
               background: darkMode ? '#000' : '#fff',
               border: 'none',
               borderRadius: 0,
@@ -1363,7 +1429,7 @@ export default function LevelBuilder() {
                       dragging={dragTokenId === token.id}
                     />
                   )}
-                  {token?.lightSource && <span aria-hidden="true" style={{ position: 'absolute', top: -5, right: -3, zIndex: 11, fontSize: 10, pointerEvents: 'none' }}>🔥</span>}
+                  {token?.lightSource && torchSrc && <img src={torchSrc} alt="" aria-hidden="true" draggable={false} style={{ position: 'absolute', top: -7, right: -5, zIndex: 11, width: 14, height: 14, objectFit: 'contain', pointerEvents: 'none' }} />}
                 </div>
               )
             }))}
@@ -1435,7 +1501,7 @@ export default function LevelBuilder() {
               <div className="level-play-on-map-list">
               {tokens.map(t => (
                 <div key={t.id} className="level-play-on-map-row">
-                  <div style={{ width: 20, height: 20, borderRadius: '50%', background: t.color, border: '1px solid rgba(255,255,255,0.3)', flexShrink: 0, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <div style={{ width: 20, height: 20, borderRadius: '50%', background: tokenColor(t), border: '1px solid rgba(255,255,255,0.3)', flexShrink: 0, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                     {t.avatar
                       ? <img src={t.avatar} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                       : <span style={{ fontSize: 9, color: '#fff', fontWeight: 700 }}>{t.name?.[0]}</span>
@@ -1445,7 +1511,7 @@ export default function LevelBuilder() {
                     <div style={{ fontSize: 11, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.name}</div>
                     {isDm && t.type === 'player' && (
                       <div style={{ display: 'flex', gap: 3, marginTop: 3 }}>
-                        <button type="button" aria-pressed={Boolean(t.lightSource)} onClick={() => toggleTokenVision(t.id, 'lightSource')} title="Toggle shared torchlight" style={{ padding: '2px 4px', border: '1px solid var(--border)', borderRadius: 4, background: t.lightSource ? 'var(--gold-bg)' : 'transparent', color: 'var(--text-2)', fontSize: 9 }}>🔥 Light {t.lightSource ? 'On' : 'Off'}</button>
+                        <button type="button" aria-pressed={Boolean(t.lightSource)} onClick={() => toggleTokenVision(t.id, 'lightSource')} title="Toggle shared torchlight" style={{ padding: '2px 4px', border: '1px solid var(--border)', borderRadius: 4, background: t.lightSource ? 'var(--gold-bg)' : 'transparent', color: 'var(--text-2)', fontSize: 9 }}>{torchSrc && <img src={torchSrc} alt="" aria-hidden="true" draggable={false} style={{ width: 12, height: 12, objectFit: 'contain', verticalAlign: '-2px', marginRight: 2 }} />}Light {t.lightSource ? 'On' : 'Off'}</button>
                         <button type="button" aria-pressed={Boolean(t.darkvision)} onClick={() => toggleTokenVision(t.id, 'darkvision')} title="Toggle this character’s darkvision" style={{ padding: '2px 4px', border: '1px solid var(--border)', borderRadius: 4, background: t.darkvision ? 'var(--gold-bg)' : 'transparent', color: 'var(--text-2)', fontSize: 9 }}>◉ Darkvision {t.darkvision ? 'On' : 'Off'}</button>
                       </div>
                     )}
@@ -1479,7 +1545,7 @@ export default function LevelBuilder() {
             transform: dragPreviewTransform(dragPosRef.current),
             borderRadius: '50%',
             overflow: 'hidden',
-            background: dragPreviewToken.color || '#6366f1',
+            background: tokenColor(dragPreviewToken),
             border: '2px solid rgba(255,255,255,0.9)',
             boxShadow: '0 4px 12px rgba(0,0,0,0.45)',
             display: 'flex',
@@ -1491,7 +1557,7 @@ export default function LevelBuilder() {
         >
           {dragPreviewToken.avatar
             ? <img src={dragPreviewToken.avatar} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-            : <span style={{ fontSize: Math.max(10, cellSize * 0.35), color: '#fff', fontWeight: 700, fontFamily: 'Cinzel, serif' }}>{dragPreviewToken.name?.[0]?.toUpperCase() || '?'}</span>
+            : <span style={{ fontSize: Math.max(10, cellSize * 0.35), color: '#fff', fontWeight: 700, fontFamily: 'var(--font-title)' }}>{dragPreviewToken.name?.[0]?.toUpperCase() || '?'}</span>
           }
         </div>,
         playRootRef.current || document.body,
@@ -1507,8 +1573,28 @@ export default function LevelBuilder() {
         <div style={{ flex: 1 }}>
           <h2 style={{ fontSize: 20, marginBottom: 2 }}>Battle Map</h2>
         </div>
-        {isDm && <button className="btn btn-primary" onClick={() => openEditor(null)}>+ Create New Map</button>}
+        {isDm && <button className="btn btn-primary" onClick={() => setShowSizePicker(true)}>+ Create New Map</button>}
       </div>
+
+      {showSizePicker && (
+        <div role="dialog" aria-modal="true" aria-label="Choose a map size" onClick={() => setShowSizePicker(false)}
+          style={{ position: 'fixed', inset: 0, zIndex: 1200, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+          <div className="card" onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: 520, padding: 22 }}>
+            <h3 style={{ fontSize: 18, margin: '0 0 4px' }}>Choose a map size</h3>
+            <p style={{ fontSize: 13, color: 'var(--text-2)', margin: '0 0 14px' }}>The size is fixed once the map is created.</p>
+            <div style={{ display: 'grid', gap: 10 }}>
+              {MAP_SIZES.map(sz => (
+                <button key={sz.id} type="button" className="btn btn-ghost" onClick={() => { setShowSizePicker(false); openEditor(null, sz) }}
+                  style={{ justifyContent: 'space-between', padding: '14px 16px', textAlign: 'left' }}>
+                  <span><b style={{ fontSize: 15 }}>{sz.label}</b><br /><span style={{ fontSize: 12, color: 'var(--text-3)', fontWeight: 400 }}>{sz.blurb}</span></span>
+                  <span style={{ fontSize: 12, color: 'var(--text-2)' }}>{sz.w} × {sz.h}</span>
+                </button>
+              ))}
+            </div>
+            <div style={{ textAlign: 'right', marginTop: 14 }}><button className="btn btn-ghost btn-sm" onClick={() => setShowSizePicker(false)}>Cancel</button></div>
+          </div>
+        </div>
+      )}
 
       {plansLoading ? (
         <div style={{ flex: 1, overflowY: 'auto', padding: 24 }}>
@@ -1551,7 +1637,7 @@ export default function LevelBuilder() {
               >
                 <MapThumb content={plan.content} theme={plan.theme} />
                 <div style={{ padding: '10px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <span style={{ fontFamily: 'Cinzel, serif', fontSize: 13, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{plan.title}</span>
+                  <span style={{ fontFamily: 'var(--font-title)', fontSize: 13, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{plan.title}</span>
                   {isDm && (
                     <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
                       <button onClick={e => { e.stopPropagation(); openEditor(plan) }} title="Edit tiles"
@@ -1619,7 +1705,7 @@ function SidebarToken({ token, placed, dragging, selected, onDragStart, onSelect
         touchAction: 'pan-x',
       }}
     >
-      <div style={{ width: 28, height: 28, borderRadius: '50%', background: token.color, border: '2px solid rgba(255,255,255,0.2)', flexShrink: 0, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <div style={{ width: 28, height: 28, borderRadius: '50%', background: tokenColor(token), border: '2px solid rgba(255,255,255,0.2)', flexShrink: 0, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         {token.avatar
           ? <img src={token.avatar} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
           : <span style={{ fontSize: 12, color: '#fff', fontWeight: 700 }}>{token.name?.[0]?.toUpperCase()}</span>

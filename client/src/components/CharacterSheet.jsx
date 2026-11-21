@@ -10,11 +10,11 @@ import { COINS, FEATS, alwaysPrepared, derive, itemWeight, weaponStats } from '.
 const CSS = `
 .cs{font-family:Georgia,'Times New Roman',serif;color:#111;background:#fff;padding:14mm 12mm;max-width:210mm;margin:0 auto;font-size:11px;line-height:1.35}
 .cs *{box-sizing:border-box}
-.cs h1{font-family:Cinzel,Georgia,serif;font-size:24px;margin:0}
-.cs h2{font-family:Cinzel,Georgia,serif;font-size:11px;letter-spacing:.08em;text-transform:uppercase;border-bottom:1.5px solid #111;margin:12px 0 5px;padding-bottom:2px}
+.cs h1{font-family:'Fell Title','IM Fell English',Georgia,serif;font-size:24px;margin:0}
+.cs h2{font-family:'Fell Title','IM Fell English',Georgia,serif;font-size:11px;letter-spacing:.08em;text-transform:uppercase;border-bottom:1.5px solid #111;margin:12px 0 5px;padding-bottom:2px}
 .cs .row{display:flex;gap:8px;flex-wrap:wrap}
 .cs .box{border:1.5px solid #111;border-radius:5px;padding:4px 6px;text-align:center;min-width:62px}
-.cs .box b{display:block;font-size:17px;font-family:Cinzel,Georgia,serif}
+.cs .box b{display:block;font-size:17px;font-family:'Fell Title','IM Fell English',Georgia,serif}
 .cs .box small{font-size:8px;letter-spacing:.07em;text-transform:uppercase;color:#444}
 .cs .cols{display:grid;grid-template-columns:1fr 1fr;gap:0 18px}
 .cs .cols3{display:grid;grid-template-columns:repeat(3,1fr);gap:0 14px}
@@ -216,7 +216,7 @@ export function PrintOverlay({ char, srd, onClose }) {
     <div className="sheet-portal" style={{ position: 'fixed', inset: 0, zIndex: 2000, background: '#e9e6df', overflowY: 'auto' }}>
       <div className="no-print" style={{ position: 'sticky', top: 0, zIndex: 1, display: 'flex', gap: 8, justifyContent: 'center', alignItems: 'center', padding: 10, background: '#1c1a17', color: '#ddd', fontSize: 12 }}>
         <span>Print preview · black &amp; white, A4 / Letter, 2 pages</span>
-        <button className="btn btn-primary btn-sm" onClick={() => window.print()}>🖨 Print / save as PDF</button>
+        <button className="btn btn-primary btn-sm" onClick={() => window.print()}>Print / save as PDF</button>
         <button className="btn btn-ghost btn-sm" onClick={onClose}>Close</button>
       </div>
       <CharacterSheet char={char} srd={srd} />

@@ -557,7 +557,7 @@ export default function RoleplayAssistant() {
 
             {/* Generate card */}
             <div className="card" style={{ padding: '18px 16px', display: 'flex', flexDirection: 'column', gap: 12 }}>
-              <div style={{ fontFamily: 'Cinzel, serif', fontSize: 12, fontWeight: 600, color: 'var(--gold)', letterSpacing: '0.05em', textTransform: 'uppercase' }}>Ready to Play</div>
+              <div style={{ fontFamily: 'var(--font-title)', fontSize: 12, fontWeight: 600, color: 'var(--gold)', letterSpacing: '0.05em', textTransform: 'uppercase' }}>Ready to Play</div>
 
               {/* Completion indicators */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -623,14 +623,14 @@ export default function RoleplayAssistant() {
             {(() => {
               const hasGuide = !!(dmGuide.story || dmGuide.currentArc || dmGuide.lastSession || (dmGuide.npcs || []).length || (dmGuide.quests || []).length)
               if (!hasGuide) return (
-                <div style={{ padding: '12px 14px', background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 8, fontSize: 11, color: 'var(--text-3)', lineHeight: 1.6 }}>
+                <div style={{ padding: '12px 14px', background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 3, fontSize: 11, color: 'var(--text-3)', lineHeight: 1.6 }}>
                   <strong style={{ color: 'var(--text-2)' }}>DM Guide not set up yet</strong><br />
                   Ask your DM to fill in the Campaign Guide tab — it adds campaign context, last session recaps, NPC hooks, and quest ties to your plan automatically.
                 </div>
               )
               return (
-                <div style={{ padding: '12px 14px', background: 'var(--gold-bg)', border: '1px solid var(--gold-border)', borderRadius: 8, fontSize: 11, color: 'var(--text-2)', lineHeight: 1.7 }}>
-                  <div style={{ fontFamily: 'Cinzel, serif', fontSize: 10, fontWeight: 600, color: 'var(--gold)', letterSpacing: '0.05em', textTransform: 'uppercase', marginBottom: 8 }}>DM Context Active</div>
+                <div style={{ padding: '12px 14px', background: 'var(--gold-bg)', border: '1px solid var(--gold-border)', borderRadius: 3, fontSize: 11, color: 'var(--text-2)', lineHeight: 1.7 }}>
+                  <div style={{ fontFamily: 'var(--font-title)', fontSize: 10, fontWeight: 600, color: 'var(--gold)', letterSpacing: '0.05em', textTransform: 'uppercase', marginBottom: 8 }}>DM Context Active</div>
                   {dmGuide.currentArc && <div style={{ marginBottom: 5 }}><strong style={{ color: 'var(--text)' }}>Arc:</strong> {dmGuide.currentArc.slice(0, 80)}{dmGuide.currentArc.length > 80 ? '…' : ''}</div>}
                   {dmGuide.lastSession && <div style={{ marginBottom: 5 }}><strong style={{ color: 'var(--text)' }}>Last session:</strong> {dmGuide.lastSession.slice(0, 80)}{dmGuide.lastSession.length > 80 ? '…' : ''}</div>}
                   {(dmGuide.npcs || []).filter(n => n.name).length > 0 && <div style={{ marginBottom: 5 }}><strong style={{ color: 'var(--text)' }}>NPCs:</strong> {(dmGuide.npcs || []).filter(n => n.name).map(n => n.name).join(', ')}</div>}
@@ -686,7 +686,7 @@ export default function RoleplayAssistant() {
 
       {/* Level-up banner — premium only */}
       {isPremium && checklistLevel !== null && Number(ctx.level) > checklistLevel && (
-        <div style={{ padding: '10px 14px', marginBottom: 12, maxWidth: 700, background: 'linear-gradient(90deg, var(--gold-bg), rgba(154,124,58,0.08))', border: '2px solid var(--gold-border)', borderRadius: 8, fontSize: 12, color: 'var(--text)', lineHeight: 1.6, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+        <div style={{ padding: '10px 14px', marginBottom: 12, maxWidth: 700, background: 'linear-gradient(90deg, var(--gold-bg), rgba(154,124,58,0.08))', border: '2px solid var(--gold-border)', borderRadius: 3, fontSize: 12, color: 'var(--text)', lineHeight: 1.6, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
           <div><span style={{ color: 'var(--gold)', fontWeight: 700 }}>✦ You've reached Level {ctx.level}!</span> Your session plan can be refreshed to reflect your new abilities and hooks.</div>
           <button
             className="btn btn-primary btn-sm"
@@ -697,7 +697,7 @@ export default function RoleplayAssistant() {
       )}
 
       {/* Pro tip */}
-      <div style={{ padding: '10px 14px', marginBottom: 16, maxWidth: 700, background: 'var(--gold-bg)', border: '1px solid var(--gold-border)', borderRadius: 8, fontSize: 12, color: 'var(--text-2)', lineHeight: 1.6 }}>
+      <div style={{ padding: '10px 14px', marginBottom: 16, maxWidth: 700, background: 'var(--gold-bg)', border: '1px solid var(--gold-border)', borderRadius: 3, fontSize: 12, color: 'var(--text-2)', lineHeight: 1.6 }}>
         <strong style={{ color: 'var(--gold)' }}>How to use this:</strong> Pick <strong>2–3 items</strong> to focus on — not all of them. Tick items as the session progresses. Consistency over multiple sessions is what makes a character unforgettable.
       </div>
 
@@ -707,7 +707,7 @@ export default function RoleplayAssistant() {
           return (
             <div key={phase.phase} className="card" style={{ marginBottom: 14, overflow: 'hidden' }}>
               <div style={{ padding: '10px 16px', background: phase.headerBg, borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <div style={{ fontFamily: 'Cinzel, serif', fontSize: 13, fontWeight: 600, color: phase.headerColor }}>{phase.phase}</div>
+                <div style={{ fontFamily: 'var(--font-title)', fontSize: 13, fontWeight: 600, color: phase.headerColor }}>{phase.phase}</div>
                 <div style={{ fontSize: 11, color: 'var(--text-3)' }}>{done}/{phase.items.length} done</div>
               </div>
 
@@ -759,7 +759,7 @@ export default function RoleplayAssistant() {
 
 function SectionLabel({ children }) {
   return (
-    <div style={{ fontFamily: 'Cinzel, serif', fontSize: 12, fontWeight: 600, color: 'var(--gold)', marginBottom: 14, letterSpacing: '0.05em', textTransform: 'uppercase' }}>
+    <div style={{ fontFamily: 'var(--font-title)', fontSize: 12, fontWeight: 600, color: 'var(--gold)', marginBottom: 14, letterSpacing: '0.05em', textTransform: 'uppercase' }}>
       {children}
     </div>
   )

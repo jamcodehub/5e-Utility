@@ -39,7 +39,7 @@ export default function GearTab({ char, srd, d, onPatch }) {
     const needle = q.trim().toLowerCase()
     return srd.equipment
       .filter(e => (cat === 'all' || e.category === cat) && (!needle || e.name.toLowerCase().includes(needle)))
-      .sort((a, b) => a.name.localeCompare(b.name)).slice(0, 40)
+      .sort((a, b) => a.name.localeCompare(b.name))
   }, [srd.equipment, cat, q])
 
   // Saves the inventory and keeps Armor Class in step when armor or a shield changes.
@@ -91,7 +91,7 @@ export default function GearTab({ char, srd, d, onPatch }) {
       <Panel title="Armor class & load">
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 24, alignItems: 'center' }}>
           <div>
-            <div style={{ fontSize: 26, fontFamily: 'Cinzel, serif', color: 'var(--gold)' }}>{d.ac}</div>
+            <div style={{ fontSize: 26, fontFamily: 'var(--font-title)', color: 'var(--gold)' }}>{d.ac}</div>
             <div style={{ fontSize: 11, color: 'var(--text-3)' }}>Calculated AC{d.armor ? ` · ${d.armor.name}` : d.cls?.id === 'barbarian' || d.cls?.id === 'monk' ? ' · Unarmored Defense' : ' · no armor'}{d.shield ? ' + shield' : ''}</div>
             {acMismatch && <button className="btn btn-ghost btn-sm" style={{ marginTop: 6 }} onClick={() => onPatch({ ac: d.ac })}>Set sheet AC to {d.ac} (now {char.ac ?? 10})</button>}
           </div>

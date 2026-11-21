@@ -8,7 +8,7 @@ import { SpellBrowser } from './Spells'
 const TABS = ['Rules', 'Conditions', 'Classes', 'Races', 'Equipment', 'Spells']
 
 const label = { fontSize: 10, fontWeight: 600, color: 'var(--text-3)', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 4 }
-const title = { fontFamily: 'Cinzel, serif', fontSize: 18, color: 'var(--gold)', marginBottom: 8 }
+const title = { fontFamily: 'var(--font-title)', fontSize: 18, color: 'var(--gold)', marginBottom: 8 }
 const text = { fontSize: 13, color: 'var(--text-2)', marginBottom: 10, lineHeight: 1.6 }
 const Chip = ({ children }) => (
   <span style={{ display: 'inline-block', fontSize: 11, padding: '2px 8px', borderRadius: 999, background: 'var(--surface2)', border: '1px solid var(--border)', color: 'var(--text-2)', marginRight: 6, marginBottom: 6 }}>{children}</span>
@@ -104,7 +104,7 @@ function ClassDetail({ cls, srd }) {
       {cls.subclasses?.map(sub => (
         <div key={sub.id} style={{ marginTop: 16 }}>
           <div style={label}>{sub.flavor}</div>
-          <div style={{ fontFamily: 'Cinzel, serif', fontSize: 15, color: 'var(--gold)', marginBottom: 6 }}>{sub.name}</div>
+          <div style={{ fontFamily: 'var(--font-title)', fontSize: 15, color: 'var(--gold)', marginBottom: 6 }}>{sub.name}</div>
           <MiniMarkdown text={sub.desc} compact />
           <FeatureList ids={sub.levels.flatMap(l => l.features || [])} features={features} />
         </div>
@@ -139,7 +139,7 @@ function RaceDetail({ race, srd }) {
       <TraitList ids={race.traits} traits={srd.traits} />
       {race.subraces?.map(sr => (
         <div key={sr.id} style={{ marginTop: 16 }}>
-          <div style={{ fontFamily: 'Cinzel, serif', fontSize: 15, color: 'var(--gold)', marginBottom: 6 }}>{sr.name}</div>
+          <div style={{ fontFamily: 'var(--font-title)', fontSize: 15, color: 'var(--gold)', marginBottom: 6 }}>{sr.name}</div>
           <div style={{ marginBottom: 6 }}>{sr.abilityBonuses?.map(b => <Chip key={b.ability}>{ABILITY_NAMES[b.ability]} {fmtMod(b.bonus)}</Chip>)}</div>
           <div style={text}>{sr.desc}</div>
           <TraitList ids={sr.traits} traits={srd.traits} />

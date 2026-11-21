@@ -11,9 +11,11 @@ import journalRoutes from './routes/journal.js'
 import loreRoutes from './routes/lore.js'
 import storyboardRoutes from './routes/storyboard.js'
 import dmboardRoutes from './routes/dmboard.js'
+import battleRoutes from './routes/battle.js'
 import aiRoutes from './routes/ai.js'
 import paymentRoutes from './routes/payments.js'
 import feedbackRoutes from './routes/feedback.js'
+import dndBeyondRoutes from './routes/dndbeyond.js'
 import levelRoutes from './routes/levels.js'
 import inventoryRoutes from './routes/inventory.js'
 import uploadRoutes from './routes/upload.js'
@@ -23,6 +25,7 @@ import sharedRoutes from './routes/shared.js'
 import { attachRealtime } from './realtime.js'
 import { clientOrigins } from './lib/clientUrl.js'
 import { rejectOperatorKeys } from './lib/guards.js'
+import { runGraceSweep } from './lib/grace.js'
 import { Character, DMBoard } from './models/index.js'
 
 dotenv.config({ quiet: true })
@@ -42,6 +45,8 @@ const apiLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 600, standardHeade
 
 // Feedback is intentionally open to logged-out visitors, which also makes
 // it the easiest unauthenticated spam target — keep it tight.
+// Each import asks D&D Beyond for a character, so keep it modest per person/IP.
+const importLimiter = rateLimit({ windowMs: 60 * 60 * 1000, max: 30, standardHeaders: true, legacyHeaders: false, message: { error: 'Too many imports, please try again later.' } })
 const feedbackLimiter = rateLimit({ windowMs: 60 * 60 * 1000, max: 10, standardHeaders: true, legacyHeaders: false, message: { error: 'Too many submissions, please try again later.' } })
 
 app.use('/api/payments/webhook', express.raw({ type: 'application/json', verify: (req, res, buf) => { req.rawBody = buf } }))
@@ -64,9 +69,11 @@ app.use('/api/journal',   journalRoutes)
 app.use('/api/lore',      loreRoutes)
 app.use('/api/storyboard', storyboardRoutes)
 app.use('/api/dmboard', dmboardRoutes)
+app.use('/api/battle', battleRoutes)
 app.use('/api/ai', aiRoutes)
 app.use('/api/payments',  paymentRoutes)
 app.use('/api/feedback',  feedbackLimiter, feedbackRoutes)
+app.use('/api/dndbeyond', importLimiter, dndBeyondRoutes)
 app.use('/api/levels',    levelRoutes)
 app.use('/api/inventory', inventoryRoutes)
 app.use('/api/upload',    uploadRoutes)
@@ -104,6 +111,12 @@ mongoose.connect(process.env.MONGO_URI).then(async () => {
       console.log('Dropped stale unique index campaign_1 on dmboards collection')
     }
   } catch (e) { if (e.codeName !== 'NamespaceNotFound') console.error('DM board index self-heal check failed:', e.message) }
+
+  // Premium grace periods: send the pre-expiry reminder and remove premium once
+  // the 5 days run out. Runs once at boot, then hourly.
+  const sweep = () => runGraceSweep().catch(e => console.error('[grace]', e))
+  sweep()
+  setInterval(sweep, 60 * 60 * 1000).unref()
 
   const httpServer = createServer(app)
   attachRealtime(httpServer)

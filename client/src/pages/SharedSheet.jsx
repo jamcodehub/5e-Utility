@@ -29,7 +29,7 @@ export default function SharedSheet() {
     <div className="sheet-portal" style={shell}>
       <div className="no-print" style={{ display: 'flex', gap: 8, justifyContent: 'center', alignItems: 'center', padding: 10, background: '#1c1a17', color: '#ddd', fontSize: 12 }}>
         <span>Shared character sheet (read-only)</span>
-        <button className="btn btn-primary btn-sm" onClick={() => window.print()}>🖨 Print / save as PDF</button>
+        <button className="btn btn-primary btn-sm" onClick={() => window.print()}>Print / save as PDF</button>
       </div>
       <CharacterSheet char={char} srd={srd} />
     </div>

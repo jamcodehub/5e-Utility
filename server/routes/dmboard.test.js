@@ -10,12 +10,12 @@ test('DM boards are private, limited for free DMs, validated and conflict-checke
   const stub = (target, name, fn) => { patched.push([target, name, target[name]]); target[name] = fn }
   const secret = process.env.JWT_SECRET
   process.env.JWT_SECRET = 'test-secret'
-  const owner = '507f1f77bcf86cd799439011', player = '507f1f77bcf86cd799439012', otherDM = '507f1f77bcf86cd799439013', premiumDM = '507f1f77bcf86cd799439015'
+  const owner = '507f1f77bcf86cd799439011', player = '507f1f77bcf86cd799439012', otherDM = '507f1f77bcf86cd799439013', premiumDM = '507f1f77bcf86cd799439015', playerPremiumDM = '507f1f77bcf86cd799439016'
   const campaign = '507f1f77bcf86cd799439014'
   let boardCount = 1
   let currentVersion = 0
-  stub(User, 'findById', id => ({ select: async () => ({ role: id === player ? 'player' : 'dm', roles: [], isPremium: id === premiumDM }) }))
-  stub(Campaign, 'findOne', query => ({ select: async () => (query._id === campaign && (query.owner === owner || query.owner === premiumDM) ? { _id: campaign } : null) }))
+  stub(User, 'findById', id => ({ select: async () => ({ role: id === player ? 'player' : 'dm', roles: [], isPremium: id === premiumDM || id === playerPremiumDM, premiumRole: id === premiumDM ? 'dm' : id === playerPremiumDM ? 'player' : '' }) }))
+  stub(Campaign, 'findOne', query => ({ select: async () => (query._id === campaign && (query.owner === owner || query.owner === premiumDM || query.owner === playerPremiumDM) ? { _id: campaign } : null) }))
   stub(DMBoard, 'countDocuments', async () => boardCount)
   stub(DMBoard, 'create', async doc => { boardCount += 1; return { _id: '507f1f77bcf86cd799439099', ...doc } })
   stub(DMBoard, 'findOneAndUpdate', async (query, update) => {
@@ -53,6 +53,7 @@ test('DM boards are private, limited for free DMs, validated and conflict-checke
   }
   assert.equal((await request(owner, 'POST', '/boards', { name: 'Second' })).status, 403, 'free DM is limited to one board')
   assert.equal((await request(owner, 'POST', '/folders', { name: 'Acts' })).status, 403, 'folders need Premium')
+  assert.equal((await request(playerPremiumDM, 'POST', '/boards', { name: 'Second' })).status, 403, 'Player premium does not unlock DM tools')
   assert.equal((await request(premiumDM, 'POST', '/boards', { name: 'Second' })).status, 200)
   assert.equal((await request(premiumDM, 'POST', '/folders', { name: 'Acts' })).status, 200)
 

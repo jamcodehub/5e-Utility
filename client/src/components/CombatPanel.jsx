@@ -3,7 +3,7 @@ import { fmtMod } from '../utils/rules5e'
 
 const label = { fontSize: 10, fontWeight: 600, color: 'var(--text-3)', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 6 }
 const chip = (on, danger) => ({
-  padding: '4px 10px', borderRadius: 8, fontSize: 12, cursor: 'pointer', userSelect: 'none',
+  padding: '4px 10px', borderRadius: 3, fontSize: 12, cursor: 'pointer', userSelect: 'none',
   background: on ? (danger ? 'rgba(220,70,70,0.15)' : 'var(--gold-bg)') : 'var(--surface2)',
   color: on ? (danger ? 'var(--red)' : 'var(--gold)') : 'var(--text-2)',
   border: `1px solid ${on ? (danger ? 'var(--red)' : 'var(--gold-border)') : 'var(--border)'}`,
@@ -23,9 +23,9 @@ function Panel({ title, right, children }) {
 
 function Stat({ name, value, onClick, sub }) {
   return (
-    <div onClick={onClick} style={{ textAlign: 'center', padding: '8px 4px', background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 8, cursor: onClick ? 'pointer' : 'default' }}>
+    <div onClick={onClick} style={{ textAlign: 'center', padding: '8px 4px', background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 3, cursor: onClick ? 'pointer' : 'default' }}>
       <div style={{ fontSize: 9, color: 'var(--text-3)', letterSpacing: '0.06em', textTransform: 'uppercase' }}>{name}</div>
-      <div style={{ fontSize: 20, fontFamily: 'Cinzel, serif', color: 'var(--gold)' }}>{value}</div>
+      <div style={{ fontSize: 20, fontFamily: 'var(--font-title)', color: 'var(--gold)' }}>{value}</div>
       {sub && <div style={{ fontSize: 9, color: 'var(--text-3)' }}>{sub}</div>}
     </div>
   )
@@ -41,15 +41,12 @@ function Pips({ n, max = 3, color, onSet }) {
   )
 }
 
-// Table-play state: HP with temp HP, death saves, concentration, conditions, exhaustion, companions.
-export default function CombatPanel({ char, srd, d, roller, onPatch }) {
+// Hit points, temp HP, concentration and death saves. Lives in the popover on the character header's HP box.
+export function HitPointControls({ char, d, roller, onPatch }) {
   const [amount, setAmount] = useState('')
-  const [openCond, setOpenCond] = useState(null)
-  const [newPet, setNewPet] = useState('')
   const combat = { tempHp: 0, conditions: [], exhaustion: 0, inspiration: false, concentrating: '', deathSaves: { successes: 0, failures: 0 }, ...(char.combat || {}) }
   const hp = { current: 10, max: 10, ...(char.hp || {}) }
   const ds = combat.deathSaves
-  const conditions = srd.core.conditions.filter(c => c.id !== 'exhaustion')
   const patchCombat = (p, extra = {}) => onPatch({ combat: { ...combat, ...p }, ...extra })
   const note = (title, text) => roller.push({ title, lines: [{ label: text, total: null, detail: '' }] })
 
@@ -100,6 +97,52 @@ export default function CombatPanel({ char, srd, d, roller, onPatch }) {
     if (failures >= 3) note('Dead', 'Three failed death saves.')
     else if (successes >= 3) note('Stable', 'Three successes — you are stable at 0 HP and stop making death saves.')
   }
+  return (
+    <div>
+      {combat.concentrating && (
+        <div style={{ marginBottom: 8 }}>
+          <span style={chip(true)} onClick={() => patchCombat({ concentrating: '' })} title="Click to stop concentrating">Concentrating: {combat.concentrating} ✕</span>
+        </div>
+      )}
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: 14, flexWrap: 'wrap', marginBottom: 10 }}>
+          <span style={{ fontSize: 28, fontFamily: 'var(--font-title)', color: hp.current === 0 ? 'var(--red)' : 'var(--text)' }}>{hp.current}<span style={{ fontSize: 16, color: 'var(--text-3)' }}> / {hp.max}</span></span>
+          {combat.tempHp > 0 && <span style={{ fontSize: 14, color: 'var(--gold)' }}>+{combat.tempHp} temp</span>}
+          {combat.exhaustion >= 4 && <span style={{ fontSize: 11, color: 'var(--red)' }}>HP maximum halved by exhaustion → {Math.floor(hp.max / 2)}</span>}
+        </div>
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+          <input className="input" type="number" min="0" style={{ width: 90, fontSize: 13 }} placeholder="Amount" value={amount} onChange={e => setAmount(e.target.value)} />
+          <button className="btn btn-ghost btn-sm" onClick={damage}>Damage</button>
+          <button className="btn btn-ghost btn-sm" onClick={heal}>Heal</button>
+          <button className="btn btn-ghost btn-sm" onClick={setTemp} title="Temporary HP don't stack — you keep the higher number">Set temp HP</button>
+        </div>
+        <div style={{ fontSize: 10, color: 'var(--text-3)', marginTop: 6 }}>Damage uses temp HP first. If you're concentrating, a Constitution save (DC 10 or half the damage) rolls automatically.</div>
+
+        {hp.current === 0 && (
+          <div style={{ marginTop: 14, paddingTop: 12, borderTop: '1px solid var(--border)' }}>
+            <div style={label}>Death saving throws</div>
+            <div style={{ display: 'flex', gap: 18, alignItems: 'center', flexWrap: 'wrap' }}>
+              <span style={{ fontSize: 12, color: 'var(--text-2)' }}>Successes <Pips n={ds.successes} color="var(--green)" onSet={n => patchCombat({ deathSaves: { ...ds, successes: n } })} /></span>
+              <span style={{ fontSize: 12, color: 'var(--text-2)' }}>Failures <Pips n={ds.failures} color="var(--red)" onSet={n => patchCombat({ deathSaves: { ...ds, failures: n } })} /></span>
+              <button className="btn btn-primary btn-sm" onClick={deathSave}>Roll death save</button>
+            </div>
+            <div style={{ fontSize: 10, color: 'var(--text-3)', marginTop: 6 }}>10+ is a success, below 10 a failure. A natural 1 counts as two failures, a natural 20 brings you back with 1 HP.</div>
+          </div>
+        )}
+    </div>
+  )
+}
+
+// Table-play state: HP with temp HP, death saves, concentration, conditions, exhaustion, companions.
+export default function CombatPanel({ char, srd, d, roller, onPatch }) {
+  const [openCond, setOpenCond] = useState(null)
+  const [newPet, setNewPet] = useState('')
+  const combat = { tempHp: 0, conditions: [], exhaustion: 0, inspiration: false, concentrating: '', deathSaves: { successes: 0, failures: 0 }, ...(char.combat || {}) }
+  const hp = { current: 10, max: 10, ...(char.hp || {}) }
+  const ds = combat.deathSaves
+  const conditions = srd.core.conditions.filter(c => c.id !== 'exhaustion')
+  const patchCombat = (p, extra = {}) => onPatch({ combat: { ...combat, ...p }, ...extra })
+  const note = (title, text) => roller.push({ title, lines: [{ label: text, total: null, detail: '' }] })
+
   const toggleCond = (id) => patchCombat({ conditions: combat.conditions.includes(id) ? combat.conditions.filter(c => c !== id) : [...combat.conditions, id] })
 
   const companions = char.companions || []
@@ -122,35 +165,6 @@ export default function CombatPanel({ char, srd, d, roller, onPatch }) {
         {d.spellDc != null && <Stat name="Spell save DC" value={d.spellDc} sub={`${d.castAbility?.toUpperCase()} · atk ${fmtMod(d.spellAtk)}`} />}
         <Stat name="Inspiration" value={combat.inspiration ? '★' : '☆'} onClick={() => patchCombat({ inspiration: !combat.inspiration })} sub={combat.inspiration ? 'spend it' : 'none'} />
       </div>
-
-      <Panel title="Hit points" right={combat.concentrating && (
-        <span style={chip(true)} onClick={() => patchCombat({ concentrating: '' })} title="Click to stop concentrating">🧠 Concentrating: {combat.concentrating} ✕</span>
-      )}>
-        <div style={{ display: 'flex', alignItems: 'baseline', gap: 14, flexWrap: 'wrap', marginBottom: 10 }}>
-          <span style={{ fontSize: 28, fontFamily: 'Cinzel, serif', color: hp.current === 0 ? 'var(--red)' : 'var(--text)' }}>{hp.current}<span style={{ fontSize: 16, color: 'var(--text-3)' }}> / {hp.max}</span></span>
-          {combat.tempHp > 0 && <span style={{ fontSize: 14, color: 'var(--gold)' }}>+{combat.tempHp} temp</span>}
-          {combat.exhaustion >= 4 && <span style={{ fontSize: 11, color: 'var(--red)' }}>HP maximum halved by exhaustion → {Math.floor(hp.max / 2)}</span>}
-        </div>
-        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-          <input className="input" type="number" min="0" style={{ width: 90, fontSize: 13 }} placeholder="Amount" value={amount} onChange={e => setAmount(e.target.value)} />
-          <button className="btn btn-ghost btn-sm" onClick={damage}>Damage</button>
-          <button className="btn btn-ghost btn-sm" onClick={heal}>Heal</button>
-          <button className="btn btn-ghost btn-sm" onClick={setTemp} title="Temporary HP don't stack — you keep the higher number">Set temp HP</button>
-        </div>
-        <div style={{ fontSize: 10, color: 'var(--text-3)', marginTop: 6 }}>Damage uses temp HP first. If you're concentrating, a Constitution save (DC 10 or half the damage) rolls automatically.</div>
-
-        {hp.current === 0 && (
-          <div style={{ marginTop: 14, paddingTop: 12, borderTop: '1px solid var(--border)' }}>
-            <div style={label}>Death saving throws</div>
-            <div style={{ display: 'flex', gap: 18, alignItems: 'center', flexWrap: 'wrap' }}>
-              <span style={{ fontSize: 12, color: 'var(--text-2)' }}>Successes <Pips n={ds.successes} color="var(--green)" onSet={n => patchCombat({ deathSaves: { ...ds, successes: n } })} /></span>
-              <span style={{ fontSize: 12, color: 'var(--text-2)' }}>Failures <Pips n={ds.failures} color="var(--red)" onSet={n => patchCombat({ deathSaves: { ...ds, failures: n } })} /></span>
-              <button className="btn btn-primary btn-sm" onClick={deathSave}>🎲 Roll death save</button>
-            </div>
-            <div style={{ fontSize: 10, color: 'var(--text-3)', marginTop: 6 }}>10+ is a success, below 10 a failure. A natural 1 counts as two failures, a natural 20 brings you back with 1 HP.</div>
-          </div>
-        )}
-      </Panel>
 
       <Panel title="Conditions" right={combat.conditions.length ? <button className="btn btn-ghost btn-sm" onClick={() => patchCombat({ conditions: [] })}>Clear all</button> : null}>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>

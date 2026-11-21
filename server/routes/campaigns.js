@@ -2,6 +2,8 @@ import { Router } from 'express'
 import crypto from 'crypto'
 import jwt from 'jsonwebtoken'
 import { Campaign, Character, User, CampaignGuide, DMBoard, DMBoardFolder } from '../models/index.js'
+import { hasPremium, hasPremiumAs } from '../lib/premium.js'
+import { buildTestCharacter, MAX_TEST_PLAYERS } from '../lib/testPlayer.js'
 
 const router = Router()
 
@@ -111,15 +113,22 @@ router.post('/join', auth, async (req, res) => {
     if (!campaign) return res.status(404).json({ error: 'Invalid join code' })
 
     const uid = String(req.userId)
+    // The DM using their own campaign's code (to play it, or to try the player view): no approval is needed, but they must be
+    // recorded as a member. The player list only shows campaigns you are a member of, so without this the campaign
+    // looked joined and then disappeared the next time the role was switched.
+    if (String(campaign.owner) === uid) {
+      if (!campaign.members.some(m => String(m) === uid)) { campaign.members.push(req.userId); await campaign.save() }
+      return res.json({ pending: false, campaign })
+    }
     // Already a member
-    if (String(campaign.owner) === uid || campaign.members.some(m => String(m) === uid))
+    if (campaign.members.some(m => String(m) === uid))
       return res.json({ pending: false, campaign })
     // Already pending
     if (campaign.pendingMembers.some(m => String(m) === uid))
       return res.json({ pending: true })
 
     const user = await User.findById(req.userId)
-    if (user.role === 'player' && !user.isPremium) {
+    if (user.role === 'player' && !hasPremiumAs(user, 'player')) {
       const already = await Campaign.countDocuments({ members: req.userId })
       if (already >= 1) return res.status(403).json({ error: 'Free players can join 1 campaign. Upgrade to Premium for unlimited campaigns.' })
     }
@@ -164,6 +173,55 @@ router.delete('/:id/pending/:userId', auth, async (req, res) => {
   } catch { res.status(500).json({ error: 'Failed to reject' }) }
 })
 
+// DM removes a player from the campaign. To guard against a stray tap the DM must type the player's character name exactly
+// (their username if they have no character yet), enforced here as well as in the UI. Only their access ends: their
+// characters are kept, so they are all still there if the player is let back in. The DM can also remove themselves from the
+// player list (a placeholder test player), which never touches their ownership of the campaign.
+const memberLabel = async (campaignId, userId) => {
+  const chars = await Character.find({ campaign: campaignId, owner: userId })
+  const character = chars.find(c => c.isPrimary) || chars[0]
+  if (character?.name?.trim()) return character.name
+  const user = await User.findById(userId).select('username')
+  return user?.username || ''
+}
+
+// DM adds a "test player": a placeholder player (an account that cannot sign in) with a ready-made character, so the DM can
+// try the campaign, use them as a token on the battle map, in the battle tracker and so on. Removing them deletes them.
+router.post('/:id/test-players', auth, async (req, res) => {
+  try {
+    const campaign = await Campaign.findOne({ _id: req.params.id, owner: req.userId, isPersonal: { $ne: true } })
+    if (!campaign) return res.status(403).json({ error: 'Only the DM of a campaign can add test players.' })
+    if (await User.countDocuments({ placeholderCampaign: campaign._id }) >= MAX_TEST_PLAYERS)
+      return res.status(400).json({ error: `A campaign can have up to ${MAX_TEST_PLAYERS} test players. Remove one first.` })
+    const sheet = buildTestCharacter({ name: req.body?.name, classId: req.body?.classId, level: req.body?.level })
+    const tag = crypto.randomBytes(3).toString('hex')
+    const user = await User.create({
+      username: `Test player ${tag}`, email: `test-player-${tag}-${crypto.randomBytes(4).toString('hex')}@placeholder.invalid`,
+      role: 'player', roles: ['player'], placeholderOf: req.userId, placeholderCampaign: campaign._id,
+    })
+    const character = await Character.create({ ...sheet, campaign: campaign._id, owner: user._id, isPrimary: true })
+    campaign.members.push(user._id)
+    await campaign.save()
+    res.json({ userId: user._id, username: user.username, character, isTest: true })
+  } catch { res.status(500).json({ error: 'Failed to add the test player' }) }
+})
+
+router.delete('/:id/members/:userId', auth, async (req, res) => {
+  try {
+    const campaign = await Campaign.findOne({ _id: req.params.id, owner: req.userId })
+    if (!campaign) return res.status(403).json({ error: 'Only the DM can remove players.' })
+    const uid = String(req.params.userId)
+    if (!campaign.members.some(m => String(m) === uid)) return res.status(404).json({ error: 'That player is not in this campaign.' })
+    const expected = await memberLabel(campaign._id, uid)
+    if (!expected || req.body?.confirmName !== expected) return res.status(400).json({ error: 'Name did not match.' })
+    campaign.members = campaign.members.filter(m => String(m) !== uid)
+    await campaign.save()
+    // A test player has no one behind it, so it is deleted together with its character instead of being left behind.
+    if (await User.findOneAndDelete({ _id: uid, placeholderOf: req.userId })) await Character.deleteMany({ campaign: campaign._id, owner: uid })
+    res.json({ ok: true })
+  } catch { res.status(500).json({ error: 'Failed to remove the player' }) }
+})
+
 router.put('/:id', auth, async (req, res) => {
   try {
     const campaign = await Campaign.findOneAndUpdate(
@@ -200,13 +258,18 @@ router.delete('/:id', auth, async (req, res) => {
   const campaign = await Campaign.findOne({ _id: req.params.id, owner: req.userId })
   if (!campaign) return res.status(404).json({ error: 'Campaign not found' })
   const user = await User.findById(req.userId)
-  if (!user.isPremium) {
+  if (!hasPremiumAs(user, 'dm')) {
     return res.status(403).json({ error: 'Deleting a campaign is a Premium feature. Upgrade to Premium to delete campaigns.' })
   }
   if (req.body?.confirmName !== campaign.name) {
     return res.status(400).json({ error: 'Campaign name did not match.' })
   }
   await campaign.deleteOne()
+  const testPlayers = await User.find({ placeholderCampaign: campaign._id }).select('_id')
+  if (testPlayers.length) {
+    await Character.deleteMany({ campaign: campaign._id, owner: { $in: testPlayers.map(u => u._id) } })
+    await User.deleteMany({ _id: { $in: testPlayers.map(u => u._id) } })
+  }
   await DMBoard.deleteMany({ campaign: campaign._id })
   await DMBoardFolder.deleteMany({ campaign: campaign._id })
   res.json({ ok: true })
@@ -218,7 +281,7 @@ router.post('/:id/roleplay-session', auth, async (req, res) => {
     const user = await User.findById(req.userId)
     let char = await ensurePrimary(req.params.id, req.userId)
     if (!char) return res.status(404).json({ error: 'Create a character first before using the Roleplay Assistant.' })
-    if (!user.isPremium && (char.roleplaySessionCount || 0) >= 1) {
+    if (!hasPremiumAs(user, 'player') && (char.roleplaySessionCount || 0) >= 1) {
       return res.status(403).json({ error: 'Your first session plan is free. Upgrade to Premium for unlimited roleplay sessions.' })
     }
     char.roleplaySessionCount = (char.roleplaySessionCount || 0) + 1
@@ -265,7 +328,7 @@ router.post('/:id/characters', auth, async (req, res) => {
     if (!await isMember(req.params.id, req.userId)) return res.status(403).json({ error: 'Not a campaign member' })
     const user = await User.findById(req.userId)
     const count = await Character.countDocuments({ campaign: req.params.id, owner: req.userId })
-    if (!user.isPremium && count >= 2) {
+    if (!hasPremiumAs(user, 'player') && count >= 2) {
       return res.status(403).json({ error: 'Free accounts are limited to 2 characters per campaign. Upgrade to Premium for unlimited characters.' })
     }
     const char = await Character.create({ ...stripServerFields(req.body), campaign: req.params.id, owner: req.userId, isPrimary: count === 0 })
@@ -328,7 +391,7 @@ router.delete('/:id/characters/:charId', auth, async (req, res) => {
 router.get('/:id/members/characters', auth, async (req, res) => {
   try {
     if (!await isMember(req.params.id, req.userId)) return res.status(403).json({ error: 'Not a campaign member' })
-    const campaign = await Campaign.findById(req.params.id).populate('members', 'username')
+    const campaign = await Campaign.findById(req.params.id).populate('members', 'username avatar placeholderOf')
     if (!campaign) return res.status(404).json({ error: 'Not found' })
     const chars = await Character.find({
       campaign: req.params.id,
@@ -337,7 +400,7 @@ router.get('/:id/members/characters', auth, async (req, res) => {
     const result = campaign.members.map(m => {
       const owned = chars.filter(c => String(c.owner) === String(m._id))
       const character = owned.find(c => c.isPrimary) || owned[0] || null
-      return { userId: m._id, username: m.username, character }
+      return { userId: m._id, username: m.username, avatar: m.avatar || '', character, isTest: !!m.placeholderOf }
     })
     res.json(result)
   } catch { res.status(500).json({ error: 'Failed to load members' }) }

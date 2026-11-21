@@ -8,7 +8,8 @@ import UpgradeModal from '../components/UpgradeModal'
 import CustomCharacterBuilder from '../components/CustomCharacterBuilder'
 import CharacterActions from '../components/CharacterActions'
 import RestPanel from '../components/RestPanel'
-import CombatPanel from '../components/CombatPanel'
+import CombatPanel, { HitPointControls } from '../components/CombatPanel'
+import NewCharacterChooser from '../components/NewCharacterChooser'
 import GearTab from '../components/GearTab'
 import { InventoryPanel } from './Inventory'
 import { PrintOverlay } from '../components/CharacterSheet'
@@ -72,7 +73,11 @@ export default function Character() {
   const [avatarPreview, setAvatarPreview] = useState('')
   const [loaded, setLoaded] = useState(false)
   const [showUpgrade, setShowUpgrade] = useState(false)
-  const [builder, setBuilder] = useState(null) // null | 'custom'
+  const [builder, setBuilder] = useState(null) // null | 'choose' | 'beyond' (chooser) | 'custom' (creator)
+  const [ddbUrl, setDdbUrl] = useState('')
+  const [ddbBusy, setDdbBusy] = useState(false)
+  const [hpOpen, setHpOpen] = useState(false) // hit point / rest popover on the header
+  const hpRef = useRef(null)
   const roller = useRoller()
   const [srdData, setSrdData] = useState(null)
   const [printing, setPrinting] = useState(false)
@@ -80,10 +85,20 @@ export default function Character() {
 
   // Rules data is only fetched once the Actions / Gear tabs are opened
   useEffect(() => {
-    if ((tab === 'actions' || tab === 'gear' || printing || sharing) && !srdData) {
+    if ((tab === 'actions' || tab === 'gear' || hpOpen || printing || sharing) && !srdData) {
       loadSrdMany('core', 'classes', 'races', 'traits', 'features', 'equipment', 'spells').then(setSrdData).catch(() => toast('Could not load the rules data'))
     }
-  }, [tab]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [tab, hpOpen]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // The popover closes on a click outside it or Escape (and while the sheet is being edited).
+  useEffect(() => {
+    if (!hpOpen) return
+    const onDown = (e) => { if (hpRef.current && !hpRef.current.contains(e.target)) setHpOpen(false) }
+    const onKey = (e) => { if (e.key === 'Escape') setHpOpen(false) }
+    document.addEventListener('mousedown', onDown); document.addEventListener('keydown', onKey)
+    return () => { document.removeEventListener('mousedown', onDown); document.removeEventListener('keydown', onKey) }
+  }, [hpOpen])
+  useEffect(() => { if (editing) setHpOpen(false) }, [editing])
 
   const FREE_CHAR_LIMIT = 2
   const atCharLimit = !isPremium && characters.length >= FREE_CHAR_LIMIT
@@ -114,11 +129,16 @@ export default function Character() {
   }
 
   const [creatorNew, setCreatorNew] = useState(false) // creator launched from "+ New Character"
-  const openNewChooser = () => {
+  // "+ New Character" first asks how: our creator, or an import from D&D Beyond (`step` can open straight on either).
+  const openNewChooser = (step = 'choose') => {
     if (!activeCampaign) return
     if (atCharLimit) { setShowUpgrade(true); return }
     setCreatorNew(true)
-    setBuilder('custom')
+    setBuilder(step)
+  }
+  const importedCharacter = async (fields, warnings) => {
+    if (!await applyBuild(activeCampaign._id, fields)) return
+    toast(`Imported ${fields.name || 'your character'}. ${warnings.map(w => w + ' ').join('')}`.trim())
   }
 
   // Deleting requires typing the character's exact (case-sensitive) name.
@@ -182,6 +202,7 @@ export default function Character() {
       if (creatorNew) selectCharacter(updated); else { setChar(updated); setForm(updated) }
       setBuilder(null); setCreatorNew(false)
       toast('Character updated')
+      return true
     } catch (e) {
       if (e?.status === 403) { setShowUpgrade(true); return }
       toast(e.message || 'Save failed')
@@ -205,6 +226,20 @@ export default function Character() {
       toast(err.message || 'Avatar upload failed')
     }
     setAvatarUploading(false)
+  }
+
+  // Fills the form from a public D&D Beyond character. Nothing is saved until the player presses Save.
+  const importFromBeyond = async () => {
+    if (!ddbUrl.trim() || ddbBusy) return
+    setDdbBusy(true)
+    try {
+      const { fields, warnings } = await api('/dndbeyond/preview', { method: 'POST', body: { url: ddbUrl.trim() } })
+      setForm(p => ({ ...p, ...fields }))
+      if (fields.avatarUrl) setAvatarPreview(fields.avatarUrl)
+      setDdbUrl('')
+      toast(`Imported ${fields.name || 'your character'}. ${(warnings || []).map(w => w + ' ').join('')}Review it, then press Save.`)
+    } catch (e) { toast(e.message || 'Import failed') }
+    setDdbBusy(false)
   }
 
   const save = async () => {
@@ -338,7 +373,7 @@ export default function Character() {
           </div>
         ))}
         <button
-          onClick={openNewChooser}
+          onClick={() => openNewChooser()}
           className="btn btn-ghost btn-sm"
           style={{ fontSize: 12, opacity: atCharLimit ? 0.7 : 1 }}
         >
@@ -347,7 +382,7 @@ export default function Character() {
       </div>
 
       {/* Header card */}
-      <div className="card" style={{ padding: '16px 20px', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
+      <div className="card" style={{ position: 'relative', padding: '16px 20px', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
         {/* Avatar */}
         <div style={{ position: 'relative', flexShrink: 0 }}>
           <div style={{ width: 56, height: 56, borderRadius: '50%', overflow: 'hidden', background: 'var(--gold-bg)', border: '2px solid var(--gold-border)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24 }}>
@@ -355,7 +390,7 @@ export default function Character() {
           </div>
           {editing && (
             <label style={{ position: 'absolute', inset: 0, borderRadius: '50%', background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: avatarUploading ? 'wait' : 'pointer', fontSize: 11, color: '#fff', flexDirection: 'column', gap: 2 }}>
-              <span style={{ fontSize: 16 }}>{avatarUploading ? '⏳' : '📷'}</span>
+              <span style={{ fontSize: 16 }}>{avatarUploading ? '…' : '+'}</span>
               {!avatarUploading && <input type="file" accept="image/*" onChange={handleAvatar} style={{ display: 'none' }} />}
             </label>
           )}
@@ -363,15 +398,21 @@ export default function Character() {
 
         <div style={{ flex: 1, minWidth: 200 }}>
           {editing ? (
+            <>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
               <input className="input" placeholder="Name" value={F.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} style={{ width: 150 }} />
               <input className="input" placeholder="Race" value={F.race} onChange={e => setForm(p => ({ ...p, race: e.target.value }))} style={{ width: 110 }} />
               <input className="input" placeholder="Class" value={F.class} onChange={e => setForm(p => ({ ...p, class: e.target.value }))} style={{ width: 110 }} />
               <input className="input" type="number" placeholder="Level" value={F.level} onChange={e => setForm(p => ({ ...p, level: +e.target.value }))} style={{ width: 65 }} />
             </div>
+            <form style={{ display: 'flex', gap: 8, marginTop: 8, flexWrap: 'wrap' }} onSubmit={e => { e.preventDefault(); importFromBeyond() }}>
+              <input className="input" placeholder="Or paste a D&D Beyond character link to import it" value={ddbUrl} onChange={e => setDdbUrl(e.target.value)} aria-label="D&D Beyond character link" style={{ flex: 1, minWidth: 220 }} />
+              <button type="submit" className="btn btn-ghost btn-sm" disabled={ddbBusy || !ddbUrl.trim()}>{ddbBusy ? 'Importing…' : 'Import'}</button>
+            </form>
+            </>
           ) : (
             <>
-              <div style={{ fontFamily: 'Cinzel, serif', fontSize: 18, fontWeight: 600 }}>{F.name || 'Unnamed Hero'}</div>
+              <div style={{ fontFamily: 'var(--font-title)', fontSize: 18, fontWeight: 600 }}>{F.name || 'Unnamed Hero'}</div>
               <div style={{ fontSize: 12, color: 'var(--text-2)', marginTop: 2 }}>{[F.race, F.class, F.level ? `Level ${F.level}` : ''].filter(Boolean).join(' · ')}</div>
             </>
           )}
@@ -383,7 +424,7 @@ export default function Character() {
             { label: 'HP',   color: 'var(--green)' },
             { label: 'AC',   color: 'var(--text)'  },
             { label: 'Prof', color: 'var(--text)'  },
-            { label: 'Init', color: 'var(--accent)' },
+            { label: 'Init', color: 'var(--gold)' },
           ].map(({ label, color }) => (
             <div key={label} style={{ textAlign: 'center', minWidth: 44 }}>
               <div style={{ fontSize: 9, fontWeight: 600, color: 'var(--text-3)', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 2 }}>{label}</div>
@@ -394,16 +435,27 @@ export default function Character() {
                     <input type="number" className="input" style={{ width: 42, padding: '4px', fontSize: 11, textAlign: 'center' }} value={F.hp?.max ?? 10} onChange={e => setForm(p => ({ ...p, hp: { ...p.hp, max: +e.target.value } }))} />
                   </div>
                 ) : label === 'Init' ? (
-                  <div style={{ fontFamily: 'Cinzel, serif', fontSize: 16, fontWeight: 600, color }}>{mod(F.stats?.dex ?? 10)}</div>
+                  <div style={{ fontFamily: 'var(--font-title)', fontSize: 16, fontWeight: 600, color }}>{mod(F.stats?.dex ?? 10)}</div>
                 ) : (
                   <input type="number" className="input" style={{ width: 52, padding: '4px', fontSize: 11, textAlign: 'center' }}
                     value={label === 'AC' ? F.ac ?? 10 : F.profBonus ?? 2}
                     onChange={e => setForm(p => ({ ...p, [label === 'AC' ? 'ac' : 'profBonus']: +e.target.value }))} />
                 )
               ) : (
-                <div style={{ fontFamily: 'Cinzel, serif', fontSize: 18, fontWeight: 600, color }}>
-                  {label === 'HP' ? `${F.hp?.current ?? 10}/${F.hp?.max ?? 10}` : label === 'AC' ? F.ac ?? 10 : label === 'Prof' ? `+${F.profBonus ?? 2}` : mod(F.stats?.dex ?? 10)}
-                </div>
+                label === 'HP' && char ? (
+                  <button type="button" onClick={() => setHpOpen(o => !o)} aria-expanded={hpOpen} aria-label="Manage hit points" title="Manage hit points: damage, healing, temp HP and rests"
+                    style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontFamily: 'var(--font-title)', fontSize: 18, fontWeight: 600, color, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                    {F.hp?.current ?? 10}/{F.hp?.max ?? 10}
+                    <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true" focusable="false" style={{ opacity: 0.6, transform: hpOpen ? 'rotate(180deg)' : 'none', transition: 'transform .15s' }}><path d="M2 3.5 5 6.5 8 3.5" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                  </button>
+                ) : (
+                  <div style={{ fontFamily: 'var(--font-title)', fontSize: 18, fontWeight: 600, color }}>
+                    {label === 'HP' ? `${F.hp?.current ?? 10}/${F.hp?.max ?? 10}` : label === 'AC' ? F.ac ?? 10 : label === 'Prof' ? `+${F.profBonus ?? 2}` : mod(F.stats?.dex ?? 10)}
+                  </div>
+                )
+              )}
+              {label === 'HP' && !editing && char?.combat?.tempHp > 0 && (
+                <div style={{ fontSize: 10, color: 'var(--gold)', marginTop: 1 }}>+{char.combat.tempHp} temp</div>
               )}
               {label === 'HP' && !editing && (
                 <div style={{ display: 'flex', gap: 4, justifyContent: 'center', marginTop: 4 }}>
@@ -424,12 +476,36 @@ export default function Character() {
                 {char && <button className="btn btn-ghost btn-sm" onClick={() => setSharing(true)}>Share</button>}
               </>}
         </div>
+
+        {hpOpen && char && !editing && (
+          <div ref={hpRef} className="card" role="dialog" aria-label="Hit points and rest"
+            style={{ position: 'absolute', top: 'calc(100% + 8px)', right: 0, zIndex: 60, width: 'min(480px, 100%)', padding: 16, boxShadow: 'var(--shadow-md)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+              <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-3)', letterSpacing: '0.06em', textTransform: 'uppercase' }}>Hit points</div>
+              <button type="button" className="btn btn-ghost btn-sm" onClick={() => setHpOpen(false)}>Done</button>
+            </div>
+            {srdData ? (
+              <>
+                <HitPointControls char={char} d={derive(char, srdData)} roller={roller} onPatch={patchChar} />
+                <div style={{ marginTop: 14, paddingTop: 12, borderTop: '1px solid var(--border)' }}>
+                  <RestPanel bare char={char} srd={srdData} roller={roller} onPatch={patchChar} />
+                </div>
+              </>
+            ) : <div style={{ color: 'var(--text-3)', fontSize: 13 }}>Loading rules…</div>}
+          </div>
+        )}
       </div>
 
       {/* Onboarding banner for new players */}
       {loaded && !form.name && (
-        <div style={{ padding: '12px 16px', marginBottom: 12, background: 'var(--gold-bg)', border: '1px solid var(--gold-border)', borderRadius: 10, fontSize: 13, color: 'var(--text)', lineHeight: 1.6 }}>
+        <div style={{ padding: '12px 16px', marginBottom: 12, background: 'var(--gold-bg)', border: '1px solid var(--gold-border)', borderRadius: 4, fontSize: 13, color: 'var(--text)', lineHeight: 1.6 }}>
           <strong>Welcome!</strong> Click <strong>Edit</strong> to set up your character. Your DM and the Roleplay Assistant both read this sheet — the more you fill in, the better your session plans become.
+          {!char && (
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 10 }}>
+              <button type="button" className="btn btn-primary btn-sm" onClick={() => openNewChooser('custom')}>Use our character creator</button>
+              <button type="button" className="btn btn-ghost btn-sm" onClick={() => openNewChooser('beyond')}>Import from D&amp;D Beyond</button>
+            </div>
+          )}
         </div>
       )}
 
@@ -446,11 +522,11 @@ export default function Character() {
         !char ? <div className="card" style={{ padding: 20, fontSize: 13, color: 'var(--text-2)' }}>Save your character first, then your actions will show up here.</div>
         : !srdData ? <div style={{ color: 'var(--text-3)', fontSize: 13 }}>Loading rules…</div>
         : tab === 'actions'
-          ? <><RestPanel char={char} srd={srdData} roller={roller} onPatch={patchChar} /><CombatPanel char={char} srd={srdData} d={derive(char, srdData)} roller={roller} onPatch={patchChar} /><CharacterActions char={char} srd={srdData} roller={roller} onPatch={patchChar} /></>
+          ? <><CombatPanel char={char} srd={srdData} d={derive(char, srdData)} roller={roller} onPatch={patchChar} /><CharacterActions char={char} srd={srdData} roller={roller} onPatch={patchChar} /></>
           : <GearTab char={char} srd={srdData} d={derive(char, srdData)} onPatch={patchChar} />
       )}
       {tab === 'inventory' && <InventoryPanel toast={toast} />}
-      {tab === 'actions' && char && <RollPanel roller={roller} />}
+      {char && (tab === 'actions' || roller.history.length > 0) && <RollPanel roller={roller} />}
 
       {tab === 'stats' && (
         <div className="stat-grid-6">
@@ -459,7 +535,7 @@ export default function Character() {
               <div style={{ fontSize: 9, fontWeight: 600, color: 'var(--text-3)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 4 }}>{STAT_LABELS[k]}</div>
               {editing
                 ? <input type="number" className="input" style={{ textAlign: 'center', padding: '4px', fontSize: 15 }} value={F.stats?.[k] ?? 10} onChange={e => setForm(p => ({ ...p, stats: { ...p.stats, [k]: +e.target.value } }))} />
-                : <><div style={{ fontFamily: 'Cinzel, serif', fontSize: 24, fontWeight: 600, color: 'var(--gold)' }}>{mod(F.stats?.[k] ?? 10)}</div><div style={{ fontSize: 11, color: 'var(--text-2)', marginTop: 1 }}>{F.stats?.[k] ?? 10}</div></>
+                : <><div style={{ fontFamily: 'var(--font-title)', fontSize: 24, fontWeight: 600, color: 'var(--gold)' }}>{mod(F.stats?.[k] ?? 10)}</div><div style={{ fontSize: 11, color: 'var(--text-2)', marginTop: 1 }}>{F.stats?.[k] ?? 10}</div></>
               }
             </div>
           ))}
@@ -503,7 +579,7 @@ export default function Character() {
       {sharing && char && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }} onClick={() => setSharing(false)}>
           <div className="card" style={{ width: '100%', maxWidth: 460, padding: 22 }} onClick={e => e.stopPropagation()}>
-            <div style={{ fontFamily: 'Cinzel, serif', fontSize: 17, color: 'var(--gold)', marginBottom: 8 }}>Share {char.name || 'this character'}</div>
+            <div style={{ fontFamily: 'var(--font-title)', fontSize: 17, color: 'var(--gold)', marginBottom: 8 }}>Share {char.name || 'this character'}</div>
             <div style={{ fontSize: 13, color: 'var(--text-2)', lineHeight: 1.5, marginBottom: 12 }}>Anyone with the link can view a read-only sheet and print it, even without an account. Your notes, lore and goals are never shared.</div>
             {char.shareToken ? (
               <>
@@ -522,7 +598,7 @@ export default function Character() {
       {deleteTarget && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.65)', zIndex: 1100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }} onClick={closeDeleteModal}>
           <div className="card" role="dialog" aria-modal="true" aria-labelledby="delete-char-title" style={{ width: '100%', maxWidth: 380, padding: 22 }} onClick={e => e.stopPropagation()}>
-            <div id="delete-char-title" style={{ fontFamily: 'Cinzel, serif', fontSize: 16, fontWeight: 600, color: 'var(--red)', marginBottom: 10 }}>Delete Character</div>
+            <div id="delete-char-title" style={{ fontFamily: 'var(--font-title)', fontSize: 16, fontWeight: 600, color: 'var(--red)', marginBottom: 10 }}>Delete Character</div>
             <div style={{ fontSize: 13, color: 'var(--text-2)', marginBottom: 14, lineHeight: 1.6 }}>
               This permanently deletes this character sheet. This cannot be undone.{' '}
               Type <strong style={{ color: 'var(--text)' }}>{deleteTargetName}</strong> exactly to confirm.
@@ -551,6 +627,7 @@ export default function Character() {
           </div>
         </div>
       )}
+      {(builder === 'choose' || builder === 'beyond') && <NewCharacterChooser initial={builder} onClose={() => { setBuilder(null); setCreatorNew(false) }} onCreator={() => setBuilder('custom')} onImported={importedCharacter} />}
       {builder === 'custom' && <CustomCharacterBuilder onClose={() => { setBuilder(null); setCreatorNew(false) }} onComplete={applyBuild} />}
       {showUpgrade && <UpgradeModal onClose={() => setShowUpgrade(false)} message={`Free accounts are limited to ${FREE_CHAR_LIMIT} characters per campaign. Upgrade to Premium for unlimited characters.`} />}
     </div>

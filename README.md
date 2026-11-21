@@ -48,5 +48,3 @@ Features
 ## Built for the whole campaign
 
 5e Utility is designed to support a campaign from prep through play: DMs can organize sessions and campaign material, while players can maintain their characters and journal. Shared maps and campaign tools help bring those pieces together at the table.
-
-

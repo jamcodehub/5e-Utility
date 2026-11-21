@@ -1,8 +1,9 @@
 import { useEffect } from 'react'
 import { Link } from 'react-router-dom'
+import { usePageMeta } from '../../hooks/usePageMeta'
 
 export const SITE_NAME = '5e Utility'
-export const SITE_URL = 'https://www.5eutility.com'
+export const SITE_URL = 'https://5eutility.com'
 // Must be an inbox that is actually monitored; it is shown on both legal pages.
 export const CONTACT_EMAIL = 'support@5eutility.com'
 export const LAST_UPDATED = '7 November 2026'
@@ -28,12 +29,8 @@ export const PageLink = ({ to, children }) => <Link to={to} style={linkStyle}>{c
 
 // Public, standalone page shell (works logged in or out) for the legal pages.
 export default function LegalLayout({ title, children }) {
-  useEffect(() => {
-    const previous = document.title
-    document.title = `${title} – ${SITE_NAME}`
-    window.scrollTo(0, 0)
-    return () => { document.title = previous }
-  }, [title])
+  usePageMeta({ title: `${title} – ${SITE_NAME}`, description: `${title} for ${SITE_NAME}, the D&D 5e campaign companion.`, path: window.location.pathname })
+  useEffect(() => { window.scrollTo(0, 0) }, [title])
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--bg)', color: 'var(--text)' }}>

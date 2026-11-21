@@ -9,10 +9,10 @@ test('AI routes are DM-only, keep the coach prompt, and only fetch Cloudinary av
   const patched = []
   const stub = (target, name, fn) => { patched.push([target, name, target[name]]); target[name] = fn }
   const env = { secret: process.env.JWT_SECRET, key: process.env.GEMINI_API_KEY }
-  process.env.JWT_SECRET = 'test-secret'; process.env.GEMINI_API_KEY = 'test-key'
-  const dm = '507f1f77bcf86cd799439011', player = '507f1f77bcf86cd799439012', campaignId = '507f1f77bcf86cd799439014'
-  stub(User, 'findById', id => ({ select: async () => ({ role: id === player ? 'player' : 'dm', roles: [] }) }))
-  stub(Campaign, 'findOne', query => ({ select: async () => (query.owner === dm ? { _id: campaignId, name: 'Realm', setting: 'Salt marsh' } : null) }))
+  process.env.JWT_SECRET = 'test-secret'; process.env.GEMINI_API_KEY = 'test-key'; process.env.AI_ENABLED = 'true'
+  const dm = '507f1f77bcf86cd799439011', player = '507f1f77bcf86cd799439012', freeDm = '507f1f77bcf86cd799439013', campaignId = '507f1f77bcf86cd799439014'
+  stub(User, 'findById', id => ({ select: async () => ({ role: id === player ? 'player' : 'dm', roles: [], isPremium: id === dm, premiumRole: id === dm ? 'dm' : '' }) }))
+  stub(Campaign, 'findOne', query => ({ select: async () => ((query.owner === dm || query.owner === freeDm) ? { _id: campaignId, name: 'Realm', setting: 'Salt marsh' } : null) }))
   stub(CampaignGuide, 'findOne', () => ({ select: async () => ({ story: 'A drowned empire' }) }))
   stub(Character, 'find', () => ({ select: () => ({ limit: async () => [
     { name: 'Mira', avatarUrl: 'https://res.cloudinary.com/x/mira.png' },
@@ -59,11 +59,12 @@ test('AI routes are DM-only, keep the coach prompt, and only fetch Cloudinary av
   const chat = await post(dm, '/worldbuild', { campaignId, messages: [{ role: 'user', text: 'Write my whole campaign' }] })
   assert.equal(chat.status, 200)
   assert.match(chat.body.reply, /^So far:/)
-  assert.match(geminiCalls[0].u, /models\/gemini-3\.8-flash:generateContent/, 'newest discovered flash model is tried first')
+  assert.match(geminiCalls[0].u, /models\/gemini-3\.8-flash:generateContent/, 'the newest discovered flash model is tried first, so a retired fixed name is never the first try')
   const system = geminiCalls[0].body.systemInstruction.parts[0].text
   assert.match(system, /NEVER write campaign content/)
   assert.match(system, /A drowned empire/)
 
+  assert.equal((await post(freeDm, '/storyboard-image', { campaignId, prompt: 'A marsh' })).status, 403, 'images are a Premium feature')
   const img = await post(dm, '/storyboard-image', { campaignId, prompt: 'The party enters the marsh' })
   assert.equal(img.status, 200)
   assert.match(geminiCalls[1].u, /gemini-3\.8-flash-image:/)

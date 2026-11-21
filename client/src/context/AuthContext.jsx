@@ -55,7 +55,9 @@ const storeUser = (user) => {
     username: user.username,
     email: user.email,
     phone: user.phone || '',
-    isPremium: !!user.isPremium,
+    avatar: user.avatar || '',
+    isPremium: !!user.isPremium,   // premium for the role the account is acting as right now
+    hasSubscription: !!user.hasSubscription, premiumRole: user.premiumRole || '', // a subscription exists, and which role it covers
     role: user.role || 'player',
     roles: user.roles?.length ? user.roles : [user.role || 'player'],
     twoFactorEnabled: !!user.twoFactorEnabled,

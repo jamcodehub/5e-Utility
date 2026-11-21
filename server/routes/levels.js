@@ -1,11 +1,12 @@
 import { Router } from 'express'
 import { LevelPlan, Campaign, User } from '../models/index.js'
+import { hasPremium, hasPremiumAs } from '../lib/premium.js'
 import { auth, isMember } from './campaigns.js'
 
 const router = Router()
 
 // Keep in sync with src/data/levelThemes.js (only themes that are live)
-const ALLOWED_THEMES = ['medieval', 'cartoon']
+export const ALLOWED_THEMES = ['medieval', 'cartoon', 'scifi']
 
 router.get('/:campaignId', auth, async (req, res) => {
   if (!await isMember(req.params.campaignId, req.userId)) return res.status(403).json({ error: 'Not a campaign member' })
@@ -17,7 +18,7 @@ router.post('/:campaignId', auth, async (req, res) => {
     if (!await isMember(req.params.campaignId, req.userId)) return res.status(403).json({ error: 'Not a campaign member' })
     const campaign = await Campaign.findById(req.params.campaignId)
     const owner = campaign ? await User.findById(campaign.owner) : null
-    if (!owner?.isPremium) {
+    if (!hasPremiumAs(owner, 'dm')) {
       const count = await LevelPlan.countDocuments({ campaign: req.params.campaignId })
       if (count >= 5) return res.status(403).json({ error: 'Free campaigns are limited to 5 level plans. Upgrade to the Ultimate DM Toolkit for unlimited plans.' })
     }

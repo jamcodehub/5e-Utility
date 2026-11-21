@@ -55,11 +55,11 @@ export default function CharacterOverview({ campaignId, refreshKey }) {
   return (
     <div style={{ padding: '14px 14px 24px' }}>
       <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-        <div style={{ width: 44, height: 44, borderRadius: '50%', background: 'var(--gold-bg)', border: '1px solid var(--gold-border)', overflow: 'hidden', flexShrink: 0, display: 'grid', placeItems: 'center', color: 'var(--gold)', fontFamily: 'Cinzel, serif' }}>
+        <div style={{ width: 44, height: 44, borderRadius: '50%', background: 'var(--gold-bg)', border: '1px solid var(--gold-border)', overflow: 'hidden', flexShrink: 0, display: 'grid', placeItems: 'center', color: 'var(--gold)', fontFamily: 'var(--font-title)' }}>
           {char.avatarUrl ? <img src={char.avatarUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : (char.name || 'H')[0]}
         </div>
         <div style={{ minWidth: 0 }}>
-          <div style={{ fontFamily: 'Cinzel, serif', fontSize: 15, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{char.name || 'Unnamed Hero'}</div>
+          <div style={{ fontFamily: 'var(--font-title)', fontSize: 15, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{char.name || 'Unnamed Hero'}</div>
           <div style={{ fontSize: 11, color: 'var(--text-3)' }}>Level {d.level} {[char.race, char.class].filter(Boolean).join(' ')}</div>
         </div>
       </div>
@@ -75,7 +75,7 @@ export default function CharacterOverview({ campaignId, refreshKey }) {
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6, marginTop: 10 }}>
         {[['AC', d.ac], ['Init', signed(d.initiative)], ['Speed', `${d.speed} ft`]].map(([k, v]) => (
-          <div key={k} style={{ textAlign: 'center', padding: '6px 4px', background: 'var(--surface2)', borderRadius: 8, border: '1px solid var(--border)' }}>
+          <div key={k} style={{ textAlign: 'center', padding: '6px 4px', background: 'var(--surface2)', borderRadius: 3, border: '1px solid var(--border)' }}>
             <div style={{ fontSize: 9, color: 'var(--text-3)', textTransform: 'uppercase' }}>{k}</div>
             <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)' }}>{v}</div>
           </div>
@@ -98,7 +98,7 @@ export default function CharacterOverview({ campaignId, refreshKey }) {
       <div style={label}>Abilities</div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6 }}>
         {ABILITIES.map(([id, abbr]) => (
-          <RuleTip key={id} tip={abilityTip(srd.core, id)} as="div" style={{ textAlign: 'center', padding: '6px 2px', background: 'var(--surface2)', borderRadius: 8, border: '1px solid var(--border)' }}>
+          <RuleTip key={id} tip={abilityTip(srd.core, id)} as="div" style={{ textAlign: 'center', padding: '6px 2px', background: 'var(--surface2)', borderRadius: 3, border: '1px solid var(--border)' }}>
             <div style={{ fontSize: 9, color: 'var(--text-3)' }}>{abbr}{id === 'dex' ? ' · agility' : ''}</div>
             <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--text)' }}>{char.stats?.[id] ?? 10}</div>
             <div style={{ fontSize: 11, color: 'var(--gold)' }}>{signed(d.mod(id))}</div>
