@@ -15,7 +15,8 @@ export const VIEWER_KEY = '5eutility-viewer-key'
 export const CLASS_IDS = ['barbarian', 'bard', 'cleric', 'druid', 'fighter', 'monk', 'paladin', 'ranger', 'rogue', 'sorcerer', 'warlock', 'wizard']
 const KINDS = ['player', 'enemy', 'boss', 'npc']
 
-// In the dark the DM still sees the map, dimly, so they can run the game; players see pitch black.
+// The DM sees the same pitch black as players (they may be streaming their screen) unless they switch on "Reveal map" to peek,
+// and then the dark parts show dimly.
 export const DM_DIM = 0.3
 
 // "Wizard (Evocation)", "Eldritch Knight Fighter", "wizard 3" -> 'wizard' / 'fighter'; anything else -> '' (a plain figure).
@@ -35,7 +36,8 @@ export function viewerUrl(gameUrl) {
 // black where the player cannot see, dim where only darkvision reaches, and fading with distance from a torch for players.
 // Outdoors a torch's light fades smoothly out to nothing (`visibility.lightFade`, 1 at the torch down to 0 at the edge of its reach)
 // instead of ending in a ring. Where no light reaches is pitch black, indoors and out.
-export function viewerLevels({ darkMode, isDm, visibility, rows, cols, outdoor = false }) {
+export function viewerLevels({ darkMode, isDm, visibility, rows, cols, outdoor = false, dmReveal = false }) {
+  const peek = isDm && dmReveal ? DM_DIM : 0
   const levels = []
   for (let r = 0; r < rows; r++) {
     for (let c = 0; c < cols; c++) {
@@ -44,11 +46,11 @@ export function viewerLevels({ darkMode, isDm, visibility, rows, cols, outdoor =
         const fade = Math.max(0, Math.min(1, visibility?.lightFade?.[r]?.[c] || 0))
         let level = fade * fade * (3 - 2 * fade) // eases in and out, so there is no visible ring
         if (visibility?.darkvision?.[r]?.[c]) level = Math.max(level, 0.35)
-        if (isDm) level = Math.max(level, DM_DIM)
+        level = Math.max(level, peek)
         levels.push(Math.round(level * 100) / 100)
         continue
       }
-      if (!visibility?.visible?.[r]?.[c]) { levels.push(isDm ? DM_DIM : 0); continue }
+      if (!visibility?.visible?.[r]?.[c]) { levels.push(peek); continue }
       if (visibility.darkvision?.[r]?.[c]) { levels.push(0.35); continue }
       const strength = visibility.lightStrength?.[r]?.[c] || 0
       levels.push(!isDm && visibility.torchlit?.[r]?.[c] && strength ? Math.round((0.45 + strength * 0.55) * 100) / 100 : 1)

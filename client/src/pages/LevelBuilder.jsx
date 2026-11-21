@@ -293,7 +293,7 @@ const dragPreviewTransform = ({ x, y }) => `translate3d(${x}px, ${y}px, 0) trans
 // One square of the play board. Memoised, so a token taking a step redraws only the squares it left and entered, not the whole
 // board (a 48 by 33 map has 1,584 squares: drawing them all on every step took about 0.3 seconds and made walking lag).
 const PlayCell = memo(function PlayCell({ r, c, cellId, groundTile, object, turn, objectTurn, visible, dmView, fade, torchlit, darkvision, lightStrength, doorOpen, locked, shade, token, dragging, darkMode, isDm, cellSize, torchSrc, onCellClick, onDragStart }) {
-  // `dmView`: in the dark the DM still sees the map, dimly, so they can run the game; players see pitch black.
+  // `dmView`: with "Reveal map" on, the DM sees the dark parts dimly; otherwise they see the same pitch black as players.
   const shown = visible || dmView
   const isDoor = cellId === 'door'
   const isStair = cellId === 'stairs' || cellId === 'stairs-down'
@@ -459,6 +459,7 @@ export default function LevelBuilder() {
   const [zoom, setZoom] = useState(1)
   const [isFullscreen, setIsFullscreen] = useState(false)
   const [showTokens, setShowTokens] = useState(true)
+  const [dmReveal, setDmReveal] = useState(false) // DM peeks at the dark parts of the map (off by default: they may be streaming)
 
   // ── Tile theme ── (map grids store tile ids, so a theme only swaps the artwork)
   const [editTheme, setEditTheme] = useState(DEFAULT_THEME)
@@ -1278,8 +1279,8 @@ export default function LevelBuilder() {
 
   // What the 3D view is sent: how lit each square is (same as the 2D board shows), and each token's class.
   const viewerLevelList = useMemo(
-    () => viewerLevels({ darkMode: dark, isDm, visibility, rows: gridH, cols: gridW, outdoor }),
-    [dark, isDm, visibility, gridH, gridW, outdoor],
+    () => viewerLevels({ darkMode: dark, isDm, visibility, rows: gridH, cols: gridW, outdoor, dmReveal }),
+    [dark, isDm, visibility, gridH, gridW, outdoor, dmReveal],
   )
   const classOfToken = useCallback((t) => availableTokens.find(a => a.id === t.id)?.classId || '', [availableTokens])
   const handleViewerClick = ({ row, col, tokenId }) => {
@@ -1665,6 +1666,12 @@ export default function LevelBuilder() {
       {!isFullscreen && <div className="level-play-toolbar" style={{ padding: '10px 16px', background: 'var(--surface)', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
         <span style={{ fontFamily: 'var(--font-title)', fontSize: 14, fontWeight: 600, flex: 1 }}>{selectedPlan?.title}</span>
         <PeekingViewers viewers={viewers} />
+        {isDm && dark && (
+          <button type="button" className="btn btn-ghost btn-sm" aria-pressed={dmReveal} onClick={() => setDmReveal(v => !v)}
+            title={dmReveal ? 'Hide the dark parts of the map from your own screen again, so it matches what players see.' : 'Only you: show the dark parts of the map dimly on your screen so you can move things. Players still see black. Leave this off while streaming.'}>
+            {dmReveal ? '🙈 Hide map' : '👁 Reveal map'}
+          </button>
+        )}
         {isDm && (
           <button
             type="button"
@@ -1731,7 +1738,7 @@ export default function LevelBuilder() {
                   objectTurn={rotationOf(objectGrid[r]?.[c], objectRotations[r]?.[c], r, c) * 90}
                   visible={visibility.visible[r]?.[c]}
                   fade={dark && outdoor ? Math.min(1, visibility.lightFade[r]?.[c] || 0) : null}
-                  dmView={isDm && dark && !visibility.visible[r]?.[c]}
+                  dmView={isDm && dmReveal && dark && !visibility.visible[r]?.[c]}
                   torchlit={visibility.torchlit[r]?.[c]}
                   darkvision={visibility.darkvision[r]?.[c]}
                   lightStrength={visibility.lightStrength[r]?.[c] || 0}

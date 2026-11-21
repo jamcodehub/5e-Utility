@@ -38,18 +38,21 @@ test('with fog: black out of sight, dim with darkvision, fading torchlight for p
   assert.equal(player.length, rows * cols)
 })
 
-test('the DM sees full torchlit squares, and the dark dimly rather than black, so they can run the game', () => {
+test('the DM sees the same black as players by default, and the dark dimly once they reveal the map', () => {
   const dm = viewerLevels({ darkMode: true, isDm: true, visibility, rows, cols })
-  assert.deepEqual(dm, [1, 0.35, DM_DIM, 1, 0.35, 1])
-  const players = viewerLevels({ darkMode: true, isDm: false, visibility, rows, cols })
-  assert.equal(players[2], 0, 'the same square is pitch black for players')
+  assert.equal(dm[2], 0, 'pitch black for the DM too, so a streamed screen gives nothing away')
+  const peek = viewerLevels({ darkMode: true, isDm: true, visibility, rows, cols, dmReveal: true })
+  assert.deepEqual(peek, [1, 0.35, DM_DIM, 1, 0.35, 1])
+  const players = viewerLevels({ darkMode: true, isDm: false, visibility, rows, cols, dmReveal: true })
+  assert.equal(players[2], 0, 'revealing is DM-only: players still get black')
   assert.ok(DM_DIM > 0 && DM_DIM < 0.5)
 })
 
-test('outdoors the DM also sees the dark dimly, players see black', () => {
+test('outdoors the DM is black too until they reveal the map, players always see black', () => {
   const vis = { visible: [[true, false]], torchlit: [[true, false]], darkvision: [[false, false]], lightStrength: [[1, 0]], lightFade: [[1, 0]] }
-  assert.deepEqual(viewerLevels({ darkMode: true, isDm: true, visibility: vis, rows: 1, cols: 2, outdoor: true }), [1, DM_DIM])
-  assert.deepEqual(viewerLevels({ darkMode: true, isDm: false, visibility: vis, rows: 1, cols: 2, outdoor: true }), [1, 0])
+  assert.deepEqual(viewerLevels({ darkMode: true, isDm: true, visibility: vis, rows: 1, cols: 2, outdoor: true }), [1, 0])
+  assert.deepEqual(viewerLevels({ darkMode: true, isDm: true, visibility: vis, rows: 1, cols: 2, outdoor: true, dmReveal: true }), [1, DM_DIM])
+  assert.deepEqual(viewerLevels({ darkMode: true, isDm: false, visibility: vis, rows: 1, cols: 2, outdoor: true, dmReveal: true }), [1, 0])
 })
 
 test('missing visibility data never throws', () => {
