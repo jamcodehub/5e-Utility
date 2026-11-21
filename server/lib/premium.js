@@ -6,6 +6,17 @@ export const premiumRoleOf = (user) => (user?.premiumRole === 'dm' ? 'dm' : 'pla
 // Is this account premium for the given side (what its tools check)?
 export const hasPremiumAs = (user, role) => !!user?.isPremium && (role === 'player' || premiumRoleOf(user) === 'dm')
 
+// Both sides at a glance, for the site to read: Player Premium, and DM Premium (which includes Player Premium).
+export const planFlags = (user) => ({ isPlayerPremium: hasPremiumAs(user, 'player'), isDmPremium: hasPremiumAs(user, 'dm') })
+
+// Accounts that went premium before there were two plans have an empty `premiumRole`, which counts as Player Premium. This
+// writes that down ('player') so the database says which plan every paying account holds. Safe to run any number of times;
+// returns how many accounts it changed.
+export const stampLegacyPlans = async (User) => {
+  const result = await User.updateMany({ isPremium: true, premiumRole: { $in: ['', null] } }, { premiumRole: 'player' })
+  return result?.modifiedCount ?? 0
+}
+
 // Premium for the role the account is currently acting as.
 export const hasPremium = (user) => hasPremiumAs(user, user?.role === 'dm' ? 'dm' : 'player')
 

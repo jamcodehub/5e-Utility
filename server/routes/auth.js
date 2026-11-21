@@ -8,7 +8,7 @@ import { User, PendingSignup } from '../models/index.js'
 import { emailDomainProblem } from '../lib/emailCheck.js'
 import { validAvatarUrl } from '../lib/avatar.js'
 import { checkUsername } from '../lib/username.js'
-import { hasPremium, premiumRoleOf } from '../lib/premium.js'
+import { hasPremium, premiumRoleOf, planFlags } from '../lib/premium.js'
 import { primaryClientUrl } from '../lib/clientUrl.js'
 import { perEmailLimiter, requireCaptcha, captchaEnabled } from '../lib/guards.js'
 
@@ -187,7 +187,7 @@ const readGoogle = async (credential) => {
 
 const publicUser = (user) => ({
   id: user._id, username: user.username, email: user.email,
-  phone: user.phone || '', avatar: user.avatar || '', isPremium: hasPremium(user), hasSubscription: !!user.isPremium, premiumRole: user.isPremium ? premiumRoleOf(user) : '',
+  phone: user.phone || '', avatar: user.avatar || '', isPremium: hasPremium(user), hasSubscription: !!user.isPremium, premiumRole: user.isPremium ? premiumRoleOf(user) : '', ...planFlags(user),
   role: user.role || 'player',
   roles: [...new Set([...(user.roles || []), user.role || 'player'])],
   twoFactorEnabled: user.twoFactorEnabled || false,

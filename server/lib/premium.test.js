@@ -34,3 +34,22 @@ test('prices: one per plan, the old single price is only a fallback, and prices 
   assert.equal(planForPrice('price_d', env), 'dm'); assert.equal(planForPrice('price_p', env), 'player')
   assert.equal(planForPrice('price_old', env), null); assert.equal(planForPrice('', env), null); assert.equal(planForPrice(undefined, env), null)
 })
+
+test('plan flags say Player Premium and DM Premium plainly', async () => {
+  const { planFlags } = await import('./premium.js')
+  assert.deepEqual(planFlags({ isPremium: true, premiumRole: 'player' }), { isPlayerPremium: true, isDmPremium: false })
+  assert.deepEqual(planFlags({ isPremium: true, premiumRole: '' }), { isPlayerPremium: true, isDmPremium: false }, 'an older account with no plan written is Player')
+  assert.deepEqual(planFlags({ isPremium: true, premiumRole: 'dm' }), { isPlayerPremium: true, isDmPremium: true }, 'DM Premium includes Player Premium')
+  assert.deepEqual(planFlags({ isPremium: false, premiumRole: 'dm' }), { isPlayerPremium: false, isDmPremium: false }, 'no subscription, no plan')
+  assert.deepEqual(planFlags(null), { isPlayerPremium: false, isDmPremium: false })
+})
+
+test('older paying accounts are stamped Player Premium, nobody else is touched', async () => {
+  const { stampLegacyPlans } = await import('./premium.js')
+  let seen
+  const User = { updateMany: async (filter, update) => { seen = { filter, update }; return { modifiedCount: 3 } } }
+  assert.equal(await stampLegacyPlans(User), 3)
+  assert.deepEqual(seen.filter, { isPremium: true, premiumRole: { $in: ['', null] } }, 'only paying accounts with no plan written')
+  assert.deepEqual(seen.update, { premiumRole: 'player' })
+  assert.equal(await stampLegacyPlans({ updateMany: async () => ({}) }), 0)
+})

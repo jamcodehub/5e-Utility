@@ -26,7 +26,8 @@ import { attachRealtime } from './realtime.js'
 import { clientOrigins } from './lib/clientUrl.js'
 import { rejectOperatorKeys } from './lib/guards.js'
 import { runGraceSweep } from './lib/grace.js'
-import { Character, DMBoard } from './models/index.js'
+import { Character, DMBoard, User } from './models/index.js'
+import { stampLegacyPlans } from './lib/premium.js'
 
 dotenv.config({ quiet: true })
 
@@ -111,6 +112,12 @@ mongoose.connect(process.env.MONGO_URI).then(async () => {
       console.log('Dropped stale unique index campaign_1 on dmboards collection')
     }
   } catch (e) { if (e.codeName !== 'NamespaceNotFound') console.error('DM board index self-heal check failed:', e.message) }
+
+  // Paying accounts from before there were two plans have no plan written down; stamp them Player Premium (what they have).
+  try {
+    const stamped = await stampLegacyPlans(User)
+    if (stamped) console.log(`Stamped ${stamped} older premium account(s) as Player Premium`)
+  } catch (e) { console.error('Premium plan stamp failed:', e.message) }
 
   // Premium grace periods: send the pre-expiry reminder and remove premium once
   // the 5 days run out. Runs once at boot, then hourly.
