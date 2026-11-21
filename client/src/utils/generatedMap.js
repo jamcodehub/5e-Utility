@@ -18,6 +18,10 @@ const MAX_COLS = 80
 
 const bad = (error) => ({ error })
 
+// Ground heights, if the map has them: a grid the size of the map of whole levels 0 to 15.
+const validHeights = (heights, rows, cols) => Array.isArray(heights) && heights.length === rows
+  && heights.every(row => Array.isArray(row) && row.length === cols && row.every(n => Number.isInteger(n) && n >= 0 && n <= 15))
+
 // Returns { title, theme, content, width, height } for a good map, or { error } saying what was wrong.
 export function readGeneratedMap(payload) {
   if (!payload || typeof payload !== 'object') return bad('The generator sent something unexpected.')
@@ -38,6 +42,7 @@ export function readGeneratedMap(payload) {
       if (o !== null && !OBJECTS.has(o)) return bad('The map uses an object this version does not know.')
     }
   }
+  if (content.heights !== undefined && !validHeights(content.heights, ground.length, width)) return bad('The map heights are not valid.')
   const title = typeof payload.title === 'string' ? payload.title.replace(/\s+/g, ' ').trim().slice(0, 80) : ''
   return {
     title: title || 'Generated map',

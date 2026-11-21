@@ -1,5 +1,5 @@
 import { useDebouncedSave } from '../hooks/useDebouncedSave'
-import { useState, useEffect, useCallback, useMemo, useRef, useId } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef, useId, memo } from 'react'
 import { createPortal } from 'react-dom'
 import { Link, useSearchParams } from 'react-router-dom'
 import { api } from '../context/AuthContext'
@@ -13,6 +13,11 @@ import { TILES, OBJECT_TILES } from '../data/levelTiles'
 import { THEMES, DEFAULT_THEME, resolveThemeId, getThemeTiles } from '../data/levelThemes'
 import { avatarSrc } from '../components/ProfileAvatar'
 import { tokenColor } from '../utils/tokenColor'
+import { keyToStep, stepToken, isTypingTarget, bumpedDoor } from '../utils/tokenMove'
+import { classIdFor, viewerLevels } from '../utils/viewer3d'
+import { readHeights, heightShade } from '../utils/mapHeights'
+import { rotationOf, nextRotation, rotationLabel, readRotations, compactRotations, withRotation } from '../utils/tileRotation'
+import Battle3DView from '../components/Battle3DView'
 // Note: module-level TILES / OBJECT_TILES above are the base (Medieval) set, used for
 // logic that doesn't depend on artwork. MapThumb and LevelBuilder shadow them with the
 // active theme's tiles (same ids, different art).
@@ -40,6 +45,7 @@ const blankGrid = (w, h) => blankOf('empty', w, h)
 const blankObjectGrid = (w, h) => blankOf(null, w, h)
 const blankDoorStates = (w, h) => blankOf(false, w, h)
 const blankStairLinks = (w, h) => blankOf(null, w, h)
+const blankRotations = (w, h) => blankOf(null, w, h) // quarter turns chosen by the author; null = automatic (see utils/tileRotation.js)
 
 function normalizeGrid(value, fallback, { w, h } = { w: GRID_W, h: GRID_H }) {
   return Array.from({ length: h }, (_, r) =>
@@ -52,7 +58,7 @@ function parseMapContent(content) {
     const parsed = JSON.parse(content)
     if (Array.isArray(parsed)) {
       const dims = dimsOf(parsed)
-      return { ground: normalizeGrid(parsed, 'empty', dims), objects: blankObjectGrid(dims.w, dims.h), stairLinks: blankStairLinks(dims.w, dims.h), dims }
+      return { ground: normalizeGrid(parsed, 'empty', dims), objects: blankObjectGrid(dims.w, dims.h), stairLinks: blankStairLinks(dims.w, dims.h), rotations: blankRotations(dims.w, dims.h), objectRotations: blankRotations(dims.w, dims.h), dims }
     }
     if (parsed && Array.isArray(parsed.ground)) {
       const dims = dimsOf(parsed.ground)
@@ -60,6 +66,9 @@ function parseMapContent(content) {
         ground: normalizeGrid(parsed.ground, 'empty', dims),
         objects: normalizeGrid(parsed.objects, null, dims),
         stairLinks: normalizeGrid(parsed.stairLinks, null, dims),
+        heights: readHeights(parsed.heights, dims.h, dims.w), // ground height (mountains, dunes...), or null for a flat map
+        rotations: readRotations(parsed.rotations, dims.h, dims.w),
+        objectRotations: readRotations(parsed.objectRotations, dims.h, dims.w),
         dims,
       }
     }
@@ -67,7 +76,7 @@ function parseMapContent(content) {
     // Older maps may have empty or malformed content; use an empty object layer.
   }
   const dims = { w: GRID_W, h: GRID_H }
-  return { ground: blankGrid(), objects: blankObjectGrid(), stairLinks: blankStairLinks(), dims }
+  return { ground: blankGrid(), objects: blankObjectGrid(), stairLinks: blankStairLinks(), rotations: blankRotations(), objectRotations: blankRotations(), dims }
 }
 
 function normalizeDoorStates(value, dims) {
@@ -117,14 +126,15 @@ function objectTile(id) {
   return OBJECT_TILES.find(tile => tile.id === id)
 }
 
-function TileIconPlaceholder({ tile, style = {} }) {
+function TileIconPlaceholder({ tile, style = {}, rotate = 0 }) {
+  // `rotate` is in degrees, a quarter turn at a time (see utils/tileRotation.js)
   if (tile.imageUrl) {
     return <img
       src={tile.imageUrl}
       alt=""
       aria-hidden="true"
       draggable="false"
-      style={{ width: '94%', height: '94%', objectFit: 'contain', pointerEvents: 'none', ...style }}
+      style={{ width: '94%', height: '94%', objectFit: 'contain', pointerEvents: 'none', transform: rotate ? `rotate(${rotate}deg)` : undefined, ...style }}
     />
   }
 
@@ -141,7 +151,7 @@ function TileIconPlaceholder({ tile, style = {} }) {
         WebkitMaskRepeat: 'no-repeat',
         WebkitMaskPosition: 'center',
         WebkitMaskSize: 'contain',
-        transform: tile.id === 'stairs-down' ? 'rotate(180deg)' : undefined,
+        transform: [tile.id === 'stairs-down' && 'rotate(180deg)', rotate && `rotate(${rotate}deg)`].filter(Boolean).join(' ') || undefined,
         pointerEvents: 'none',
         ...style,
       }} />
@@ -153,6 +163,7 @@ function TileIconPlaceholder({ tile, style = {} }) {
         border: '1px dashed rgba(0,0,0,0.32)',
         boxSizing: 'border-box',
         pointerEvents: 'none',
+        transform: rotate ? `rotate(${rotate}deg)` : undefined,
         ...style,
       }} />
 }
@@ -272,6 +283,64 @@ function PeekingViewers({ viewers }) {
 
 const dragPreviewTransform = ({ x, y }) => `translate3d(${x}px, ${y}px, 0) translate(-50%, -50%) scale(1.08)`
 
+// One square of the play board. Memoised, so a token taking a step redraws only the squares it left and entered, not the whole
+// board (a 48 by 33 map has 1,584 squares: drawing them all on every step took about 0.3 seconds and made walking lag).
+const PlayCell = memo(function PlayCell({ r, c, cellId, groundTile, object, turn, objectTurn, visible, torchlit, darkvision, lightStrength, doorOpen, locked, shade, token, dragging, darkMode, isDm, cellSize, torchSrc, onCellClick, onDragStart }) {
+  const isDoor = cellId === 'door'
+  const isStair = cellId === 'stairs' || cellId === 'stairs-down'
+  const cellBase = isDoor && doorOpen ? 'floor' : cellId
+  return (
+    <div
+      data-map-cell
+      data-row={r}
+      data-col={c}
+      onClick={event => onCellClick(event, r, c)}
+      title={visible && isDoor ? (doorOpen ? 'Click to close door' : 'Click to open door') : visible && isStair ? 'Click to use stairs' : undefined}
+      style={{
+        minWidth: 0,
+        minHeight: 0,
+        background: darkMode && !visible ? '#000' : tileColor(cellBase),
+        border: `0.5px solid ${darkMode && !visible ? 'transparent' : 'rgba(0,0,0,0.08)'}`,
+        position: 'relative',
+        contain: 'layout style', // a change inside one square does not make the browser lay out the whole board again
+        filter: darkvision
+          ? 'brightness(0.35)'
+          : !isDm && darkMode && torchlit && lightStrength
+            ? `brightness(${0.45 + lightStrength * 0.55})`
+            : undefined,
+        cursor: visible && (isDoor || isStair) ? 'pointer' : undefined,
+      }}
+    >
+      {groundTile?.imageUrl && visible && (
+        <img
+          src={groundTile.imageUrl}
+          alt=""
+          aria-hidden="true"
+          draggable="false"
+          style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', pointerEvents: 'none', transform: turn ? `rotate(${turn}deg)` : undefined }}
+        />
+      )}
+      {groundTile?.iconUrl && visible && !(isDoor && doorOpen) && (
+        <TileIconPlaceholder tile={groundTile} rotate={turn} style={{ position: 'absolute', inset: '21%', width: '58%', height: '58%', filter: darkvision ? 'brightness(0.35)' : undefined }} />
+      )}
+      {shade && visible && <div aria-hidden="true" style={{ position: 'absolute', inset: 0, pointerEvents: 'none', ...shade }} />}
+      {object && visible && (
+        <TileIconPlaceholder tile={object} rotate={objectTurn} style={{ position: 'absolute', zIndex: 1, filter: darkvision ? 'brightness(0.35)' : undefined }} />
+      )}
+      {token && (
+        <Token
+          token={token}
+          cellSize={cellSize}
+          onDragStart={onDragStart}
+          dragging={dragging}
+        />
+      )}
+      {isDoor && !doorOpen && locked && visible && <span aria-label="Locked door" title="Locked door" style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: Math.max(8, cellSize * 0.5), pointerEvents: 'none', zIndex: 2, textShadow: '0 1px 2px #000' }}>🔒</span>}
+      {token?.lightSource && torchSrc && <img src={torchSrc} alt="" aria-hidden="true" draggable={false} style={{ position: 'absolute', top: -7, right: -5, zIndex: 11, width: 14, height: 14, objectFit: 'contain', pointerEvents: 'none' }} />}
+    </div>
+  )
+})
+
 function Token({ token, cellSize, onDragStart, dragging }) {
   const initials = token.name?.[0]?.toUpperCase() || '?'
   return (
@@ -334,6 +403,14 @@ export default function LevelBuilder() {
   const [tokens, setTokens] = useState([]) // { id, name, avatar, color, row, col, hp, maxHp }
   const [darkMode, setDarkMode] = useState(false)
   const [doorStates, setDoorStates] = useState(blankDoorStates())
+  const [rotations, setRotations] = useState(() => blankRotations()) // quarter turns of ground tiles the author chose
+  const [objectRotations, setObjectRotations] = useState(() => blankRotations()) // and of upper-layer objects
+  const [paintRotation, setPaintRotation] = useState(null) // the turn given to tiles being placed: null = automatic
+  const [heights, setHeights] = useState(null) // ground height per square for maps that have it (see utils/mapHeights.js)
+  const [doorLocks, setDoorLocks] = useState(blankDoorStates()) // locked doors: only the DM can unlock them (see server/lib/doors.js)
+  const [knocks, setKnocks] = useState([]) // DM only: players trying a locked door, waiting for an answer
+  const [doorMenu, setDoorMenu] = useState(null) // DM only: the door they clicked, { row, col }
+  const waitingKnocksRef = useRef(new Set()) // doors this player has asked the DM about
   // The map's size is just the size of its saved grid (Small / Medium / Large templates, or legacy Medium).
   const gridH = grid.length
   const gridW = grid[0]?.length ?? GRID_W
@@ -345,6 +422,7 @@ export default function LevelBuilder() {
   const [dragPreviewToken, setDragPreviewToken] = useState(null)
   const dragPosRef = useRef({ x: 0, y: 0 })
   const [tapToPlaceTokenId, setTapToPlaceTokenId] = useState(null)
+  const [view3d, setView3d] = useState(false) // true: the live 3D view (the Godot game) instead of the flat board
   const [cellSize, setCellSize] = useState(28)
   const gridRef = useRef(null)
   const scrollRef = useRef(null)
@@ -384,6 +462,8 @@ export default function LevelBuilder() {
   toastRef.current = toast
 
   const startTokenDrag = (e, tokenId) => {
+    // Players can only move their own character's token (the server enforces this too); the DM moves anything.
+    if (!isDm && tokenId !== `char-${user?.id}`) return
     e.preventDefault?.()
     e.stopPropagation?.()
     setDragTokenId(tokenId)
@@ -516,6 +596,7 @@ export default function LevelBuilder() {
           hp: m.character?.hp?.current ?? m.character?.hp?.max ?? 10,
           maxHp: m.character?.hp?.max ?? 10,
           type: 'player',
+          classId: classIdFor(m.character?.class), // for the 3D miniature
         })
       })
 
@@ -576,6 +657,32 @@ export default function LevelBuilder() {
       setDoorStates(normalized)
       setPlans(current => current.map(plan => plan._id === selectedPlanId ? { ...plan, doorStates: normalized } : plan))
     }
+    const onDoorLocks = (locks) => {
+      const normalized = normalizeDoorStates(locks, dimsRef.current)
+      setDoorLocks(normalized)
+      setPlans(current => current.map(plan => plan._id === selectedPlanId ? { ...plan, doorLocks: normalized } : plan))
+    }
+    const onDoorLock = ({ row, col, locked } = {}) => {
+      if (!Number.isInteger(row) || !Number.isInteger(col) || row < 0 || row >= dimsRef.current.h || col < 0 || col >= dimsRef.current.w || typeof locked !== 'boolean') return
+      setDoorLocks(current => current.map((cells, r) => r === row ? cells.map((isLocked, c) => c === col ? locked : isLocked) : cells))
+      setPlans(current => current.map(plan => {
+        if (plan._id !== selectedPlanId) return plan
+        const locks = normalizeDoorStates(plan.doorLocks, dimsRef.current)
+        locks[row][col] = locked
+        return { ...plan, doorLocks: locks }
+      }))
+      setKnocks(current => current.filter(k => !(k.row === row && k.col === col)))
+      if (!locked && waitingKnocksRef.current.delete(`${row}:${col}`)) toastRef.current('The DM unlocked the door')
+    }
+    const onDoorKnock = ({ row, col, userId, name } = {}) => {
+      if (!Number.isInteger(row) || !Number.isInteger(col) || typeof userId !== 'string') return
+      setKnocks(current => current.some(k => k.row === row && k.col === col && k.userId === userId)
+        ? current
+        : [...current, { row, col, userId, name: String(name || 'A player').slice(0, 60) }])
+    }
+    const onDoorDenied = ({ row, col } = {}) => {
+      if (waitingKnocksRef.current.delete(`${row}:${col}`)) toastRef.current('The door stays locked')
+    }
     const onTravel = ({ destinationId, destinationPlan } = {}) => {
       const existingPlan = plansRef.current.find(plan => plan._id === destinationId)
       const destination = destinationPlan ? { ...(existingPlan || {}), ...destinationPlan } : existingPlan
@@ -594,6 +701,9 @@ export default function LevelBuilder() {
       setTokens(Array.isArray(destination.tokens) ? destination.tokens : [])
       setDarkMode(Boolean(destination.darkMode))
       setDoorStates(normalizeDoorStates(destination.doorStates, parsed.dims))
+      setDoorLocks(normalizeDoorStates(destination.doorLocks, parsed.dims))
+      setHeights(parsed.heights); setRotations(parsed.rotations); setObjectRotations(parsed.objectRotations)
+      setKnocks([])
     }
     const onDoorState = ({ row, col, open } = {}) => {
       if (!Number.isInteger(row) || !Number.isInteger(col) || row < 0 || row >= dimsRef.current.h || col < 0 || col >= dimsRef.current.w || typeof open !== 'boolean') return
@@ -612,6 +722,10 @@ export default function LevelBuilder() {
     socket.on('level:dark-mode', onDarkMode)
     socket.on('level:doors', onDoorStates)
     socket.on('level:door', onDoorState)
+    socket.on('level:door-locks', onDoorLocks)
+    socket.on('level:door-lock', onDoorLock)
+    socket.on('level:door-knock', onDoorKnock)
+    socket.on('level:door-denied', onDoorDenied)
     socket.on('level:travel', onTravel)
     socket.emit('level:join', selectedPlanId)
     return () => {
@@ -620,7 +734,13 @@ export default function LevelBuilder() {
       socket.off('level:dark-mode', onDarkMode)
       socket.off('level:doors', onDoorStates)
       socket.off('level:door', onDoorState)
+      socket.off('level:door-locks', onDoorLocks)
+      socket.off('level:door-lock', onDoorLock)
+      socket.off('level:door-knock', onDoorKnock)
+      socket.off('level:door-denied', onDoorDenied)
       socket.off('level:travel', onTravel)
+      setKnocks([])
+      setDoorMenu(null)
       socket.emit('level:leave', selectedPlanId)
       setViewers([])
     }
@@ -637,6 +757,40 @@ export default function LevelBuilder() {
     getSocket().emit('level:tokens', { planId: selectedPlanId, tokens })
   }, [tokens, mode, selectedPlanId])
 
+  // Walk with WASD or the arrow keys. A player moves their own character's token; the DM moves the token selected in the side
+  // list. Steps are limited to about 8 a second, so holding a key walks smoothly without flooding the server with saves.
+  // Keys come from this page, or from the 3D view (the game in a frame has its own keyboard focus and passes them on).
+  const lastStepRef = useRef(0)
+  const walkToken = (key) => {
+    const step = keyToStep(key)
+    if (!step) return false
+    const movingId = isDm ? tapToPlaceTokenId : `char-${user?.id}`
+    if (!movingId || !tokens.some(t => t.id === movingId && Number.isInteger(t.row))) return false
+    const now = Date.now()
+    if (now - lastStepRef.current < 100) return true
+    lastStepRef.current = now
+    // Walking into a closed door opens it. If it is locked a player asks the DM; the DM can open it without unlocking.
+    const door = bumpedDoor(tokens, movingId, step, grid, doorStates)
+    if (door) {
+      if (!isDm && doorLocks[door.row]?.[door.col]) knockOnDoor(door.row, door.col)
+      else toggleDoor(door.row, door.col, true)
+      return true
+    }
+    setTokens(current => stepToken(current, movingId, step, grid, objectGrid, doorStates))
+    return true
+  }
+  const walkRef = useRef(walkToken)
+  walkRef.current = walkToken
+  useEffect(() => {
+    if (mode !== 'play' || !selectedPlanId) return undefined
+    const onKeyDown = (e) => {
+      if (e.ctrlKey || e.metaKey || e.altKey || isTypingTarget(e.target)) return
+      if (walkRef.current(e.key)) e.preventDefault()
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [mode, selectedPlanId])
+
   // ── Gallery actions ──
   const openEditor = (plan = null, size = null) => {
     if (!isDm) return
@@ -648,6 +802,7 @@ export default function LevelBuilder() {
       setGrid(parsed.ground)
       setObjectGrid(parsed.objects)
       setStairLinks(parsed.stairLinks)
+      setHeights(parsed.heights); setRotations(parsed.rotations); setObjectRotations(parsed.objectRotations)
       setDoorStates(normalizeDoorStates(plan.doorStates, parsed.dims))
     } else {
       setEditPlanId(null)
@@ -658,6 +813,9 @@ export default function LevelBuilder() {
       setObjectGrid(blankObjectGrid(w, h))
       setStairLinks(blankStairLinks(w, h))
       setDoorStates(blankDoorStates(w, h))
+      setHeights(null)
+      setRotations(blankRotations(w, h))
+      setObjectRotations(blankRotations(w, h))
     }
     setEditTheme(resolveThemeId(plan?.theme))
     setEditLayer('ground')
@@ -675,6 +833,8 @@ export default function LevelBuilder() {
     setStairLinks(parsed.stairLinks)
     setDarkMode(Boolean(plan.darkMode))
     setDoorStates(normalizeDoorStates(plan.doorStates, parsed.dims))
+    setDoorLocks(normalizeDoorStates(plan.doorLocks, parsed.dims))
+    setHeights(parsed.heights); setRotations(parsed.rotations); setObjectRotations(parsed.objectRotations)
     setTokens(Array.isArray(plan.tokens) ? plan.tokens : [])
     setMode('play')
     if (isDm && activeCampaign && !activeCampaign.isPersonal) {
@@ -716,7 +876,7 @@ export default function LevelBuilder() {
     try {
       const body = {
         title,
-        content: JSON.stringify({ ground: grid, objects: objectGrid, stairLinks }),
+        content: JSON.stringify({ ground: grid, objects: objectGrid, stairLinks, ...extraContent() }),
         doorStates,
         theme: editTheme,
       }
@@ -741,7 +901,7 @@ export default function LevelBuilder() {
     if (mapBaseline.current.id !== editPlanId) { mapBaseline.current = { id: editPlanId, snap }; return }
     if (mapBaseline.current.snap === snap) return
     const id = editPlanId, title = editTitle.trim()
-    const body = { content: JSON.stringify({ ground: grid, objects: objectGrid, stairLinks }), doorStates, theme: editTheme, ...(title ? { title } : {}) }
+    const body = { content: JSON.stringify({ ground: grid, objects: objectGrid, stairLinks, ...extraContent() }), doorStates, theme: editTheme, ...(title ? { title } : {}) }
     scheduleMapSave(async () => {
       try {
         const plan = await api(`/levels/${id}`, { method: 'PUT', body })
@@ -761,6 +921,26 @@ export default function LevelBuilder() {
   }
 
   // ── Paint ──
+  // What a saved map carries beyond the tiles themselves: ground heights and any turns the author chose.
+  const extraContent = () => ({
+    ...(heights ? { heights } : {}),
+    ...(compactRotations(rotations) ? { rotations } : {}),
+    ...(compactRotations(objectRotations) ? { objectRotations } : {}),
+  })
+
+  // R turns the tiles you are about to place.
+  useEffect(() => {
+    if (mode !== 'editor') return undefined
+    const onKeyDown = (e) => {
+      if ((e.key === 'r' || e.key === 'R') && !e.ctrlKey && !e.metaKey && !e.altKey && !isTypingTarget(e.target)) {
+        e.preventDefault()
+        setPaintRotation(nextRotation)
+      }
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [mode])
+
   const paint = (r, c) => {
     if (editLayer === 'objects') {
       setObjectGrid(current => {
@@ -768,6 +948,7 @@ export default function LevelBuilder() {
         next[r][c] = tool === 'object-erase' ? null : tool
         return next
       })
+      setObjectRotations(current => withRotation(current, r, c, tool === 'object-erase' ? null : paintRotation))
       return
     }
     setGrid(current => {
@@ -775,6 +956,7 @@ export default function LevelBuilder() {
       next[r][c] = tool
       return next
     })
+    setRotations(current => withRotation(current, r, c, paintRotation))
     if (!['stairs', 'stairs-down'].includes(tool)) {
       setStairLinks(current => {
         const next = current.map(row => row.slice())
@@ -820,17 +1002,45 @@ export default function LevelBuilder() {
     setPendingStair(null)
   }
 
-  const toggleDoor = (row, col) => {
+  const toggleDoor = (row, col, open = !doorStates[row]?.[col]) => {
     const socket = getSocket()
     socket.timeout(5000).emit('level:door', {
       planId: selectedPlanId,
       row,
       col,
-      open: !doorStates[row]?.[col],
+      open,
     }, (error, response) => {
       if (error) toast('Could not update the door')
       else if (!response?.ok) toast(response?.error || 'Could not update the door')
     })
+  }
+
+  // A player tries a locked door: the DM is asked whether to let them through.
+  const knockOnDoor = (row, col) => {
+    const key = `${row}:${col}`
+    if (waitingKnocksRef.current.has(key)) { toast('Still waiting for the DM to answer'); return }
+    waitingKnocksRef.current.add(key)
+    toast('The door is locked. Asking the DM to let you through…')
+    getSocket().timeout(5000).emit('level:door-knock', { planId: selectedPlanId, row, col }, (error, response) => {
+      if (error || !response?.ok) { waitingKnocksRef.current.delete(key); toast(response?.error || 'Could not ask the DM') }
+    })
+  }
+
+  // The DM locks or unlocks a door, or answers a player's request about one.
+  const setDoorLocked = (row, col, locked) => {
+    getSocket().timeout(5000).emit('level:door-lock', { planId: selectedPlanId, row, col, locked }, (error, response) => {
+      if (error) toast('Could not update the door')
+      else if (!response?.ok) toast(response?.error || 'Could not update the door')
+    })
+  }
+  const answerKnock = (knock, answer) => {
+    setKnocks(current => current.filter(k => k !== knock))
+    if (answer === 'deny') {
+      getSocket().emit('level:door-deny', { planId: selectedPlanId, row: knock.row, col: knock.col, userId: knock.userId })
+      return
+    }
+    setDoorLocked(knock.row, knock.col, false)
+    if (answer === 'open') toggleDoor(knock.row, knock.col, true)
   }
 
   const travelViaStair = (row, col) => {
@@ -858,7 +1068,9 @@ export default function LevelBuilder() {
       return
     }
     if (grid[row]?.[col] === 'door') {
-      toggleDoor(row, col)
+      if (isDm) setDoorMenu({ row, col })
+      else if (doorLocks[row]?.[col] && !doorStates[row]?.[col]) knockOnDoor(row, col)
+      else toggleDoor(row, col)
       return
     }
     if (grid[row]?.[col] === 'stairs' || grid[row]?.[col] === 'stairs-down') travelViaStair(row, col)
@@ -915,17 +1127,19 @@ export default function LevelBuilder() {
     })),
     [isDemo, objectGrid],
   )
+  // The fog only depends on where light and darkvision come from, so it is worked out again only when one of those moves, not
+  // every time any token takes a step.
+  const placed = token => Number.isInteger(token.row) && Number.isInteger(token.col)
+  const lightCarriers = tokens.filter(token => token.lightSource && placed(token))
+  const lightKey = lightCarriers.map(token => `${token.row}:${token.col}`).join('|')
   const sharedLightSources = useMemo(() => [
     ...mapLightSources,
-    ...tokens
-      .filter(token => token.lightSource && Number.isInteger(token.row) && Number.isInteger(token.col))
-      .map(token => ({ ...token, radius: TORCH_LIGHT_RADIUS })),
-  ], [mapLightSources, tokens])
+    ...lightCarriers.map(token => ({ ...token, radius: TORCH_LIGHT_RADIUS })),
+  ], [mapLightSources, lightKey]) // eslint-disable-line react-hooks/exhaustive-deps
   const localPlayerToken = tokens.find(token => token.id === `char-${user?.id}`)
-  const darkvisionSources = useMemo(() => isDm
-    ? tokens.filter(token => token.darkvision && Number.isInteger(token.row) && Number.isInteger(token.col))
-    : localPlayerToken?.darkvision ? [localPlayerToken] : [],
-  [isDm, localPlayerToken, tokens])
+  const visionCarriers = isDm ? tokens.filter(token => token.darkvision && placed(token)) : (localPlayerToken?.darkvision ? [localPlayerToken] : [])
+  const visionKey = visionCarriers.map(token => `${token.row}:${token.col}`).join('|')
+  const darkvisionSources = useMemo(() => visionCarriers, [isDm, visionKey]) // eslint-disable-line react-hooks/exhaustive-deps
   const visibility = useMemo(() => {
     const visible = []
     const torchlit = []
@@ -962,6 +1176,33 @@ export default function LevelBuilder() {
     }
     return { visible, torchlit, darkvision, lightStrength }
   }, [darkMode, doorStates, grid, isDm, darkvisionSources, sharedLightSources])
+
+  // Where each token stands (one lookup for the whole board instead of a search per square), and each square's height shading.
+  const tokenAtCell = useMemo(() => {
+    const byCell = new Map()
+    tokens.forEach(token => { if (Number.isInteger(token.row)) byCell.set(`${token.row}:${token.col}`, token) })
+    return byCell
+  }, [tokens])
+  const shadeGrid = useMemo(() => (heights ? grid.map((row, r) => row.map((_, c) => heightShade(heights, r, c))) : null), [heights, grid])
+  // Squares are memoised, so they must get the same functions every time; these call whatever the latest versions are.
+  const cellClickRef = useRef(null)
+  cellClickRef.current = handlePlayCellClick
+  const dragStartRef = useRef(null)
+  dragStartRef.current = startTokenDrag
+  const onCellClick = useCallback((event, r, c) => cellClickRef.current(event, r, c), [])
+  const onTokenDragStart = useCallback((e, id) => dragStartRef.current(e, id), [])
+
+  // What the 3D view is sent: how lit each square is (same as the 2D board shows), and each token's class.
+  const viewerLevelList = useMemo(
+    () => viewerLevels({ darkMode, isDm, visibility, rows: gridH, cols: gridW }),
+    [darkMode, isDm, visibility, gridH, gridW],
+  )
+  const classOfToken = useCallback((t) => availableTokens.find(a => a.id === t.id)?.classId || '', [availableTokens])
+  const handleViewerClick = ({ row, col, tokenId }) => {
+    // The DM picks a token to walk (like Move in the side list); everything else is a click on a square, as on the flat board.
+    if (tokenId && isDm) { setTapToPlaceTokenId(current => current === tokenId ? null : tokenId); return }
+    handlePlayCellClick({ target: null, currentTarget: null }, row, col)
+  }
 
   if (!activeCampaign && !campaignsLoading) return (
     <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-3)' }}>
@@ -1092,6 +1333,12 @@ export default function LevelBuilder() {
 
       <div className="lb-editor-workspace">
       <aside className="lb-editor-tools" aria-label="Map tile selection">
+        <button type="button" className="btn btn-ghost btn-sm" onClick={() => setPaintRotation(nextRotation)}
+          title="Turn the tiles you place a quarter turn at a time (or press R). Auto turns natural floors such as grass and stone at random and leaves everything else as drawn."
+          style={{ width: '100%', marginBottom: 8, justifyContent: 'center', gap: 6 }}>
+          <span aria-hidden="true" style={{ display: 'inline-block', transform: paintRotation ? `rotate(${paintRotation * 90}deg)` : undefined, transition: 'transform 120ms' }}>↑</span>
+          Rotate: {rotationLabel(paintRotation)} <kbd style={{ fontSize: 9, opacity: 0.7 }}>R</kbd>
+        </button>
         <div className="lb-tool-palettes">
           {[
             { layer: 'ground', title: 'Ground Tiles', tiles: TILES.filter(tile => tile.id !== 'chest') },
@@ -1117,7 +1364,7 @@ export default function LevelBuilder() {
                       background: selected ? 'var(--gold-bg)' : 'var(--surface)', color: 'var(--text)',
                     }}>
                       {tile.imageUrl || tile.iconUrl || tile.id.startsWith('rock-')
-                        ? <TileIconPlaceholder tile={tile} style={{ width: 14, height: 14, flexShrink: 0 }} />
+                        ? <TileIconPlaceholder tile={tile} rotate={selected && paintRotation ? paintRotation * 90 : 0} style={{ width: 14, height: 14, flexShrink: 0 }} />
                         : <span style={{ width: 12, height: 12, borderRadius: 2, background: tile.color === 'transparent' || !tile.color ? 'repeating-conic-gradient(#ccc 0% 25%, #fff 0% 50%) 50%/6px 6px' : tile.color, border: '1px solid rgba(0,0,0,0.2)', flexShrink: 0 }} />
                       }
                       <span title={tile.label} style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{tile.label}</span>
@@ -1189,6 +1436,8 @@ export default function LevelBuilder() {
           {grid.map((row, r) => row.map((cellId, c) => {
             const t = TILES.find(x => x.id === cellId) || TILES[TILES.length - 1]
             const object = objectTile(objectGrid[r]?.[c])
+            const turn = rotationOf(cellId, rotations[r]?.[c], r, c) * 90
+            const objectTurn = rotationOf(objectGrid[r]?.[c], objectRotations[r]?.[c], r, c) * 90
             return (
               <div key={`${r}-${c}`} className="lb-cell" data-lb-cell={`${r}-${c}`}
                 onMouseDown={() => { if (linkMode) return; setPainting(true); paint(r, c) }}
@@ -1197,10 +1446,10 @@ export default function LevelBuilder() {
                 onTouchStart={() => { if (!linkMode) paint(r, c) }}
                 style={{ background: t.color === 'transparent' ? '#f5f4f1' : t.color, display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative' }}
               >
-                {t.imageUrl && <TileIconPlaceholder tile={t} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />}
-                {t.iconUrl && <TileIconPlaceholder tile={t} style={{ position: 'absolute', inset: '21%', width: '58%', height: '58%' }} />}
+                {t.imageUrl && <TileIconPlaceholder tile={t} rotate={turn} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />}
+                {t.iconUrl && <TileIconPlaceholder tile={t} rotate={turn} style={{ position: 'absolute', inset: '21%', width: '58%', height: '58%' }} />}
                 {stairLinks[r]?.[c] && <span aria-label="Linked stairs" style={{ position: 'absolute', top: 0, right: 1, color: '#fff', fontSize: 8, textShadow: '0 1px 2px #000', pointerEvents: 'none' }}>→</span>}
-                {object && object.id !== 'object-erase' && (object.imageUrl || object.iconUrl || object.id.startsWith('rock-')) && <TileIconPlaceholder tile={object} style={{ position: 'absolute', zIndex: 1 }} />}
+                {object && object.id !== 'object-erase' && (object.imageUrl || object.iconUrl || object.id.startsWith('rock-')) && <TileIconPlaceholder tile={object} rotate={objectTurn} style={{ position: 'absolute', zIndex: 1 }} />}
                 {darkMode && !visibility.torchlit[r]?.[c] && !visibility.darkvision[r]?.[c] && (
                   <div
                     aria-hidden="true"
@@ -1372,75 +1621,81 @@ export default function LevelBuilder() {
               WebkitTouchCallout: 'none',
             }}
           >
-            {grid.map((row, r) => row.map((cellId, c) => {
-              const token = tokens.find(t => t.row === r && t.col === c)
-              const object = objectTile(objectGrid[r]?.[c])
-              const visible = visibility.visible[r]?.[c]
-              const torchlit = visibility.torchlit[r]?.[c]
-              const darkvision = visibility.darkvision[r]?.[c]
+            {!view3d && grid.map((row, r) => row.map((cellId, c) => {
+              const token = tokenAtCell.get(`${r}:${c}`)
               const doorOpen = Boolean(doorStates[r]?.[c])
-              const isDoor = cellId === 'door'
-              const isStair = cellId === 'stairs' || cellId === 'stairs-down'
-              const cellBase = isDoor && doorOpen ? 'floor' : cellId
-              const lightStrength = visibility.lightStrength[r]?.[c] || 0
-              const groundTile = TILES.find(tile => tile.id === cellBase)
               return (
-                <div
+                <PlayCell
                   key={`${r}-${c}`}
-                  data-map-cell
-                  data-row={r}
-                  data-col={c}
-                  onClick={event => handlePlayCellClick(event, r, c)}
-                  title={visible && isDoor ? (doorOpen ? 'Click to close door' : 'Click to open door') : visible && isStair ? 'Click to use stairs' : undefined}
-                  style={{
-                    minWidth: 0,
-                    minHeight: 0,
-                    background: darkMode && !visible ? '#000' : tileColor(cellBase),
-                    border: `0.5px solid ${darkMode && !visible ? 'transparent' : 'rgba(0,0,0,0.08)'}`,
-                    position: 'relative',
-                    filter: darkvision
-                      ? 'brightness(0.35)'
-                      : !isDm && darkMode && torchlit && lightStrength
-                        ? `brightness(${0.45 + lightStrength * 0.55})`
-                        : undefined,
-                    cursor: visible && (isDoor || isStair) ? 'pointer' : undefined,
-                  }}
-                >
-                  {groundTile?.imageUrl && visible && (
-                    <img
-                      src={groundTile.imageUrl}
-                      alt=""
-                      aria-hidden="true"
-                      draggable="false"
-                      style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', pointerEvents: 'none' }}
-                    />
-                  )}
-                  {groundTile?.iconUrl && visible && !(isDoor && doorOpen) && (
-                    <TileIconPlaceholder tile={groundTile} style={{ position: 'absolute', inset: '21%', width: '58%', height: '58%', filter: darkvision ? 'brightness(0.35)' : undefined }} />
-                  )}
-                  {object && visible && (
-                    <TileIconPlaceholder tile={object} style={{ position: 'absolute', zIndex: 1, filter: darkvision ? 'brightness(0.35)' : undefined }} />
-                  )}
-                  {token && (
-                    <Token
-                      token={token}
-                      cellSize={cellSize}
-                      onDragStart={startTokenDrag}
-                      dragging={dragTokenId === token.id}
-                    />
-                  )}
-                  {token?.lightSource && torchSrc && <img src={torchSrc} alt="" aria-hidden="true" draggable={false} style={{ position: 'absolute', top: -7, right: -5, zIndex: 11, width: 14, height: 14, objectFit: 'contain', pointerEvents: 'none' }} />}
-                </div>
+                  r={r}
+                  c={c}
+                  cellId={cellId}
+                  groundTile={TILES.find(tile => tile.id === (cellId === 'door' && doorOpen ? 'floor' : cellId))}
+                  object={objectTile(objectGrid[r]?.[c])}
+                  turn={rotationOf(cellId === 'door' && doorOpen ? 'floor' : cellId, rotations[r]?.[c], r, c) * 90}
+                  objectTurn={rotationOf(objectGrid[r]?.[c], objectRotations[r]?.[c], r, c) * 90}
+                  visible={visibility.visible[r]?.[c]}
+                  torchlit={visibility.torchlit[r]?.[c]}
+                  darkvision={visibility.darkvision[r]?.[c]}
+                  lightStrength={visibility.lightStrength[r]?.[c] || 0}
+                  doorOpen={doorOpen}
+                  locked={Boolean(doorLocks[r]?.[c])}
+                  shade={shadeGrid?.[r]?.[c]}
+                  token={token}
+                  dragging={Boolean(token) && dragTokenId === token.id}
+                  darkMode={darkMode}
+                  isDm={isDm}
+                  cellSize={cellSize}
+                  torchSrc={torchSrc}
+                  onCellClick={onCellClick}
+                  onDragStart={onTokenDragStart}
+                />
               )
             }))}
           </div>
           </div>
+          {(knocks.length > 0 || doorMenu) && (
+            <div role="dialog" aria-label="Door" style={{ position: 'absolute', top: 10, left: '50%', transform: 'translateX(-50%)', zIndex: 30, display: 'flex', flexDirection: 'column', gap: 8, width: 'min(92%, 380px)' }}>
+              {knocks.map(k => (
+                <div key={`${k.userId}:${k.row}:${k.col}`} className="card" style={{ padding: 12, background: 'var(--surface)', border: '1px solid var(--gold)', borderRadius: 8, boxShadow: '0 4px 16px rgba(0,0,0,0.3)' }}>
+                  <div style={{ fontSize: 13, marginBottom: 8 }}><b>{k.name}</b> is trying the locked door. Let them through?</div>
+                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                    <button type="button" className="btn btn-primary btn-sm" onClick={() => answerKnock(k, 'open')}>Unlock and open</button>
+                    <button type="button" className="btn btn-ghost btn-sm" onClick={() => answerKnock(k, 'unlock')}>Just unlock</button>
+                    <button type="button" className="btn btn-ghost btn-sm" onClick={() => answerKnock(k, 'deny')}>Keep it locked</button>
+                  </div>
+                </div>
+              ))}
+              {doorMenu && (
+                <div className="card" style={{ padding: 12, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, boxShadow: '0 4px 16px rgba(0,0,0,0.3)' }}>
+                  <div style={{ fontSize: 13, marginBottom: 8 }}><b>Door</b> · {doorStates[doorMenu.row]?.[doorMenu.col] ? 'open' : doorLocks[doorMenu.row]?.[doorMenu.col] ? 'locked' : 'closed'}</div>
+                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                    <button type="button" className="btn btn-primary btn-sm" onClick={() => { toggleDoor(doorMenu.row, doorMenu.col); setDoorMenu(null) }}>{doorStates[doorMenu.row]?.[doorMenu.col] ? 'Close' : 'Open'}</button>
+                    <button type="button" className="btn btn-ghost btn-sm" onClick={() => { setDoorLocked(doorMenu.row, doorMenu.col, !doorLocks[doorMenu.row]?.[doorMenu.col]); setDoorMenu(null) }}>{doorLocks[doorMenu.row]?.[doorMenu.col] ? 'Unlock' : 'Lock'}</button>
+                    <button type="button" className="btn btn-ghost btn-sm" onClick={() => setDoorMenu(null)}>Cancel</button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+          {view3d && (
+            <Battle3DView
+              ground={grid} objects={objectGrid} heights={heights} doorStates={doorStates} doorLocks={doorLocks} theme={themeId}
+              tokens={tokens} levels={viewerLevelList} darkMode={darkMode}
+              focusId={isDm ? (tapToPlaceTokenId || '') : `char-${user?.id}`} classOf={classOfToken}
+              onClick={handleViewerClick} onKey={key => walkRef.current(key)}
+              tokensOpen={isDm && showTokens && !isFullscreen}
+            />
+          )}
           <div className="level-play-controls" data-tokens-open={isDm && showTokens && !isFullscreen} style={{ position: 'absolute', bottom: 18, display: 'flex', gap: 4, opacity: 0.35, transition: 'opacity .15s', zIndex: 20 }} onMouseEnter={e => { e.currentTarget.style.opacity = 0.95 }} onMouseLeave={e => { e.currentTarget.style.opacity = 0.35 }}>
             {[
               ...(isDm && !isFullscreen ? [{ label: '☰', title: showTokens ? 'Hide tokens panel' : 'Show tokens panel', onClick: () => setShowTokens(v => !v) }] : []),
-              { label: '−', title: 'Zoom out', onClick: () => changeZoom(-0.5), disabled: zoom <= 1 },
-              { label: `${Math.round(zoom * 100)}%`, title: 'Reset zoom', onClick: () => changeZoom(0, true), disabled: zoom === 1 },
-              { label: '+', title: 'Zoom in', onClick: () => changeZoom(0.5), disabled: zoom >= 4 },
+              { label: view3d ? '2D' : '3D', title: view3d ? 'Back to the flat board' : 'See the map in 3D', onClick: () => setView3d(v => !v) },
+              ...(view3d ? [] : [
+                { label: '−', title: 'Zoom out', onClick: () => changeZoom(-0.5), disabled: zoom <= 1 },
+                { label: `${Math.round(zoom * 100)}%`, title: 'Reset zoom', onClick: () => changeZoom(0, true), disabled: zoom === 1 },
+                { label: '+', title: 'Zoom in', onClick: () => changeZoom(0.5), disabled: zoom >= 4 },
+              ]),
               { label: isFullscreen ? '⤡' : '⤢', title: isFullscreen ? 'Exit fullscreen' : 'Fullscreen', onClick: toggleFullscreen },
             ].map(b => (
               <button key={b.title} type="button" title={b.title} aria-label={b.title} disabled={b.disabled} onClick={b.onClick}
@@ -1451,6 +1706,7 @@ export default function LevelBuilder() {
         {isDm && showTokens && !isFullscreen && (
         <div className="level-play-tokens" style={{ position: 'absolute', top: 0, right: 0, bottom: 0, zIndex: 15, width: 240, display: 'flex', flexDirection: 'column', background: 'var(--surface)', borderLeft: '1px solid var(--border)', overflow: 'hidden' }}>
         <div className="level-play-token-list">
+            <div style={{ padding: '6px 10px', fontSize: 11, color: 'var(--text-3)' }}>Players walk their own token with WASD or the arrow keys. Press Move on a token here to walk it yourself.</div>
             {/* Section: Players */}
             {availableTokens.filter(t => t.type === 'player').length > 0 && (
               <>

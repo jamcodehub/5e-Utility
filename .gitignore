@@ -9,3 +9,6 @@ client_secret*.json
 .DS_Store
 .vscode/*
 !.vscode/settings.json
+
+# Godot map generator web export (large; see Notion 1.9 notes for where it should live)
+client/public/godot/
