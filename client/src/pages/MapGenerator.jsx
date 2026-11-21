@@ -72,36 +72,43 @@ export default function MapGenerator() {
     )
   }
 
+  // The generator fills everything beside the sidebar: no heading, just the game and a way back to the maps. Anything the page has
+  // to say (saving, saved, an error) floats over the top of the game.
+  const note = error
+    ? { text: error, color: '#ff8a80', role: 'alert' }
+    : status
+      ? { text: status, color: '#8fe3a8', role: 'status' }
+      : !campaign
+        ? { text: NEEDS_CAMPAIGN, color: '#f2ead8', role: 'status' }
+        : null
+
   return (
-    <div className="page-content" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-      <div>
-        <h2 style={{ fontSize: 22, marginBottom: 4 }}>Map generator</h2>
-        <p style={{ color: 'var(--text-2)', fontSize: 14, margin: 0 }}>
-          Make a dungeon, city, camp, mountains and more, look at it flat or in 3D, then press the green <b>Save to my maps</b> button
-          {campaign ? <> to add it to <b>{campaign.name}</b>.</> : '.'}
-        </p>
-      </div>
+    <div style={{ position: 'relative', flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', background: '#14110d' }}>
+      {installed === false ? (
+        <div style={{ padding: 24, color: '#d8d0bd', fontSize: 14, lineHeight: 1.6 }}>
+          <b style={{ color: '#f2ead8' }}>The map generator is not installed on this server yet.</b><br />
+          The game files are expected at <code>{GAME_URL}</code>.
+        </div>
+      ) : (
+        <>
+          <iframe ref={frame} src={GAME_URL} title="Map generator" allow="fullscreen" onLoad={() => setLoaded(true)}
+            style={{ flex: 1, width: '100%', minHeight: 0, border: 0, display: 'block', background: '#14110d' }} />
+          {!loaded && <div style={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center', color: '#a89f8a', pointerEvents: 'none', fontSize: 14 }}>Loading the generator…</div>}
+        </>
+      )}
 
-      <div aria-live="polite" style={{ minHeight: 0 }}>
-        {!campaign && !error && <div role="status" style={{ fontSize: 13, color: 'var(--text-2)' }}>{NEEDS_CAMPAIGN}</div>}
-        {status && <div role="status" style={{ fontSize: 14, fontWeight: 600, color: 'var(--green)' }}>{status}</div>}
-        {error && <div role="alert" style={{ fontSize: 13, color: 'var(--red)' }}>{error}</div>}
-      </div>
+      <button type="button" onClick={() => navigate('/levels')}
+        style={{ position: 'absolute', top: 10, right: 12, zIndex: 5, padding: '7px 14px', borderRadius: 6, cursor: 'pointer', fontSize: 13, fontWeight: 600,
+          background: 'rgba(20,17,13,0.85)', color: '#f2ead8', border: '1px solid rgba(255,255,255,0.28)' }}>
+        ← Back to Maps
+      </button>
 
-      <div style={{ position: 'relative', width: '100%', height: 'min(80vh, 820px)', minHeight: 420 }}>
-        {installed === false ? (
-          <div className="card" style={{ padding: 24, color: 'var(--text-2)', fontSize: 14, lineHeight: 1.6, height: '100%' }}>
-            <b style={{ color: 'var(--text)' }}>The map generator is not installed on this server yet.</b><br />
-            The game files are expected at <code>{GAME_URL}</code>.
-          </div>
-        ) : (
-          <>
-            <iframe ref={frame} src={GAME_URL} title="Map generator" allow="fullscreen" onLoad={() => setLoaded(true)}
-              style={{ width: '100%', height: '100%', border: '1px solid var(--border)', borderRadius: 6, background: '#14110d', display: 'block' }} />
-            {!loaded && <div style={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center', color: 'var(--text-3)', pointerEvents: 'none', fontSize: 14 }}>Loading the generator…</div>}
-          </>
-        )}
-      </div>
+      {note && (
+        <div role={note.role} aria-live="polite" style={{ position: 'absolute', top: 10, left: '50%', transform: 'translateX(-50%)', zIndex: 5, maxWidth: 'min(70%, 560px)',
+          padding: '8px 14px', borderRadius: 6, fontSize: 13, fontWeight: 600, textAlign: 'center', background: 'rgba(20,17,13,0.9)', color: note.color, border: '1px solid rgba(255,255,255,0.2)' }}>
+          {note.text}
+        </div>
+      )}
     </div>
   )
 }
