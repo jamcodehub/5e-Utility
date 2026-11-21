@@ -39,6 +39,9 @@ const dimsOf = (grid) => {
   return h >= 6 && h <= 60 && w >= 6 && w <= 80 ? { w, h } : { w: GRID_W, h: GRID_H }
 }
 
+// The Night half of the Day/Night toggle (a crescent moon; the toggle's own filter makes it white when it needs to be)
+const MOON_ICON = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M21 14.5A9 9 0 0 1 9.5 3a9 9 0 1 0 11.5 11.5z'/%3E%3C/svg%3E"
+
 const TORCH_LIGHT_RADIUS = OBJECT_TILES.find(tile => tile.id === 'torch').lightRadius
 const DARKVISION_RADIUS = 6
 
@@ -1390,13 +1393,13 @@ export default function LevelBuilder() {
             className="level-darkness-toggle"
             data-dark={darkMode}
             onClick={() => toggleDarkMode(editPlanId)}
-            aria-label="Fog of war (map darkness for players)"
+            aria-label="Day or night (map lighting for players)"
             aria-pressed={darkMode}
-            title={darkMode ? 'Fog of war is on for players' : 'Fog of war is off for players'}
+            title={darkMode ? 'Night: players only see what torches and darkvision light up. Click for day.' : 'Day: players see the whole map. Click for night.'}
           >
             <span className="level-darkness-toggle-thumb" aria-hidden="true" />
-            <span className="level-darkness-toggle-label" title="Fog of war off"><img src="https://res.cloudinary.com/crcbzpw6/image/upload/v1795083562/sun-regular-full.svg" alt="Fog of war off" /></span>
-            <span className="level-darkness-toggle-label" title="Fog of war on"><img src="https://res.cloudinary.com/crcbzpw6/image/upload/v1795083576/cloud-regular-full.svg" alt="Fog of war on" /></span>
+            <span className="level-darkness-toggle-label" title="Day"><img src="https://res.cloudinary.com/crcbzpw6/image/upload/v1795083562/sun-regular-full.svg" alt="Day" /></span>
+            <span className="level-darkness-toggle-label" title="Night"><img src={MOON_ICON} alt="Night" /></span>
           </button>
         )}
         <div style={{ display: 'flex', gap: 8, flexShrink: 0, marginLeft: 'auto' }}>
@@ -1661,13 +1664,13 @@ export default function LevelBuilder() {
             className="level-darkness-toggle"
             data-dark={darkMode}
             onClick={() => toggleDarkMode(selectedPlanId)}
-            aria-label="Fog of war (map darkness for players)"
+            aria-label="Day or night (map lighting for players)"
             aria-pressed={darkMode}
-            title={darkMode ? 'Fog of war is on for players' : 'Fog of war is off for players'}
+            title={darkMode ? 'Night: players only see what torches and darkvision light up. Click for day.' : 'Day: players see the whole map. Click for night.'}
           >
             <span className="level-darkness-toggle-thumb" aria-hidden="true" />
-            <span className="level-darkness-toggle-label" title="Fog of war off"><img src="https://res.cloudinary.com/crcbzpw6/image/upload/v1795083562/sun-regular-full.svg" alt="Fog of war off" /></span>
-            <span className="level-darkness-toggle-label" title="Fog of war on"><img src="https://res.cloudinary.com/crcbzpw6/image/upload/v1795083576/cloud-regular-full.svg" alt="Fog of war on" /></span>
+            <span className="level-darkness-toggle-label" title="Day"><img src="https://res.cloudinary.com/crcbzpw6/image/upload/v1795083562/sun-regular-full.svg" alt="Day" /></span>
+            <span className="level-darkness-toggle-label" title="Night"><img src={MOON_ICON} alt="Night" /></span>
           </button>
         )}
         <button className="btn btn-ghost btn-sm" onClick={() => { setTokens([]); setMode('gallery') }}>← Back</button>
