@@ -4,6 +4,7 @@ import { LevelPlan, User } from './models/index.js'
 import { isMember } from './routes/campaigns.js'
 import { clientOrigins } from './lib/clientUrl.js'
 import { applyPlayerTokenUpdate, mapDims, sameTokens } from './lib/tokenRules.js'
+import { groundOf, isLocked, withLock, canKnock } from './lib/doors.js'
 
 // Real-time collaborative Level Builder "Play mode" board — everyone viewing
 // the same map (DM + players) sees token moves live and the board persists
@@ -34,6 +35,8 @@ export function attachRealtime(httpServer) {
     const users = await User.find({ _id: { $in: userIds } }, 'username avatar')
     io.to(`level:${planId}`).emit('level:presence', users.map(u => ({ userId: u._id, username: u.username, avatar: u.avatar })))
   }
+
+  const doorKnocks = new Map() // recent door requests, so a player cannot flood the DM
 
   io.on('connection', (socket) => {
     socket.on('campaign:join', async (campaignId, acknowledge) => {
@@ -92,6 +95,7 @@ export function attachRealtime(httpServer) {
         socket.emit('level:tokens', plan.tokens || [])
         socket.emit('level:dark-mode', Boolean(plan.darkMode))
         socket.emit('level:doors', plan.doorStates || [])
+        socket.emit('level:door-locks', plan.doorLocks || [])
         broadcastPresence(planId)
       } catch { /* ignore bad room join */ }
     })
@@ -153,12 +157,13 @@ export function attachRealtime(httpServer) {
       }
     })
 
+    // Open or close a door. Anyone on the map can, except that a locked door stays shut until the DM unlocks it.
     socket.on('level:door', async (payload = {}, acknowledge) => {
       const respond = typeof acknowledge === 'function' ? acknowledge : () => {}
       const { planId, row, col, open } = payload
       if (typeof planId !== 'string' || !planId
-        || !Number.isInteger(row) || row < 0 || row >= 22
-        || !Number.isInteger(col) || col < 0 || col >= 32
+        || !Number.isInteger(row) || row < 0
+        || !Number.isInteger(col) || col < 0
         || typeof open !== 'boolean') {
         respond({ ok: false, error: 'Invalid door update' })
         return
@@ -169,11 +174,13 @@ export function attachRealtime(httpServer) {
           respond({ ok: false, error: 'You cannot interact with this map' })
           return
         }
-        let map
-        try { map = JSON.parse(plan.content) } catch { map = null }
-        const ground = Array.isArray(map) ? map : map?.ground
+        const ground = groundOf(plan.content)
         if (ground?.[row]?.[col] !== 'door') {
           respond({ ok: false, error: 'There is no door at that location' })
+          return
+        }
+        if (open && isLocked(plan.doorLocks, row, col) && String(plan.owner) !== socket.userId) {
+          respond({ ok: false, locked: true, error: 'The door is locked' })
           return
         }
         const doorStates = Array.isArray(plan.doorStates)
@@ -189,6 +196,87 @@ export function attachRealtime(httpServer) {
         console.error('Failed to update battle map door:', error)
         respond({ ok: false, error: 'Could not update the door' })
       }
+    })
+
+    // The DM locks or unlocks a door. Locking an open door closes it.
+    socket.on('level:door-lock', async (payload = {}, acknowledge) => {
+      const respond = typeof acknowledge === 'function' ? acknowledge : () => {}
+      const { planId, row, col, locked } = payload
+      if (typeof planId !== 'string' || !planId || !Number.isInteger(row) || row < 0 || !Number.isInteger(col) || col < 0 || typeof locked !== 'boolean') {
+        respond({ ok: false, error: 'Invalid door update' })
+        return
+      }
+      try {
+        const plan = await LevelPlan.findById(planId)
+        if (!plan || String(plan.owner) !== socket.userId || !await isMember(plan.campaign, socket.userId)) {
+          respond({ ok: false, error: 'Only the DM can lock or unlock doors' })
+          return
+        }
+        if (groundOf(plan.content)?.[row]?.[col] !== 'door') {
+          respond({ ok: false, error: 'There is no door at that location' })
+          return
+        }
+        plan.doorLocks = withLock(plan.doorLocks, row, col, locked)
+        const wasOpen = locked && plan.doorStates?.[row]?.[col] === true
+        if (wasOpen) {
+          const doorStates = plan.doorStates.map(cells => Array.isArray(cells) ? cells.slice() : [])
+          doorStates[row][col] = false
+          plan.doorStates = doorStates
+        }
+        await plan.save()
+        io.to(`level:${planId}`).emit('level:door-lock', { row, col, locked })
+        if (wasOpen) io.to(`level:${planId}`).emit('level:door', { row, col, open: false })
+        respond({ ok: true, row, col, locked })
+      } catch (error) {
+        console.error('Failed to lock or unlock a battle map door:', error)
+        respond({ ok: false, error: 'Could not update the door' })
+      }
+    })
+
+    // A player tries a locked door. The DM is asked whether to let them through (one request per door every few seconds).
+    socket.on('level:door-knock', async (payload = {}, acknowledge) => {
+      const respond = typeof acknowledge === 'function' ? acknowledge : () => {}
+      const { planId, row, col } = payload
+      if (typeof planId !== 'string' || !planId || !Number.isInteger(row) || row < 0 || !Number.isInteger(col) || col < 0) {
+        respond({ ok: false, error: 'Invalid door' })
+        return
+      }
+      try {
+        const plan = await LevelPlan.findById(planId)
+        if (!plan || !await isMember(plan.campaign, socket.userId)) {
+          respond({ ok: false, error: 'You cannot interact with this map' })
+          return
+        }
+        if (groundOf(plan.content)?.[row]?.[col] !== 'door' || !isLocked(plan.doorLocks, row, col)) {
+          respond({ ok: false, error: 'That door is not locked' })
+          return
+        }
+        if (!canKnock(doorKnocks, `${planId}:${row}:${col}:${socket.userId}`, Date.now())) {
+          respond({ ok: true, waiting: true })
+          return
+        }
+        const mine = (Array.isArray(plan.tokens) ? plan.tokens : []).find(t => t?.id === `char-${socket.userId}`)
+        const user = mine?.name ? null : await User.findById(socket.userId).select('username')
+        const name = String(mine?.name || user?.username || 'A player').slice(0, 60)
+        const sockets = await io.in(`level:${planId}`).fetchSockets()
+        for (const s of sockets) if (s.userId === String(plan.owner)) s.emit('level:door-knock', { row, col, userId: socket.userId, name })
+        respond({ ok: true, waiting: true })
+      } catch (error) {
+        console.error('Failed to send a door request to the DM:', error)
+        respond({ ok: false, error: 'Could not ask the DM' })
+      }
+    })
+
+    // The DM says a door stays locked: the player who asked is told.
+    socket.on('level:door-deny', async (payload = {}) => {
+      const { planId, row, col, userId } = payload
+      if (typeof planId !== 'string' || !planId || !Number.isInteger(row) || !Number.isInteger(col) || typeof userId !== 'string') return
+      try {
+        const plan = await LevelPlan.findById(planId).select('owner')
+        if (!plan || String(plan.owner) !== socket.userId) return
+        const sockets = await io.in(`level:${planId}`).fetchSockets()
+        for (const s of sockets) if (s.userId === userId) s.emit('level:door-denied', { row, col })
+      } catch { /* the player just keeps waiting */ }
     })
 
     socket.on('level:travel', async (payload = {}, acknowledge) => {
@@ -270,6 +358,7 @@ export function attachRealtime(httpServer) {
             tokens: destinationTokens,
             darkMode: Boolean(destination.darkMode),
             doorStates: destination.doorStates || [],
+            doorLocks: destination.doorLocks || [],
           },
         })
         respond({ ok: true })

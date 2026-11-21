@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { keyToStep, canStand, stepToken, isTypingTarget } from './tokenMove.js'
+import { keyToStep, canStand, stepToken, isTypingTarget, bumpedDoor } from './tokenMove.js'
 
 const ground = [
   ['wall', 'wall', 'wall', 'wall', 'wall'],
@@ -69,4 +69,15 @@ test('typing in a box is never a move', () => {
   assert.equal(isTypingTarget({ tagName: 'DIV', isContentEditable: true }), true)
   assert.equal(isTypingTarget({ tagName: 'DIV' }), false)
   assert.equal(isTypingTarget(null), false)
+})
+
+test('walking into a closed door is noticed, so it can be opened or its lock tried', () => {
+  const tokens = [{ id: 'a', row: 1, col: 2 }]
+  assert.deepEqual(bumpedDoor(tokens, 'a', keyToStep('d'), ground, closed), { row: 1, col: 3 })
+  const open = closed.map(r => r.slice()); open[1][3] = true
+  assert.equal(bumpedDoor(tokens, 'a', keyToStep('d'), ground, open), null, 'an open door is just walked through')
+  assert.equal(bumpedDoor(tokens, 'a', keyToStep('a'), ground, closed), null, 'floor, not a door')
+  assert.equal(bumpedDoor(tokens, 'a', keyToStep('x'), ground, closed), null, 'not a movement key')
+  assert.equal(bumpedDoor(tokens, 'zzz', keyToStep('d'), ground, closed), null, 'unknown token')
+  assert.equal(bumpedDoor([{ id: 'a', row: 1, col: 2 }, { id: 'b', row: 1, col: 3 }], 'a', keyToStep('d'), ground, closed), null, 'someone is standing in the doorway')
 })

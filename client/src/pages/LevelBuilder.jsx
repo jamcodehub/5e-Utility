@@ -13,7 +13,7 @@ import { TILES, OBJECT_TILES } from '../data/levelTiles'
 import { THEMES, DEFAULT_THEME, resolveThemeId, getThemeTiles } from '../data/levelThemes'
 import { avatarSrc } from '../components/ProfileAvatar'
 import { tokenColor } from '../utils/tokenColor'
-import { keyToStep, stepToken, isTypingTarget } from '../utils/tokenMove'
+import { keyToStep, stepToken, isTypingTarget, bumpedDoor } from '../utils/tokenMove'
 import { classIdFor, viewerLevels } from '../utils/viewer3d'
 import Battle3DView from '../components/Battle3DView'
 // Note: module-level TILES / OBJECT_TILES above are the base (Medieval) set, used for
@@ -337,6 +337,10 @@ export default function LevelBuilder() {
   const [tokens, setTokens] = useState([]) // { id, name, avatar, color, row, col, hp, maxHp }
   const [darkMode, setDarkMode] = useState(false)
   const [doorStates, setDoorStates] = useState(blankDoorStates())
+  const [doorLocks, setDoorLocks] = useState(blankDoorStates()) // locked doors: only the DM can unlock them (see server/lib/doors.js)
+  const [knocks, setKnocks] = useState([]) // DM only: players trying a locked door, waiting for an answer
+  const [doorMenu, setDoorMenu] = useState(null) // DM only: the door they clicked, { row, col }
+  const waitingKnocksRef = useRef(new Set()) // doors this player has asked the DM about
   // The map's size is just the size of its saved grid (Small / Medium / Large templates, or legacy Medium).
   const gridH = grid.length
   const gridW = grid[0]?.length ?? GRID_W
@@ -583,6 +587,32 @@ export default function LevelBuilder() {
       setDoorStates(normalized)
       setPlans(current => current.map(plan => plan._id === selectedPlanId ? { ...plan, doorStates: normalized } : plan))
     }
+    const onDoorLocks = (locks) => {
+      const normalized = normalizeDoorStates(locks, dimsRef.current)
+      setDoorLocks(normalized)
+      setPlans(current => current.map(plan => plan._id === selectedPlanId ? { ...plan, doorLocks: normalized } : plan))
+    }
+    const onDoorLock = ({ row, col, locked } = {}) => {
+      if (!Number.isInteger(row) || !Number.isInteger(col) || row < 0 || row >= dimsRef.current.h || col < 0 || col >= dimsRef.current.w || typeof locked !== 'boolean') return
+      setDoorLocks(current => current.map((cells, r) => r === row ? cells.map((isLocked, c) => c === col ? locked : isLocked) : cells))
+      setPlans(current => current.map(plan => {
+        if (plan._id !== selectedPlanId) return plan
+        const locks = normalizeDoorStates(plan.doorLocks, dimsRef.current)
+        locks[row][col] = locked
+        return { ...plan, doorLocks: locks }
+      }))
+      setKnocks(current => current.filter(k => !(k.row === row && k.col === col)))
+      if (!locked && waitingKnocksRef.current.delete(`${row}:${col}`)) toastRef.current('The DM unlocked the door')
+    }
+    const onDoorKnock = ({ row, col, userId, name } = {}) => {
+      if (!Number.isInteger(row) || !Number.isInteger(col) || typeof userId !== 'string') return
+      setKnocks(current => current.some(k => k.row === row && k.col === col && k.userId === userId)
+        ? current
+        : [...current, { row, col, userId, name: String(name || 'A player').slice(0, 60) }])
+    }
+    const onDoorDenied = ({ row, col } = {}) => {
+      if (waitingKnocksRef.current.delete(`${row}:${col}`)) toastRef.current('The door stays locked')
+    }
     const onTravel = ({ destinationId, destinationPlan } = {}) => {
       const existingPlan = plansRef.current.find(plan => plan._id === destinationId)
       const destination = destinationPlan ? { ...(existingPlan || {}), ...destinationPlan } : existingPlan
@@ -601,6 +631,8 @@ export default function LevelBuilder() {
       setTokens(Array.isArray(destination.tokens) ? destination.tokens : [])
       setDarkMode(Boolean(destination.darkMode))
       setDoorStates(normalizeDoorStates(destination.doorStates, parsed.dims))
+      setDoorLocks(normalizeDoorStates(destination.doorLocks, parsed.dims))
+      setKnocks([])
     }
     const onDoorState = ({ row, col, open } = {}) => {
       if (!Number.isInteger(row) || !Number.isInteger(col) || row < 0 || row >= dimsRef.current.h || col < 0 || col >= dimsRef.current.w || typeof open !== 'boolean') return
@@ -619,6 +651,10 @@ export default function LevelBuilder() {
     socket.on('level:dark-mode', onDarkMode)
     socket.on('level:doors', onDoorStates)
     socket.on('level:door', onDoorState)
+    socket.on('level:door-locks', onDoorLocks)
+    socket.on('level:door-lock', onDoorLock)
+    socket.on('level:door-knock', onDoorKnock)
+    socket.on('level:door-denied', onDoorDenied)
     socket.on('level:travel', onTravel)
     socket.emit('level:join', selectedPlanId)
     return () => {
@@ -627,7 +663,13 @@ export default function LevelBuilder() {
       socket.off('level:dark-mode', onDarkMode)
       socket.off('level:doors', onDoorStates)
       socket.off('level:door', onDoorState)
+      socket.off('level:door-locks', onDoorLocks)
+      socket.off('level:door-lock', onDoorLock)
+      socket.off('level:door-knock', onDoorKnock)
+      socket.off('level:door-denied', onDoorDenied)
       socket.off('level:travel', onTravel)
+      setKnocks([])
+      setDoorMenu(null)
       socket.emit('level:leave', selectedPlanId)
       setViewers([])
     }
@@ -656,6 +698,13 @@ export default function LevelBuilder() {
     const now = Date.now()
     if (now - lastStepRef.current < 120) return true
     lastStepRef.current = now
+    // Walking into a closed door opens it. If it is locked a player asks the DM; the DM can open it without unlocking.
+    const door = bumpedDoor(tokens, movingId, step, grid, doorStates)
+    if (door) {
+      if (!isDm && doorLocks[door.row]?.[door.col]) knockOnDoor(door.row, door.col)
+      else toggleDoor(door.row, door.col, true)
+      return true
+    }
     setTokens(current => stepToken(current, movingId, step, grid, objectGrid, doorStates))
     return true
   }
@@ -709,6 +758,7 @@ export default function LevelBuilder() {
     setStairLinks(parsed.stairLinks)
     setDarkMode(Boolean(plan.darkMode))
     setDoorStates(normalizeDoorStates(plan.doorStates, parsed.dims))
+    setDoorLocks(normalizeDoorStates(plan.doorLocks, parsed.dims))
     setTokens(Array.isArray(plan.tokens) ? plan.tokens : [])
     setMode('play')
     if (isDm && activeCampaign && !activeCampaign.isPersonal) {
@@ -854,17 +904,45 @@ export default function LevelBuilder() {
     setPendingStair(null)
   }
 
-  const toggleDoor = (row, col) => {
+  const toggleDoor = (row, col, open = !doorStates[row]?.[col]) => {
     const socket = getSocket()
     socket.timeout(5000).emit('level:door', {
       planId: selectedPlanId,
       row,
       col,
-      open: !doorStates[row]?.[col],
+      open,
     }, (error, response) => {
       if (error) toast('Could not update the door')
       else if (!response?.ok) toast(response?.error || 'Could not update the door')
     })
+  }
+
+  // A player tries a locked door: the DM is asked whether to let them through.
+  const knockOnDoor = (row, col) => {
+    const key = `${row}:${col}`
+    if (waitingKnocksRef.current.has(key)) { toast('Still waiting for the DM to answer'); return }
+    waitingKnocksRef.current.add(key)
+    toast('The door is locked. Asking the DM to let you through…')
+    getSocket().timeout(5000).emit('level:door-knock', { planId: selectedPlanId, row, col }, (error, response) => {
+      if (error || !response?.ok) { waitingKnocksRef.current.delete(key); toast(response?.error || 'Could not ask the DM') }
+    })
+  }
+
+  // The DM locks or unlocks a door, or answers a player's request about one.
+  const setDoorLocked = (row, col, locked) => {
+    getSocket().timeout(5000).emit('level:door-lock', { planId: selectedPlanId, row, col, locked }, (error, response) => {
+      if (error) toast('Could not update the door')
+      else if (!response?.ok) toast(response?.error || 'Could not update the door')
+    })
+  }
+  const answerKnock = (knock, answer) => {
+    setKnocks(current => current.filter(k => k !== knock))
+    if (answer === 'deny') {
+      getSocket().emit('level:door-deny', { planId: selectedPlanId, row: knock.row, col: knock.col, userId: knock.userId })
+      return
+    }
+    setDoorLocked(knock.row, knock.col, false)
+    if (answer === 'open') toggleDoor(knock.row, knock.col, true)
   }
 
   const travelViaStair = (row, col) => {
@@ -892,7 +970,9 @@ export default function LevelBuilder() {
       return
     }
     if (grid[row]?.[col] === 'door') {
-      toggleDoor(row, col)
+      if (isDm) setDoorMenu({ row, col })
+      else if (doorLocks[row]?.[col] && !doorStates[row]?.[col]) knockOnDoor(row, col)
+      else toggleDoor(row, col)
       return
     }
     if (grid[row]?.[col] === 'stairs' || grid[row]?.[col] === 'stairs-down') travelViaStair(row, col)
@@ -1475,15 +1555,40 @@ export default function LevelBuilder() {
                       dragging={dragTokenId === token.id}
                     />
                   )}
+                  {isDoor && !doorOpen && doorLocks[r]?.[c] && visible && <span aria-label="Locked door" title="Locked door" style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: Math.max(8, cellSize * 0.5), pointerEvents: 'none', zIndex: 2, textShadow: '0 1px 2px #000' }}>🔒</span>}
                   {token?.lightSource && torchSrc && <img src={torchSrc} alt="" aria-hidden="true" draggable={false} style={{ position: 'absolute', top: -7, right: -5, zIndex: 11, width: 14, height: 14, objectFit: 'contain', pointerEvents: 'none' }} />}
                 </div>
               )
             }))}
           </div>
           </div>
+          {(knocks.length > 0 || doorMenu) && (
+            <div role="dialog" aria-label="Door" style={{ position: 'absolute', top: 10, left: '50%', transform: 'translateX(-50%)', zIndex: 30, display: 'flex', flexDirection: 'column', gap: 8, width: 'min(92%, 380px)' }}>
+              {knocks.map(k => (
+                <div key={`${k.userId}:${k.row}:${k.col}`} className="card" style={{ padding: 12, background: 'var(--surface)', border: '1px solid var(--gold)', borderRadius: 8, boxShadow: '0 4px 16px rgba(0,0,0,0.3)' }}>
+                  <div style={{ fontSize: 13, marginBottom: 8 }}><b>{k.name}</b> is trying the locked door. Let them through?</div>
+                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                    <button type="button" className="btn btn-primary btn-sm" onClick={() => answerKnock(k, 'open')}>Unlock and open</button>
+                    <button type="button" className="btn btn-ghost btn-sm" onClick={() => answerKnock(k, 'unlock')}>Just unlock</button>
+                    <button type="button" className="btn btn-ghost btn-sm" onClick={() => answerKnock(k, 'deny')}>Keep it locked</button>
+                  </div>
+                </div>
+              ))}
+              {doorMenu && (
+                <div className="card" style={{ padding: 12, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, boxShadow: '0 4px 16px rgba(0,0,0,0.3)' }}>
+                  <div style={{ fontSize: 13, marginBottom: 8 }}><b>Door</b> · {doorStates[doorMenu.row]?.[doorMenu.col] ? 'open' : doorLocks[doorMenu.row]?.[doorMenu.col] ? 'locked' : 'closed'}</div>
+                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                    <button type="button" className="btn btn-primary btn-sm" onClick={() => { toggleDoor(doorMenu.row, doorMenu.col); setDoorMenu(null) }}>{doorStates[doorMenu.row]?.[doorMenu.col] ? 'Close' : 'Open'}</button>
+                    <button type="button" className="btn btn-ghost btn-sm" onClick={() => { setDoorLocked(doorMenu.row, doorMenu.col, !doorLocks[doorMenu.row]?.[doorMenu.col]); setDoorMenu(null) }}>{doorLocks[doorMenu.row]?.[doorMenu.col] ? 'Unlock' : 'Lock'}</button>
+                    <button type="button" className="btn btn-ghost btn-sm" onClick={() => setDoorMenu(null)}>Cancel</button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
           {view3d && (
             <Battle3DView
-              ground={grid} objects={objectGrid} doorStates={doorStates} theme={themeId}
+              ground={grid} objects={objectGrid} doorStates={doorStates} doorLocks={doorLocks} theme={themeId}
               tokens={tokens} levels={viewerLevelList} darkMode={darkMode}
               focusId={isDm ? (tapToPlaceTokenId || '') : `char-${user?.id}`} classOf={classOfToken}
               onClick={handleViewerClick} onKey={key => walkRef.current(key)}

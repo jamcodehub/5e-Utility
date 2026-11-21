@@ -51,3 +51,15 @@ export function isTypingTarget(target) {
   const tag = String(target.tagName || '').toLowerCase()
   return tag === 'input' || tag === 'textarea' || tag === 'select' || target.isContentEditable === true
 }
+
+// Is the token walking into a closed door? Returns { row, col } of the door, or null. (A door someone else stands in, or one the
+// token could not reach anyway, does not count.)
+export function bumpedDoor(tokens, id, step, ground, doorStates) {
+  if (!step) return null
+  const token = tokens.find(t => t.id === id)
+  if (!token || !Number.isInteger(token.row) || !Number.isInteger(token.col)) return null
+  const row = token.row + step.dr
+  const col = token.col + step.dc
+  if (ground?.[row]?.[col] !== 'door' || doorStates?.[row]?.[col]) return null
+  return tokens.some(t => t.id !== id && t.row === row && t.col === col) ? null : { row, col }
+}

@@ -2,6 +2,7 @@ import { Router } from 'express'
 import { LevelPlan, Campaign, User } from '../models/index.js'
 import { hasPremium, hasPremiumAs } from '../lib/premium.js'
 import { auth, isMember } from './campaigns.js'
+import { locksFromContent, pruneLocks } from '../lib/doors.js'
 
 const router = Router()
 
@@ -25,6 +26,7 @@ router.post('/:campaignId', auth, async (req, res) => {
     const plan = await LevelPlan.create({
       title: req.body.title, content: req.body.content, tokens: req.body.tokens, stairLinks: req.body.stairLinks,
       theme: ALLOWED_THEMES.includes(req.body.theme) ? req.body.theme : 'medieval',
+      doorLocks: locksFromContent(req.body.content), // locked doors the map was designed with (the map generator makes some)
       campaign: req.params.campaignId, owner: req.userId,
     })
     res.json(plan)
@@ -43,6 +45,11 @@ router.put('/:id', auth, async (req, res) => {
   if (ALLOWED_THEMES.includes(req.body.theme)) updates.theme = req.body.theme
   if (typeof req.body.darkMode === 'boolean') updates.darkMode = req.body.darkMode
   if (Array.isArray(req.body.doorStates)) updates.doorStates = req.body.doorStates
+  if (typeof req.body.content === 'string') {
+    // The map was edited: a lock only stays where there is still a door.
+    const before = await LevelPlan.findOne({ _id: req.params.id, owner: req.userId }).select('doorLocks')
+    if (before) updates.doorLocks = pruneLocks(before.doorLocks, req.body.content)
+  }
   const plan = await LevelPlan.findOneAndUpdate({ _id: req.params.id, owner: req.userId }, updates, { returnDocument: 'after' })
   res.json(plan)
 })

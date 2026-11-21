@@ -48,9 +48,10 @@ test('missing visibility data never throws', () => {
 })
 
 test('the map message has plain data only', () => {
-  const m = buildMapMessage({ ground: [['floor']], objects: [[undefined]], doorStates: [[1]], theme: undefined })
+  const m = buildMapMessage({ ground: [['floor']], objects: [[undefined]], doorStates: [[1]], doorLocks: [[0]], theme: undefined })
   assert.equal(m.type, VIEWER_MAP)
-  assert.deepEqual(m.map, { ground: [['floor']], objects: [[null]], doorStates: [[true]], theme: 'medieval' })
+  assert.deepEqual(m.map, { ground: [['floor']], objects: [[null]], doorStates: [[true]], doorLocks: [[false]], theme: 'medieval' })
+  assert.deepEqual(buildMapMessage({ ground: [['door']] }).map.doorLocks, [], 'no locks sent when there are none')
   assert.doesNotThrow(() => JSON.stringify(m))
 })
 

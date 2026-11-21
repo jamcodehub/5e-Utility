@@ -44,13 +44,14 @@ export function viewerLevels({ darkMode, isDm, visibility, rows, cols }) {
   return levels
 }
 
-export function buildMapMessage({ ground, objects, doorStates, theme }) {
+export function buildMapMessage({ ground, objects, doorStates, doorLocks, theme }) {
   return {
     type: VIEWER_MAP,
     map: {
       ground,
       objects: (objects || []).map(row => (row || []).map(id => id || null)),
       doorStates: (doorStates || []).map(row => (row || []).map(Boolean)),
+      doorLocks: (doorLocks || []).map(row => (row || []).map(Boolean)),
       theme: theme || 'medieval',
     },
   }
