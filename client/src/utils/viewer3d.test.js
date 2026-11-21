@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { classIdFor, CLASS_IDS, viewerLevels, buildMapMessage, buildStateMessage, readViewerMessage, viewerUrl, VIEWER_MAP, VIEWER_STATE } from './viewer3d.js'
+import { DM_DIM, classIdFor, CLASS_IDS, viewerLevels, buildMapMessage, buildStateMessage, readViewerMessage, viewerUrl, VIEWER_MAP, VIEWER_STATE } from './viewer3d.js'
 
 test('a class is found in whatever the player typed, otherwise nothing', () => {
   assert.equal(classIdFor('Wizard'), 'wizard')
@@ -38,9 +38,18 @@ test('with fog: black out of sight, dim with darkvision, fading torchlight for p
   assert.equal(player.length, rows * cols)
 })
 
-test('the DM sees full torchlit squares, as on the 2D board, but still black where nothing is seen', () => {
+test('the DM sees full torchlit squares, and the dark dimly rather than black, so they can run the game', () => {
   const dm = viewerLevels({ darkMode: true, isDm: true, visibility, rows, cols })
-  assert.deepEqual(dm, [1, 0.35, 0, 1, 0.35, 1])
+  assert.deepEqual(dm, [1, 0.35, DM_DIM, 1, 0.35, 1])
+  const players = viewerLevels({ darkMode: true, isDm: false, visibility, rows, cols })
+  assert.equal(players[2], 0, 'the same square is pitch black for players')
+  assert.ok(DM_DIM > 0 && DM_DIM < 0.5)
+})
+
+test('outdoors the DM also sees the dark dimly, players see black', () => {
+  const vis = { visible: [[true, false]], torchlit: [[true, false]], darkvision: [[false, false]], lightStrength: [[1, 0]], lightFade: [[1, 0]] }
+  assert.deepEqual(viewerLevels({ darkMode: true, isDm: true, visibility: vis, rows: 1, cols: 2, outdoor: true }), [1, DM_DIM])
+  assert.deepEqual(viewerLevels({ darkMode: true, isDm: false, visibility: vis, rows: 1, cols: 2, outdoor: true }), [1, 0])
 })
 
 test('missing visibility data never throws', () => {

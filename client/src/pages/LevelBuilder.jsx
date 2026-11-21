@@ -292,14 +292,17 @@ const dragPreviewTransform = ({ x, y }) => `translate3d(${x}px, ${y}px, 0) trans
 
 // One square of the play board. Memoised, so a token taking a step redraws only the squares it left and entered, not the whole
 // board (a 48 by 33 map has 1,584 squares: drawing them all on every step took about 0.3 seconds and made walking lag).
-const PlayCell = memo(function PlayCell({ r, c, cellId, groundTile, object, turn, objectTurn, visible, fade, torchlit, darkvision, lightStrength, doorOpen, locked, shade, token, dragging, darkMode, isDm, cellSize, torchSrc, onCellClick, onDragStart }) {
-  const shown = visible
+const PlayCell = memo(function PlayCell({ r, c, cellId, groundTile, object, turn, objectTurn, visible, dmView, fade, torchlit, darkvision, lightStrength, doorOpen, locked, shade, token, dragging, darkMode, isDm, cellSize, torchSrc, onCellClick, onDragStart }) {
+  // `dmView`: in the dark the DM still sees the map, dimly, so they can run the game; players see pitch black.
+  const shown = visible || dmView
   const isDoor = cellId === 'door'
   const isStair = cellId === 'stairs' || cellId === 'stairs-down'
   const cellBase = isDoor && doorOpen ? 'floor' : cellId
   // Dimming is applied to the pictures, not to the square's box: the pictures run a hair past the square's edges so neighbours
   // overlap, which leaves no seams for light lines to show through.
-  const lightFilter = darkvision
+  const lightFilter = dmView
+    ? 'brightness(0.3)'
+    : darkvision
     ? 'brightness(0.35)'
     : fade !== null && fade !== undefined && torchlit
       // outdoors: torch light fades smoothly out to nothing (1 at the torch, 0 at the edge of its reach)
@@ -1128,7 +1131,7 @@ export default function LevelBuilder() {
   }
 
   const handlePlayCellClick = (event, row, col) => {
-    if ((!tapToPlaceTokenId && event.target !== event.currentTarget) || !visibility.visible[row]?.[col]) return
+    if ((!tapToPlaceTokenId && event.target !== event.currentTarget) || (!isDm && !visibility.visible[row]?.[col])) return
     if (tapToPlaceTokenId) {
       setTokens(current => {
         if (current.some(token => token.id === tapToPlaceTokenId)) {
@@ -1155,7 +1158,7 @@ export default function LevelBuilder() {
   }
 
   const toggleDarkMode = (planId = selectedPlanId) => {
-    if (!isDm || !planId) return
+    if (!isDm || !planId || !outdoor) return
     const socket = getSocket()
     socket.timeout(5000).emit('level:dark-mode', { planId, darkMode: !darkMode }, (error, response) => {
       if (error) {
@@ -1214,6 +1217,9 @@ export default function LevelBuilder() {
   const visionKey = visionCarriers.map(token => `${token.row}:${token.col}`).join('|')
   const darkvisionSources = useMemo(() => visionCarriers, [isDm, visionKey]) // eslint-disable-line react-hooks/exhaustive-deps
   const outdoor = isOutdoorMap(outdoorFlag, grid)
+  // Daylight only reaches outdoor maps: outdoors it is dark only at night (the Day/Night toggle); caves, dungeons and other
+  // places without daylight are always dark, so torches and darkvision always matter there.
+  const dark = outdoor ? darkMode : true
   const visibility = useMemo(() => {
     const visible = []
     const torchlit = []
@@ -1237,9 +1243,9 @@ export default function LevelBuilder() {
         const hasDarkvision = darkvisionSources.some(source =>
           canSeeFrom(grid, doorStates, source, row, col, DARKVISION_RADIUS)
         )
-        visible[row][col] = !darkMode || sharedLight || hasDarkvision
-        torchlit[row][col] = !darkMode || sharedLight
-        darkvision[row][col] = darkMode && hasDarkvision && !sharedLight
+        visible[row][col] = !dark || sharedLight || hasDarkvision
+        torchlit[row][col] = !dark || sharedLight
+        darkvision[row][col] = dark && hasDarkvision && !sharedLight
         // Outdoors a torch's light fades out smoothly over its whole reach.
         lightFade[row][col] = nearbyLights.length ? Math.max(...nearbyLights.map(({ distance, radius }) => Math.max(0, 1 - distance / (radius + 1)))) : 0
         lightStrength[row][col] = sharedLight
@@ -1253,7 +1259,7 @@ export default function LevelBuilder() {
       }
     }
     return { visible, torchlit, darkvision, lightStrength, lightFade }
-  }, [darkMode, doorStates, grid, isDm, darkvisionSources, sharedLightSources, outdoor])
+  }, [dark, doorStates, grid, isDm, darkvisionSources, sharedLightSources, outdoor])
 
   // Where each token stands (one lookup for the whole board instead of a search per square), and each square's height shading.
   const tokenAtCell = useMemo(() => {
@@ -1272,8 +1278,8 @@ export default function LevelBuilder() {
 
   // What the 3D view is sent: how lit each square is (same as the 2D board shows), and each token's class.
   const viewerLevelList = useMemo(
-    () => viewerLevels({ darkMode, isDm, visibility, rows: gridH, cols: gridW, outdoor }),
-    [darkMode, isDm, visibility, gridH, gridW, outdoor],
+    () => viewerLevels({ darkMode: dark, isDm, visibility, rows: gridH, cols: gridW, outdoor }),
+    [dark, isDm, visibility, gridH, gridW, outdoor],
   )
   const classOfToken = useCallback((t) => availableTokens.find(a => a.id === t.id)?.classId || '', [availableTokens])
   const handleViewerClick = ({ row, col, tokenId }) => {
@@ -1391,11 +1397,12 @@ export default function LevelBuilder() {
           <button
             type="button"
             className="level-darkness-toggle"
-            data-dark={darkMode}
+            data-dark={dark}
             onClick={() => toggleDarkMode(editPlanId)}
             aria-label="Day or night (map lighting for players)"
-            aria-pressed={darkMode}
-            title={darkMode ? 'Night: players only see what torches and darkvision light up. Click for day.' : 'Day: players see the whole map. Click for night.'}
+            aria-pressed={dark}
+            disabled={!outdoor}
+            title={!outdoor ? 'No daylight reaches this map (a cave, dungeon or windowless place), so it is always dark: players only see what torches and darkvision light up. Tick Outdoor map in the editor if daylight does reach it.' : dark ? 'Night: players only see what torches and darkvision light up. Click for day.' : 'Day: players see the whole map. Click for night.'}
           >
             <span className="level-darkness-toggle-thumb" aria-hidden="true" />
             <span className="level-darkness-toggle-label" title="Day"><img src="https://res.cloudinary.com/crcbzpw6/image/upload/v1795083562/sun-regular-full.svg" alt="Day" /></span>
@@ -1411,9 +1418,9 @@ export default function LevelBuilder() {
 
       <div className="lb-editor-workspace">
       <aside className="lb-editor-tools" aria-label="Map tile selection">
-        <label title="On an outdoor map a torch's light fades out smoothly into the dark instead of ending in a ring. Where no light reaches is pitch black either way. Leave it unticked for dungeons and caves."
+        <label title="Tick this for an outdoor map, or a place with windows. It then has a Day / Night toggle: by day players see everything, at night only what torches and darkvision light up. Leave it unticked for caves, dungeons and windowless rooms, which are always dark."
           style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: 'var(--text-2)', margin: '0 0 8px', cursor: 'pointer' }}>
-          <input type="checkbox" checked={outdoor} onChange={e => setOutdoorFlag(e.target.checked)} /> Outdoor map (torch light fades out smoothly)
+          <input type="checkbox" checked={outdoor} onChange={e => setOutdoorFlag(e.target.checked)} /> Daylight reaches this map (Day / Night applies)
         </label>
         <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
           <button type="button" className="btn btn-ghost btn-sm" onClick={runUndo} disabled={!history.undo.length} title="Undo the last click or drag (Ctrl or ⌘ + Z)" style={{ flex: 1, justifyContent: 'center' }}>↶ Undo</button>
@@ -1537,7 +1544,7 @@ export default function LevelBuilder() {
                 {cellId === 'door' && designLocks[r]?.[c] && <span aria-label="Locked door" title="Locked door" style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, pointerEvents: 'none', zIndex: 2, textShadow: '0 1px 2px #000' }}>🔒</span>}
                 {stairLinks[r]?.[c] && <span aria-label="Linked stairs" style={{ position: 'absolute', top: 0, right: 1, color: '#fff', fontSize: 8, textShadow: '0 1px 2px #000', pointerEvents: 'none' }}>→</span>}
                 {object && object.id !== 'object-erase' && (object.imageUrl || object.iconUrl || object.id.startsWith('rock-')) && <TileIconPlaceholder tile={object} rotate={objectTurn} style={{ position: 'absolute', zIndex: 1 }} />}
-                {darkMode && !visibility.torchlit[r]?.[c] && !visibility.darkvision[r]?.[c] && (
+                {outdoor && darkMode && !visibility.torchlit[r]?.[c] && !visibility.darkvision[r]?.[c] && (
                   <div
                     aria-hidden="true"
                     style={{
@@ -1662,11 +1669,12 @@ export default function LevelBuilder() {
           <button
             type="button"
             className="level-darkness-toggle"
-            data-dark={darkMode}
+            data-dark={dark}
             onClick={() => toggleDarkMode(selectedPlanId)}
             aria-label="Day or night (map lighting for players)"
-            aria-pressed={darkMode}
-            title={darkMode ? 'Night: players only see what torches and darkvision light up. Click for day.' : 'Day: players see the whole map. Click for night.'}
+            aria-pressed={dark}
+            disabled={!outdoor}
+            title={!outdoor ? 'No daylight reaches this map (a cave, dungeon or windowless place), so it is always dark: players only see what torches and darkvision light up. Tick Outdoor map in the editor if daylight does reach it.' : dark ? 'Night: players only see what torches and darkvision light up. Click for day.' : 'Day: players see the whole map. Click for night.'}
           >
             <span className="level-darkness-toggle-thumb" aria-hidden="true" />
             <span className="level-darkness-toggle-label" title="Day"><img src="https://res.cloudinary.com/crcbzpw6/image/upload/v1795083562/sun-regular-full.svg" alt="Day" /></span>
@@ -1698,7 +1706,7 @@ export default function LevelBuilder() {
               height: box.w && box.h ? `${Math.min(box.w / gridW, box.h / gridH) * gridH * zoom}px` : `${zoom * 100}%`,
               margin: 'auto',
               flexShrink: 0,
-              background: darkMode ? '#000' : '#24201a',
+              background: dark ? '#000' : '#24201a',
               border: 'none',
               borderRadius: 0,
               overflow: 'hidden',
@@ -1722,7 +1730,8 @@ export default function LevelBuilder() {
                   turn={rotationOf(cellId === 'door' && doorOpen ? 'floor' : cellId, rotations[r]?.[c], r, c) * 90}
                   objectTurn={rotationOf(objectGrid[r]?.[c], objectRotations[r]?.[c], r, c) * 90}
                   visible={visibility.visible[r]?.[c]}
-                  fade={darkMode && outdoor ? Math.min(1, visibility.lightFade[r]?.[c] || 0) : null}
+                  fade={dark && outdoor ? Math.min(1, visibility.lightFade[r]?.[c] || 0) : null}
+                  dmView={isDm && dark && !visibility.visible[r]?.[c]}
                   torchlit={visibility.torchlit[r]?.[c]}
                   darkvision={visibility.darkvision[r]?.[c]}
                   lightStrength={visibility.lightStrength[r]?.[c] || 0}
@@ -1731,7 +1740,7 @@ export default function LevelBuilder() {
                   shade={shadeGrid?.[r]?.[c]}
                   token={token}
                   dragging={Boolean(token) && dragTokenId === token.id}
-                  darkMode={darkMode}
+                  darkMode={dark}
                   isDm={isDm}
                   cellSize={cellSize}
                   torchSrc={torchSrc}
@@ -1769,7 +1778,7 @@ export default function LevelBuilder() {
           {view3d && (
             <Battle3DView
               ground={grid} objects={objectGrid} heights={heights} doorStates={doorStates} doorLocks={doorLocks} theme={themeId}
-              tokens={tokens} levels={viewerLevelList} darkMode={darkMode}
+              tokens={tokens} levels={viewerLevelList} darkMode={dark}
               focusId={isDm ? (tapToPlaceTokenId || '') : `char-${user?.id}`} classOf={classOfToken}
               onClick={handleViewerClick} onKey={key => walkRef.current(key)}
               tokensOpen={isDm && showTokens && !isFullscreen}

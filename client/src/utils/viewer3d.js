@@ -15,6 +15,9 @@ export const VIEWER_KEY = '5eutility-viewer-key'
 export const CLASS_IDS = ['barbarian', 'bard', 'cleric', 'druid', 'fighter', 'monk', 'paladin', 'ranger', 'rogue', 'sorcerer', 'warlock', 'wizard']
 const KINDS = ['player', 'enemy', 'boss', 'npc']
 
+// In the dark the DM still sees the map, dimly, so they can run the game; players see pitch black.
+export const DM_DIM = 0.3
+
 // "Wizard (Evocation)", "Eldritch Knight Fighter", "wizard 3" -> 'wizard' / 'fighter'; anything else -> '' (a plain figure).
 export function classIdFor(text) {
   const words = String(text || '').toLowerCase().match(/[a-z]+/g) || []
@@ -41,10 +44,11 @@ export function viewerLevels({ darkMode, isDm, visibility, rows, cols, outdoor =
         const fade = Math.max(0, Math.min(1, visibility?.lightFade?.[r]?.[c] || 0))
         let level = fade * fade * (3 - 2 * fade) // eases in and out, so there is no visible ring
         if (visibility?.darkvision?.[r]?.[c]) level = Math.max(level, 0.35)
+        if (isDm) level = Math.max(level, DM_DIM)
         levels.push(Math.round(level * 100) / 100)
         continue
       }
-      if (!visibility?.visible?.[r]?.[c]) { levels.push(0); continue }
+      if (!visibility?.visible?.[r]?.[c]) { levels.push(isDm ? DM_DIM : 0); continue }
       if (visibility.darkvision?.[r]?.[c]) { levels.push(0.35); continue }
       const strength = visibility.lightStrength?.[r]?.[c] || 0
       levels.push(!isDm && visibility.torchlit?.[r]?.[c] && strength ? Math.round((0.45 + strength * 0.55) * 100) / 100 : 1)
