@@ -216,8 +216,9 @@ export default function Character() {
     try {
       const { fields, warnings } = await api('/dndbeyond/preview', { method: 'POST', body: { url: ddbUrl.trim() } })
       setForm(p => ({ ...p, ...fields }))
+      if (fields.avatarUrl) setAvatarPreview(fields.avatarUrl)
       setDdbUrl('')
-      toast(`Imported ${fields.name || 'your character'}. ${warnings?.[0] ? warnings[0] + ' ' : ''}Review it, then press Save.`)
+      toast(`Imported ${fields.name || 'your character'}. ${(warnings || []).map(w => w + ' ').join('')}Review it, then press Save.`)
     } catch (e) { toast(e.message || 'Import failed') }
     setDdbBusy(false)
   }

@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { parseCharacterId, mapCharacter } from './dndbeyond.js'
+import { parseCharacterId, mapCharacter, avatarSource, copyAvatar } from './dndbeyond.js'
 
 test('finds the character number in links, share links and bare numbers, and nothing else', () => {
   for (const ok of ['https://www.dndbeyond.com/characters/123456789', 'dndbeyond.com/characters/123456789/', 'https://www.dndbeyond.com/profile/someone/characters/123456789',
@@ -53,4 +53,23 @@ test('uses overrides, copes with missing data and never goes below 1 hp', () => 
   assert.equal(o.stats.str, 20); assert.equal(o.hp.max, 55); assert.equal(o.hp.current, 0)
   const empty = mapCharacter({}).fields
   assert.equal(empty.level, 1); assert.equal(empty.ac, 10); assert.equal(empty.hp.max, 1); assert.equal(empty.stats.dex, 10); assert.equal(empty.name, '')
+})
+
+test('only picks up pictures hosted by D&D Beyond over https', () => {
+  const pic = (avatarUrl) => ({ decorations: { avatarUrl } })
+  assert.equal(avatarSource(pic('https://www.dndbeyond.com/avatars/1/2/3/4/636.jpeg')), 'https://www.dndbeyond.com/avatars/1/2/3/4/636.jpeg')
+  assert.ok(avatarSource(pic('https://media.dndbeyond.com/a/b.png')))
+  for (const bad of [null, undefined, '', 'http://www.dndbeyond.com/a.png', 'https://evil.example.com/a.png', 'https://dndbeyond.com.evil.com/a.png', 'https://user:pw@www.dndbeyond.com/a.png', 'https://169.254.169.254/a.png', 'x'.repeat(600)])
+    assert.equal(avatarSource(pic(bad)), '', String(bad))
+  assert.equal(avatarSource({}), '')
+})
+
+test('copies the picture into the user\'s own folder, and gives back nothing if that fails', async () => {
+  const calls = []
+  const ok = { upload: async (src, opts) => { calls.push([src, opts]); return { secure_url: 'https://res.cloudinary.com/x/image/upload/v1/lore-ledger/u1/a.jpg' } } }
+  assert.equal(await copyAvatar('https://www.dndbeyond.com/a.png', 'u1', ok), 'https://res.cloudinary.com/x/image/upload/v1/lore-ledger/u1/a.jpg')
+  assert.equal(calls[0][1].folder, 'lore-ledger/u1')
+  assert.equal(await copyAvatar('https://www.dndbeyond.com/a.png', 'u1', { upload: async () => { throw new Error('nope') } }), '')
+  assert.equal(await copyAvatar('', 'u1', ok), '')
+  assert.equal(calls.length, 1)
 })

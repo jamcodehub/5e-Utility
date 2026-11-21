@@ -1,6 +1,7 @@
 import { Router } from 'express'
 import { auth } from './campaigns.js'
-import { parseCharacterId, characterServiceUrl, mapCharacter } from '../lib/dndbeyond.js'
+import { v2 as cloudinary } from 'cloudinary'
+import { parseCharacterId, characterServiceUrl, mapCharacter, avatarSource, copyAvatar } from '../lib/dndbeyond.js'
 
 const router = Router()
 const MAX_BYTES = 4 * 1024 * 1024
@@ -21,7 +22,16 @@ router.post('/preview', auth, async (req, res) => {
     if (text.length > MAX_BYTES) return res.status(502).json({ error: 'That character is too large to import.' })
     const body = JSON.parse(text)
     if (!body?.success || !body.data) return res.status(502).json({ error: 'D&D Beyond sent something unexpected, so the import did not work.' })
-    res.json(mapCharacter(body.data))
+    const mapped = mapCharacter(body.data)
+    // The picture: copied into the player's own Cloudinary folder so the sheet can show it.
+    const source = avatarSource(body.data)
+    if (source) {
+      const cloudReady = process.env.CLOUDINARY_CLOUD_NAME && process.env.CLOUDINARY_API_KEY && process.env.CLOUDINARY_API_SECRET
+      const url = cloudReady ? await copyAvatar(source, req.userId, cloudinary.uploader) : ''
+      if (url) mapped.fields.avatarUrl = url
+      else mapped.warnings.push('The character picture could not be copied. You can upload one by hand.')
+    }
+    res.json(mapped)
   } catch (e) {
     const timedOut = e?.name === 'TimeoutError' || e?.name === 'AbortError'
     res.status(502).json({ error: timedOut ? 'D&D Beyond took too long to answer. Please try again.' : 'Could not read that character from D&D Beyond.' })

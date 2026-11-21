@@ -98,3 +98,27 @@ export function mapCharacter(data) {
   }
   return { fields, warnings }
 }
+
+// The character's picture, only if it is hosted by D&D Beyond itself over https (anything else is ignored).
+export function avatarSource(data) {
+  const u = data?.decorations?.avatarUrl
+  if (typeof u !== 'string' || u.length > 500) return ''
+  try {
+    const url = new URL(u)
+    const host = url.hostname.toLowerCase()
+    const ok = url.protocol === 'https:' && !url.username && !url.password && (host === 'dndbeyond.com' || host.endsWith('.dndbeyond.com'))
+    return ok ? url.toString() : ''
+  } catch { return '' }
+}
+
+// Copies that picture into our own Cloudinary folder for this user (Cloudinary fetches it; this server never downloads it),
+// because the character sheet only shows Cloudinary pictures. Returns the new link, or '' if it could not be copied.
+export async function copyAvatar(source, userId, uploader) {
+  if (!source) return ''
+  try {
+    const r = await uploader.upload(source, {
+      folder: `lore-ledger/${userId}`, resource_type: 'image', allowed_formats: ['jpg', 'jpeg', 'png', 'webp', 'gif'], timeout: 20000,
+    })
+    return typeof r?.secure_url === 'string' ? r.secure_url : ''
+  } catch { return '' }
+}
