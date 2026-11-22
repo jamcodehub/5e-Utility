@@ -216,7 +216,7 @@ function useIsMobile() {
 
 export default function Shell({ children }) {
   const { user, logout, isPremium } = useAuth()
-  const { campaigns, activeCampaign, setActive, createCampaign, joinCampaign } = useCampaign()
+  const { campaigns, activeCampaign, setActive, createCampaign, joinCampaign, joinRequestId } = useCampaign()
   const { theme, lightMode } = useTheme()
   const navigate = useNavigate()
   const isMobile = useIsMobile()
@@ -276,6 +276,8 @@ export default function Shell({ children }) {
 
   const [showSettings, setShowSettings] = useState(false)
   const [joinPending, setJoinPending] = useState(false)
+  // The DM approved the request (the campaign is now selected for us): the "Joining pending" note is no longer true.
+  useEffect(() => { if (!joinRequestId) setJoinPending(false) }, [joinRequestId])
   const [pendingMembers, setPendingMembers] = useState([])
 
   useEffect(() => {

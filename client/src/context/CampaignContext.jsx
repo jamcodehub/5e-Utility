@@ -41,6 +41,19 @@ export function CampaignProvider({ children }) {
   // role, so until it matches the user's role it must not be exposed.
   const [loadedRole, setLoadedRole] = useState(null)
   const loadSeq = useRef(0)
+  // A player who asked to join a campaign that needs the DM's approval: remember which one, so that once the DM approves it
+  // becomes the selected campaign by itself (this device only; dropped after a week).
+  const [joinRequestId, setJoinRequestId] = useState(null)
+  const joinKey = (role) => `joinRequest:${role || 'player'}`
+  const readJoinRequest = (role) => {
+    try {
+      const v = JSON.parse(localStorage.getItem(joinKey(role)))
+      if (v?.id && Date.now() - v.at < 7 * 24 * 3600 * 1000) return String(v.id)
+      localStorage.removeItem(joinKey(role))
+    } catch { /* ignore */ }
+    return null
+  }
+  const loadRef = useRef(null)
 
   // The last campaign is remembered separately for each mode, so switching between
   // player and DM returns to the campaign you were last using in that mode.
@@ -53,19 +66,30 @@ export function CampaignProvider({ children }) {
     else localStorage.removeItem(key)
   }
 
-  const load = async () => {
+  const load = async (quiet = false) => {
     if (!user) {
       setCampaignsLoading(false)
       return
     }
     const seq = ++loadSeq.current
     const role = user.role
-    setCampaignsLoading(true)
+    if (!quiet) setCampaignsLoading(true)
     setCampaignsError('')
     try {
       const data = await api('/campaigns')
       if (seq !== loadSeq.current) return
       setCampaigns(data)
+      // The DM approved the request: go straight to that campaign, even if another one was selected.
+      const wanted = readJoinRequest(role)
+      const joined = wanted && data.find(c => String(c._id) === wanted)
+      setJoinRequestId(joined ? null : wanted)
+      if (joined) {
+        localStorage.removeItem(joinKey(role))
+        localStorage.setItem(roleKey(role), joined._id)
+        setActiveRaw(joined)
+        setLoadedRole(role)
+        return
+      }
       // Keep the current selection if it's still valid (e.g. a background
       // reload shouldn't yank the user to a different campaign); otherwise
       // restore whichever one they were last viewing, or fall back to the
@@ -94,6 +118,16 @@ export function CampaignProvider({ children }) {
   }
 
   useEffect(() => { load() }, [user?.id || user?._id, user?.role])
+  loadRef.current = load
+
+  // While a join request waits for the DM, look again every so often (and when the tab is opened again), without a loading flash.
+  useEffect(() => {
+    if (!joinRequestId) return undefined
+    const look = () => { if (!document.hidden) loadRef.current?.(true) }
+    const timer = setInterval(look, 15000)
+    window.addEventListener('focus', look)
+    return () => { clearInterval(timer); window.removeEventListener('focus', look) }
+  }, [joinRequestId])
 
   // Returns null on success, error string on failure
   const createCampaign = async (body) => {
@@ -133,7 +167,13 @@ export function CampaignProvider({ children }) {
   const joinCampaign = async (code) => {
     try {
       const res = await api('/campaigns/join', { method: 'POST', body: { code } })
-      if (res.pending) return 'pending'
+      if (res.pending) {
+        if (res.campaignId) {
+          try { localStorage.setItem(joinKey(user?.role), JSON.stringify({ id: String(res.campaignId), at: Date.now() })) } catch { /* ignore */ }
+          setJoinRequestId(String(res.campaignId))
+        }
+        return 'pending'
+      }
       const c = res.campaign || res
       setCampaigns(p => p.some(x => x._id === c._id) ? p.map(x => x._id === c._id ? c : x) : [c, ...p])
       setActive(c)
@@ -145,7 +185,7 @@ export function CampaignProvider({ children }) {
 
   const stale = loadedRole !== user?.role
   return (
-    <CampaignContext.Provider value={{ campaigns: stale ? [] : campaigns, activeCampaign: stale ? null : activeCampaign, campaignsLoading: campaignsLoading || stale, campaignsError, setActive, createCampaign, updateCampaign, deleteCampaign, leaveCampaign, joinCampaign, reload: load }}>
+    <CampaignContext.Provider value={{ campaigns: stale ? [] : campaigns, activeCampaign: stale ? null : activeCampaign, campaignsLoading: campaignsLoading || stale, campaignsError, setActive, createCampaign, updateCampaign, deleteCampaign, leaveCampaign, joinCampaign, joinRequestId, reload: () => load() }}>
       {children}
     </CampaignContext.Provider>
   )

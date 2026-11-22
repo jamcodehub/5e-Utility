@@ -125,7 +125,7 @@ router.post('/join', auth, async (req, res) => {
       return res.json({ pending: false, campaign })
     // Already pending
     if (campaign.pendingMembers.some(m => String(m) === uid))
-      return res.json({ pending: true })
+      return res.json({ pending: true, campaignId: campaign._id })
 
     const user = await User.findById(req.userId)
     if (user.role === 'player' && !hasPremiumAs(user, 'player')) {
@@ -135,7 +135,7 @@ router.post('/join', auth, async (req, res) => {
 
     campaign.pendingMembers.push(req.userId)
     await campaign.save()
-    res.json({ pending: true })
+    res.json({ pending: true, campaignId: campaign._id })
   } catch { res.status(500).json({ error: 'Failed to submit join request' }) }
 })
 

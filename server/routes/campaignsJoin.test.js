@@ -39,5 +39,6 @@ test('a DM using their own campaign code is recorded as a member, so it stays in
   // someone else still needs approval, and is not added to the members
   const theirs = await join(other)
   assert.equal(theirs.body.pending, true)
+  assert.equal(String(theirs.body.campaignId), doc._id, 'the request says which campaign it was for, so the player can be taken there once approved')
   assert.deepEqual(doc.members.map(String), [owner]); assert.deepEqual(doc.pendingMembers.map(String), [other])
 })
