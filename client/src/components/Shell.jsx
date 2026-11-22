@@ -292,8 +292,11 @@ export default function Shell({ children }) {
       navigate(`/levels?map=${encodeURIComponent(planId)}`)
     }
     socket.on('level:show', onShowMap)
-    memberCampaigns.forEach(campaign => socket.emit('campaign:join', campaign._id))
+    const joinRooms = () => memberCampaigns.forEach(campaign => socket.emit('campaign:join', campaign._id))
+    joinRooms()
+    socket.on('connect', joinRooms)   // after a dropped connection the server has forgotten the rooms: join them again
     return () => {
+      socket.off('connect', joinRooms)
       socket.off('level:show', onShowMap)
       memberCampaigns.forEach(campaign => socket.emit('campaign:leave', campaign._id))
     }

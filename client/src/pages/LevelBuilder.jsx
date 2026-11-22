@@ -746,7 +746,15 @@ export default function LevelBuilder() {
     socket.on('level:door-denied', onDoorDenied)
     socket.on('level:travel', onTravel)
     socket.emit('level:join', selectedPlanId)
+    // The server forgets which map a connection was watching whenever the connection drops and comes back (a network blip, a
+    // laptop that slept, the server restarting). Join again then, and when the tab is looked at again, so live updates (tokens
+    // the DM places, doors, light) keep arriving instead of stopping until the page is refreshed. Joining also sends the board.
+    const rejoin = () => { if (!document.hidden) socket.emit('level:join', selectedPlanId) }
+    socket.on('connect', rejoin)
+    document.addEventListener('visibilitychange', rejoin)
     return () => {
+      socket.off('connect', rejoin)
+      document.removeEventListener('visibilitychange', rejoin)
       socket.off('level:tokens', onTokens)
       socket.off('level:presence', onPresence)
       socket.off('level:dark-mode', onDarkMode)
