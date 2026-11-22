@@ -55,6 +55,12 @@ test('outdoors the DM is black too until they reveal the map, players always see
   assert.deepEqual(viewerLevels({ darkMode: true, isDm: false, visibility: vis, rows: 1, cols: 2, outdoor: true, dmReveal: true }), [1, 0])
 })
 
+test('the map message carries which side each torch sits on', () => {
+  const base = { ground: [['wall']], objects: [['torch']], doorStates: [[false]], doorLocks: [[false]], theme: 'medieval' }
+  assert.equal(buildMapMessage(base).map.objectRotations, null)
+  assert.deepEqual(buildMapMessage({ ...base, objectRotations: [[2]] }).map.objectRotations, [[2]])
+})
+
 test('missing visibility data never throws', () => {
   assert.deepEqual(viewerLevels({ darkMode: true, isDm: false, visibility: null, rows: 1, cols: 2 }), [0, 0])
 })
@@ -62,7 +68,7 @@ test('missing visibility data never throws', () => {
 test('the map message has plain data only', () => {
   const m = buildMapMessage({ ground: [['floor']], objects: [[undefined]], doorStates: [[1]], doorLocks: [[0]], heights: [[3]], theme: undefined })
   assert.equal(m.type, VIEWER_MAP)
-  assert.deepEqual(m.map, { ground: [['floor']], objects: [[null]], doorStates: [[true]], doorLocks: [[false]], heights: [[3]], theme: 'medieval' })
+  assert.deepEqual(m.map, { ground: [['floor']], objects: [[null]], doorStates: [[true]], doorLocks: [[false]], objectRotations: null, heights: [[3]], theme: 'medieval' })
   assert.deepEqual(buildMapMessage({ ground: [['door']] }).map.doorLocks, [], 'no locks sent when there are none')
   assert.doesNotThrow(() => JSON.stringify(m))
 })

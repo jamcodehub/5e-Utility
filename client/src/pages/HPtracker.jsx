@@ -10,7 +10,7 @@ import { derive, weaponStats } from '../utils/sheet'
 import { signed } from '../utils/dice'
 import { tokenColor } from '../utils/tokenColor'
 import {
-  abilityMod, rollInitiative, sortByInitiative, nextTurn, resolveAttack, applyDamage, applyHeal, parseAmount, describeAttack, mergeSaved,
+  abilityMod, rollInitiative, sortByInitiative, resolveAttack, applyDamage, applyHeal, parseAmount, describeAttack, mergeSaved,
 } from '../utils/combat'
 
 const nanoid = () => Math.random().toString(36).slice(2, 9)
@@ -65,7 +65,7 @@ function Summary({ c }) {
 
 const selectStyle = { padding: '4px 6px', fontSize: 12, flex: 1, minWidth: 0 }
 
-function CombatantCard({ c, others, isTurn, expanded, onToggle, onChange, onRemove, onAttack, onHeal }) {
+function CombatantCard({ c, others, expanded, onToggle, onChange, onRemove, onAttack, onHeal }) {
   const [dmgInput, setDmgInput] = useState('')
   const [healInput, setHealInput] = useState('')
   const [panel, setPanel] = useState(null) // 'attack' | 'heal' | null
@@ -114,13 +114,12 @@ function CombatantCard({ c, others, isTurn, expanded, onToggle, onChange, onRemo
   const maxHp = c.maxHp ?? 0
   const isDead = maxHp > 0 && hp === 0
   const tagColor = tokenColor(c)
-  const outline = isTurn ? '2px solid var(--gold-fill, var(--gold))' : undefined
 
   return (
     <div style={{
       background: 'var(--surface)', border: `1px solid ${isDead ? 'var(--red)' : 'var(--border)'}`,
       borderLeft: `4px solid ${tagColor}`, borderRadius: 4, padding: '12px 14px',
-      opacity: isDead ? 0.6 : 1, outline, outlineOffset: -1,
+      opacity: isDead ? 0.6 : 1,
     }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
         {/* Avatar / initials */}
@@ -453,10 +452,9 @@ export default function HpTracker() {
     pushLog(`Initiative rolled: ${order.map(c => `${c.name} ${c.init}`).join(', ')}`)
   }
 
-  const advanceTurn = () => {
-    const r = nextTurn(sortedCombatants, turnId, round)
-    setTurnId(r.turnId)
-    if (r.round !== round) { setRound(r.round); pushLog(`Round ${r.round}`) }
+  const nextRound = () => {
+    setRound(round + 1)
+    pushLog(`Round ${round + 1}`)
   }
 
   const doAttack = ({ attackerId, attack, targetId, mode }) => {
@@ -530,8 +528,7 @@ export default function HpTracker() {
             </div>
           </div>
           <button className="btn btn-primary btn-sm" onClick={rollAllInitiative} disabled={!combatants.length}>Roll initiative</button>
-          <button className="btn btn-ghost btn-sm" onClick={advanceTurn} disabled={!hasInit}>Next turn</button>
-          <button className="btn btn-ghost btn-sm" onClick={() => { setRound(r => r + 1); pushLog(`Round ${round + 1}`) }}>Next Round</button>
+          <button className="btn btn-ghost btn-sm" onClick={nextRound}>Next Round</button>
           <button className="btn btn-ghost btn-sm" onClick={resetAll}>Reset</button>
         </div>
 
@@ -548,7 +545,7 @@ export default function HpTracker() {
           ) : (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 12, alignItems: 'start' }}>
               {sortedCombatants.map(c => (
-                <CombatantCard key={c.id} c={c} others={sortedCombatants} isTurn={c.id === turnId}
+                <CombatantCard key={c.id} c={c} others={sortedCombatants}
                   expanded={expandedId === c.id} onToggle={() => setExpandedId(id => id === c.id ? null : c.id)}
                   onChange={updateCombatant} onRemove={removeCombatant} onAttack={doAttack} onHeal={doHeal} />
               ))}

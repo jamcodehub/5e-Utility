@@ -18,7 +18,7 @@ import { classIdFor, viewerLevels } from '../utils/viewer3d'
 import { readHeights, heightShade } from '../utils/mapHeights'
 import { emptyHistory, endStroke as endHistoryStroke, undo as undoHistory, redo as redoHistory, pushSnapshot } from '../utils/editHistory'
 import { isOutdoorMap } from '../utils/outdoor'
-import { rotationOf, nextRotation, rotationLabel, readRotations, compactRotations, withRotation } from '../utils/tileRotation'
+import { rotationOf, nextRotation, rotationLabel, readRotations, compactRotations, withRotation, dragSide, objectTurnOf, TORCH_ID } from '../utils/tileRotation'
 import Battle3DView from '../components/Battle3DView'
 // Note: module-level TILES / OBJECT_TILES above are the base (Medieval) set, used for
 // logic that doesn't depend on artwork. MapThumb and LevelBuilder shadow them with the
@@ -413,6 +413,7 @@ export default function LevelBuilder() {
   const [tool, setTool] = useState('wall')
   const [painting, setPainting] = useState(false)
   const lastTouchCell = useRef(null)
+  const torchAnchor = useRef(null) // while a torch is being placed: where the pointer went down, so dragging chooses which side it sits on
 
   // ── Play mode state ──
   const [tokens, setTokens] = useState([]) // { id, name, avatar, color, row, col, hp, maxHp }
@@ -1014,15 +1015,30 @@ export default function LevelBuilder() {
         setPaintRotation(nextRotation)
       }
     }
+    // Placing a torch: click where it goes, then drag towards the side of the square it should sit on (right, down, left or up)
+    const onMove = (e) => {
+      const a = torchAnchor.current
+      if (!a) return
+      const side = dragSide(e.clientX - a.x, e.clientY - a.y)
+      if (side === null || side === a.side) return
+      a.side = side
+      setObjectRotations(current => withRotation(current, a.r, a.c, side))
+    }
+    const onUp = () => { torchAnchor.current = null }
     // A drag that ends outside the map still ends the stroke
     window.addEventListener('keydown', onKeyDown)
     window.addEventListener('mouseup', finishStroke)
+    window.addEventListener('mousemove', onMove)
+    window.addEventListener('mouseup', onUp)
     return () => {
       window.removeEventListener('keydown', onKeyDown)
       window.removeEventListener('mouseup', finishStroke)
+      window.removeEventListener('mousemove', onMove)
+      window.removeEventListener('mouseup', onUp)
     }
   }, [mode, finishStroke])
 
+  const placingTorch = editLayer === 'objects' && tool === TORCH_ID
   const paint = (r, c) => {
     if (editLayer === 'objects') {
       setObjectGrid(current => {
@@ -1514,13 +1530,23 @@ export default function LevelBuilder() {
             // Finger-drag painting: paint every cell the finger passes over.
             if (linkMode) return
             const t = e.touches[0]
+            const anchor = torchAnchor.current
+            if (anchor && t) {
+              // Placing a torch: the finger's drag chooses the side, it does not paint more squares
+              const side = dragSide(t.clientX - anchor.x, t.clientY - anchor.y)
+              if (side !== null && side !== anchor.side) {
+                anchor.side = side
+                setObjectRotations(current => withRotation(current, anchor.r, anchor.c, side))
+              }
+              return
+            }
             const el = t && document.elementFromPoint(t.clientX, t.clientY)?.closest('[data-lb-cell]')
             if (!el || el.dataset.lbCell === lastTouchCell.current) return
             lastTouchCell.current = el.dataset.lbCell
             const [r, c] = el.dataset.lbCell.split('-').map(Number)
             paint(r, c)
           }}
-          onTouchEnd={() => { lastTouchCell.current = null; finishStroke() }}
+          onTouchEnd={() => { lastTouchCell.current = null; torchAnchor.current = null; finishStroke() }}
           onMouseUp={() => { setPainting(false); finishStroke() }}
           onMouseLeave={() => { setPainting(false); finishStroke() }}
           style={{
@@ -1539,13 +1565,25 @@ export default function LevelBuilder() {
             const t = TILES.find(x => x.id === cellId) || TILES[TILES.length - 1]
             const object = objectTile(objectGrid[r]?.[c])
             const turn = rotationOf(cellId, rotations[r]?.[c], r, c) * 90
-            const objectTurn = rotationOf(objectGrid[r]?.[c], objectRotations[r]?.[c], r, c) * 90
+            const objectTurn = objectTurnOf(objectGrid[r]?.[c], objectRotations[r]?.[c], r, c) * 90
+            const torchSide = objectGrid[r]?.[c] === TORCH_ID ? objectRotations[r]?.[c] : null
             return (
               <div key={`${r}-${c}`} className="lb-cell" data-lb-cell={`${r}-${c}`}
-                onMouseDown={() => { if (linkMode) return; beginStroke(); setPainting(true); paint(r, c) }}
+                onMouseDown={(e) => {
+                  if (linkMode) return
+                  beginStroke()
+                  if (placingTorch) { torchAnchor.current = { r, c, x: e.clientX, y: e.clientY, side: null }; paint(r, c); return }
+                  setPainting(true); paint(r, c)
+                }}
                 onMouseEnter={() => { if (painting && !linkMode) paint(r, c) }}
                 onClick={() => handleEditorCellClick(r, c)}
-                onTouchStart={() => { if (!linkMode) { beginStroke(); paint(r, c) } }}
+                onTouchStart={(e) => {
+                  if (linkMode) return
+                  beginStroke()
+                  const t = e.touches?.[0]
+                  if (placingTorch && t) torchAnchor.current = { r, c, x: t.clientX, y: t.clientY, side: null }
+                  paint(r, c)
+                }}
                 style={{ background: t.color === 'transparent' ? '#f5f4f1' : t.color, display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative' }}
               >
                 {t.imageUrl && <TileIconPlaceholder tile={t} rotate={turn} bleed style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />}
@@ -1553,6 +1591,17 @@ export default function LevelBuilder() {
                 {cellId === 'door' && designLocks[r]?.[c] && <span aria-label="Locked door" title="Locked door" style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, pointerEvents: 'none', zIndex: 2, textShadow: '0 1px 2px #000' }}>🔒</span>}
                 {stairLinks[r]?.[c] && <span aria-label="Linked stairs" style={{ position: 'absolute', top: 0, right: 1, color: '#fff', fontSize: 8, textShadow: '0 1px 2px #000', pointerEvents: 'none' }}>→</span>}
                 {object && object.id !== 'object-erase' && (object.imageUrl || object.iconUrl || object.id.startsWith('rock-')) && <TileIconPlaceholder tile={object} rotate={objectTurn} style={{ position: 'absolute', zIndex: 1 }} />}
+                {Number.isInteger(torchSide) && torchSide >= 0 && torchSide <= 3 && (
+                  <span aria-hidden="true" title="The torch sits on this side" style={{
+                    position: 'absolute', zIndex: 3, width: 0, height: 0, pointerEvents: 'none',
+                    ...[
+                      { right: 0, top: '50%', marginTop: -4, borderTop: '4px solid transparent', borderBottom: '4px solid transparent', borderRight: '6px solid #f5c542' },
+                      { bottom: 0, left: '50%', marginLeft: -4, borderLeft: '4px solid transparent', borderRight: '4px solid transparent', borderBottom: '6px solid #f5c542' },
+                      { left: 0, top: '50%', marginTop: -4, borderTop: '4px solid transparent', borderBottom: '4px solid transparent', borderLeft: '6px solid #f5c542' },
+                      { top: 0, left: '50%', marginLeft: -4, borderLeft: '4px solid transparent', borderRight: '4px solid transparent', borderTop: '6px solid #f5c542' },
+                    ][torchSide],
+                  }} />
+                )}
                 {outdoor && darkMode && !visibility.torchlit[r]?.[c] && !visibility.darkvision[r]?.[c] && (
                   <div
                     aria-hidden="true"
@@ -1743,7 +1792,7 @@ export default function LevelBuilder() {
                   groundTile={TILES.find(tile => tile.id === (cellId === 'door' && doorOpen ? 'floor' : cellId))}
                   object={objectTile(objectGrid[r]?.[c])}
                   turn={rotationOf(cellId === 'door' && doorOpen ? 'floor' : cellId, rotations[r]?.[c], r, c) * 90}
-                  objectTurn={rotationOf(objectGrid[r]?.[c], objectRotations[r]?.[c], r, c) * 90}
+                  objectTurn={objectTurnOf(objectGrid[r]?.[c], objectRotations[r]?.[c], r, c) * 90}
                   visible={visibility.visible[r]?.[c]}
                   fade={dark && outdoor ? Math.min(1, visibility.lightFade[r]?.[c] || 0) : null}
                   dmView={isDm && dmReveal && dark && !visibility.visible[r]?.[c]}
@@ -1792,7 +1841,7 @@ export default function LevelBuilder() {
           )}
           {view3d && (
             <Battle3DView
-              ground={grid} objects={objectGrid} heights={heights} doorStates={doorStates} doorLocks={doorLocks} theme={themeId}
+              ground={grid} objects={objectGrid} objectRotations={objectRotations} heights={heights} doorStates={doorStates} doorLocks={doorLocks} theme={themeId}
               tokens={tokens} levels={viewerLevelList} darkMode={dark}
               focusId={isDm ? (tapToPlaceTokenId || '') : `char-${user?.id}`} classOf={classOfToken}
               onClick={handleViewerClick} onKey={key => walkRef.current(key)}

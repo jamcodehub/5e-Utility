@@ -59,7 +59,7 @@ export function viewerLevels({ darkMode, isDm, visibility, rows, cols, outdoor =
   return levels
 }
 
-export function buildMapMessage({ ground, objects, doorStates, doorLocks, heights, theme }) {
+export function buildMapMessage({ ground, objects, objectRotations, doorStates, doorLocks, heights, theme }) {
   return {
     type: VIEWER_MAP,
     map: {
@@ -67,6 +67,7 @@ export function buildMapMessage({ ground, objects, doorStates, doorLocks, height
       objects: (objects || []).map(row => (row || []).map(id => id || null)),
       doorStates: (doorStates || []).map(row => (row || []).map(Boolean)),
       doorLocks: (doorLocks || []).map(row => (row || []).map(Boolean)),
+      objectRotations: objectRotations || null, // which side each torch sits on (0 right, 1 down, 2 left, 3 up), null where not chosen
       heights: heights || null, // ground height per square (mountains, dunes...), or null for flat ground
       theme: theme || 'medieval',
     },

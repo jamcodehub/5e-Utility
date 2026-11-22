@@ -56,3 +56,14 @@ test('setting one square leaves the original grid alone', () => {
   assert.equal(next[0], grid[0], 'untouched rows are shared')
   assert.deepEqual(withRotation(next, 1, 0, null), [[null, null], [null, null]])
 })
+
+test('a drag chooses the side a torch sits on', async () => {
+  const { dragSide, objectTurnOf } = await import('./tileRotation.js')
+  assert.equal(dragSide(2, 3), null, 'a tiny movement chooses nothing')
+  assert.equal(dragSide(30, 4), 0)
+  assert.equal(dragSide(4, 30), 1)
+  assert.equal(dragSide(-30, 4), 2)
+  assert.equal(dragSide(4, -30), 3)
+  assert.equal(objectTurnOf('torch', 2, 1, 1), 0, 'a torch picture is never turned')
+  assert.equal(objectTurnOf('barrel', 2, 1, 1), 2)
+})

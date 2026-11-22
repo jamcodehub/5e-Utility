@@ -50,3 +50,19 @@ export function compactRotations(grid) {
 export function withRotation(grid, row, col, choice) {
   return grid.map((cells, r) => (r === row ? cells.map((n, c) => (c === col ? (choice ?? null) : n)) : cells))
 }
+
+// Torches: which side of its square a torch sits on, chosen by clicking where it goes and dragging towards that side.
+// Stored in `objectRotations`: 0 = right (east), 1 = down (south), 2 = left (west), 3 = up (north); null = automatic.
+export const TORCH_ID = 'torch'
+
+// The side a drag points to, from how far the pointer moved: null until it has moved a few pixels, then whichever way it went most.
+export function dragSide(dx, dy, minimum = 10) {
+  if (Math.hypot(dx, dy) < minimum) return null
+  if (Math.abs(dx) >= Math.abs(dy)) return dx > 0 ? 0 : 2
+  return dy > 0 ? 1 : 3
+}
+
+// How many quarter turns to draw an object with: torches are never turned (their number is a side, not a turn).
+export function objectTurnOf(objectId, stored, row, col) {
+  return objectId === TORCH_ID ? 0 : rotationOf(objectId, stored, row, col)
+}
