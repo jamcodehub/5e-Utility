@@ -4,6 +4,7 @@ import jwt from 'jsonwebtoken'
 import { Campaign, Character, User, CampaignGuide, DMBoard, DMBoardFolder } from '../models/index.js'
 import { hasPremium, hasPremiumAs } from '../lib/premium.js'
 import { buildTestCharacter, MAX_TEST_PLAYERS } from '../lib/testPlayer.js'
+import { notifyUser } from '../lib/notify.js'
 
 const router = Router()
 
@@ -158,6 +159,7 @@ router.post('/:id/approve/:userId', auth, async (req, res) => {
     if (!campaign.members.some(m => String(m) === req.params.userId))
       campaign.members.push(req.params.userId)
     await campaign.save()
+    notifyUser(req.params.userId, 'campaign:approved', { campaignId: campaign._id })   // the player's open page selects it at once
     res.json({ ok: true })
   } catch { res.status(500).json({ error: 'Failed to approve' }) }
 })

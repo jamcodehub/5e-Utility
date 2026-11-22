@@ -5,6 +5,7 @@ import { isMember } from './routes/campaigns.js'
 import { clientOrigins } from './lib/clientUrl.js'
 import { applyPlayerTokenUpdate, mapDims, sameTokens } from './lib/tokenRules.js'
 import { groundOf, isLocked, withLock, canKnock } from './lib/doors.js'
+import { setNotifier, userRoom } from './lib/notify.js'
 
 // Real-time collaborative Level Builder "Play mode" board — everyone viewing
 // the same map (DM + players) sees token moves live and the board persists
@@ -13,6 +14,8 @@ export function attachRealtime(httpServer) {
   const io = new Server(httpServer, {
     cors: { origin: clientOrigins() },
   })
+
+  setNotifier(io)
 
   io.use((socket, next) => {
     try {
@@ -39,6 +42,7 @@ export function attachRealtime(httpServer) {
   const doorKnocks = new Map() // recent door requests, so a player cannot flood the DM
 
   io.on('connection', (socket) => {
+    socket.join(userRoom(socket.userId))   // private messages for this user (e.g. a join request was approved)
     socket.on('campaign:join', async (campaignId, acknowledge) => {
       const respond = typeof acknowledge === 'function' ? acknowledge : () => {}
       if (typeof campaignId !== 'string' || !campaignId) {

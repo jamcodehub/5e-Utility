@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect, useRef } from 'react'
 import { api, useAuth } from './AuthContext'
+import { getSocket } from '../utils/socket'
 
 const CampaignContext = createContext(null)
 export const useCampaign = () => useContext(CampaignContext)
@@ -120,13 +121,22 @@ export function CampaignProvider({ children }) {
   useEffect(() => { load() }, [user?.id || user?._id, user?.role])
   loadRef.current = load
 
-  // While a join request waits for the DM, look again every so often (and when the tab is opened again), without a loading flash.
+  // While a join request waits for the DM: the server tells this page the moment it is approved, so the campaign is selected at
+  // once. As a fallback (a dropped connection, a request sent before this existed) it also looks again every so often and when
+  // the tab is opened again, without a loading flash.
   useEffect(() => {
     if (!joinRequestId) return undefined
     const look = () => { if (!document.hidden) loadRef.current?.(true) }
     const timer = setInterval(look, 15000)
     window.addEventListener('focus', look)
-    return () => { clearInterval(timer); window.removeEventListener('focus', look) }
+    let socket = null
+    const approved = () => loadRef.current?.(true)
+    try { socket = getSocket(); socket.on('campaign:approved', approved) } catch { /* the timer still covers it */ }
+    return () => {
+      clearInterval(timer)
+      window.removeEventListener('focus', look)
+      try { socket?.off('campaign:approved', approved) } catch { /* ignore */ }
+    }
   }, [joinRequestId])
 
   // Returns null on success, error string on failure
