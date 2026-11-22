@@ -6,7 +6,7 @@ import { TILES, OBJECT_TILES } from '../data/levelTiles.js'
 export const MESSAGE_TYPE = '5eutility-map-generated'
 
 // The battle map's own themes (see client/src/data/levelThemes.js). Anything else falls back to medieval.
-export const GENERATED_THEMES = ['medieval', 'cartoon', 'scifi']
+export const GENERATED_THEMES = ['medieval', 'cartoon', 'scifi', 'gothic', 'pixel']
 
 const GROUND = new Set([...TILES.map(t => t.id), 'empty'])
 const OBJECTS = new Set(OBJECT_TILES.map(t => t.id))

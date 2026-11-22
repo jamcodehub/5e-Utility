@@ -7,7 +7,7 @@ import { locksFromContent, pruneLocks, hasDesignedLocks } from '../lib/doors.js'
 const router = Router()
 
 // Keep in sync with src/data/levelThemes.js (only themes that are live)
-export const ALLOWED_THEMES = ['medieval', 'cartoon', 'scifi']
+export const ALLOWED_THEMES = ['medieval', 'cartoon', 'scifi', 'gothic', 'pixel']
 
 router.get('/:campaignId', auth, async (req, res) => {
   if (!await isMember(req.params.campaignId, req.userId)) return res.status(403).json({ error: 'Not a campaign member' })
