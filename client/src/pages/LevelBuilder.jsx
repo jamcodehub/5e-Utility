@@ -1183,7 +1183,7 @@ export default function LevelBuilder() {
   }
 
   const toggleDarkMode = (planId = selectedPlanId) => {
-    if (!isDm || !planId || !outdoor) return
+    if (!isDm || !planId) return
     const socket = getSocket()
     socket.timeout(5000).emit('level:dark-mode', { planId, darkMode: !darkMode }, (error, response) => {
       if (error) {
@@ -1242,9 +1242,9 @@ export default function LevelBuilder() {
   const visionKey = visionCarriers.map(token => `${token.row}:${token.col}`).join('|')
   const darkvisionSources = useMemo(() => visionCarriers, [isDm, visionKey]) // eslint-disable-line react-hooks/exhaustive-deps
   const outdoor = isOutdoorMap(outdoorFlag, grid)
-  // Daylight only reaches outdoor maps: outdoors it is dark only at night (the Day/Night toggle); caves, dungeons and other
-  // places without daylight are always dark, so torches and darkvision always matter there.
-  const dark = outdoor ? darkMode : true
+  // The Day / Night toggle decides on every map: Night means players only see what torches and darkvision light up. (`outdoor`
+  // only makes torch light fade out softly instead of ending in a ring.)
+  const dark = darkMode
   const visibility = useMemo(() => {
     const visible = []
     const torchlit = []
@@ -1426,8 +1426,7 @@ export default function LevelBuilder() {
             onClick={() => toggleDarkMode(editPlanId)}
             aria-label="Day or night (map lighting for players)"
             aria-pressed={dark}
-            disabled={!outdoor}
-            title={!outdoor ? 'No daylight reaches this map (a cave, dungeon or windowless place), so it is always dark: players only see what torches and darkvision light up. Tick Outdoor map in the editor if daylight does reach it.' : dark ? 'Night: players only see what torches and darkvision light up. Click for day.' : 'Day: players see the whole map. Click for night.'}
+            title={dark ? 'Night: players only see what torches and darkvision light up. Click for day.' : 'Day: players see the whole map. Click for night.'}
           >
             <span className="level-darkness-toggle-thumb" aria-hidden="true" />
             <span className="level-darkness-toggle-label" title="Day"><img src="https://res.cloudinary.com/crcbzpw6/image/upload/v1795083562/sun-regular-full.svg" alt="Day" /></span>
@@ -1443,10 +1442,6 @@ export default function LevelBuilder() {
 
       <div className="lb-editor-workspace">
       <aside className="lb-editor-tools" aria-label="Map tile selection">
-        <label title="Tick this for an outdoor map, or a place with windows. It then has a Day / Night toggle: by day players see everything, at night only what torches and darkvision light up. Leave it unticked for caves, dungeons and windowless rooms, which are always dark."
-          style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: 'var(--text-2)', margin: '0 0 8px', cursor: 'pointer' }}>
-          <input type="checkbox" checked={outdoor} onChange={e => setOutdoorFlag(e.target.checked)} /> Daylight reaches this map (Day / Night applies)
-        </label>
         <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
           <button type="button" className="btn btn-ghost btn-sm" onClick={runUndo} disabled={!history.undo.length} title="Undo the last click or drag (Ctrl or ⌘ + Z)" style={{ flex: 1, justifyContent: 'center' }}>↶ Undo</button>
           <button type="button" className="btn btn-ghost btn-sm" onClick={runRedo} disabled={!history.redo.length} title="Put back what you undid (Ctrl or ⌘ + Shift + Z)" style={{ flex: 1, justifyContent: 'center' }}>↷ Redo</button>
@@ -1737,8 +1732,7 @@ export default function LevelBuilder() {
             onClick={() => toggleDarkMode(selectedPlanId)}
             aria-label="Day or night (map lighting for players)"
             aria-pressed={dark}
-            disabled={!outdoor}
-            title={!outdoor ? 'No daylight reaches this map (a cave, dungeon or windowless place), so it is always dark: players only see what torches and darkvision light up. Tick Outdoor map in the editor if daylight does reach it.' : dark ? 'Night: players only see what torches and darkvision light up. Click for day.' : 'Day: players see the whole map. Click for night.'}
+            title={dark ? 'Night: players only see what torches and darkvision light up. Click for day.' : 'Day: players see the whole map. Click for night.'}
           >
             <span className="level-darkness-toggle-thumb" aria-hidden="true" />
             <span className="level-darkness-toggle-label" title="Day"><img src="https://res.cloudinary.com/crcbzpw6/image/upload/v1795083562/sun-regular-full.svg" alt="Day" /></span>
