@@ -29,8 +29,10 @@ export default function GuideAssistant({ campaignId }) {
   const { busy, unread } = useWorldAssistant(campaignId)
   const [narrow, setNarrow] = useState(() => window.innerWidth <= 768)
   // On phones the guide starts closed (it covers the whole page); the remembered state is for desktop.
-  const [open, setOpen] = useState(() => window.innerWidth > 768 && localStorage.getItem('worldbuildOpen') === '1')
-  useEffect(() => { if (!narrow) localStorage.setItem('worldbuildOpen', open ? '1' : '0') }, [open, narrow])
+  // While the guide is only a "coming soon" note it always starts closed (it would just take up space), and it does not
+  // overwrite the remembered state, so it opens as the user left it once the real guide arrives.
+  const [open, setOpen] = useState(() => AI_ENABLED && window.innerWidth > 768 && localStorage.getItem('worldbuildOpen') === '1')
+  useEffect(() => { if (AI_ENABLED && !narrow) localStorage.setItem('worldbuildOpen', open ? '1' : '0') }, [open, narrow])
   useEffect(() => {
     const f = () => setNarrow(window.innerWidth <= 768)
     window.addEventListener('resize', f)
