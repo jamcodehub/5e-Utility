@@ -1669,7 +1669,7 @@ export default function LevelBuilder() {
         {isDm && dark && (
           <button type="button" className="btn btn-ghost btn-sm" aria-pressed={dmReveal} onClick={() => setDmReveal(v => !v)}
             title={dmReveal ? 'Hide the dark parts of the map from your own screen again, so it matches what players see.' : 'Only you: show the dark parts of the map dimly on your screen so you can move things. Players still see black. Leave this off while streaming.'}>
-            {dmReveal ? '🙈 Hide map' : '👁 Reveal map'}
+            {dmReveal ? 'Hide map' : 'Reveal map'}
           </button>
         )}
         {isDm && (
