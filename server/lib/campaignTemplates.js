@@ -1,5 +1,16 @@
-import { CampaignGuide, Lore, Journal } from '../models/index.js'
+import fs from 'node:fs'
+import path from 'node:path'
+import { fileURLToPath } from 'node:url'
+import { CampaignGuide, Lore, Journal, LevelPlan } from '../models/index.js'
 import { CAMPAIGN_TEMPLATES } from '../data/campaigns/index.js'
+import { locksFromContent } from './doors.js'
+
+const MAPS_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'data', 'campaigns', 'maps')
+
+// One ready-made battle map, read from its file: { title, theme, darkMode, content, doorStates }. Null if the file is missing or broken.
+export function readTemplateMap(templateId, slug) {
+  try { return JSON.parse(fs.readFileSync(path.join(MAPS_DIR, templateId, `${slug}.json`), 'utf8')) } catch { return null }
+}
 
 // The ready-made campaigns a DM can start from instead of a blank page. Each carries a Campaign Guide (story, arc, world notes,
 // NPCs, quests), lore cards (NPCs, places, factions, foes, bosses) and a plan for every session, which is saved into the DM's
@@ -11,7 +22,7 @@ export const findTemplate = (id) => CAMPAIGN_TEMPLATES.find(t => t.id === id) ||
 
 // What the picker shows: no story content, just enough to choose.
 export const templateSummaries = (canUsePremium) => CAMPAIGN_TEMPLATES.map(t => ({
-  id: t.id, title: t.title, tagline: t.tagline, levels: t.levels, sessions: t.sessions.length, tone: t.tone, pitch: t.pitch,
+  id: t.id, title: t.title, tagline: t.tagline, levels: t.levels, sessions: t.sessions.length, maps: t.maps.length, tone: t.tone, pitch: t.pitch,
   premium: t.premium, locked: t.premium && !canUsePremium,
 }))
 
@@ -31,6 +42,14 @@ export function templateProblems(t) {
   need(t.lore?.some(l => l.tag === 'boss') && t.lore?.some(l => l.tag === 'enemy') && t.lore?.some(l => l.tag === 'location') && t.lore?.some(l => l.tag === 'faction'), 'lore needs a boss, enemies, places and factions')
   need(t.lore?.filter(l => l.tag === 'enemy' || l.tag === 'boss').every(l => Number.isInteger(l.maxHp) && l.maxHp > 0), 'enemies and bosses need hit points')
   need(Array.isArray(t.sessions) && t.sessions.length >= 6 && t.sessions.every(s => s.title && s.content?.length > 800), 'sessions')
+  need(Array.isArray(t.maps) && t.maps.length >= 5 && new Set(t.maps).size === t.maps.length, 'maps')
+  for (const slug of t.maps || []) {
+    const m = readTemplateMap(t.id, slug)
+    let grid = null
+    try { grid = JSON.parse(m.content) } catch { /* reported below */ }
+    need(Boolean(m?.title) && Array.isArray(grid?.ground) && grid.ground.length >= 10 && Array.isArray(grid?.objects) && grid.objects.length === grid.ground.length, `map ${slug} is missing or broken`)
+  }
+  need(Array.isArray(t.sessionMaps) && t.sessionMaps.length === t.sessions?.length && t.sessionMaps.every(list => list.length > 0 && list.every(slug => t.maps?.includes(slug))), 'sessionMaps')
   return problems
 }
 
@@ -46,7 +65,21 @@ export async function seedCampaign(campaign, template, userId) {
     campaign: campaign._id, title: l.title, tag: l.tag, content: l.content,
     hp: l.maxHp ?? null, maxHp: l.maxHp ?? null,
   })))
-  await Journal.insertMany(template.sessions.map((s, i) => ({
-    campaign: campaign._id, author: userId, session: i + 1, title: s.title, content: s.content,
-  })))
+  // The battle maps go into the campaign map list, ready to play.
+  const titles = {}
+  for (const slug of template.maps) {
+    const m = readTemplateMap(template.id, slug)
+    if (!m) continue
+    titles[slug] = m.title
+    await LevelPlan.create({
+      campaign: campaign._id, owner: userId, title: m.title, content: m.content, theme: m.theme || 'medieval',
+      darkMode: Boolean(m.darkMode), doorStates: m.doorStates || [], doorLocks: locksFromContent(m.content), tokens: [],
+    })
+  }
+  // Each session plan says which of those maps it uses.
+  await Journal.insertMany(template.sessions.map((s, i) => {
+    const used = (template.sessionMaps[i] || []).map(slug => titles[slug]).filter(Boolean)
+    const mapLine = used.length ? `\n\nBATTLE MAPS (already in your Maps tab): ${used.join('; ')}.` : ''
+    return { campaign: campaign._id, author: userId, session: i + 1, title: s.title, content: s.content + mapLine }
+  }))
 }

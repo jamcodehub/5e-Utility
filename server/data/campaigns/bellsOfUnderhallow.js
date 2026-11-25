@@ -9,6 +9,10 @@ export default {
   premium: true,
   pitch: 'A hill village where the church bell rings thirteen at midnight and every night one person vanishes from everyone\'s memory, house and all. A slow-burn mystery about grief, remembering and what a community owes its dead. Each player chooses someone their character loves, and in Session 5 the bell takes one of them. Puzzles are deduction, change-ringing and an acrostic, and every session ends on a gut-turn.',
 
+  // Battle maps made with the map generator (files in data/campaigns/maps/<id>/), and which ones each session uses.
+  maps: ['underhallow','gilt-lamb','chapel','ringing-chamber','churchyard','crypt'],
+  sessionMaps: [['underhallow','gilt-lamb'],['chapel','crypt'],['ringing-chamber'],['churchyard'],['underhallow','chapel'],['crypt','chapel']],
+
   guide: {
     story: `Underhallow is a village of three hundred souls on a hill above a river fog, famous for one thing: the bells of the Chapel of Hollow Mercy. There are twelve bells in the tower that ring the hours. At midnight there is a thirteenth, a dark bronze bell hanging by itself in the lowest chamber, and it rings once, very softly, and every night since the spring one person disappears from the memory of everyone in the village. Neighbours walk past their house and see an empty plot. Portraits show an empty chair. A name is on every tongue and then it is not.
 

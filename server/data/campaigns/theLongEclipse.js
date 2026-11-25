@@ -9,6 +9,10 @@ export default {
   premium: true,
   pitch: 'The sun has been dimming for a year, and nobody knows why. The Dawn Order sends the party on a pilgrimage with a single ember: through a city of lamps, down the river of the dead and up to the throne where the sun was first lit. Each character walks a personal Hearth Trial. What waits at the end is not a dying god but a lamp holding something back, and the last act is a choice about what it should burn. Built for high-level parties who want cinematic set pieces and real character arcs.',
 
+  // Battle maps made with the map generator (files in data/campaigns/maps/<id>/), and which ones each session uses.
+  maps: ['first-hearth','last-light-inn','road-of-lamps','river-of-the-dead','throne-of-dawn','long-night'],
+  sessionMaps: [['first-hearth','last-light-inn'],['road-of-lamps'],['river-of-the-dead'],['throne-of-dawn'],['throne-of-dawn'],['long-night']],
+
   guide: {
     story: `A year ago the sun began to dim. Not suddenly: a shade at a time, so that every morning looks a little more like evening. Crops fail. Cities put lamps in their windows at noon. The oldest people say the light has a different colour now, like a coin held too long in the hand. Nobody knows why. The temples blame each other; the scholars blame the temples.
 

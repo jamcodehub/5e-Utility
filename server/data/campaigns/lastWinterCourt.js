@@ -9,6 +9,10 @@ export default {
   premium: true,
   pitch: 'A widow hires the party to steal back the years her husband sold to the Hoar Queen. The Winter Court has kept the last night of winter going for a hundred years; its vault, the Larder of Years, holds every mortal lifetime it ever bought. A proper heist in six acts: the offer, the casing, the masquerade, the vault, the betrayal and the choice. Every favour from a fey creature creates a Debt, and every Debt gets called in. Built around heist roles so every player has a job to be brilliant at.',
 
+  // Battle maps made with the map generator (files in data/campaigns/maps/<id>/), and which ones each session uses.
+  maps: ['last-embers','frozen-road','long-dusk-fair','court','pale-gardens','larder','cracking-lake'],
+  sessionMaps: [['last-embers','frozen-road'],['long-dusk-fair'],['court'],['larder','pale-gardens'],['cracking-lake'],['cracking-lake','pale-gardens']],
+
   guide: {
     story: `Across the frozen lake of Hollin-Vael it is always the last night of winter. The Winter Court has held that night for a hundred years by the will of the Hoar Queen Orsolya, who cannot bear to let it end. Her palace sits in the middle of the ice; its dancers do not tire, its candles do not gutter, and its servants do not age. Mortals who cross the lake are offered bargains: a harvest, a cure, a child. The Court collects its price in years, and keeps them in sealed jars in the Larder of Years, the deepest cellar of the palace.
 

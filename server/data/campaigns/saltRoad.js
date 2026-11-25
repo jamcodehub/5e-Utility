@@ -9,6 +9,10 @@ export default {
   premium: false,
   pitch: 'A dying caravan master, forty urns of living seawater and four hundred miles of white seabed where an ocean used to be. A found-family road story that grows from a first-level escort job into a choice about who the sea belongs to. Built to be easy to run: one level per session, one big set piece and one puzzle each time.',
 
+  // Battle maps made with the map generator (files in data/campaigns/maps/<id>/), and which ones each session uses.
+  maps: ['night-camp','wreck-forest','singing-hull','tallow-station','glass-flats','pressure-hall'],
+  sessionMaps: [['night-camp'],['wreck-forest'],['singing-hull'],['tallow-station'],['glass-flats'],['pressure-hall']],
+
   guide: {
     story: `Forty years ago the Brineheart Sea left in a single night. Ports became ghost towns on the edge of a white desert. Ships still stand in the salt on their keels. The only thing that crosses the seabed now is the Salt Road, a line of marker-poles that caravans follow from the dying port of Low Tarn in the west to Kesh Maren in the east, the one great city that still has water: a reservoir the size of a county, held back by the Dam of Nine Hands.
 

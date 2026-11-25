@@ -60,7 +60,7 @@ export default function NewCampaignDialog({ onCreate, onClose, onUpgrade }) {
             <button type="button" key={t.id} onClick={() => setChoice(t.id)} aria-pressed={choice === t.id} style={card(choice === t.id, t.locked)}>
               <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, flexWrap: 'wrap' }}>
                 <span style={{ fontWeight: 600, fontSize: 15 }}>{t.title}</span>
-                <span style={{ fontSize: 12, color: 'var(--text-3)' }}>Levels {t.levels} · {t.sessions} sessions</span>
+                <span style={{ fontSize: 12, color: 'var(--text-3)' }}>Levels {t.levels} · {t.sessions} sessions · {t.maps} maps</span>
                 {t.locked
                   ? <span style={{ marginLeft: 'auto', fontSize: 11, fontWeight: 600, color: 'var(--gold)', border: '1px solid var(--gold-border)', borderRadius: 999, padding: '1px 8px' }}>DM Premium</span>
                   : !t.premium && <span style={{ marginLeft: 'auto', fontSize: 11, fontWeight: 600, color: 'var(--green, #2f9e57)' }}>Free</span>}
@@ -69,7 +69,7 @@ export default function NewCampaignDialog({ onCreate, onClose, onUpgrade }) {
               {choice === t.id && (
                 <div style={{ fontSize: 13, color: 'var(--text-2)', marginTop: 8, lineHeight: 1.5 }}>
                   {t.pitch}
-                  <div style={{ marginTop: 6, color: 'var(--text-3)' }}>Fills in: the Campaign Guide, lore cards for NPCs, places, factions and foes, and a plan for every session in your session planner. Tone: {t.tone}.</div>
+                  <div style={{ marginTop: 6, color: 'var(--text-3)' }}>Fills in: the Campaign Guide, lore cards for NPCs, places, factions and foes, a plan for every session in your session planner, and the battle maps those sessions use, ready to play. Tone: {t.tone}.</div>
                 </div>
               )}
             </button>

@@ -9,6 +9,10 @@ export default {
   premium: true,
   pitch: 'Two cities have fought for eleven years across the Meridian Line, an ancient wall of brass pillars that holds back the Ashlands. The party are the last neutral Envoys, sent to broker a ceasefire. They find out both governments already know the Line is failing, and that the war is the lie that lets them hide it. Six sessions of negotiation, espionage and logic puzzles build to a mass battle whose difficulty is set by the allies the party has earned.',
 
+  // Battle maps made with the map generator (files in data/campaigns/maps/<id>/), and which ones each session uses.
+  maps: ['corrans-gate','counting-house','hearth-hall','quills-hut','ashlands','the-line'],
+  sessionMaps: [['corrans-gate'],['counting-house'],['hearth-hall'],['ashlands','quills-hut'],['the-line'],['the-line','ashlands']],
+
   guide: {
     story: `The Meridian Line is a wall of nine hundred brass pillars, each as tall as a cathedral, running two hundred miles across the neck of a continent. West of it lies the Republic of Veyra, a merchant city of canals and ledgers. East of it lies Dunmark, a mountain theocracy that keeps its hearths burning day and night. South of it lies the Ashlands, a plain of cinder that was once a kingdom and now is a grey waste that moves when the wind does not.
 
