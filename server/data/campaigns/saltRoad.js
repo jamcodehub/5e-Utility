@@ -13,6 +13,23 @@ export default {
   maps: ['night-camp','wreck-forest','singing-hull','tallow-station','glass-flats','pressure-hall'],
   sessionMaps: [['night-camp'],['wreck-forest'],['singing-hull'],['tallow-station'],['glass-flats'],['pressure-hall']],
 
+  // The DM's shop: items to hand out, some made for this story (marked Story item).
+  shop: [
+    { name: "Salt-stone", qty: 5, weight: 0.1, value: "5 sp", notes: "Story item. A grey lump Oriel sucks to keep her cough down. Sucking one for a minute gives advantage on your next save against heat or thirst exhaustion today." },
+    { name: "Marrow & Daughters waterskin", qty: 6, weight: 5, value: "2 gp", notes: "Stamped with the family mark. Holds 4 pints. Tamsin will remember who lost theirs." },
+    { name: "Glare-goggles", qty: 4, weight: 0.5, value: "15 gp", notes: "Smoked glass in a leather strap. Removes the disadvantage on Perception from salt-glare at noon in the Wreck Forest and on the Glass Flats." },
+    { name: "Salt-runner boots", qty: 4, weight: 3, value: "25 gp", notes: "Wide soles for loose crust. You ignore difficult terrain from salt crust, and leave no clear tracks on it." },
+    { name: "Marker-pole lantern", qty: 3, weight: 2, value: "8 gp", notes: "Hooded lantern with blue glass, made to be hung on a road marker. Bright light 30 ft, dim 30 ft more, burns 8 hours on a flask of oil." },
+    { name: "Caravan rations (7 days)", qty: 10, weight: 14, value: "3 gp", notes: "Dried fish, hard bread and salt. Keeps for a month. A week of these keeps the Water track from dropping on a failed travel check, once." },
+    { name: "Wet sailcloth wrap", qty: 4, weight: 4, value: "5 gp", notes: "Wraps one urn or crate to keep it cool. Each wrap reduces Urn-Heat by 1 for a day when applied by a character who is also humming, singing or telling the urn a story." },
+    { name: "Dune-hound treats", qty: 6, weight: 0.2, value: "1 gp", notes: "Dried meat. Advantage on Animal Handling checks to calm a salt-mad dune hound; a calmed hound follows the caravan." },
+    { name: "Sand-skiff whistle", qty: 2, weight: 0.1, value: "15 gp", notes: "Story item. A Bone Fleet whistle. Once per day, a blast calls a skiff to the nearest wreck within a mile if the Bone Fleet is friendly with you. Juro offers it in Session 4." },
+    { name: "Tide-glass", qty: 1, weight: 0.5, value: "100 gp", notes: "Story item. A thumb-sized bottle of sea-green glass that hums and grows warm within 100 ft of a seed-water urn. It runs hotter as Urn-Heat rises, so you can read the track by touch." },
+    { name: "Oriel's salt-stone", qty: 1, weight: 0.1, value: "Priceless", notes: "Story item. Oriel's own. While you hold it, once per day when you or an ally within 30 ft fails a save against fear or despair, they may reroll it. Given at the end of Session 5." },
+    { name: "Dael's unopened letter", qty: 1, weight: 0, value: "Priceless", notes: "Story item. Written in a dead man's hand: \"Do not take them to Kesh. Take them home.\" Hand this over at the end of Session 5." },
+    { name: "Potion of healing", qty: 3, weight: 0.5, value: "50 gp", notes: "Restores 2d4+2 hit points. Sold at Tallow Station for double." },
+  ],
+
   guide: {
     story: `Forty years ago the Brineheart Sea left in a single night. Ports became ghost towns on the edge of a white desert. Ships still stand in the salt on their keels. The only thing that crosses the seabed now is the Salt Road, a line of marker-poles that caravans follow from the dying port of Low Tarn in the west to Kesh Maren in the east, the one great city that still has water: a reservoir the size of a county, held back by the Dam of Nine Hands.
 

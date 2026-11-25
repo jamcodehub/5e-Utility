@@ -171,7 +171,7 @@ export function InventoryPanel({ toast, isDM = false }) {
             <button onClick={() => toggleEquipped(item.id)} title={item.equipped ? 'Unequip' : 'Equip'} style={{ width: 16, height: 16, borderRadius: 4, cursor: 'pointer', padding: 0, background: item.equipped ? 'var(--gold)' : 'transparent', border: `2px solid ${item.equipped ? 'var(--gold)' : 'var(--border-strong)'}`, transition: 'all .15s', flexShrink: 0 }} />
             <div style={{ minWidth: 0 }}>
               <div style={{ fontSize: 13, fontWeight: item.equipped ? 600 : 400, color: item.equipped ? 'var(--text)' : 'var(--text-2)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.name}</div>
-              {item.notes && <div style={{ fontSize: 11, color: 'var(--text-3)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: 1 }}>{item.notes}</div>}
+              {item.notes && <div title={item.notes} style={{ fontSize: 11, color: 'var(--text-3)', overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', marginTop: 1, lineHeight: 1.4 }}>{item.notes}</div>}
             </div>
             <div style={{ fontSize: 11, color: 'var(--text-3)', whiteSpace: 'nowrap' }}>{item.value || ''}</div>
             <div style={{ fontSize: 12, fontFamily: 'var(--font-title)', color: 'var(--text-2)', minWidth: 24, textAlign: 'center' }}>×{item.qty || 1}</div>

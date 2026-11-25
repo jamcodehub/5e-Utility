@@ -13,6 +13,23 @@ export default {
   maps: ['corrans-gate','counting-house','hearth-hall','quills-hut','ashlands','the-line'],
   sessionMaps: [['corrans-gate'],['counting-house'],['hearth-hall'],['ashlands','quills-hut'],['the-line'],['the-line','ashlands']],
 
+  // The DM's shop: items to hand out, some made for this story (marked Story item).
+  shop: [
+    { name: "Concord envoy's seal", qty: 4, weight: 0.2, value: "Priceless", notes: "Story item. Grey wax and a brass die. Advantage on Persuasion checks with officials of either city while you remain neutral. Take a side in public and it goes dull." },
+    { name: "Cinder-veil", qty: 4, weight: 0.2, value: "25 gp", notes: "Story item. A grey cloth face-wrap. Advantage on Constitution saves against the Ash Legionnaires' ash cloud and against cinder storms." },
+    { name: "Hearth-Guard lamp", qty: 2, weight: 2, value: "40 gp", notes: "Story item. A dunmark lamp that burns without oil. Bright light 20 ft, dim 20 ft more. A creature within 5 ft takes half damage from the first fire effect each round." },
+    { name: "Veyran field ledger", qty: 1, weight: 1, value: "50 gp", notes: "Story item. A supply log forged for the Counting House. Advantage on Deception checks to pass as a quartermaster clerk." },
+    { name: "Antidote for the Choir's poison", qty: 3, weight: 0.2, value: "50 gp", notes: "Story item. Counters the poison used on Secretary Pell. Advantage on saves against it for 1 hour, and ends it if given within a minute." },
+    { name: "Quill's brass wrench", qty: 1, weight: 2, value: "75 gp", notes: "Story item. A ward-tuning tool older than the war. Advantage on Arcana and Investigation checks to read a ward or a pillar's inscription. Quill gives it only to someone who brought tea." },
+    { name: "A replica tuning fork", qty: 1, weight: 0.5, value: "30 gp", notes: "Story item. A practice fork for the Chord. Striking it near a pillar tells you whether it is in tune (it does not re-seat the ward)." },
+    { name: "Key-stone rubbing", qty: 1, weight: 0, value: "10 gp", notes: "Story item. A wax impression of the Hearth Hall's stones, enough to see the nested patterns when you are not allowed near the real ones." },
+    { name: "Tin of tea for Magister Quill", qty: 3, weight: 0.2, value: "5 gp", notes: "Story item. Brewed and offered, it gets Quill talking for an hour and counts as the first step to winning her as an Ally." },
+    { name: "Mira Kest's brother's tag", qty: 1, weight: 0, value: "Priceless", notes: "Story item. A dented Veyran soldier's tag. Return it to Captain Kest and she will remember who did it." },
+    { name: "Signal rocket (Veyran)", qty: 3, weight: 1, value: "10 gp", notes: "Lights the sky red for a minute within 1 mile. Veyran troops will come, and Dunmark will see it too." },
+    { name: "Field rations (siege)", qty: 10, weight: 10, value: "5 gp", notes: "Salt biscuit and dried pulse. A week of these keeps you fed through the Ashlands." },
+    { name: "Potion of healing", qty: 3, weight: 0.5, value: "50 gp", notes: "Restores 2d4+2 hit points. Veyran quartermasters sell them, Dunmark chaplains bless them." },
+  ],
+
   guide: {
     story: `The Meridian Line is a wall of nine hundred brass pillars, each as tall as a cathedral, running two hundred miles across the neck of a continent. West of it lies the Republic of Veyra, a merchant city of canals and ledgers. East of it lies Dunmark, a mountain theocracy that keeps its hearths burning day and night. South of it lies the Ashlands, a plain of cinder that was once a kingdom and now is a grey waste that moves when the wind does not.
 

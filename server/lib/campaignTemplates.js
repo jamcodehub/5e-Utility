@@ -1,7 +1,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { CampaignGuide, Lore, Journal, LevelPlan } from '../models/index.js'
+import { CampaignGuide, Lore, Journal, LevelPlan, Inventory } from '../models/index.js'
 import { CAMPAIGN_TEMPLATES } from '../data/campaigns/index.js'
 import { locksFromContent } from './doors.js'
 
@@ -22,7 +22,7 @@ export const findTemplate = (id) => CAMPAIGN_TEMPLATES.find(t => t.id === id) ||
 
 // What the picker shows: no story content, just enough to choose.
 export const templateSummaries = (canUsePremium) => CAMPAIGN_TEMPLATES.map(t => ({
-  id: t.id, title: t.title, tagline: t.tagline, levels: t.levels, sessions: t.sessions.length, maps: t.maps.length, tone: t.tone, pitch: t.pitch,
+  id: t.id, title: t.title, tagline: t.tagline, levels: t.levels, sessions: t.sessions.length, maps: t.maps.length, shop: t.shop.length, storyItems: t.shop.filter(i => i.notes.startsWith('Story item')).length, tone: t.tone, pitch: t.pitch,
   premium: t.premium, locked: t.premium && !canUsePremium,
 }))
 
@@ -43,6 +43,8 @@ export function templateProblems(t) {
   need(t.lore?.some(l => l.tag === 'boss') && t.lore?.some(l => l.tag === 'enemy') && t.lore?.some(l => l.tag === 'location') && t.lore?.some(l => l.tag === 'faction'), 'lore needs a boss, enemies, places and factions')
   need(t.lore?.filter(l => l.tag === 'enemy' || l.tag === 'boss').every(l => Number.isInteger(l.maxHp) && l.maxHp > 0), 'enemies and bosses need hit points')
   need(Array.isArray(t.sessions) && t.sessions.length >= 6 && t.sessions.every(s => s.title && s.content?.length > 800), 'sessions')
+  need(Array.isArray(t.shop) && t.shop.length >= 10 && t.shop.every(i => i.name && Number.isInteger(i.qty) && i.qty > 0 && typeof i.value === 'string' && i.value && typeof i.notes === 'string' && i.notes.length > 30), 'shop')
+  need(t.shop?.filter(i => i.notes.startsWith('Story item')).length >= (t.premium ? 7 : 4), 'the shop needs items made for the story')
   need(Array.isArray(t.maps) && t.maps.length >= 5 && new Set(t.maps).size === t.maps.length, 'maps')
   for (const slug of t.maps || []) {
     const m = readTemplateMap(t.id, slug)
@@ -73,6 +75,11 @@ export async function seedCampaign(campaign, template, userId) {
     campaign: campaign._id, title: l.title, tag: l.tag, content: l.content,
     hp: l.maxHp ?? null, maxHp: l.maxHp ?? null,
   })))
+  // The DM's shop: the items to hand out, which are in the DM's Shop Items page.
+  await Inventory.create({
+    campaign: campaign._id, owner: userId, currency: { pp: 0, gp: 0, ep: 0, sp: 0, cp: 0 },
+    items: template.shop.map((item, i) => ({ id: `shop-${i + 1}`, equipped: false, ...item })),
+  })
   // The battle maps go into the campaign map list, ready to play.
   const titles = {}
   for (const slug of template.maps) {

@@ -13,6 +13,23 @@ export default {
   maps: ['last-embers','frozen-road','long-dusk-fair','court','pale-gardens','larder','cracking-lake'],
   sessionMaps: [['last-embers','frozen-road'],['long-dusk-fair'],['court'],['larder','pale-gardens'],['cracking-lake'],['cracking-lake','pale-gardens']],
 
+  // The DM's shop: items to hand out, some made for this story (marked Story item).
+  shop: [
+    { name: "Bottled breath", qty: 3, weight: 0.5, value: "30 gp", notes: "Story item. A flask of held-in winter air. Open it to create a 10 ft radius of perfect silence for 1 round, or to whisper a message that only one named person will hear." },
+    { name: "A secondhand shadow", qty: 2, weight: 0, value: "A favour", notes: "Story item. A shadow Wick has bought from someone who will not miss it. Wear it for one hour for advantage on a Stealth check. Its owner may want it back. Taking it creates a Debt." },
+    { name: "Cold-iron nails", qty: 5, weight: 0.1, value: "5 gp", notes: "Story item. Pinned to a surface, a nail forces any fey within 10 ft to make a DC 14 Wisdom save or stop for a round. Using one breaks a Courtesy and raises Notice by 1." },
+    { name: "Masquerade masks (set of six)", qty: 1, weight: 2, value: "60 gp", notes: "Story item. Each is different: a fox, a heron, a moth, a stag, a crow and a blank. Advantage on Deception checks to pass as a courtier. Each mask has one flaw the Court will notice." },
+    { name: "Forged Midwinter invitation", qty: 3, weight: 0, value: "50 gp", notes: "Story item. Passes a quick look at the gate. Withstands Master Thistlewick for one question; a second question raises Notice by 1." },
+    { name: "Frost-wine flask", qty: 3, weight: 1, value: "25 gp", notes: "Story item. Gives resistance to cold damage for 1 hour. Accepted from a fey, it also creates a Debt; bought at the Fair, it does not, but the stallholder will remember." },
+    { name: "Loaf of moonlight", qty: 3, weight: 1, value: "10 gp", notes: "Story item. Feeds a character for a day, never spoils. Mortals who eat it dream of the Court for a week and wake up cold." },
+    { name: "Winter coat (Cold Anvil make)", qty: 4, weight: 6, value: "5 gp", notes: "Heavy wool. Advantage on saves against cold weather. Ilse's village makes them and will give the party one each." },
+    { name: "Ilse's notes on the Courtesies", qty: 1, weight: 0, value: "Priceless", notes: "Story item. Seventeen years of notes in a widow's neat hand. Gives advantage on History checks about fey etiquette, and the answers to the Session 1 test." },
+    { name: "Ring of Larder keys", qty: 1, weight: 1, value: "Priceless", notes: "Story item. Lifted from a servant in Session 3. Opens the service door to the Larder stair. Any Knight of the Hoar Guard will recognise it." },
+    { name: "Corvin's jar", qty: 1, weight: 2, value: "Priceless", notes: "Story item. A sealed jar of glowing amber with Corvin Harrowgate's name on the lid: forty years. Break the seal beside him to free him." },
+    { name: "The jar of black ice", qty: 1, weight: 1, value: "Priceless", notes: "Story item. Metal sticks to it. A single snowflake that does not melt: the last day of winter. Do not hand this out before Session 4." },
+    { name: "Potion of healing", qty: 3, weight: 0.5, value: "50 gp", notes: "Restores 2d4+2 hit points. The Fair sells them as 'bottled warmth' for twice the price." },
+  ],
+
   guide: {
     story: `Across the frozen lake of Hollin-Vael it is always the last night of winter. The Winter Court has held that night for a hundred years by the will of the Hoar Queen Orsolya, who cannot bear to let it end. Her palace sits in the middle of the ice; its dancers do not tire, its candles do not gutter, and its servants do not age. Mortals who cross the lake are offered bargains: a harvest, a cure, a child. The Court collects its price in years, and keeps them in sealed jars in the Larder of Years, the deepest cellar of the palace.
 

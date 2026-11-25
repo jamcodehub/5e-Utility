@@ -13,6 +13,23 @@ export default {
   maps: ['first-hearth','last-light-inn','road-of-lamps','river-of-the-dead','throne-of-dawn','long-night'],
   sessionMaps: [['first-hearth','last-light-inn'],['road-of-lamps'],['river-of-the-dead'],['throne-of-dawn'],['throne-of-dawn'],['long-night']],
 
+  // The DM's shop: items to hand out, some made for this story (marked Story item).
+  shop: [
+    { name: "Dawn-Order lamp", qty: 4, weight: 2, value: "25 gp", notes: "Story item. A brass lantern that never needs oil. Bright light 30 ft, dim 30 ft more, brighter whenever someone near it tells the truth." },
+    { name: "Pilgrim's lamp-book", qty: 4, weight: 0.5, value: "2 gp", notes: "A small book where you record each lamp you light for someone. Each entry gives the party a point on the Dimness Clock track (reduce it by 1, once per session)." },
+    { name: "Ysenne's taper", qty: 3, weight: 0.1, value: "3 gp", notes: "Story item. A beeswax taper from the Road of Lamps. Lighting a lantern with it for someone else gives them advantage on their next saving throw, once per day." },
+    { name: "Spare silver wick", qty: 3, weight: 0.1, value: "10 gp", notes: "Story item. Relights any lamp, including a lamp the wind or cold has put out. Does not relight the Lantern." },
+    { name: "Ferryman's coin", qty: 3, weight: 0.1, value: "Priceless", notes: "Story item. Pays for one crossing of the River of the Dead, in either direction. Obbin gives these for a true story." },
+    { name: "Kael's star chart", qty: 1, weight: 0.5, value: "40 gp", notes: "Story item. Hand-copied from the Order's library. Advantage on Survival and Wisdom (navigation) checks under the dimmed sky." },
+    { name: "Shard of morning", qty: 1, weight: 0.5, value: "Priceless", notes: "Story item. A gift of the Lesser Sun Dawn. Once per day, the bearer can shed daylight (as the spell) for 10 minutes without a spell slot. Earned in Session 4." },
+    { name: "Aurelian's trimming-knife", qty: 1, weight: 0.5, value: "Priceless", notes: "Story item. A small silver knife that has trimmed the sun's wick for nine hundred years. Once per day, it cuts the darkness: a 20 ft sphere of magical darkness within 60 ft ends." },
+    { name: "Charred talisman of the Kindled", qty: 3, weight: 0.2, value: "1 gp", notes: "Story item. A blackened charm of a flame. Advantage on Charisma checks with Sister Thessaly's pilgrims, who take it as a sign of respect." },
+    { name: "Hearth token", qty: 6, weight: 0.1, value: "Priceless", notes: "Story item. A blank lead medallion for each pilgrim. Engrave it with your Hearth. A character whose Hearth is lit may spend it to gain advantage on a save against despair; spending it dims the Hearth." },
+    { name: "Cold-weather bedroll", qty: 6, weight: 7, value: "1 gp", notes: "Warm even in the dimming. Advantage on saves against cold while resting." },
+    { name: "Torches (10)", qty: 5, weight: 10, value: "1 sp", notes: "Bright light 20 ft, dim 20 ft more. They burn weakly in the Long Night and go out if you let your Hearth fade." },
+    { name: "Potion of healing", qty: 3, weight: 0.5, value: "50 gp", notes: "Restores 2d4+2 hit points. The Dawn Order keeps a few in the mother-house." },
+  ],
+
   guide: {
     story: `A year ago the sun began to dim. Not suddenly: a shade at a time, so that every morning looks a little more like evening. Crops fail. Cities put lamps in their windows at noon. The oldest people say the light has a different colour now, like a coin held too long in the hand. Nobody knows why. The temples blame each other; the scholars blame the temples.
 

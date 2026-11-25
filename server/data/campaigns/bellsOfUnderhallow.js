@@ -13,6 +13,23 @@ export default {
   maps: ['underhallow','gilt-lamb','chapel','ringing-chamber','churchyard','crypt'],
   sessionMaps: [['underhallow','gilt-lamb'],['chapel','crypt'],['ringing-chamber'],['churchyard'],['underhallow','chapel'],['crypt','chapel']],
 
+  // The DM's shop: items to hand out, some made for this story (marked Story item).
+  shop: [
+    { name: "Mourning candle", qty: 6, weight: 0.5, value: "5 gp", notes: "Story item. Burns pale blue within 30 ft of a Faded or of someone who has been forgotten, and gutters to green if they are being remembered. Burns 4 hours." },
+    { name: "Ringer's gloves", qty: 4, weight: 0.5, value: "6 gp", notes: "Padded leather. Advantage on Strength checks to pull a heavy bell rope, and you cannot be pulled off your feet by one." },
+    { name: "Change-ringing chalk", qty: 12, weight: 0.1, value: "1 sp", notes: "Ketch's ringers draw each peal on the wall before they ring it. Writing the order down gives advantage on the first check to ring it right." },
+    { name: "Ketch's tuning fork", qty: 1, weight: 0.2, value: "40 gp", notes: "Story item. A brass fork stamped with a bell. Struck near the ringing chamber, it hums the true pitch of each bell and gives advantage on Performance checks to feel a peal. Found in Ketch's notebook case." },
+    { name: "Dr Oss's stethoscope", qty: 1, weight: 0.5, value: "25 gp", notes: "Story item and a Keeping. Advantage on Medicine checks to hear a heartbeat or lung sound. Whoever carries it remembers Dr Marguerite Oss when the bell takes her." },
+    { name: "The cooper's ring", qty: 1, weight: 0, value: "3 gp", notes: "Story item and a Keeping. A plain iron ring from number 9, Tallow Lane. Whoever carries it remembers Anselm the cooper and his family." },
+    { name: "Hob's father's watch", qty: 1, weight: 0.2, value: "10 gp", notes: "Story item and a Keeping. The watch that put Hob back in the world when it was returned to him by accident. Carried by someone else, it works for them too." },
+    { name: "The red scarf (unfinished)", qty: 1, weight: 0.2, value: "Priceless", notes: "Story item. Half-knitted by Mother Ysolde for a daughter she cannot remember. As a Keeping it restores a person's memory of Josephine Pell. Finished, it restores Ysolde's." },
+    { name: "Brother Caul's hammer", qty: 1, weight: 6, value: "20 gp", notes: "Story item. Counts as magical against the Thirteenth Bell, which it damages as if it were a siege weapon. Using it on the bell has terrible consequences for the Hollow Children." },
+    { name: "Hooded lantern", qty: 3, weight: 2, value: "5 gp", notes: "Bright light 30 ft, dim 30 ft more. The fog in Underhallow dims it to 15 ft, which is why every window carries one." },
+    { name: "Flask of lamp oil", qty: 10, weight: 1, value: "1 sp", notes: "Burns 6 hours in a lantern, or thrown deals 5 fire damage." },
+    { name: "A night at the Gilt Lamb", qty: 5, weight: 0, value: "2 sp", notes: "A bed, a bowl of stew and Hob's gossip. Hob will tell you one small thing the village has forgotten." },
+    { name: "Potion of healing", qty: 3, weight: 0.5, value: "50 gp", notes: "Restores 2d4+2 hit points. Dr Oss keeps three in the surgery." },
+  ],
+
   guide: {
     story: `Underhallow is a village of three hundred souls on a hill above a river fog, famous for one thing: the bells of the Chapel of Hollow Mercy. There are twelve bells in the tower that ring the hours. At midnight there is a thirteenth, a dark bronze bell hanging by itself in the lowest chamber, and it rings once, very softly, and every night since the spring one person disappears from the memory of everyone in the village. Neighbours walk past their house and see an empty plot. Portraits show an empty chair. A name is on every tongue and then it is not.
 
