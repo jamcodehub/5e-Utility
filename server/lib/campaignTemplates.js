@@ -37,7 +37,8 @@ export function templateProblems(t) {
   for (const k of ['story', 'worldNotes']) need(typeof g[k] === 'string' && g[k].length > 200, `guide.${k}`)
   need(typeof g.currentArc === 'string' && g.currentArc.length > 60, 'guide.currentArc')
   need(Array.isArray(g.npcs) && g.npcs.length >= 5 && g.npcs.every(n => n.name && n.description && n.characterRelation), 'guide.npcs')
-  need(Array.isArray(g.quests) && g.quests.length >= 4 && g.quests.every(q => q.title && q.description), 'guide.quests')
+  need(Array.isArray(g.quests) && g.quests.length >= 4 && g.quests.every(q => q.title && q.description && ['main', 'side'].includes(q.kind)), 'guide.quests')
+  need(g.quests?.filter(q => q.kind === 'main').length >= 3 && g.quests?.some(q => q.kind === 'side'), 'a main story of at least 3 quests and some side quests')
   need(Array.isArray(t.lore) && t.lore.length >= 12 && t.lore.every(l => l.title && LORE_TAGS.includes(l.tag) && l.content?.length > 40), 'lore')
   need(t.lore?.some(l => l.tag === 'boss') && t.lore?.some(l => l.tag === 'enemy') && t.lore?.some(l => l.tag === 'location') && t.lore?.some(l => l.tag === 'faction'), 'lore needs a boss, enemies, places and factions')
   need(t.lore?.filter(l => l.tag === 'enemy' || l.tag === 'boss').every(l => Number.isInteger(l.maxHp) && l.maxHp > 0), 'enemies and bosses need hit points')
@@ -53,13 +54,20 @@ export function templateProblems(t) {
   return problems
 }
 
+// Quests as the DM sees them at the start: nothing is started yet, the main story comes first in its order, then the side quests.
+export function orderedQuests(quests) {
+  const main = quests.filter(q => q.kind === 'main')
+  const side = quests.filter(q => q.kind !== 'main')
+  return [...main, ...side].map(q => ({ ...q, status: 'not-started', order: (q.kind === 'main' ? main : side).indexOf(q) + 1 }))
+}
+
 // Creates everything a template carries inside a new campaign. `userId` is the DM (author of the session plans).
 export async function seedCampaign(campaign, template, userId) {
   const g = template.guide
   const stamp = (list, prefix) => list.map((item, i) => ({ ...item, id: `${prefix}-${i + 1}` }))
   await CampaignGuide.create({
     campaign: campaign._id, story: g.story, currentArc: g.currentArc, lastSession: g.lastSession || '', worldNotes: g.worldNotes,
-    npcs: stamp(g.npcs, 'npc'), quests: stamp(g.quests.map(q => ({ status: 'active', ...q })), 'quest'),
+    npcs: stamp(g.npcs, 'npc'), quests: stamp(orderedQuests(g.quests), 'quest'),
   })
   await Lore.insertMany(template.lore.map(l => ({
     campaign: campaign._id, title: l.title, tag: l.tag, content: l.content,

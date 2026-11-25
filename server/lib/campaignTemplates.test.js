@@ -34,3 +34,15 @@ test('puzzle answers and encounter numbers are written into the session plans', 
     assert.match(s.content, /ROLE SPOTLIGHTS/, `${t.id}: ${s.title} has no role spotlights`)
   }
 })
+
+test('quests start not started, main story first in order, then side quests', async () => {
+  const { orderedQuests } = await import('./campaignTemplates.js')
+  for (const t of CAMPAIGN_TEMPLATES) {
+    const q = orderedQuests(t.guide.quests)
+    assert.ok(q.every(x => x.status === 'not-started'), `${t.id}: every quest should start as not started`)
+    const firstSide = q.findIndex(x => x.kind === 'side')
+    assert.ok(firstSide > 0 && q.slice(0, firstSide).every(x => x.kind === 'main') && q.slice(firstSide).every(x => x.kind === 'side'), `${t.id}: main story first, then side quests`)
+    assert.deepEqual(q.filter(x => x.kind === 'main').map(x => x.order), q.filter(x => x.kind === 'main').map((_, i) => i + 1))
+    assert.equal(q[0].order, 1)
+  }
+})

@@ -1,3 +1,4 @@
+import { orderQuests, questPointer } from '../utils/quests'
 import GuideAssistant from '../components/GuideAssistant'
 import { useDebouncedSave } from '../hooks/useDebouncedSave'
 import { useState, useEffect, useCallback, useRef } from 'react'
@@ -112,19 +113,28 @@ function RelationNote() {
 }
 
 // ─── QuestCard ────────────────────────────────────────────────────────────────
-function QuestCard({ quest, onChange, onRemove, activePlayer, onInserted }) {
+function QuestCard({ quest, onChange, onRemove, activePlayer, onInserted, number, pointer }) {
   const u = f => e => onChange({ ...quest, [f]: e.target.value })
-  const SC = { active: '#1d6a3a', completed: '#9a7c3a', failed: '#b03030' }
+  const SC = { 'not-started': '#7a7468', active: '#1d6a3a', completed: '#9a7c3a', failed: '#b03030' }
   return (
     <div style={{ border: '1px solid var(--border)', borderRadius: 3, padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 8 }}>
-      <div style={{ display: 'flex', gap: 8 }}>
+      {pointer && <div style={{ alignSelf: 'flex-start', fontSize: 10, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--gold)', background: 'var(--gold-bg)', border: '1px solid var(--gold-border)', borderRadius: 999, padding: '2px 10px' }}>{pointer}</div>}
+      <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+        {number && <span aria-label={`Main story quest ${number}`} style={{ width: 24, height: 24, borderRadius: '50%', border: '1px solid var(--gold-border)', background: 'var(--gold-bg)', color: 'var(--gold)', fontSize: 12, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>{number}</span>}
         <input className="input" value={quest.title} onChange={u('title')} placeholder="Quest title" style={{ flex: 1, fontSize: 13, fontWeight: 500 }} />
+        <button onClick={onRemove} style={{ background: 'none', border: 'none', color: 'var(--text-3)', cursor: 'pointer', fontSize: 18, lineHeight: 1, padding: '0 2px', flexShrink: 0 }}>✕</button>
+      </div>
+      <div style={{ display: 'flex', gap: 8 }}>
+        <select value={quest.kind === 'main' ? 'main' : 'side'} onChange={u('kind')} aria-label="Main story or side quest" style={{ fontSize: 11, border: '1px solid var(--border)', borderRadius: 6, padding: '4px 6px', background: 'var(--surface)', color: 'var(--text-2)', cursor: 'pointer', flexShrink: 0 }}>
+          <option value="main">Main story</option>
+          <option value="side">Side quest</option>
+        </select>
         <select value={quest.status} onChange={u('status')} style={{ fontSize: 11, border: '1px solid var(--border)', borderRadius: 6, padding: '4px 6px', background: 'var(--surface)', color: SC[quest.status], cursor: 'pointer', flexShrink: 0 }}>
+          <option value="not-started">Not started</option>
           <option value="active">Active</option>
           <option value="completed">Completed</option>
           <option value="failed">Failed</option>
         </select>
-        <button onClick={onRemove} style={{ background: 'none', border: 'none', color: 'var(--text-3)', cursor: 'pointer', fontSize: 18, lineHeight: 1, padding: '0 2px', flexShrink: 0 }}>✕</button>
       </div>
       <DropTextarea value={quest.description} onChange={u('description')} rows={2}
         placeholder="What is this quest? Stakes, background, what needs to happen…"
@@ -279,7 +289,7 @@ export default function CampaignGuide() {
   const upd = f => e => { setGuide(g => ({ ...g, [f]: e.target.value })); setDirty(true) }
   const clearPlayer = () => setActive(null)
 
-  const addQuest = () => { setGuide(g => ({ ...g, quests: [...g.quests, { id: nanoid(), title: '', description: '', status: 'active', characterRelation: '' }] })); setDirty(true) }
+  const addQuest = () => { setGuide(g => ({ ...g, quests: [...g.quests, { id: nanoid(), title: '', description: '', status: 'active', kind: '', characterRelation: '' }] })); setDirty(true) }
   const updQuest = (id, v) => { setGuide(g => ({ ...g, quests: g.quests.map(q => q.id === id ? v : q) })); setDirty(true) }
   const rmQuest  = id      => { setGuide(g => ({ ...g, quests: g.quests.filter(q => q.id !== id) })); setDirty(true) }
 
@@ -335,9 +345,19 @@ export default function CampaignGuide() {
       </div>
       {guide.quests.length === 0
         ? <div style={{ fontSize: 12, color: 'var(--text-3)', lineHeight: 1.8 }}>No quests yet. The <span style={{ color: 'var(--gold)' }}>Character Relation</span> field ties each quest to a specific character's motivation.</div>
-        : <div style={isMobile ? { display: 'flex', flexDirection: 'column', gap: 10 } : { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: 12, alignItems: 'start' }}>
-            {guide.quests.map(q => <QuestCard key={q.id} quest={q} onChange={v => updQuest(q.id, v)} onRemove={() => rmQuest(q.id)} activePlayer={activePlayer} onInserted={clearPlayer} />)}
-          </div>}
+        : (() => {
+            const { grouped, main, side } = orderQuests(guide.quests)
+            const pointer = questPointer(guide.quests)
+            const gridStyle = isMobile ? { display: 'flex', flexDirection: 'column', gap: 10 } : { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: 12, alignItems: 'start' }
+            const card = (q, number) => <QuestCard key={q.id} quest={q} number={number} pointer={pointer?.id === q.id ? pointer.text : ''} onChange={v => updQuest(q.id, v)} onRemove={() => rmQuest(q.id)} activePlayer={activePlayer} onInserted={clearPlayer} />
+            const heading = (text, note) => <div style={{ margin: '4px 0 8px' }}><SectionLabel style={{ margin: 0 }}>{text}</SectionLabel>{note && <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 2 }}>{note}</div>}</div>
+            return grouped ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                <div>{heading('Main story', 'Follow these in order. The first one is where the campaign starts.')}<div style={gridStyle}>{main.map((q, i) => card(q, i + 1))}</div></div>
+                {side.length > 0 && <div>{heading('Side quests', 'Optional. Use them whenever the table wants a detour.')}<div style={gridStyle}>{side.map(q => card(q))}</div></div>}
+              </div>
+            ) : <div style={gridStyle}>{side.map(q => card(q))}</div>
+          })()}
       {guide.quests.length > 0 && (
         <button className="btn btn-primary btn-sm" onClick={save} disabled={saving} style={{ width: '100%', justifyContent: 'center', marginTop: 12, opacity: dirty ? 1 : 0.45 }}>
           {saving ? 'Saving…' : dirty ? '✦ Save Guide' : 'Saved ✓'}

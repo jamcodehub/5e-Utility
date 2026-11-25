@@ -230,7 +230,9 @@ const CampaignGuideSchema = new Schema({
     id:                { type: String },
     title:             { type: String, default: '' },
     description:       { type: String, default: '' },
-    status:            { type: String, enum: ['active', 'completed', 'failed'], default: 'active' },
+    status:            { type: String, enum: ['not-started', 'active', 'completed', 'failed'], default: 'active' },
+    kind:              { type: String, enum: ['main', 'side', ''], default: '' },   // 'main' = main story, 'side' = side quest, '' = not sorted
+    order:             { type: Number, default: 0 },                                  // place in its group, 1 is first
     characterRelation: { type: String, default: '' },
   }],
 }, { timestamps: true })
