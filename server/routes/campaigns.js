@@ -5,6 +5,8 @@ import { Campaign, Character, User, CampaignGuide, DMBoard, DMBoardFolder } from
 import { hasPremium, hasPremiumAs } from '../lib/premium.js'
 import { buildTestCharacter, MAX_TEST_PLAYERS } from '../lib/testPlayer.js'
 import { notifyUser } from '../lib/notify.js'
+import { FREE_CAMPAIGNS } from '../lib/limits.js'
+import { findTemplate, templateSummaries, seedCampaign } from '../lib/campaignTemplates.js'
 
 const router = Router()
 
@@ -52,15 +54,30 @@ router.get('/', auth, async (req, res) => {
 })
 
 // Only DMs can create campaigns.
+// The ready-made campaigns a DM can start from (what the New Campaign dialog lists). `locked` ones need DM Premium.
+router.get('/templates', auth, async (req, res) => {
+  const user = await User.findById(req.userId)
+  res.json(templateSummaries(hasPremiumAs(user, 'dm')))
+})
+
 router.post('/', auth, async (req, res) => {
   try {
     const user = await User.findById(req.userId)
     if (user?.role !== 'dm') return res.status(403).json({ error: 'Only Dungeon Masters can create campaigns.' })
+    const template = req.body?.templateId ? findTemplate(String(req.body.templateId)) : null
+    if (req.body?.templateId && !template) return res.status(400).json({ error: 'That ready-made campaign does not exist.' })
+    if (template?.premium && !hasPremiumAs(user, 'dm')) return res.status(403).json({ error: 'This ready-made campaign is part of DM Premium.' })
+    if (!hasPremiumAs(user, 'dm') && await Campaign.countDocuments({ owner: req.userId, isPersonal: { $ne: true } }) >= FREE_CAMPAIGNS)
+      return res.status(403).json({ error: `Free DMs can run ${FREE_CAMPAIGNS} campaigns. Upgrade to DM Premium for unlimited campaigns.` })
 
     let joinCode
     do { joinCode = genCode() } while (await Campaign.findOne({ joinCode }))
 
-    const campaign = await Campaign.create({ ...pickCampaignFields(req.body), owner: req.userId, joinCode })
+    const fields = pickCampaignFields(req.body)
+    if (template) { fields.description = fields.description || template.pitch; fields.setting = fields.setting || template.title }
+    if (!fields.name?.trim() && template) fields.name = template.title
+    const campaign = await Campaign.create({ ...fields, owner: req.userId, joinCode })
+    if (template) await seedCampaign(campaign, template, req.userId)
     res.json(campaign)
   } catch (e) { res.status(500).json({ error: e.message }) }
 })
@@ -131,7 +148,7 @@ router.post('/join', auth, async (req, res) => {
     const user = await User.findById(req.userId)
     if (user.role === 'player' && !hasPremiumAs(user, 'player')) {
       const already = await Campaign.countDocuments({ members: req.userId })
-      if (already >= 1) return res.status(403).json({ error: 'Free players can join 1 campaign. Upgrade to Premium for unlimited campaigns.' })
+      if (already >= FREE_CAMPAIGNS) return res.status(403).json({ error: `Free players can join ${FREE_CAMPAIGNS} campaigns. Upgrade to Premium for unlimited campaigns.` })
     }
 
     campaign.pendingMembers.push(req.userId)

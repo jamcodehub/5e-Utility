@@ -6,6 +6,8 @@ import { useMusic, MOODS } from '../context/MusicContext'
 import { useTheme } from '../context/ThemeContext'
 import { getSocket } from '../utils/socket'
 import { useState, useEffect, useRef } from 'react'
+import { FREE_CAMPAIGNS } from '../utils/limits'
+import NewCampaignDialog from './NewCampaignDialog'
 import SettingsModal from './SettingsModal'
 import ProfileAvatar from './ProfileAvatar'
 import CharacterOverview from './CharacterSidebar'
@@ -255,8 +257,6 @@ export default function Shell({ children }) {
   ))
 
   const [creating, setCreating] = useState(false)
-  const [newName, setNewName]   = useState('')
-  const [error, setError]       = useState('')
   const [joining, setJoining]   = useState(false)
   const [joinCode, setJoinCode] = useState('')
   const [joinError, setJoinError] = useState('')
@@ -317,13 +317,14 @@ export default function Shell({ children }) {
     setPendingMembers(p => p.filter(m => m._id !== userId))
   }
 
-  const handleCreate = async (e) => {
-    e.preventDefault()
-    if (!newName.trim()) return
-    const err = await createCampaign({ name: newName.trim() })
-    if (err) { setError(err); return }
-    setNewName(''); setCreating(false); setError(''); setShowCampaigns(false)
+  // Called by the New Campaign dialog with the name (and the ready-made campaign, if one was chosen). Returns an error text, or null.
+  const handleCreate = async (body) => {
+    const err = await createCampaign(body)
+    if (err) return err
+    setCreating(false); setShowCampaigns(false)
+    return null
   }
+  const createDialog = creating ? <NewCampaignDialog onCreate={handleCreate} onClose={() => setCreating(false)} onUpgrade={() => { setCreating(false); setShowCampaigns(false); navigate('/premium') }} /> : null
 
   const handleJoin = async (e) => {
     e.preventDefault()
@@ -335,8 +336,8 @@ export default function Shell({ children }) {
   }
 
   const realCampaigns = campaigns.filter(c => !c.isPersonal)
-  const canCreate = isDM && (isPremium || realCampaigns.length === 0)
-  const canJoin = !isDM && (isPremium || realCampaigns.length === 0)
+  const canCreate = isDM && (isPremium || realCampaigns.length < FREE_CAMPAIGNS)
+  const canJoin = !isDM && (isPremium || realCampaigns.length < FREE_CAMPAIGNS)
 
   const navLinkStyle = (isActive) => ({
     display: 'flex', flexDirection: 'row',
@@ -357,6 +358,7 @@ export default function Shell({ children }) {
   if (isMobile) {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden' }}>
+        {createDialog}
         {/* Mobile top bar */}
         <div style={{ background: 'var(--surface)', borderBottom: '1px solid var(--border)', padding: '8px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
           <img src={logoUrl} alt="5e Utility" style={{ height: 32, width: 'auto', objectFit: 'contain', display: 'block', filter: 'var(--logo-filter, none)' }} />
@@ -393,16 +395,7 @@ export default function Shell({ children }) {
                 ))}
               </div>
             )}
-            {creating ? (
-              <form onSubmit={handleCreate} style={{ marginTop: 6 }}>
-                <input autoFocus className="input" style={{ marginBottom: 6, padding: '6px 8px', fontSize: 12 }} placeholder="Campaign name..." value={newName} onChange={e => setNewName(e.target.value)} />
-                {error && <div style={{ fontSize: 11, color: 'var(--red)', marginBottom: 6 }}>{error}</div>}
-                <div style={{ display: 'flex', gap: 4 }}>
-                  <button type="submit" className="btn btn-primary btn-sm" style={{ flex: 1 }}>Create</button>
-                  <button type="button" className="btn btn-ghost btn-sm" onClick={() => { setCreating(false); setError('') }}>✕</button>
-                </div>
-              </form>
-            ) : joining ? (
+            {joining ? (
               <form onSubmit={handleJoin} style={{ marginTop: 6 }}>
                 <input autoFocus className="input" style={{ marginBottom: 6, padding: '6px 8px', fontSize: 12, textTransform: 'uppercase' }} placeholder="Join code..." value={joinCode} onChange={e => setJoinCode(e.target.value)} />
                 {joinError && <div style={{ fontSize: 11, color: 'var(--red)', marginBottom: 6 }}>{joinError}</div>}
@@ -495,6 +488,7 @@ export default function Shell({ children }) {
   // Desktop layout — unchanged
   return (
     <div style={{ display: 'flex', height: '100vh', overflow: 'hidden' }}>
+      {createDialog}
       <aside style={{ width: 232, flexShrink: 0, background: 'var(--surface)', borderRight: '1px solid var(--border)', display: 'flex', flexDirection: 'column' }}>
         <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <img src="https://res.cloudinary.com/crcbzpw6/image/upload/v1794483597/5E_UTILITY_Pure_Black_2000.png" alt="5e Utility" style={{ width: '100%', maxWidth: 160, height: 'auto', objectFit: 'contain', display: 'block', filter: 'var(--logo-filter, none)' }} />
@@ -520,16 +514,7 @@ export default function Shell({ children }) {
               ))}
             </div>
           )}
-          {creating ? (
-            <form onSubmit={handleCreate} style={{ marginTop: 4 }}>
-              <input autoFocus className="input" style={{ marginBottom: 4, padding: '6px 8px', fontSize: 12 }} placeholder="Campaign name..." value={newName} onChange={e => setNewName(e.target.value)} />
-              {error && <div style={{ fontSize: 11, color: 'var(--red)', marginBottom: 6, lineHeight: 1.4 }}>{error} <button type="button" onClick={() => navigate('/premium')} style={{ background: 'none', border: 'none', color: 'var(--gold)', cursor: 'pointer', fontSize: 11 }}>Upgrade →</button></div>}
-              <div style={{ display: 'flex', gap: 4 }}>
-                <button type="submit" className="btn btn-primary btn-sm" style={{ flex: 1 }}>Create</button>
-                <button type="button" className="btn btn-ghost btn-sm" onClick={() => { setCreating(false); setError('') }}>✕</button>
-              </div>
-            </form>
-          ) : joining ? (
+          {joining ? (
             <form onSubmit={handleJoin} style={{ marginTop: 4 }}>
               <input autoFocus className="input" style={{ marginBottom: 4, padding: '6px 8px', fontSize: 12, textTransform: 'uppercase' }} placeholder="Join code..." value={joinCode} onChange={e => setJoinCode(e.target.value)} />
               {joinError && <div style={{ fontSize: 11, color: 'var(--red)', marginBottom: 6 }}>{joinError}</div>}

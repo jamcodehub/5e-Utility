@@ -1,3 +1,5 @@
+import { FREE_JOURNAL_ENTRIES, FREE_MAPS_PER_CAMPAIGN, FREE_CAMPAIGNS } from '../utils/limits'
+
 // Visuals for the Premium slides on the landing page.
 const THEME_SHOTS = [
   { id: 'monk', label: 'Monk' }, { id: 'sorcerer', label: 'Sorcerer' },
@@ -20,11 +22,11 @@ export function ThemeMontage() {
 
 // What the free plan includes and what Premium lifts, taken from the limits the app really enforces.
 const ROWS = [
-  ['Battle maps', '5 per campaign', 'Unlimited'],
+  ['Battle maps', `${FREE_MAPS_PER_CAMPAIGN} per campaign`, 'Unlimited'],
   ['DM boards', '1 board', 'Unlimited, with folders'],
   ['Music tracks', '5 tracks', 'Unlimited'],
-  ['Campaigns (players)', '1 campaign', 'Unlimited'],
-  ['Journal entries', '15 entries', 'Unlimited'],
+  ['Campaigns', `${FREE_CAMPAIGNS} campaigns`, 'Unlimited'],
+  ['Journal entries', `${FREE_JOURNAL_ENTRIES} per campaign`, 'Unlimited'],
   ['Themes', 'Light and Dark', 'Every class theme'],
   ['AI world-building guide', 'Coming soon', 'Coming soon'],
 ]

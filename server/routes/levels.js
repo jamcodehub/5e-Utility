@@ -1,6 +1,7 @@
 import { Router } from 'express'
 import { LevelPlan, Campaign, User } from '../models/index.js'
 import { hasPremium, hasPremiumAs } from '../lib/premium.js'
+import { FREE_MAPS_PER_CAMPAIGN } from '../lib/limits.js'
 import { auth, isMember } from './campaigns.js'
 import { locksFromContent, pruneLocks, hasDesignedLocks } from '../lib/doors.js'
 
@@ -21,7 +22,7 @@ router.post('/:campaignId', auth, async (req, res) => {
     const owner = campaign ? await User.findById(campaign.owner) : null
     if (!hasPremiumAs(owner, 'dm')) {
       const count = await LevelPlan.countDocuments({ campaign: req.params.campaignId })
-      if (count >= 5) return res.status(403).json({ error: 'Free campaigns are limited to 5 level plans. Upgrade to the Ultimate DM Toolkit for unlimited plans.' })
+      if (count >= FREE_MAPS_PER_CAMPAIGN) return res.status(403).json({ error: `Free campaigns are limited to ${FREE_MAPS_PER_CAMPAIGN} battle maps. Upgrade to the Ultimate DM Toolkit for unlimited maps.` })
     }
     const plan = await LevelPlan.create({
       title: req.body.title, content: req.body.content, tokens: req.body.tokens, stairLinks: req.body.stairLinks,

@@ -3,6 +3,7 @@ import { useSearchParams, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { api } from '../context/AuthContext'
 import { AI_ENABLED } from '../utils/features'
+import { FREE_JOURNAL_ENTRIES, FREE_MAPS_PER_CAMPAIGN, FREE_CAMPAIGNS } from '../utils/limits'
 
 const label = f => (AI_ENABLED || !/storyboard generation/i.test(f) ? f : `${f} (coming soon)`)
 
@@ -14,7 +15,8 @@ const FEATURES = {
       'Storyboard generation x10',
       'Idea generator',
       'HP tracker',
-      'x5 level builder',
+      `${FREE_CAMPAIGNS} campaigns, ${FREE_MAPS_PER_CAMPAIGN} battle maps each`,
+      'Ready-made campaign: The Salt Road',
     ],
     premium: [
       'Everything in Player Premium',
@@ -23,6 +25,8 @@ const FEATURES = {
       'Idea generator',
       'HP tracker',
       '5e rules & misc reference page',
+      'Unlimited battle maps and campaigns',
+      '4 more ready-made campaigns, each with a full session-by-session plan, lore cards and puzzles',
       'Unlimited level building editor',
       'Unlimited storyboard generations',
       '11 exclusive class themes',
@@ -31,9 +35,9 @@ const FEATURES = {
   },
   player: {
     free: [
-      '1 campaign',
+      `${FREE_CAMPAIGNS} campaigns`,
       '1 character sheet',
-      '15 Journal / Session Planner entries',
+      `${FREE_JOURNAL_ENTRIES} Journal / Session Planner entries per campaign`,
       'Lore board',
     ],
     premium: [
