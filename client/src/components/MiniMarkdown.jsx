@@ -6,12 +6,13 @@ import { Fragment } from 'react'
 
 function inline(text) {
   const parts = []
-  const re = /(\*\*[^*\n]+\*\*|\*[^*\n]+\*|(?<!\w)_[^_\n]+_(?!\w))/g
+  const re = /(\*\*\*[^*\n]+\*\*\*|\*\*[^*\n]+\*\*|\*[^*\n]+\*|(?<!\w)_[^_\n]+_(?!\w))/g
   let last = 0, m, i = 0
   while ((m = re.exec(text))) {
     if (m.index > last) parts.push(text.slice(last, m.index))
     const tok = m[0]
-    if (tok.startsWith('**')) parts.push(<strong key={i++}>{tok.slice(2, -2)}</strong>)
+    if (tok.startsWith('***')) parts.push(<strong key={i++}><em>{tok.slice(3, -3)}</em></strong>)
+    else if (tok.startsWith('**')) parts.push(<strong key={i++}>{tok.slice(2, -2)}</strong>)
     else parts.push(<em key={i++}>{tok.slice(1, -1)}</em>)
     last = m.index + tok.length
   }
