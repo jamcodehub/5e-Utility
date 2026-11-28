@@ -23,6 +23,8 @@ test('AI routes are DM-only, keep the coach prompt, and only fetch Cloudinary av
   ] }) }))
 
   const geminiCalls = [], fetched = []
+  // The first answer is a statement (no question), so the server must ask again; the second is a proper question.
+  const guideReplies = ['So far: a drowned empire.', 'Who drowned it, and why?']
   const realFetch = globalThis.fetch
   stub(globalThis, 'fetch', async (url, opts) => {
     const u = String(url)
@@ -38,7 +40,7 @@ test('AI routes are DM-only, keep the coach prompt, and only fetch Cloudinary av
     if (u.includes('generativelanguage')) {
       const body = JSON.parse(opts.body); geminiCalls.push({ u, body })
       const isImage = u.includes('image')
-      return new Response(JSON.stringify({ candidates: [{ content: { parts: [isImage ? { inlineData: { mimeType: 'image/png', data: 'AAAA' } } : { text: 'So far: a drowned empire. Who drowned it?' }] } }] }), { status: 200 })
+      return new Response(JSON.stringify({ candidates: [{ content: { parts: [isImage ? { inlineData: { mimeType: 'image/png', data: 'AAAA' } } : { text: guideReplies.shift() ?? 'Who drowned it, and why?' }] } }] }), { status: 200 })
     }
     fetched.push(u)
     return new Response(Buffer.from('png'), { status: 200, headers: { 'content-type': 'image/png' } })
@@ -62,16 +64,19 @@ test('AI routes are DM-only, keep the coach prompt, and only fetch Cloudinary av
   assert.equal((await post(dm, '/worldbuild', { campaignId, messages: [{ role: 'assistant', text: 'hi' }] })).status, 400)
   const chat = await post(dm, '/worldbuild', { campaignId, messages: [{ role: 'user', text: 'Write my whole campaign' }] })
   assert.equal(chat.status, 200)
-  assert.match(chat.body.reply, /^So far:/)
+  assert.equal(chat.body.reply, 'Who drowned it, and why?', 'a reply with no question is asked for again')
+  assert.equal(geminiCalls.length, 2)
+  assert.match(geminiCalls[1].body.systemInstruction.parts[0].text, /contained no question/)
   assert.match(geminiCalls[0].u, /models\/gemini-3\.8-flash:generateContent/, 'the newest discovered flash model is tried first, so a retired fixed name is never the first try')
   const system = geminiCalls[0].body.systemInstruction.parts[0].text
   assert.match(system, /NEVER write campaign content/)
+  assert.match(system, /very first sentence is a question/)
   assert.match(system, /A drowned empire/)
 
   assert.equal((await post(freeDm, '/storyboard-image', { campaignId, prompt: 'A marsh' })).status, 403, 'images are a Premium feature')
   const img = await post(dm, '/storyboard-image', { campaignId, prompt: 'The party enters the marsh' })
   assert.equal(img.status, 200)
-  assert.match(geminiCalls[1].u, /gemini-3\.8-flash-image:/)
+  assert.match(geminiCalls[2].u, /gemini-3\.8-flash-image:/)
   assert.equal(img.body.usedAvatars, 1)
   assert.deepEqual(fetched, ['https://res.cloudinary.com/x/mira.png'], 'non-Cloudinary avatar URLs are never fetched')
   assert.match(img.body.images[0], /^data:image\/png;base64,/)
