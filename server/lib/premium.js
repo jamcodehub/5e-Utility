@@ -1,4 +1,4 @@
-// Two paid plans: Player Premium ($5) and DM Premium ($15). DM Premium includes everything in Player Premium, so it
+// Two paid plans: Player Premium ($2) and DM Premium ($5). DM Premium includes everything in Player Premium, so it
 // covers both roles; Player Premium covers the player side only. `premiumRole` is the plan the account holds ('player' or
 // 'dm'), stamped by Stripe checkout; accounts made premium before that field existed (empty) count as Player premium.
 export const premiumRoleOf = (user) => (user?.premiumRole === 'dm' ? 'dm' : 'player')

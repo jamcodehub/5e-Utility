@@ -31,7 +31,7 @@ const FEATURES = {
       'Unlimited storyboard generations',
       '11 exclusive class themes',
     ],
-    price: 15,
+    price: 5,
   },
   player: {
     free: [
@@ -50,7 +50,7 @@ const FEATURES = {
       'Roleplay plan syncs with DM Campaign Guide',
       '11 exclusive class themes — Bard, Cleric, Fighter, Monk, Ranger, Sorcerer, Warlock, Gunslinger, Artificer, Bloodhunter & Wizard',
     ],
-    price: 5,
+    price: 2,
   },
 }
 
