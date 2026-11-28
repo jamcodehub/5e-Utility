@@ -12,7 +12,6 @@ const FEATURES = {
     free: [
       'NPC / World Lore ledger',
       'Character Builder x20',
-      'AI world-building guide: 10 questions a day',
       'Idea generator',
       'HP tracker',
       `${FREE_CAMPAIGNS} campaigns, ${FREE_MAPS_PER_CAMPAIGN} battle maps each`,
@@ -29,7 +28,7 @@ const FEATURES = {
       '4 more ready-made campaigns, each with a full session-by-session plan, lore cards and puzzles',
       'Unlimited level building editor',
       'AI world-building guide: 60 questions an hour',
-      'AI scene images for your storyboard',
+      'AI scene images for your storyboard: 40 a day',
       '11 exclusive class themes',
     ],
     price: 5,

@@ -1,13 +1,15 @@
 import { useState, useEffect } from 'react'
 import WorldAssistant from './WorldAssistant'
 import { useWorldAssistant } from '../context/WorldAssistantContext'
+import { Link } from 'react-router-dom'
+import { useAuth } from '../context/AuthContext'
 import { AI_ENABLED } from '../utils/features'
 
 const EASE = 'cubic-bezier(.4,0,.2,1)'
 
 // Slide-out world-building guide for a flex-row parent with position: relative.
 // Renders the toggle tab and the right-hand panel; the panel pushes the page on desktop and overlays it on phones.
-function ComingSoon({ onClose }) {
+function ComingSoon({ onClose, upgrade = false }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}>
       <div style={{ padding: '14px 14px 10px', borderBottom: '1px solid var(--border)' }}>
@@ -18,14 +20,16 @@ function ComingSoon({ onClose }) {
         <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 4, lineHeight: 1.5 }}>Asks questions only. You write the world.</div>
       </div>
       <div style={{ flex: 1, padding: '40px 20px', textAlign: 'center', color: 'var(--text-2)', fontSize: 13, lineHeight: 1.7 }}>
-        <span style={{ display: 'inline-block', marginBottom: 12, padding: '2px 10px', border: '1px solid var(--gold-border)', borderRadius: 3, color: 'var(--gold)', fontSize: 11, fontWeight: 600, letterSpacing: '0.12em', textTransform: 'uppercase' }}>Coming soon</span>
+        <span style={{ display: 'inline-block', marginBottom: 12, padding: '2px 10px', border: '1px solid var(--gold-border)', borderRadius: 3, color: 'var(--gold)', fontSize: 11, fontWeight: 600, letterSpacing: '0.12em', textTransform: 'uppercase' }}>{upgrade ? 'DM Premium' : 'Coming soon'}</span>
         <div>A guide that asks you the questions that help you decide your setting, factions and plot, so you stay the author of your world.</div>
+        {upgrade && <Link to="/premium" className="btn btn-primary btn-sm" style={{ display: 'inline-flex', marginTop: 18 }}>See DM Premium</Link>}
       </div>
     </div>
   )
 }
 
 export default function GuideAssistant({ campaignId }) {
+  const { isPremium } = useAuth()
   const { busy, unread } = useWorldAssistant(campaignId)
   const [narrow, setNarrow] = useState(() => window.innerWidth <= 768)
   // On phones the guide starts closed (it covers the whole page); the remembered state is for desktop.
@@ -61,7 +65,7 @@ export default function GuideAssistant({ campaignId }) {
             : { flexShrink: 0, width: open ? 340 : 0, overflow: 'hidden', borderLeft: open ? '1px solid var(--border)' : 'none', transition: `width .3s ${EASE}, visibility .3s` }),
         }}
       >
-        <div style={{ width: narrow ? '100%' : 340, height: '100%' }}>{AI_ENABLED ? <WorldAssistant campaignId={campaignId} onClose={narrow ? () => setOpen(false) : undefined} /> : <ComingSoon onClose={narrow ? () => setOpen(false) : undefined} />}</div>
+        <div style={{ width: narrow ? '100%' : 340, height: '100%' }}>{AI_ENABLED && isPremium ? <WorldAssistant campaignId={campaignId} onClose={narrow ? () => setOpen(false) : undefined} /> : <ComingSoon upgrade={AI_ENABLED} onClose={narrow ? () => setOpen(false) : undefined} />}</div>
       </aside>
     </>
   )

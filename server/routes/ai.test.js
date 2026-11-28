@@ -55,6 +55,7 @@ test('AI routes are DM-only, keep the coach prompt, and only fetch Cloudinary av
   }
 
   assert.equal((await post(player, '/worldbuild', { campaignId, messages: [{ role: 'user', text: 'hi' }] })).status, 403)
+  assert.equal((await post(freeDm, '/worldbuild', { campaignId, messages: [{ role: 'user', text: 'hi' }] })).status, 403, 'the guide is a DM Premium feature')
   assert.equal((await post(dm, '/worldbuild', { campaignId, messages: [{ role: 'assistant', text: 'hi' }] })).status, 400)
   const chat = await post(dm, '/worldbuild', { campaignId, messages: [{ role: 'user', text: 'Write my whole campaign' }] })
   assert.equal(chat.status, 200)
