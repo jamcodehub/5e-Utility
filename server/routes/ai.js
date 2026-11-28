@@ -131,7 +131,7 @@ const callGemini = async (pickModels, body, { textOnly = false } = {}) => {
   throw failure(attempts, lastStatus)
 }
 
-export { callGemini as callGeminiForTests }
+export { callGemini as callGeminiForTests, textModels, imageModels, discoverModels }
 
 const makeLimiter = (windowMs, max, message) => rateLimit({
   windowMs, max, standardHeaders: true, legacyHeaders: false,
