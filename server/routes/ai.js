@@ -39,7 +39,10 @@ const textModels = async (key) => {
   const bad = /image|tts|live|audio|embed|thinking|exp|latest|preview/
   const flash = all.filter(n => /flash/.test(n) && !/lite/.test(n) && !bad.test(n))
   const lite = all.filter(n => /flash-lite/.test(n) && !bad.test(n))
-  return [process.env.GEMINI_MODEL, ...newestFirst(flash).slice(0, 2), ...newestFirst(lite).slice(0, 1), 'gemini-flash-latest', 'gemini-2.5-flash'].filter(Boolean)
+  // The fast "flash-lite" model goes first: the guide only asks short questions, and the bigger flash models were measured
+  // hanging for 20s+ while flash-lite answered in about a second. The bigger ones stay as backups.
+  const [l1, l2] = newestFirst(lite), [f1, f2] = newestFirst(flash)
+  return [process.env.GEMINI_MODEL, l1, f1, f2, l2, 'gemini-flash-latest', 'gemini-2.5-flash'].filter(Boolean)
 }
 const imageModels = async (key) => {
   const found = (await discoverModels(key)).filter(n => /image/.test(n) && !/tts|live|audio|embed/.test(n))
