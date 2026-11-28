@@ -5,14 +5,14 @@ import { api } from '../context/AuthContext'
 import { AI_ENABLED } from '../utils/features'
 import { FREE_JOURNAL_ENTRIES, FREE_MAPS_PER_CAMPAIGN, FREE_CAMPAIGNS } from '../utils/limits'
 
-const label = f => (AI_ENABLED || !/storyboard generation/i.test(f) ? f : `${f} (coming soon)`)
+const label = f => (AI_ENABLED || !/^AI /.test(f) ? f : `${f} (coming soon)`)
 
 const FEATURES = {
   dm: {
     free: [
       'NPC / World Lore ledger',
       'Character Builder x20',
-      'Storyboard generation x10',
+      'AI world-building guide: 10 questions a day',
       'Idea generator',
       'HP tracker',
       `${FREE_CAMPAIGNS} campaigns, ${FREE_MAPS_PER_CAMPAIGN} battle maps each`,
@@ -28,7 +28,8 @@ const FEATURES = {
       'Unlimited battle maps and campaigns',
       '4 more ready-made campaigns, each with a full session-by-session plan, lore cards and puzzles',
       'Unlimited level building editor',
-      'Unlimited storyboard generations',
+      'AI world-building guide: 60 questions an hour',
+      'AI scene images for your storyboard',
       '11 exclusive class themes',
     ],
     price: 5,

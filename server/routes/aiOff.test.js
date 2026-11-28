@@ -2,10 +2,10 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import express from 'express'
 
-delete process.env.AI_ENABLED
+process.env.AI_ENABLED = 'false'
 const { default: router } = await import('./ai.js')
 
-test('the AI routes answer 503 until AI_ENABLED=true (coming soon)', async (t) => {
+test('with AI_ENABLED=false the AI routes answer 503 (coming soon)', async (t) => {
   const app = express(); app.use(express.json()); app.use('/ai', router)
   const server = await new Promise(resolve => { const l = app.listen(0, '127.0.0.1', () => resolve(l)) })
   t.after(() => server.close())

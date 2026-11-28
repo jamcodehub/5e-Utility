@@ -10,6 +10,7 @@ import ShowcaseCarousel from '../components/ShowcaseCarousel'
 import SpinningDice from '../components/SpinningDice'
 import { ThemeMontage, PlanTable } from '../components/PremiumVisuals'
 import './PublicDemo.css'
+import { AI_ENABLED } from '../utils/features'
 
 const signInIconUrl = 'https://res.cloudinary.com/crcbzpw6/image/upload/v1792051212/right-to-bracket-solid-full.svg'
 const heroLogoUrl = new CloudinaryImage('5e_Utillity', { cloudName: 'crcbzpw6' })
@@ -37,7 +38,7 @@ const ABOUT = [
   { id: 'battle-tracker', image: '/showcase/battle-tracker-v2.jpg', alt: 'The Battle Tracker with a boss, an enemy and a player card in initiative order, each with hit points and attack buttons', title: 'Battle Tracker', text: 'Roll initiative for everyone, work out attacks against armour class and keep hit points straight. Search the SRD monster list to add enemies in a click.' },
   { id: 'storyboard', image: '/showcase/storyboard-v2.jpg', alt: 'A Storyboard page: an illustration of a party of adventurers beside the scene text', title: 'Storyboard', text: 'Lay out the scenes of your adventure as illustrated pages, then print them for the table.' },
   { id: 'journal', image: '/showcase/journal-v2.jpg', alt: 'A Journal entry with the list of days on the left and the session notes on the right', title: 'Journal', text: 'Write session notes for each campaign and character, with the date written and last edit saved on every entry.' },
-  { title: 'Campaign Guide', image: '/showcase/campaign-guide-v3.jpg', alt: 'The Campaign Guide with story, current arc, session recap and world notes', text: 'Keep your story, arc, session recap and quests in one guide that your players’ Roleplay Assistant reads automatically. A world-building guide that only asks questions is coming soon.', to: '/register', cta: 'Create a free account' },
+  { title: 'Campaign Guide', image: '/showcase/campaign-guide-v3.jpg', alt: 'The Campaign Guide with story, current arc, session recap and world notes', text: 'Keep your story, arc, session recap and quests in one guide that your players’ Roleplay Assistant reads automatically. ' + (AI_ENABLED ? 'The AI world-building guide asks you questions instead of writing your world for you.' : 'A world-building guide that only asks questions is coming soon.'), to: '/register', cta: 'Create a free account' },
   { id: 'roleplay', image: '/showcase/roleplay-v2.jpg', alt: 'The Roleplay Assistant with character basics and character depth fields filled in', title: 'Roleplay', text: 'Fill in your character’s background, personality and goals, and get a session plan that ties them to the story your DM is telling.' },
   { title: 'Lore, characters and dice', visual: <SpinningDice />, text: 'Keep world and NPC lore, build character sheets and roll true 3D d4, d6, d8, d10, d12 and d20 dice.', to: '/register', cta: 'Create a free account' },
   { title: 'Class themes', badge: 'Premium', visual: <ThemeMontage />, text: 'Switch the whole app between class themes such as Barbarian, Wizard, Druid, Paladin, Rogue and Bard. The rest of these screenshots show the default light theme. Light and Dark are free.', to: '/register', cta: 'Create a free account' },
