@@ -5,7 +5,6 @@ import { ThemeProvider } from './context/ThemeContext'
 import { MusicProvider } from './context/MusicContext'
 import { WorldAssistantProvider } from './context/WorldAssistantContext'
 import Shell from './components/Shell'
-import DMBoard from './components/DMBoard'
 import Auth from './pages/Auth'
 import PublicDemo from './pages/PublicDemo'
 import SessionPlanner from './pages/SessionPlanner'
@@ -31,6 +30,7 @@ import { lazy, Suspense, useEffect } from 'react'
 // Keep both role-specific landing pages in the initial bundle so the first
 // authenticated screen never waits for a route chunk
 // Secondary pages are downloaded only when needed.
+const DMBoard = lazy(() => import('./components/DMBoard'))
 const loadStoryboard = () => import('./pages/Storyboard')
 const loadJournal = () => import('./pages/Journal')
 const loadLore = () => import('./pages/Lore')

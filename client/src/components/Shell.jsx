@@ -5,12 +5,15 @@ import { useCampaign } from '../context/CampaignContext'
 import { useMusic, MOODS } from '../context/MusicContext'
 import { useTheme } from '../context/ThemeContext'
 import { getSocket } from '../utils/socket'
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, lazy, Suspense } from 'react'
+
+// Only needed once opened, so they stay out of the first download.
+const NewCampaignDialog = lazy(() => import('./NewCampaignDialog'))
+const SettingsModal = lazy(() => import('./SettingsModal'))
+const CharacterOverview = lazy(() => import('./CharacterSidebar'))
+const lazyBox = (node) => <Suspense fallback={null}>{node}</Suspense>
 import { FREE_CAMPAIGNS } from '../utils/limits'
-import NewCampaignDialog from './NewCampaignDialog'
-import SettingsModal from './SettingsModal'
 import ProfileAvatar from './ProfileAvatar'
-import CharacterOverview from './CharacterSidebar'
 import { CloudinaryImage } from '@cloudinary/url-gen'
 import { quality, format } from '@cloudinary/url-gen/actions/delivery'
 import { auto as autoQuality } from '@cloudinary/url-gen/qualifiers/quality'
@@ -248,12 +251,12 @@ export default function Shell({ children }) {
       position: 'fixed', top: 52, bottom: 72, right: 0, width: SIDEBAR_W, zIndex: 55, background: 'var(--surface)', borderLeft: '1px solid var(--border)',
       overflowY: 'auto', transform: charOpen ? 'none' : 'translateX(100%)', visibility: charOpen ? 'visible' : 'hidden',
       transition: `transform .32s ${EASE}, visibility .32s`, boxShadow: charOpen ? '-8px 0 24px rgba(0,0,0,.25)' : 'none',
-    }}><CharacterOverview campaignId={activeCampaign._id} refreshKey={location.pathname} /></aside>
+    }}><Suspense fallback={<div style={{ padding: 16, fontSize: 12, color: 'var(--text-3)' }}>Loading your character…</div>}><CharacterOverview campaignId={activeCampaign._id} refreshKey={location.pathname} /></Suspense></aside>
   ) : (
     <aside aria-hidden={!charOpen} style={{
       width: charOpen ? 320 : 0, flexShrink: 0, overflow: 'hidden', background: 'var(--surface)', borderLeft: charOpen ? '1px solid var(--border)' : '0 solid transparent',
       transition: `width .32s ${EASE}`,
-    }}><div style={{ width: 320, height: '100%', overflowY: 'auto' }}><CharacterOverview campaignId={activeCampaign._id} refreshKey={location.pathname} /></div></aside>
+    }}><div style={{ width: 320, height: '100%', overflowY: 'auto' }}><Suspense fallback={<div style={{ padding: 16, fontSize: 12, color: 'var(--text-3)' }}>Loading your character…</div>}><CharacterOverview campaignId={activeCampaign._id} refreshKey={location.pathname} /></Suspense></div></aside>
   ))
 
   const [creating, setCreating] = useState(false)
@@ -324,7 +327,7 @@ export default function Shell({ children }) {
     setCreating(false); setShowCampaigns(false)
     return null
   }
-  const createDialog = creating ? <NewCampaignDialog onCreate={handleCreate} onClose={() => setCreating(false)} onUpgrade={() => { setCreating(false); setShowCampaigns(false); navigate('/premium') }} /> : null
+  const createDialog = creating ? lazyBox(<NewCampaignDialog onCreate={handleCreate} onClose={() => setCreating(false)} onUpgrade={() => { setCreating(false); setShowCampaigns(false); navigate('/premium') }} />) : null
 
   const handleJoin = async (e) => {
     e.preventDefault()
@@ -480,7 +483,7 @@ export default function Shell({ children }) {
           <SwipeNav items={NAV} navLinkStyle={navLinkStyle} darkMode={darkMode} />
         </nav>
 
-        {showSettings && <SettingsModal onClose={() => setShowSettings(false)} />}
+        {showSettings && lazyBox(<SettingsModal onClose={() => setShowSettings(false)} />)}
       </div>
     )
   }
@@ -599,7 +602,7 @@ export default function Shell({ children }) {
 
       <main style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column', minWidth: 0 }}>{children}</main>
       {charPanel}{charToggle}
-      {showSettings && <SettingsModal onClose={() => setShowSettings(false)} />}
+      {showSettings && lazyBox(<SettingsModal onClose={() => setShowSettings(false)} />)}
     </div>
   )
 }
