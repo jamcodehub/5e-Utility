@@ -7,12 +7,13 @@ export const THEMES = {
   light: {
     label: 'Light',
     vars: {
-      '--bg': '#f5f4f1', '--surface': '#ffffff', '--surface2': '#f0ede8',
-      '--border': '#e4e0d8', '--border-strong': '#ccc8bf',
-      '--text': '#1a1917', '--text-2': '#6b6760', '--text-3': '#a8a49c',
-      '--gold': '#9a7c3a', '--gold-bg': '#faf6ed', '--gold-border': '#e8d9a8',
+      '--bg': '#fbfaf6', '--surface': '#ffffff', '--surface2': '#f3f0e8',
+      '--border': '#e8e4da', '--border-strong': '#d2cdc0',
+      '--text': '#1a1917', '--text-2': '#5e5a52', '--text-3': '#8a857b',
+      '--gold': '#7a5c14', '--gold-fill': '#c9a24b', '--gold-fill-hover': '#b88f34',
+      '--gold-bg': '#f8f0d8', '--gold-border': '#e3cf94',
       '--red': '#c0392b', '--green': '#2e7d52',
-      '--sb-outer': '#ffffff', '--sb-bar': '#f5f4f1', '--sb-bar-border': '#faf6ed',
+      '--sb-outer': '#ffffff', '--sb-bar': '#fbfaf6', '--sb-bar-border': '#faf6ed',
       '--sb-accent': '#c8a060', '--sb-spine': '#b39b74',
       '--sb-page-start': '#f7efde', '--sb-page-end': '#ede1c8',
       '--sb-page-title': '#3f2b1f', '--sb-page-body': '#5b4431', '--sb-page-meta': '#9a8060',
@@ -22,10 +23,11 @@ export const THEMES = {
   dark: {
     label: 'Dark',
     vars: {
-      '--bg': '#111214', '--surface': '#1a1c1e', '--surface2': '#222528',
+      '--bg': '#121110', '--surface': '#1a1917', '--surface2': '#222120',
       '--border': '#2e3135', '--border-strong': '#3e4248',
       '--text': '#e8e4dc', '--text-2': '#9a9690', '--text-3': '#5a5650',
-      '--gold': '#c8a060', '--gold-bg': '#1e1a10', '--gold-border': '#3a3020',
+      '--gold': '#d4b15a', '--gold-fill': '#d4b15a', '--gold-fill-hover': '#e0c070',
+      '--gold-bg': '#1e1a10', '--gold-border': '#3a3020',
       '--red': '#e05050', '--green': '#50b080',
       '--sb-outer': '#080a0c', '--sb-bar': '#0e1014', '--sb-bar-border': '#1e2428',
       '--sb-accent': '#c8a060', '--sb-spine': '#3e4860',

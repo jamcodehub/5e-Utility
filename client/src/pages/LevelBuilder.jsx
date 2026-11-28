@@ -1,7 +1,7 @@
 import { useDebouncedSave } from '../hooks/useDebouncedSave'
-import { useState, useEffect, useCallback, useMemo, useRef, useId } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef, useId, memo } from 'react'
 import { createPortal } from 'react-dom'
-import { useSearchParams } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { api } from '../context/AuthContext'
 import { useCampaign } from '../context/CampaignContext'
 import { useAuth } from '../context/AuthContext'
@@ -11,51 +11,84 @@ import { isPublicDemoPath } from '../utils/demoRuntime'
 import { SkeletonBlock } from '../components/Skeleton'
 import { TILES, OBJECT_TILES } from '../data/levelTiles'
 import { THEMES, DEFAULT_THEME, resolveThemeId, getThemeTiles } from '../data/levelThemes'
+import { avatarSrc } from '../components/ProfileAvatar'
+import { tokenColor } from '../utils/tokenColor'
+import { keyToStep, stepToken, isTypingTarget, bumpedDoor } from '../utils/tokenMove'
+import { classIdFor, viewerLevels } from '../utils/viewer3d'
+import { readHeights, heightShade } from '../utils/mapHeights'
+import { emptyHistory, endStroke as endHistoryStroke, undo as undoHistory, redo as redoHistory, pushSnapshot } from '../utils/editHistory'
+import { isOutdoorMap } from '../utils/outdoor'
+import { rotationOf, nextRotation, rotationLabel, readRotations, compactRotations, withRotation, dragSide, objectTurnOf, TORCH_ID } from '../utils/tileRotation'
+import Battle3DView from '../components/Battle3DView'
+import { backdropClose } from '../utils/backdrop'
 // Note: module-level TILES / OBJECT_TILES above are the base (Medieval) set, used for
 // logic that doesn't depend on artwork. MapThumb and LevelBuilder shadow them with the
 // active theme's tiles (same ids, different art).
 
-// A3 landscape ratio ≈ 420/297
+// A3 landscape ratio ≈ 420/297. Medium (32×22) is the original size; every existing map is Medium.
 const GRID_W = 32
 const GRID_H = 22
+const MAP_SIZES = [
+  { id: 'small', label: 'Small', w: 20, h: 14, blurb: 'A single room or a short corridor' },
+  { id: 'medium', label: 'Medium', w: 32, h: 22, blurb: 'A dungeon floor or a small village' },
+  { id: 'large', label: 'Large', w: 48, h: 33, blurb: 'A big dungeon, town or overland map' },
+]
+// A stored map's size is the size of its saved grid; anything odd falls back to Medium.
+const dimsOf = (grid) => {
+  const h = Array.isArray(grid) ? grid.length : 0
+  const w = h ? Math.max(...grid.map(row => (Array.isArray(row) ? row.length : 0))) : 0
+  return h >= 6 && h <= 60 && w >= 6 && w <= 80 ? { w, h } : { w: GRID_W, h: GRID_H }
+}
+
+// The Night half of the Day/Night toggle (a crescent moon; the toggle's own filter makes it white when it needs to be)
+const MOON_ICON = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M21 14.5A9 9 0 0 1 9.5 3a9 9 0 1 0 11.5 11.5z'/%3E%3C/svg%3E"
 
 const TORCH_LIGHT_RADIUS = OBJECT_TILES.find(tile => tile.id === 'torch').lightRadius
 const DARKVISION_RADIUS = 6
 
-const blankGrid = () => Array.from({ length: GRID_H }, () => Array.from({ length: GRID_W }, () => 'empty'))
-const blankObjectGrid = () => Array.from({ length: GRID_H }, () => Array.from({ length: GRID_W }, () => null))
-const blankDoorStates = () => Array.from({ length: GRID_H }, () => Array.from({ length: GRID_W }, () => false))
-const blankStairLinks = () => Array.from({ length: GRID_H }, () => Array.from({ length: GRID_W }, () => null))
+const blankOf = (value, w = GRID_W, h = GRID_H) => Array.from({ length: h }, () => Array.from({ length: w }, () => value))
+const blankGrid = (w, h) => blankOf('empty', w, h)
+const blankObjectGrid = (w, h) => blankOf(null, w, h)
+const blankDoorStates = (w, h) => blankOf(false, w, h)
+const blankStairLinks = (w, h) => blankOf(null, w, h)
+const blankRotations = (w, h) => blankOf(null, w, h) // quarter turns chosen by the author; null = automatic (see utils/tileRotation.js)
 
-function normalizeGrid(value, fallback) {
-  return Array.from({ length: GRID_H }, (_, r) =>
-    Array.from({ length: GRID_W }, (_, c) => value?.[r]?.[c] ?? fallback)
+function normalizeGrid(value, fallback, { w, h } = { w: GRID_W, h: GRID_H }) {
+  return Array.from({ length: h }, (_, r) =>
+    Array.from({ length: w }, (_, c) => value?.[r]?.[c] ?? fallback)
   )
 }
 
 function parseMapContent(content) {
   try {
     const parsed = JSON.parse(content)
-    if (Array.isArray(parsed)) return {
-      ground: normalizeGrid(parsed, 'empty'),
-      objects: blankObjectGrid(),
-      stairLinks: blankStairLinks(),
+    if (Array.isArray(parsed)) {
+      const dims = dimsOf(parsed)
+      return { ground: normalizeGrid(parsed, 'empty', dims), objects: blankObjectGrid(dims.w, dims.h), stairLinks: blankStairLinks(dims.w, dims.h), rotations: blankRotations(dims.w, dims.h), objectRotations: blankRotations(dims.w, dims.h), doorLocks: blankDoorStates(dims.w, dims.h), outdoor: null, dims }
     }
     if (parsed && Array.isArray(parsed.ground)) {
+      const dims = dimsOf(parsed.ground)
       return {
-        ground: normalizeGrid(parsed.ground, 'empty'),
-        objects: normalizeGrid(parsed.objects, null),
-        stairLinks: normalizeGrid(parsed.stairLinks, null),
+        ground: normalizeGrid(parsed.ground, 'empty', dims),
+        objects: normalizeGrid(parsed.objects, null, dims),
+        stairLinks: normalizeGrid(parsed.stairLinks, null, dims),
+        heights: readHeights(parsed.heights, dims.h, dims.w), // ground height (mountains, dunes...), or null for a flat map
+        rotations: readRotations(parsed.rotations, dims.h, dims.w),
+        objectRotations: readRotations(parsed.objectRotations, dims.h, dims.w),
+        doorLocks: normalizeGrid(parsed.doorLocks, false, dims).map(row => row.map(value => value === true)), // locked doors as designed
+        outdoor: typeof parsed.outdoor === 'boolean' ? parsed.outdoor : null, // null = not said (guessed from the ground)
+        dims,
       }
     }
   } catch {
     // Older maps may have empty or malformed content; use an empty object layer.
   }
-  return { ground: blankGrid(), objects: blankObjectGrid(), stairLinks: blankStairLinks() }
+  const dims = { w: GRID_W, h: GRID_H }
+  return { ground: blankGrid(), objects: blankObjectGrid(), stairLinks: blankStairLinks(), rotations: blankRotations(), objectRotations: blankRotations(), doorLocks: blankDoorStates(), outdoor: null, dims }
 }
 
-function normalizeDoorStates(value) {
-  return normalizeGrid(value, false).map(row => row.map(Boolean))
+function normalizeDoorStates(value, dims) {
+  return normalizeGrid(value, false, dims).map(row => row.map(Boolean))
 }
 
 function blocksVision(ground, doorStates, row, col) {
@@ -101,14 +134,15 @@ function objectTile(id) {
   return OBJECT_TILES.find(tile => tile.id === id)
 }
 
-function TileIconPlaceholder({ tile, style = {} }) {
+function TileIconPlaceholder({ tile, style = {}, rotate = 0, bleed = false }) {
+  // `rotate` is in degrees, a quarter turn at a time (see utils/tileRotation.js)
   if (tile.imageUrl) {
     return <img
       src={tile.imageUrl}
       alt=""
       aria-hidden="true"
       draggable="false"
-      style={{ width: '94%', height: '94%', objectFit: 'contain', pointerEvents: 'none', ...style }}
+      style={{ width: '94%', height: '94%', objectFit: 'contain', pointerEvents: 'none', transform: [rotate && `rotate(${rotate}deg)`, bleed && 'scale(1.06)'].filter(Boolean).join(' ') || undefined, ...style }}
     />
   }
 
@@ -125,7 +159,7 @@ function TileIconPlaceholder({ tile, style = {} }) {
         WebkitMaskRepeat: 'no-repeat',
         WebkitMaskPosition: 'center',
         WebkitMaskSize: 'contain',
-        transform: tile.id === 'stairs-down' ? 'rotate(180deg)' : undefined,
+        transform: [tile.id === 'stairs-down' && 'rotate(180deg)', rotate && `rotate(${rotate}deg)`].filter(Boolean).join(' ') || undefined,
         pointerEvents: 'none',
         ...style,
       }} />
@@ -137,6 +171,7 @@ function TileIconPlaceholder({ tile, style = {} }) {
         border: '1px dashed rgba(0,0,0,0.32)',
         boxSizing: 'border-box',
         pointerEvents: 'none',
+        transform: rotate ? `rotate(${rotate}deg)` : undefined,
         ...style,
       }} />
 }
@@ -152,13 +187,13 @@ function MapThumb({ content, theme }) {
 
   return (
     <svg
-      viewBox={`0 0 ${GRID_W} ${GRID_H}`}
+      viewBox={`0 0 ${grid.dims.w} ${grid.dims.h}`}
       preserveAspectRatio="none"
       aria-hidden="true"
       style={{
         display: 'block',
         width: '100%',
-        aspectRatio: `${GRID_W}/${GRID_H}`,
+        aspectRatio: `${grid.dims.w}/${grid.dims.h}`,
         borderRadius: 4,
         background: '#f5f4f1',
         shapeRendering: 'crispEdges',
@@ -199,7 +234,7 @@ function MapThumb({ content, theme }) {
         return <image key={`ground-${r}-${c}`} href={tile.iconUrl} x={c + 0.12} y={r + 0.12} width="0.76" height="0.76" preserveAspectRatio="xMidYMid meet" filter={tile.iconColor ? `url(#${tintId}-${tile.iconColor.slice(1)})` : undefined} />
       }))}
       <path
-        d={[...Array.from({ length: GRID_W + 1 }, (_, x) => `M${x} 0V${GRID_H}`), ...Array.from({ length: GRID_H + 1 }, (_, y) => `M0 ${y}H${GRID_W}`)].join(' ')}
+        d={[...Array.from({ length: grid.dims.w + 1 }, (_, x) => `M${x} 0V${grid.dims.h}`), ...Array.from({ length: grid.dims.h + 1 }, (_, y) => `M0 ${y}H${grid.dims.w}`)].join(' ')}
         fill="none"
         stroke="rgba(0,0,0,0.24)"
         strokeWidth="0.045"
@@ -242,8 +277,8 @@ function PeekingViewers({ viewers }) {
           flexShrink: 0, position: 'relative', zIndex: 5 - i,
         }}>
           {v.avatar
-            ? <img src={v.avatar} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-            : <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--gold)', fontFamily: 'Cinzel, serif' }}>{v.username?.[0]?.toUpperCase()}</span>
+            ? <img src={avatarSrc(v.avatar, 64)} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+            : <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--gold)', fontFamily: 'var(--font-title)' }}>{v.username?.[0]?.toUpperCase()}</span>
           }
         </div>
       ))}
@@ -256,6 +291,72 @@ function PeekingViewers({ viewers }) {
 
 const dragPreviewTransform = ({ x, y }) => `translate3d(${x}px, ${y}px, 0) translate(-50%, -50%) scale(1.08)`
 
+// One square of the play board. Memoised, so a token taking a step redraws only the squares it left and entered, not the whole
+// board (a 48 by 33 map has 1,584 squares: drawing them all on every step took about 0.3 seconds and made walking lag).
+const PlayCell = memo(function PlayCell({ r, c, cellId, groundTile, object, turn, objectTurn, visible, dmView, fade, torchlit, darkvision, lightStrength, doorOpen, locked, shade, token, dragging, darkMode, isDm, cellSize, torchSrc, onCellClick, onDragStart }) {
+  // `dmView`: with "Reveal map" on, the DM sees the dark parts dimly; otherwise they see the same pitch black as players.
+  const shown = visible || dmView
+  const isDoor = cellId === 'door'
+  const isStair = cellId === 'stairs' || cellId === 'stairs-down'
+  const cellBase = isDoor && doorOpen ? 'floor' : cellId
+  // Dimming is applied to the pictures, not to the square's box: the pictures run a hair past the square's edges so neighbours
+  // overlap, which leaves no seams for light lines to show through.
+  const lightFilter = dmView
+    ? 'brightness(0.3)'
+    : darkvision
+    ? 'brightness(0.35)'
+    : fade !== null && fade !== undefined && torchlit
+      // outdoors: torch light fades smoothly out to nothing (1 at the torch, 0 at the edge of its reach)
+      ? `brightness(${(fade * fade * (3 - 2 * fade)).toFixed(3)})`
+      : !isDm && darkMode && torchlit && lightStrength
+        ? `brightness(${0.45 + lightStrength * 0.55})`
+        : undefined
+  return (
+    <div
+      data-map-cell
+      data-row={r}
+      data-col={c}
+      onClick={event => onCellClick(event, r, c)}
+      title={visible && isDoor ? (doorOpen ? 'Click to close door' : 'Click to open door') : visible && isStair ? 'Click to use stairs' : undefined}
+      style={{
+        minWidth: 0,
+        minHeight: 0,
+        background: darkMode && !shown ? '#000' : tileColor(cellBase),
+        position: 'relative',
+        contain: 'layout style', // a change inside one square does not make the browser lay out the whole board again
+        cursor: visible && (isDoor || isStair) ? 'pointer' : undefined,
+      }}
+    >
+      {groundTile?.imageUrl && shown && (
+        <img
+          src={groundTile.imageUrl}
+          alt=""
+          aria-hidden="true"
+          draggable="false"
+          style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', pointerEvents: 'none', transform: `rotate(${turn || 0}deg) scale(1.06)`, filter: lightFilter }}
+        />
+      )}
+      {groundTile?.iconUrl && shown && !(isDoor && doorOpen) && (
+        <TileIconPlaceholder tile={groundTile} rotate={turn} style={{ position: 'absolute', inset: '21%', width: '58%', height: '58%', filter: lightFilter }} />
+      )}
+      {shade && shown && <div aria-hidden="true" style={{ position: 'absolute', inset: 0, pointerEvents: 'none', ...shade }} />}
+      {object && shown && (
+        <TileIconPlaceholder tile={object} rotate={objectTurn} style={{ position: 'absolute', zIndex: 1, filter: lightFilter }} />
+      )}
+      {token && (
+        <Token
+          token={token}
+          cellSize={cellSize}
+          onDragStart={onDragStart}
+          dragging={dragging}
+        />
+      )}
+      {isDoor && !doorOpen && locked && shown && <span aria-label="Locked door" title="Locked door" style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: Math.max(8, cellSize * 0.5), pointerEvents: 'none', zIndex: 2, textShadow: '0 1px 2px #000' }}>🔒</span>}
+      {token?.lightSource && torchSrc && <img src={torchSrc} alt="" aria-hidden="true" draggable={false} style={{ position: 'absolute', top: -7, right: -5, zIndex: 11, width: 14, height: 14, objectFit: 'contain', pointerEvents: 'none' }} />}
+    </div>
+  )
+})
+
 function Token({ token, cellSize, onDragStart, dragging }) {
   const initials = token.name?.[0]?.toUpperCase() || '?'
   return (
@@ -267,7 +368,7 @@ function Token({ token, cellSize, onDragStart, dragging }) {
         inset: 2,
         borderRadius: '50%',
         overflow: 'hidden',
-        background: token.color || '#6366f1',
+        background: tokenColor(token),
         border: '2px solid rgba(255,255,255,0.8)',
         boxShadow: '0 2px 6px rgba(0,0,0,0.4)',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -280,7 +381,7 @@ function Token({ token, cellSize, onDragStart, dragging }) {
     >
       {token.avatar
         ? <img src={token.avatar} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-        : <span style={{ fontSize: Math.max(8, cellSize * 0.35), color: '#fff', fontWeight: 700, fontFamily: 'Cinzel, serif' }}>{initials}</span>
+        : <span style={{ fontSize: Math.max(8, cellSize * 0.35), color: '#fff', fontWeight: 700, fontFamily: 'var(--font-title)' }}>{initials}</span>
       }
     </div>
   )
@@ -312,32 +413,66 @@ export default function LevelBuilder() {
   const [linkDestinationId, setLinkDestinationId] = useState('')
   const [tool, setTool] = useState('wall')
   const [painting, setPainting] = useState(false)
+  const lastTouchCell = useRef(null)
+  const torchAnchor = useRef(null) // while a torch is being placed: where the pointer went down, so dragging chooses which side it sits on
 
   // ── Play mode state ──
   const [tokens, setTokens] = useState([]) // { id, name, avatar, color, row, col, hp, maxHp }
   const [darkMode, setDarkMode] = useState(false)
   const [doorStates, setDoorStates] = useState(blankDoorStates())
+  const [rotations, setRotations] = useState(() => blankRotations()) // quarter turns of ground tiles the author chose
+  const [objectRotations, setObjectRotations] = useState(() => blankRotations()) // and of upper-layer objects
+  const [designLocks, setDesignLocks] = useState(() => blankDoorStates()) // doors that start locked, as set in the editor (the Locked Door tile)
+  const [outdoorFlag, setOutdoorFlag] = useState(null) // true/false if the map says whether it is open air; null = guess from the ground
+  const [paintRotation, setPaintRotation] = useState(null) // the turn given to tiles being placed: null = automatic
+  const [heights, setHeights] = useState(null) // ground height per square for maps that have it (see utils/mapHeights.js)
+  const [doorLocks, setDoorLocks] = useState(blankDoorStates()) // locked doors: only the DM can unlock them (see server/lib/doors.js)
+  const [knocks, setKnocks] = useState([]) // DM only: players trying a locked door, waiting for an answer
+  const [doorMenu, setDoorMenu] = useState(null) // DM only: the door they clicked, { row, col }
+  const waitingKnocksRef = useRef(new Set()) // doors this player has asked the DM about
+  // The map's size is just the size of its saved grid (Small / Medium / Large templates, or legacy Medium).
+  const gridH = grid.length
+  const gridW = grid[0]?.length ?? GRID_W
+  const dimsRef = useRef({ w: gridW, h: gridH })
+  dimsRef.current = { w: gridW, h: gridH }
+  const [showSizePicker, setShowSizePicker] = useState(false)
   const [availableTokens, setAvailableTokens] = useState([]) // sidebar token pool
   const [dragTokenId, setDragTokenId] = useState(null)
   const [dragPreviewToken, setDragPreviewToken] = useState(null)
   const dragPosRef = useRef({ x: 0, y: 0 })
   const [tapToPlaceTokenId, setTapToPlaceTokenId] = useState(null)
+  const [view3d, setView3d] = useState(false) // true: the live 3D view (the Godot game) instead of the flat board
   const [cellSize, setCellSize] = useState(28)
   const gridRef = useRef(null)
   const scrollRef = useRef(null)
+  // Size of the play area. The map is fitted inside it with square cells, so it is never stretched.
+  const [box, setBox] = useState({ w: 0, h: 0 })
+  useEffect(() => {
+    const el = scrollRef.current
+    if (!el) return
+    const measure = () => setBox(b => (b.w === el.clientWidth && b.h === el.clientHeight ? b : { w: el.clientWidth, h: el.clientHeight }))
+    measure()
+    const obs = new ResizeObserver(measure)
+    obs.observe(el)
+    return () => obs.disconnect()
+  }, [mode])
   const playRootRef = useRef(null)
   const panRef = useRef(null)
   const [zoom, setZoom] = useState(1)
   const [isFullscreen, setIsFullscreen] = useState(false)
   const [showTokens, setShowTokens] = useState(true)
+  const [dmReveal, setDmReveal] = useState(false) // DM peeks at the dark parts of the map (off by default: they may be streaming)
 
   // ── Tile theme ── (map grids store tile ids, so a theme only swaps the artwork)
   const [editTheme, setEditTheme] = useState(DEFAULT_THEME)
   const themeId = mode === 'editor'
     ? editTheme
     : resolveThemeId(plans.find(p => p._id === selectedPlanId)?.theme)
+  // One theme per map: once any tile has been placed the theme is fixed (an empty map can still change it).
+  const themeLocked = mode === 'editor' && (grid.some(row => row.some(id => id && id !== 'empty')) || objectGrid.some(row => row.some(Boolean)))
   const { TILES, OBJECT_TILES } = getThemeTiles(themeId)
   const objectTile = id => OBJECT_TILES.find(tile => tile.id === id)
+  const torchSrc = objectTile('torch')?.imageUrl // the Level Builder's own torch tile, used as the "carrying a light" badge
   const dragPreviewRef = useRef(null)
   const remoteUpdateRef = useRef(false)
   const [viewers, setViewers] = useState([]) // who's currently looking at this board
@@ -347,6 +482,8 @@ export default function LevelBuilder() {
   toastRef.current = toast
 
   const startTokenDrag = (e, tokenId) => {
+    // Players can only move their own character's token (the server enforces this too); the DM moves anything.
+    if (!isDm && tokenId !== `char-${user?.id}`) return
     e.preventDefault?.()
     e.stopPropagation?.()
     setDragTokenId(tokenId)
@@ -467,15 +604,19 @@ export default function LevelBuilder() {
       const pool = []
 
       const members = membersRes.status === 'fulfilled' ? membersRes.value : []
+      // A player's token shows their character's picture when they have one for this campaign, otherwise their profile photo.
       ;(members || []).forEach(m => {
-        if (m.character) pool.push({
+        const picture = m.character?.avatarUrl || m.avatar || ''
+        if (!m.character && !picture) return
+        pool.push({
           id: `char-${m.userId}`,
-          name: m.character.name || m.username,
-          avatar: m.character.avatarUrl || null,
-          color: '#6366f1',
-          hp: m.character.hp?.current ?? m.character.hp?.max ?? 10,
-          maxHp: m.character.hp?.max ?? 10,
+          name: m.character?.name || m.username,
+          avatar: picture ? avatarSrc(picture, 96) : null,
+          color: tokenColor({ type: 'player' }),
+          hp: m.character?.hp?.current ?? m.character?.hp?.max ?? 10,
+          maxHp: m.character?.hp?.max ?? 10,
           type: 'player',
+          classId: classIdFor(m.character?.class), // for the 3D miniature
         })
       })
 
@@ -486,7 +627,7 @@ export default function LevelBuilder() {
           loreId: l._id,
           name: l.title,
           avatar: null,
-          color: l.tag === 'boss' ? '#f59e0b' : l.tag === 'enemy' ? '#ef4444' : '#10b981',
+          color: tokenColor({ type: l.tag }),
           hp: l.hp ?? l.maxHp ?? 10,
           maxHp: l.maxHp ?? 10,
           type: l.tag,
@@ -508,7 +649,7 @@ export default function LevelBuilder() {
       frame = requestAnimationFrame(() => {
         const el = gridRef.current
         if (!el || !el.offsetWidth || !el.offsetHeight) return
-        const size = Math.min(el.offsetWidth / GRID_W, el.offsetHeight / GRID_H)
+        const size = Math.min(el.offsetWidth / gridW, el.offsetHeight / gridH)
         setCellSize(prev => Math.abs(prev - size) < 0.5 ? prev : size)
       })
     })
@@ -532,9 +673,35 @@ export default function LevelBuilder() {
       setPlans(current => current.map(plan => plan._id === selectedPlanId ? { ...plan, darkMode: Boolean(enabled) } : plan))
     }
     const onDoorStates = (states) => {
-      const normalized = normalizeDoorStates(states)
+      const normalized = normalizeDoorStates(states, dimsRef.current)
       setDoorStates(normalized)
       setPlans(current => current.map(plan => plan._id === selectedPlanId ? { ...plan, doorStates: normalized } : plan))
+    }
+    const onDoorLocks = (locks) => {
+      const normalized = normalizeDoorStates(locks, dimsRef.current)
+      setDoorLocks(normalized)
+      setPlans(current => current.map(plan => plan._id === selectedPlanId ? { ...plan, doorLocks: normalized } : plan))
+    }
+    const onDoorLock = ({ row, col, locked } = {}) => {
+      if (!Number.isInteger(row) || !Number.isInteger(col) || row < 0 || row >= dimsRef.current.h || col < 0 || col >= dimsRef.current.w || typeof locked !== 'boolean') return
+      setDoorLocks(current => current.map((cells, r) => r === row ? cells.map((isLocked, c) => c === col ? locked : isLocked) : cells))
+      setPlans(current => current.map(plan => {
+        if (plan._id !== selectedPlanId) return plan
+        const locks = normalizeDoorStates(plan.doorLocks, dimsRef.current)
+        locks[row][col] = locked
+        return { ...plan, doorLocks: locks }
+      }))
+      setKnocks(current => current.filter(k => !(k.row === row && k.col === col)))
+      if (!locked && waitingKnocksRef.current.delete(`${row}:${col}`)) toastRef.current('The DM unlocked the door')
+    }
+    const onDoorKnock = ({ row, col, userId, name } = {}) => {
+      if (!Number.isInteger(row) || !Number.isInteger(col) || typeof userId !== 'string') return
+      setKnocks(current => current.some(k => k.row === row && k.col === col && k.userId === userId)
+        ? current
+        : [...current, { row, col, userId, name: String(name || 'A player').slice(0, 60) }])
+    }
+    const onDoorDenied = ({ row, col } = {}) => {
+      if (waitingKnocksRef.current.delete(`${row}:${col}`)) toastRef.current('The door stays locked')
     }
     const onTravel = ({ destinationId, destinationPlan } = {}) => {
       const existingPlan = plansRef.current.find(plan => plan._id === destinationId)
@@ -553,16 +720,19 @@ export default function LevelBuilder() {
       setStairLinks(parsed.stairLinks)
       setTokens(Array.isArray(destination.tokens) ? destination.tokens : [])
       setDarkMode(Boolean(destination.darkMode))
-      setDoorStates(normalizeDoorStates(destination.doorStates))
+      setDoorStates(normalizeDoorStates(destination.doorStates, parsed.dims))
+      setDoorLocks(normalizeDoorStates(destination.doorLocks, parsed.dims))
+      setHeights(parsed.heights); setRotations(parsed.rotations); setObjectRotations(parsed.objectRotations); setDesignLocks(parsed.doorLocks); setOutdoorFlag(parsed.outdoor)
+      setKnocks([])
     }
     const onDoorState = ({ row, col, open } = {}) => {
-      if (!Number.isInteger(row) || !Number.isInteger(col) || row < 0 || row >= GRID_H || col < 0 || col >= GRID_W || typeof open !== 'boolean') return
+      if (!Number.isInteger(row) || !Number.isInteger(col) || row < 0 || row >= dimsRef.current.h || col < 0 || col >= dimsRef.current.w || typeof open !== 'boolean') return
       setDoorStates(current => current.map((cells, r) => r === row
         ? cells.map((isOpen, c) => c === col ? open : isOpen)
         : cells))
       setPlans(current => current.map(plan => {
         if (plan._id !== selectedPlanId) return plan
-        const states = normalizeDoorStates(plan.doorStates)
+        const states = normalizeDoorStates(plan.doorStates, dimsRef.current)
         states[row][col] = open
         return { ...plan, doorStates: states }
       }))
@@ -572,15 +742,33 @@ export default function LevelBuilder() {
     socket.on('level:dark-mode', onDarkMode)
     socket.on('level:doors', onDoorStates)
     socket.on('level:door', onDoorState)
+    socket.on('level:door-locks', onDoorLocks)
+    socket.on('level:door-lock', onDoorLock)
+    socket.on('level:door-knock', onDoorKnock)
+    socket.on('level:door-denied', onDoorDenied)
     socket.on('level:travel', onTravel)
     socket.emit('level:join', selectedPlanId)
+    // The server forgets which map a connection was watching whenever the connection drops and comes back (a network blip, a
+    // laptop that slept, the server restarting). Join again then, and when the tab is looked at again, so live updates (tokens
+    // the DM places, doors, light) keep arriving instead of stopping until the page is refreshed. Joining also sends the board.
+    const rejoin = () => { if (!document.hidden) socket.emit('level:join', selectedPlanId) }
+    socket.on('connect', rejoin)
+    document.addEventListener('visibilitychange', rejoin)
     return () => {
+      socket.off('connect', rejoin)
+      document.removeEventListener('visibilitychange', rejoin)
       socket.off('level:tokens', onTokens)
       socket.off('level:presence', onPresence)
       socket.off('level:dark-mode', onDarkMode)
       socket.off('level:doors', onDoorStates)
       socket.off('level:door', onDoorState)
+      socket.off('level:door-locks', onDoorLocks)
+      socket.off('level:door-lock', onDoorLock)
+      socket.off('level:door-knock', onDoorKnock)
+      socket.off('level:door-denied', onDoorDenied)
       socket.off('level:travel', onTravel)
+      setKnocks([])
+      setDoorMenu(null)
       socket.emit('level:leave', selectedPlanId)
       setViewers([])
     }
@@ -597,9 +785,45 @@ export default function LevelBuilder() {
     getSocket().emit('level:tokens', { planId: selectedPlanId, tokens })
   }, [tokens, mode, selectedPlanId])
 
+  // Walk with WASD or the arrow keys. A player moves their own character's token; the DM moves the token selected in the side
+  // list. Steps are limited to about 8 a second, so holding a key walks smoothly without flooding the server with saves.
+  // Keys come from this page, or from the 3D view (the game in a frame has its own keyboard focus and passes them on).
+  const lastStepRef = useRef(0)
+  const walkToken = (key) => {
+    const step = keyToStep(key)
+    if (!step) return false
+    const movingId = isDm ? tapToPlaceTokenId : `char-${user?.id}`
+    if (!movingId || !tokens.some(t => t.id === movingId && Number.isInteger(t.row))) return false
+    const now = Date.now()
+    if (now - lastStepRef.current < 100) return true
+    lastStepRef.current = now
+    // Walking into a closed door opens it. If it is locked a player asks the DM; the DM can open it without unlocking.
+    const door = bumpedDoor(tokens, movingId, step, grid, doorStates)
+    if (door) {
+      if (!isDm && doorLocks[door.row]?.[door.col]) knockOnDoor(door.row, door.col)
+      else toggleDoor(door.row, door.col, true)
+      return true
+    }
+    setTokens(current => stepToken(current, movingId, step, grid, objectGrid, doorStates))
+    return true
+  }
+  const walkRef = useRef(walkToken)
+  walkRef.current = walkToken
+  useEffect(() => {
+    if (mode !== 'play' || !selectedPlanId) return undefined
+    const onKeyDown = (e) => {
+      if (e.ctrlKey || e.metaKey || e.altKey || isTypingTarget(e.target)) return
+      if (walkRef.current(e.key)) e.preventDefault()
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [mode, selectedPlanId])
+
   // ── Gallery actions ──
-  const openEditor = (plan = null) => {
+  const openEditor = (plan = null, size = null) => {
     if (!isDm) return
+    setHistory(emptyHistory())
+    strokeRef.current = null
     if (plan) {
       setEditPlanId(plan._id)
       setEditTitle(plan.title)
@@ -608,15 +832,22 @@ export default function LevelBuilder() {
       setGrid(parsed.ground)
       setObjectGrid(parsed.objects)
       setStairLinks(parsed.stairLinks)
-      setDoorStates(normalizeDoorStates(plan.doorStates))
+      setHeights(parsed.heights); setRotations(parsed.rotations); setObjectRotations(parsed.objectRotations); setDesignLocks(parsed.doorLocks); setOutdoorFlag(parsed.outdoor)
+      setDoorStates(normalizeDoorStates(plan.doorStates, parsed.dims))
     } else {
       setEditPlanId(null)
       setEditTitle('')
       setDarkMode(false)
-      setGrid(blankGrid())
-      setObjectGrid(blankObjectGrid())
-      setStairLinks(blankStairLinks())
-      setDoorStates(blankDoorStates())
+      const { w, h } = size || { w: GRID_W, h: GRID_H }
+      setGrid(blankGrid(w, h))
+      setObjectGrid(blankObjectGrid(w, h))
+      setStairLinks(blankStairLinks(w, h))
+      setDoorStates(blankDoorStates(w, h))
+      setHeights(null)
+      setRotations(blankRotations(w, h))
+      setObjectRotations(blankRotations(w, h))
+      setDesignLocks(blankDoorStates(w, h))
+      setOutdoorFlag(null)
     }
     setEditTheme(resolveThemeId(plan?.theme))
     setEditLayer('ground')
@@ -633,7 +864,9 @@ export default function LevelBuilder() {
     setObjectGrid(parsed.objects)
     setStairLinks(parsed.stairLinks)
     setDarkMode(Boolean(plan.darkMode))
-    setDoorStates(normalizeDoorStates(plan.doorStates))
+    setDoorStates(normalizeDoorStates(plan.doorStates, parsed.dims))
+    setDoorLocks(normalizeDoorStates(plan.doorLocks, parsed.dims))
+    setHeights(parsed.heights); setRotations(parsed.rotations); setObjectRotations(parsed.objectRotations); setDesignLocks(parsed.doorLocks); setOutdoorFlag(parsed.outdoor)
     setTokens(Array.isArray(plan.tokens) ? plan.tokens : [])
     setMode('play')
     if (isDm && activeCampaign && !activeCampaign.isPersonal) {
@@ -675,7 +908,7 @@ export default function LevelBuilder() {
     try {
       const body = {
         title,
-        content: JSON.stringify({ ground: grid, objects: objectGrid, stairLinks }),
+        content: JSON.stringify({ ground: grid, objects: objectGrid, stairLinks, ...extraContent() }),
         doorStates,
         theme: editTheme,
       }
@@ -700,7 +933,7 @@ export default function LevelBuilder() {
     if (mapBaseline.current.id !== editPlanId) { mapBaseline.current = { id: editPlanId, snap }; return }
     if (mapBaseline.current.snap === snap) return
     const id = editPlanId, title = editTitle.trim()
-    const body = { content: JSON.stringify({ ground: grid, objects: objectGrid, stairLinks }), doorStates, theme: editTheme, ...(title ? { title } : {}) }
+    const body = { content: JSON.stringify({ ground: grid, objects: objectGrid, stairLinks, ...extraContent() }), doorStates, theme: editTheme, ...(title ? { title } : {}) }
     scheduleMapSave(async () => {
       try {
         const plan = await api(`/levels/${id}`, { method: 'PUT', body })
@@ -720,6 +953,93 @@ export default function LevelBuilder() {
   }
 
   // ── Paint ──
+  // What a saved map carries beyond the tiles themselves: ground heights and any turns the author chose.
+  const extraContent = () => ({
+    ...(heights ? { heights } : {}),
+    ...(compactRotations(rotations) ? { rotations } : {}),
+    ...(compactRotations(objectRotations) ? { objectRotations } : {}),
+    doorLocks: designLocks, // always sent from the editor, so unlocking a door in the editor sticks
+    ...(outdoorFlag === null ? {} : { outdoor: outdoorFlag }),
+  })
+
+  // ── Undo and redo ──
+  // One click, or one click-and-drag, is one step. Ctrl/Cmd+Z takes the last one back, Ctrl/Cmd+Shift+Z (or Ctrl+Y) puts it back.
+  const [history, setHistory] = useState(emptyHistory)
+  const historyRef = useRef(history)
+  historyRef.current = history
+  const latestMap = useRef(null)
+  latestMap.current = { grid, objectGrid, stairLinks, doorStates, rotations, objectRotations, designLocks }
+  const strokeRef = useRef(null) // the map as it was when the current stroke began
+  const beginStroke = () => { if (!strokeRef.current) strokeRef.current = latestMap.current }
+  const finishStroke = useCallback(() => {
+    const before = strokeRef.current
+    strokeRef.current = null
+    if (before) setHistory(current => endHistoryStroke(current, before, latestMap.current))
+  }, [])
+  // A one-off change (linking stairs) is its own step
+  const recordStep = () => setHistory(current => ({ undo: pushSnapshot(current.undo, latestMap.current), redo: [] }))
+  const applySnapshot = (snapshot) => {
+    setGrid(snapshot.grid)
+    setObjectGrid(snapshot.objectGrid)
+    setStairLinks(snapshot.stairLinks)
+    setDoorStates(snapshot.doorStates)
+    setRotations(snapshot.rotations)
+    setObjectRotations(snapshot.objectRotations)
+    setDesignLocks(snapshot.designLocks)
+  }
+  const stepHistory = (step) => {
+    if (strokeRef.current) return // still drawing
+    const result = step(historyRef.current, latestMap.current)
+    if (!result) return
+    setHistory(result.history)
+    applySnapshot(result.restore)
+  }
+  const runUndo = () => stepHistory(undoHistory)
+  const runRedo = () => stepHistory(redoHistory)
+  const historyActionsRef = useRef({})
+  historyActionsRef.current = { runUndo, runRedo }
+
+  // Keys in the editor: R turns the tiles you are about to place; Ctrl/Cmd+Z and +Shift+Z undo and redo.
+  useEffect(() => {
+    if (mode !== 'editor') return undefined
+    const onKeyDown = (e) => {
+      if (e.altKey || isTypingTarget(e.target)) return
+      const key = String(e.key).toLowerCase()
+      if ((e.ctrlKey || e.metaKey) && (key === 'z' || key === 'y')) {
+        e.preventDefault()
+        if (key === 'y' || e.shiftKey) historyActionsRef.current.runRedo()
+        else historyActionsRef.current.runUndo()
+        return
+      }
+      if (key === 'r' && !e.ctrlKey && !e.metaKey) {
+        e.preventDefault()
+        setPaintRotation(nextRotation)
+      }
+    }
+    // Placing a torch: click where it goes, then drag towards the side of the square it should sit on (right, down, left or up)
+    const onMove = (e) => {
+      const a = torchAnchor.current
+      if (!a) return
+      const side = dragSide(e.clientX - a.x, e.clientY - a.y)
+      if (side === null || side === a.side) return
+      a.side = side
+      setObjectRotations(current => withRotation(current, a.r, a.c, side))
+    }
+    const onUp = () => { torchAnchor.current = null }
+    // A drag that ends outside the map still ends the stroke
+    window.addEventListener('keydown', onKeyDown)
+    window.addEventListener('mouseup', finishStroke)
+    window.addEventListener('mousemove', onMove)
+    window.addEventListener('mouseup', onUp)
+    return () => {
+      window.removeEventListener('keydown', onKeyDown)
+      window.removeEventListener('mouseup', finishStroke)
+      window.removeEventListener('mousemove', onMove)
+      window.removeEventListener('mouseup', onUp)
+    }
+  }, [mode, finishStroke])
+
+  const placingTorch = editLayer === 'objects' && tool === TORCH_ID
   const paint = (r, c) => {
     if (editLayer === 'objects') {
       setObjectGrid(current => {
@@ -727,13 +1047,16 @@ export default function LevelBuilder() {
         next[r][c] = tool === 'object-erase' ? null : tool
         return next
       })
+      setObjectRotations(current => withRotation(current, r, c, tool === 'object-erase' ? null : paintRotation))
       return
     }
     setGrid(current => {
       const next = current.map(row => row.slice())
-      next[r][c] = tool
+      next[r][c] = tool === 'door-locked' ? 'door' : tool
       return next
     })
+    setRotations(current => withRotation(current, r, c, paintRotation))
+    setDesignLocks(current => current.map((row, index) => (index === r ? row.map((locked, col) => (col === c ? tool === 'door-locked' : locked)) : row)))
     if (!['stairs', 'stairs-down'].includes(tool)) {
       setStairLinks(current => {
         const next = current.map(row => row.slice())
@@ -741,7 +1064,7 @@ export default function LevelBuilder() {
         return next
       })
     }
-    if (tool !== 'door') {
+    if (tool !== 'door' && tool !== 'door-locked') {
       setDoorStates(current => current.map((row, index) =>
         index === r ? row.map((isOpen, col) => col === c ? false : isOpen) : row
       ))
@@ -760,6 +1083,7 @@ export default function LevelBuilder() {
 
   const saveStairLink = () => {
     if (!pendingStair || !linkDestinationId) return
+    recordStep()
     setStairLinks(current => {
       const next = current.map(row => row.slice())
       next[pendingStair.row][pendingStair.col] = linkDestinationId
@@ -771,6 +1095,7 @@ export default function LevelBuilder() {
 
   const removeStairLink = () => {
     if (!pendingStair) return
+    recordStep()
     setStairLinks(current => {
       const next = current.map(row => row.slice())
       next[pendingStair.row][pendingStair.col] = null
@@ -779,17 +1104,45 @@ export default function LevelBuilder() {
     setPendingStair(null)
   }
 
-  const toggleDoor = (row, col) => {
+  const toggleDoor = (row, col, open = !doorStates[row]?.[col]) => {
     const socket = getSocket()
     socket.timeout(5000).emit('level:door', {
       planId: selectedPlanId,
       row,
       col,
-      open: !doorStates[row]?.[col],
+      open,
     }, (error, response) => {
       if (error) toast('Could not update the door')
       else if (!response?.ok) toast(response?.error || 'Could not update the door')
     })
+  }
+
+  // A player tries a locked door: the DM is asked whether to let them through.
+  const knockOnDoor = (row, col) => {
+    const key = `${row}:${col}`
+    if (waitingKnocksRef.current.has(key)) { toast('Still waiting for the DM to answer'); return }
+    waitingKnocksRef.current.add(key)
+    toast('The door is locked. Asking the DM to let you through…')
+    getSocket().timeout(5000).emit('level:door-knock', { planId: selectedPlanId, row, col }, (error, response) => {
+      if (error || !response?.ok) { waitingKnocksRef.current.delete(key); toast(response?.error || 'Could not ask the DM') }
+    })
+  }
+
+  // The DM locks or unlocks a door, or answers a player's request about one.
+  const setDoorLocked = (row, col, locked) => {
+    getSocket().timeout(5000).emit('level:door-lock', { planId: selectedPlanId, row, col, locked }, (error, response) => {
+      if (error) toast('Could not update the door')
+      else if (!response?.ok) toast(response?.error || 'Could not update the door')
+    })
+  }
+  const answerKnock = (knock, answer) => {
+    setKnocks(current => current.filter(k => k !== knock))
+    if (answer === 'deny') {
+      getSocket().emit('level:door-deny', { planId: selectedPlanId, row: knock.row, col: knock.col, userId: knock.userId })
+      return
+    }
+    setDoorLocked(knock.row, knock.col, false)
+    if (answer === 'open') toggleDoor(knock.row, knock.col, true)
   }
 
   const travelViaStair = (row, col) => {
@@ -804,7 +1157,7 @@ export default function LevelBuilder() {
   }
 
   const handlePlayCellClick = (event, row, col) => {
-    if ((!tapToPlaceTokenId && event.target !== event.currentTarget) || !visibility.visible[row]?.[col]) return
+    if ((!tapToPlaceTokenId && event.target !== event.currentTarget) || (!isDm && !visibility.visible[row]?.[col])) return
     if (tapToPlaceTokenId) {
       setTokens(current => {
         if (current.some(token => token.id === tapToPlaceTokenId)) {
@@ -817,7 +1170,9 @@ export default function LevelBuilder() {
       return
     }
     if (grid[row]?.[col] === 'door') {
-      toggleDoor(row, col)
+      if (isDm) setDoorMenu({ row, col })
+      else if (doorLocks[row]?.[col] && !doorStates[row]?.[col]) knockOnDoor(row, col)
+      else toggleDoor(row, col)
       return
     }
     if (grid[row]?.[col] === 'stairs' || grid[row]?.[col] === 'stairs-down') travelViaStair(row, col)
@@ -874,28 +1229,36 @@ export default function LevelBuilder() {
     })),
     [isDemo, objectGrid],
   )
+  // The fog only depends on where light and darkvision come from, so it is worked out again only when one of those moves, not
+  // every time any token takes a step.
+  const placed = token => Number.isInteger(token.row) && Number.isInteger(token.col)
+  const lightCarriers = tokens.filter(token => token.lightSource && placed(token))
+  const lightKey = lightCarriers.map(token => `${token.row}:${token.col}`).join('|')
   const sharedLightSources = useMemo(() => [
     ...mapLightSources,
-    ...tokens
-      .filter(token => token.lightSource && Number.isInteger(token.row) && Number.isInteger(token.col))
-      .map(token => ({ ...token, radius: TORCH_LIGHT_RADIUS })),
-  ], [mapLightSources, tokens])
+    ...lightCarriers.map(token => ({ ...token, radius: TORCH_LIGHT_RADIUS })),
+  ], [mapLightSources, lightKey]) // eslint-disable-line react-hooks/exhaustive-deps
   const localPlayerToken = tokens.find(token => token.id === `char-${user?.id}`)
-  const darkvisionSources = useMemo(() => isDm
-    ? tokens.filter(token => token.darkvision && Number.isInteger(token.row) && Number.isInteger(token.col))
-    : localPlayerToken?.darkvision ? [localPlayerToken] : [],
-  [isDm, localPlayerToken, tokens])
+  const visionCarriers = isDm ? tokens.filter(token => token.darkvision && placed(token)) : (localPlayerToken?.darkvision ? [localPlayerToken] : [])
+  const visionKey = visionCarriers.map(token => `${token.row}:${token.col}`).join('|')
+  const darkvisionSources = useMemo(() => visionCarriers, [isDm, visionKey]) // eslint-disable-line react-hooks/exhaustive-deps
+  const outdoor = isOutdoorMap(outdoorFlag, grid)
+  // The Day / Night toggle decides on every map: Night means players only see what torches and darkvision light up. (`outdoor`
+  // only makes torch light fade out softly instead of ending in a ring.)
+  const dark = darkMode
   const visibility = useMemo(() => {
     const visible = []
     const torchlit = []
     const darkvision = []
     const lightStrength = []
-    for (let row = 0; row < GRID_H; row++) {
+    const lightFade = []
+    for (let row = 0; row < gridH; row++) {
       visible[row] = []
       torchlit[row] = []
       darkvision[row] = []
       lightStrength[row] = []
-      for (let col = 0; col < GRID_W; col++) {
+      lightFade[row] = []
+      for (let col = 0; col < gridW; col++) {
         const nearbyLights = sharedLightSources
           .filter(source => canSeeFrom(grid, doorStates, source, row, col, source.radius))
           .map(source => ({
@@ -906,9 +1269,11 @@ export default function LevelBuilder() {
         const hasDarkvision = darkvisionSources.some(source =>
           canSeeFrom(grid, doorStates, source, row, col, DARKVISION_RADIUS)
         )
-        visible[row][col] = !darkMode || sharedLight || hasDarkvision
-        torchlit[row][col] = !darkMode || sharedLight
-        darkvision[row][col] = darkMode && hasDarkvision && !sharedLight
+        visible[row][col] = !dark || sharedLight || hasDarkvision
+        torchlit[row][col] = !dark || sharedLight
+        darkvision[row][col] = dark && hasDarkvision && !sharedLight
+        // Outdoors a torch's light fades out smoothly over its whole reach.
+        lightFade[row][col] = nearbyLights.length ? Math.max(...nearbyLights.map(({ distance, radius }) => Math.max(0, 1 - distance / (radius + 1)))) : 0
         lightStrength[row][col] = sharedLight
           ? Math.max(...nearbyLights.map(({ distance, radius }) => {
               const coreRadius = Math.floor(radius * 0.6)
@@ -919,8 +1284,35 @@ export default function LevelBuilder() {
           : 0
       }
     }
-    return { visible, torchlit, darkvision, lightStrength }
-  }, [darkMode, doorStates, grid, isDm, darkvisionSources, sharedLightSources])
+    return { visible, torchlit, darkvision, lightStrength, lightFade }
+  }, [dark, doorStates, grid, isDm, darkvisionSources, sharedLightSources, outdoor])
+
+  // Where each token stands (one lookup for the whole board instead of a search per square), and each square's height shading.
+  const tokenAtCell = useMemo(() => {
+    const byCell = new Map()
+    tokens.forEach(token => { if (Number.isInteger(token.row)) byCell.set(`${token.row}:${token.col}`, token) })
+    return byCell
+  }, [tokens])
+  const shadeGrid = useMemo(() => (heights ? grid.map((row, r) => row.map((_, c) => heightShade(heights, r, c))) : null), [heights, grid])
+  // Squares are memoised, so they must get the same functions every time; these call whatever the latest versions are.
+  const cellClickRef = useRef(null)
+  cellClickRef.current = handlePlayCellClick
+  const dragStartRef = useRef(null)
+  dragStartRef.current = startTokenDrag
+  const onCellClick = useCallback((event, r, c) => cellClickRef.current(event, r, c), [])
+  const onTokenDragStart = useCallback((e, id) => dragStartRef.current(e, id), [])
+
+  // What the 3D view is sent: how lit each square is (same as the 2D board shows), and each token's class.
+  const viewerLevelList = useMemo(
+    () => viewerLevels({ darkMode: dark, isDm, visibility, rows: gridH, cols: gridW, outdoor, dmReveal }),
+    [dark, isDm, visibility, gridH, gridW, outdoor, dmReveal],
+  )
+  const classOfToken = useCallback((t) => availableTokens.find(a => a.id === t.id)?.classId || '', [availableTokens])
+  const handleViewerClick = ({ row, col, tokenId }) => {
+    // The DM picks a token to walk (like Move in the side list); everything else is a click on a square, as on the flat board.
+    if (tokenId && isDm) { setTapToPlaceTokenId(current => current === tokenId ? null : tokenId); return }
+    handlePlayCellClick({ target: null, currentTarget: null }, row, col)
+  }
 
   if (!activeCampaign && !campaignsLoading) return (
     <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-3)' }}>
@@ -937,7 +1329,7 @@ export default function LevelBuilder() {
   if (mode === 'editor') return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
       <style>{`
-        .lb-cell { aspect-ratio: 1; border: 0.5px solid rgba(0,0,0,0.1); cursor: crosshair; touch-action: none; }
+        .lb-cell { aspect-ratio: 1; border: 0; cursor: crosshair; touch-action: none; }
         .lb-editor-canvas-wrap, .lb-editor-canvas-wrap * { user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
         .lb-editor-workspace { display: flex; flex: 1; min-height: 0; overflow: hidden; }
         .lb-editor-tools { width: 248px; flex: 0 0 248px; padding: 10px; overflow-y: auto; background: var(--surface); border-right: 1px solid var(--border); }
@@ -953,7 +1345,7 @@ export default function LevelBuilder() {
           position: relative;
           display: inline-flex;
           align-items: center;
-          width: 132px;
+          width: 80px;
           height: 34px;
           padding: 3px;
           border: 1px solid var(--border);
@@ -975,6 +1367,8 @@ export default function LevelBuilder() {
           letter-spacing: 0.02em;
           transition: color 220ms ease;
         }
+        .level-darkness-toggle-label img { width: 16px; height: 16px; display: block; margin: 0 auto; filter: brightness(0); transition: filter 220ms ease; }
+        .level-darkness-toggle[data-dark="true"] .level-darkness-toggle-label img { filter: brightness(0) invert(1); }
         .level-darkness-toggle-thumb {
           position: absolute;
           top: 3px;
@@ -1003,7 +1397,7 @@ export default function LevelBuilder() {
           html, body { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
           body * { visibility: hidden; }
           #level-print, #level-print * { visibility: visible; }
-          #level-print { position: fixed; inset: 0; width: 100vw; height: 100vh; display: grid; grid-template-columns: repeat(${GRID_W}, 1fr); background: #fff; }
+          #level-print { position: fixed; inset: 0; width: 100vw; height: 100vh; display: grid; grid-template-columns: repeat(${gridW}, 1fr); background: #fff; }
           #level-print > div { border: 0.3pt solid rgba(0,0,0,0.15); -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
         }
       `}</style>
@@ -1017,25 +1411,27 @@ export default function LevelBuilder() {
           title="Tile theme"
           value={editTheme}
           onChange={e => setEditTheme(resolveThemeId(e.target.value))}
+          disabled={themeLocked}
           style={{ width: 190 }}
         >
           {THEMES.map(theme => (
             <option key={theme.id} value={theme.id} disabled={!theme.available}>{theme.label}</option>
           ))}
         </select>
+        {themeLocked && <span style={{ fontSize: 12, color: 'var(--text-3)' }}>This map uses {THEMES.find(t => t.id === editTheme)?.label}. Clear its tiles or start a new map to use another theme.</span>}
         {isDm && editPlanId && (
           <button
             type="button"
             className="level-darkness-toggle"
-            data-dark={darkMode}
+            data-dark={dark}
             onClick={() => toggleDarkMode(editPlanId)}
-            aria-label="Map lighting"
-            aria-pressed={darkMode}
-            title={darkMode ? 'Darkness is on for players' : 'Darkness is off for players'}
+            aria-label="Day or night (map lighting for players)"
+            aria-pressed={dark}
+            title={dark ? 'Night: players only see what torches and darkvision light up. Click for day.' : 'Day: players see the whole map. Click for night.'}
           >
             <span className="level-darkness-toggle-thumb" aria-hidden="true" />
-            <span className="level-darkness-toggle-label">☀ Light</span>
-            <span className="level-darkness-toggle-label">☾ Dark</span>
+            <span className="level-darkness-toggle-label" title="Day"><img src="https://res.cloudinary.com/crcbzpw6/image/upload/v1795083562/sun-regular-full.svg" alt="Day" /></span>
+            <span className="level-darkness-toggle-label" title="Night"><img src={MOON_ICON} alt="Night" /></span>
           </button>
         )}
         <div style={{ display: 'flex', gap: 8, flexShrink: 0, marginLeft: 'auto' }}>
@@ -1047,9 +1443,19 @@ export default function LevelBuilder() {
 
       <div className="lb-editor-workspace">
       <aside className="lb-editor-tools" aria-label="Map tile selection">
+        <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
+          <button type="button" className="btn btn-ghost btn-sm" onClick={runUndo} disabled={!history.undo.length} title="Undo the last click or drag (Ctrl or ⌘ + Z)" style={{ flex: 1, justifyContent: 'center' }}>↶ Undo</button>
+          <button type="button" className="btn btn-ghost btn-sm" onClick={runRedo} disabled={!history.redo.length} title="Put back what you undid (Ctrl or ⌘ + Shift + Z)" style={{ flex: 1, justifyContent: 'center' }}>↷ Redo</button>
+        </div>
+        <button type="button" className="btn btn-ghost btn-sm" onClick={() => setPaintRotation(nextRotation)}
+          title="Turn the tiles you place a quarter turn at a time (or press R). Auto turns natural floors such as grass and stone at random and leaves everything else as drawn."
+          style={{ width: '100%', marginBottom: 8, justifyContent: 'center', gap: 6 }}>
+          <span aria-hidden="true" style={{ display: 'inline-block', transform: paintRotation ? `rotate(${paintRotation * 90}deg)` : undefined, transition: 'transform 120ms' }}>↑</span>
+          Rotate: {rotationLabel(paintRotation)} <kbd style={{ fontSize: 9, opacity: 0.7 }}>R</kbd>
+        </button>
         <div className="lb-tool-palettes">
           {[
-            { layer: 'ground', title: 'Ground Tiles', tiles: TILES.filter(tile => tile.id !== 'chest') },
+            { layer: 'ground', title: 'Ground Tiles', tiles: TILES.filter(tile => tile.id !== 'chest').flatMap(tile => (tile.id === 'door' ? [tile, { ...tile, id: 'door-locked', label: 'Locked Door' }] : [tile])) },
             { layer: 'objects', title: 'Upper Layer Objects', tiles: OBJECT_TILES },
           ].map(palette => (
             <div key={palette.layer} className="lb-tool-palette" style={{
@@ -1072,7 +1478,7 @@ export default function LevelBuilder() {
                       background: selected ? 'var(--gold-bg)' : 'var(--surface)', color: 'var(--text)',
                     }}>
                       {tile.imageUrl || tile.iconUrl || tile.id.startsWith('rock-')
-                        ? <TileIconPlaceholder tile={tile} style={{ width: 14, height: 14, flexShrink: 0 }} />
+                        ? <TileIconPlaceholder tile={tile} rotate={selected && paintRotation ? paintRotation * 90 : 0} style={{ width: 14, height: 14, flexShrink: 0 }} />
                         : <span style={{ width: 12, height: 12, borderRadius: 2, background: tile.color === 'transparent' || !tile.color ? 'repeating-conic-gradient(#ccc 0% 25%, #fff 0% 50%) 50%/6px 6px' : tile.color, border: '1px solid rgba(0,0,0,0.2)', flexShrink: 0 }} />
                       }
                       <span title={tile.label} style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{tile.label}</span>
@@ -1089,7 +1495,7 @@ export default function LevelBuilder() {
           setLinkMode(current => !current)
           setPendingStair(null)
           setPainting(false)
-        }} style={{ width: '100%', marginTop: 8, justifyContent: 'center' }}>🔗 Link stairs</button>
+        }} style={{ width: '100%', marginTop: 8, justifyContent: 'center' }}>Link stairs</button>
       </aside>
       <main className="lb-editor-map">
       {linkMode && pendingStair && (
@@ -1116,14 +1522,35 @@ export default function LevelBuilder() {
       <div className="lb-editor-canvas-wrap">
         <div
           id="level-print"
-          onMouseUp={() => setPainting(false)}
-          onMouseLeave={() => setPainting(false)}
+          onTouchMove={e => {
+            // Finger-drag painting: paint every cell the finger passes over.
+            if (linkMode) return
+            const t = e.touches[0]
+            const anchor = torchAnchor.current
+            if (anchor && t) {
+              // Placing a torch: the finger's drag chooses the side, it does not paint more squares
+              const side = dragSide(t.clientX - anchor.x, t.clientY - anchor.y)
+              if (side !== null && side !== anchor.side) {
+                anchor.side = side
+                setObjectRotations(current => withRotation(current, anchor.r, anchor.c, side))
+              }
+              return
+            }
+            const el = t && document.elementFromPoint(t.clientX, t.clientY)?.closest('[data-lb-cell]')
+            if (!el || el.dataset.lbCell === lastTouchCell.current) return
+            lastTouchCell.current = el.dataset.lbCell
+            const [r, c] = el.dataset.lbCell.split('-').map(Number)
+            paint(r, c)
+          }}
+          onTouchEnd={() => { lastTouchCell.current = null; torchAnchor.current = null; finishStroke() }}
+          onMouseUp={() => { setPainting(false); finishStroke() }}
+          onMouseLeave={() => { setPainting(false); finishStroke() }}
           style={{
             display: 'grid',
-            gridTemplateColumns: `repeat(${GRID_W}, 1fr)`,
+            gridTemplateColumns: `repeat(${gridW}, 1fr)`,
             width: '100%',
-            maxWidth: `calc((100vh - 120px) * ${GRID_W / GRID_H})`,
-            background: '#fff',
+            maxWidth: `calc((100vh - 120px) * ${gridW / gridH})`,
+            background: '#24201a',
             border: '3px solid #4a3f33',
             borderRadius: 4,
             overflow: 'hidden',
@@ -1133,19 +1560,45 @@ export default function LevelBuilder() {
           {grid.map((row, r) => row.map((cellId, c) => {
             const t = TILES.find(x => x.id === cellId) || TILES[TILES.length - 1]
             const object = objectTile(objectGrid[r]?.[c])
+            const turn = rotationOf(cellId, rotations[r]?.[c], r, c) * 90
+            const objectTurn = objectTurnOf(objectGrid[r]?.[c], objectRotations[r]?.[c], r, c) * 90
+            const torchSide = objectGrid[r]?.[c] === TORCH_ID ? objectRotations[r]?.[c] : null
             return (
-              <div key={`${r}-${c}`} className="lb-cell"
-                onMouseDown={() => { if (linkMode) return; setPainting(true); paint(r, c) }}
+              <div key={`${r}-${c}`} className="lb-cell" data-lb-cell={`${r}-${c}`}
+                onMouseDown={(e) => {
+                  if (linkMode) return
+                  beginStroke()
+                  if (placingTorch) { torchAnchor.current = { r, c, x: e.clientX, y: e.clientY, side: null }; paint(r, c); return }
+                  setPainting(true); paint(r, c)
+                }}
                 onMouseEnter={() => { if (painting && !linkMode) paint(r, c) }}
                 onClick={() => handleEditorCellClick(r, c)}
-                onTouchStart={() => { if (!linkMode) paint(r, c) }}
+                onTouchStart={(e) => {
+                  if (linkMode) return
+                  beginStroke()
+                  const t = e.touches?.[0]
+                  if (placingTorch && t) torchAnchor.current = { r, c, x: t.clientX, y: t.clientY, side: null }
+                  paint(r, c)
+                }}
                 style={{ background: t.color === 'transparent' ? '#f5f4f1' : t.color, display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative' }}
               >
-                {t.imageUrl && <TileIconPlaceholder tile={t} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />}
-                {t.iconUrl && <TileIconPlaceholder tile={t} style={{ position: 'absolute', inset: '21%', width: '58%', height: '58%' }} />}
-                {stairLinks[r]?.[c] && <span aria-label="Linked stairs" style={{ position: 'absolute', top: 0, right: 1, color: '#fff', fontSize: 8, textShadow: '0 1px 2px #000', pointerEvents: 'none' }}>↗</span>}
-                {object && object.id !== 'object-erase' && (object.imageUrl || object.iconUrl || object.id.startsWith('rock-')) && <TileIconPlaceholder tile={object} style={{ position: 'absolute', zIndex: 1 }} />}
-                {darkMode && !visibility.torchlit[r]?.[c] && !visibility.darkvision[r]?.[c] && (
+                {t.imageUrl && <TileIconPlaceholder tile={t} rotate={turn} bleed style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />}
+                {t.iconUrl && <TileIconPlaceholder tile={t} rotate={turn} style={{ position: 'absolute', inset: '21%', width: '58%', height: '58%' }} />}
+                {cellId === 'door' && designLocks[r]?.[c] && <span aria-label="Locked door" title="Locked door" style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, pointerEvents: 'none', zIndex: 2, textShadow: '0 1px 2px #000' }}>🔒</span>}
+                {stairLinks[r]?.[c] && <span aria-label="Linked stairs" style={{ position: 'absolute', top: 0, right: 1, color: '#fff', fontSize: 8, textShadow: '0 1px 2px #000', pointerEvents: 'none' }}>→</span>}
+                {object && object.id !== 'object-erase' && (object.imageUrl || object.iconUrl || object.id.startsWith('rock-')) && <TileIconPlaceholder tile={object} rotate={objectTurn} style={{ position: 'absolute', zIndex: 1 }} />}
+                {Number.isInteger(torchSide) && torchSide >= 0 && torchSide <= 3 && (
+                  <span aria-hidden="true" title="The torch sits on this side" style={{
+                    position: 'absolute', zIndex: 3, width: 0, height: 0, pointerEvents: 'none',
+                    ...[
+                      { right: 0, top: '50%', marginTop: -4, borderTop: '4px solid transparent', borderBottom: '4px solid transparent', borderRight: '6px solid #f5c542' },
+                      { bottom: 0, left: '50%', marginLeft: -4, borderLeft: '4px solid transparent', borderRight: '4px solid transparent', borderBottom: '6px solid #f5c542' },
+                      { left: 0, top: '50%', marginTop: -4, borderTop: '4px solid transparent', borderBottom: '4px solid transparent', borderLeft: '6px solid #f5c542' },
+                      { top: 0, left: '50%', marginLeft: -4, borderLeft: '4px solid transparent', borderRight: '4px solid transparent', borderTop: '6px solid #f5c542' },
+                    ][torchSide],
+                  }} />
+                )}
+                {outdoor && darkMode && !visibility.torchlit[r]?.[c] && !visibility.darkvision[r]?.[c] && (
                   <div
                     aria-hidden="true"
                     style={{
@@ -1176,6 +1629,7 @@ export default function LevelBuilder() {
         .level-play-map, .level-play-map * { user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
         .level-play-content { min-height: 0; }
         .level-play-controls { right: 18px; }
+        .level-play-scroll[data-tokens-open="true"] { right: 240px !important; }
         .level-play-controls[data-tokens-open="true"] { right: 258px; }
         .level-play-tokens { border-left: 1px solid var(--border); overflow: hidden; }
         .level-play-token-list { flex: 1; overflow-y: auto; padding: 8px; }
@@ -1188,7 +1642,7 @@ export default function LevelBuilder() {
           position: relative;
           display: inline-flex;
           align-items: center;
-          width: 132px;
+          width: 80px;
           height: 34px;
           padding: 3px;
           border: 1px solid var(--border);
@@ -1217,6 +1671,8 @@ export default function LevelBuilder() {
           letter-spacing: 0.02em;
           transition: color 220ms ease;
         }
+        .level-darkness-toggle-label img { width: 16px; height: 16px; display: block; margin: 0 auto; filter: brightness(0); transition: filter 220ms ease; }
+        .level-darkness-toggle[data-dark="true"] .level-darkness-toggle-label img { filter: brightness(0) invert(1); }
         .level-darkness-toggle-thumb {
           position: absolute;
           top: 3px;
@@ -1244,8 +1700,11 @@ export default function LevelBuilder() {
           .level-play-content { flex-direction: column; }
           .level-play-map { min-height: 0; flex: 1 1 auto !important; padding: 0 !important; }
           .level-play-map > div { width: 100% !important; max-width: 100% !important; }
-          .level-play-tokens { top: auto !important; left: 0 !important; right: 0 !important; width: 100% !important; height: 38%; min-height: 155px; max-height: 270px; border-left: 0 !important; border-top: 1px solid var(--border); }
-          .level-play-controls[data-tokens-open="true"] { right: 18px; bottom: calc(38% + 10px); }
+          .level-play-tokens { top: auto !important; left: 0 !important; right: 0 !important; bottom: 0 !important; width: 100% !important; height: 34vh; min-height: 155px; max-height: 270px; border-left: 0 !important; border-top: 1px solid var(--border); }
+          .level-play-map > .level-play-controls { left: auto !important; right: 10px !important; bottom: 10px !important; width: max-content !important; max-width: calc(100% - 20px) !important; }
+          .level-play-map > .level-play-controls[data-tokens-open="true"] { bottom: calc(max(155px, min(34vh, 270px)) + 10px) !important; }
+          .level-play-toolbar > span:first-child { font-size: 15px; }
+          .level-play-scroll[data-tokens-open="true"] { right: 0 !important; bottom: clamp(155px, 34vh, 270px) !important; }
           .level-play-token-list { display: flex; flex: 1 1 auto; flex-direction: row; align-items: stretch; gap: 6px; overflow-x: auto; overflow-y: hidden; padding: 6px 8px; }
           .level-play-token-heading { display: none; }
           .level-play-token-entry { flex: 0 0 148px; margin: 0; }
@@ -1258,21 +1717,27 @@ export default function LevelBuilder() {
       `}</style>
       {/* Play toolbar */}
       {!isFullscreen && <div className="level-play-toolbar" style={{ padding: '10px 16px', background: 'var(--surface)', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
-        <span style={{ fontFamily: 'Cinzel, serif', fontSize: 14, fontWeight: 600, flex: 1 }}>{selectedPlan?.title}</span>
+        <span style={{ fontFamily: 'var(--font-title)', fontSize: 14, fontWeight: 600, flex: 1 }}>{selectedPlan?.title}</span>
         <PeekingViewers viewers={viewers} />
+        {isDm && dark && (
+          <button type="button" className="btn btn-ghost btn-sm" aria-pressed={dmReveal} onClick={() => setDmReveal(v => !v)}
+            title={dmReveal ? 'Hide the dark parts of the map from your own screen again, so it matches what players see.' : 'Only you: show the dark parts of the map dimly on your screen so you can move things. Players still see black. Leave this off while streaming.'}>
+            {dmReveal ? 'Hide map' : 'Reveal map'}
+          </button>
+        )}
         {isDm && (
           <button
             type="button"
             className="level-darkness-toggle"
-            data-dark={darkMode}
+            data-dark={dark}
             onClick={() => toggleDarkMode(selectedPlanId)}
-            aria-label="Map lighting"
-            aria-pressed={darkMode}
-            title={darkMode ? 'Darkness is on for players' : 'Darkness is off for players'}
+            aria-label="Day or night (map lighting for players)"
+            aria-pressed={dark}
+            title={dark ? 'Night: players only see what torches and darkvision light up. Click for day.' : 'Day: players see the whole map. Click for night.'}
           >
             <span className="level-darkness-toggle-thumb" aria-hidden="true" />
-            <span className="level-darkness-toggle-label">☀ Light</span>
-            <span className="level-darkness-toggle-label">☾ Dark</span>
+            <span className="level-darkness-toggle-label" title="Day"><img src="https://res.cloudinary.com/crcbzpw6/image/upload/v1795083562/sun-regular-full.svg" alt="Day" /></span>
+            <span className="level-darkness-toggle-label" title="Night"><img src={MOON_ICON} alt="Night" /></span>
           </button>
         )}
         <button className="btn btn-ghost btn-sm" onClick={() => { setTokens([]); setMode('gallery') }}>← Back</button>
@@ -1281,22 +1746,26 @@ export default function LevelBuilder() {
 
       <div className="level-play-content" style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
         {/* Map area */}
-        <div className="level-play-map" style={{ flex: 1, minWidth: 0, position: 'relative', overflow: 'hidden', padding: 0, background: '#000' }}>
+        <div className="level-play-map" style={{ flex: 1, minWidth: 0, position: 'relative', overflow: 'hidden', padding: 0, background: isFullscreen ? '#000' : 'var(--surface2, #000)' }}>
           <div
             ref={scrollRef}
             className="level-play-scroll"
             onPointerDown={startPan}
-            style={{ position: 'absolute', inset: 0, overflow: 'auto', cursor: zoom > 1 && !dragTokenId ? 'grab' : undefined, touchAction: dragTokenId ? 'none' : undefined }}
+            data-tokens-open={isDm && showTokens && !isFullscreen}
+            style={{ position: 'absolute', inset: 0, overflow: 'auto', display: 'flex', cursor: zoom > 1 && !dragTokenId ? 'grab' : undefined, touchAction: dragTokenId ? 'none' : undefined }}
           >
           <div
             ref={gridRef}
             style={{
               display: 'grid',
-              gridTemplateColumns: `repeat(${GRID_W}, 1fr)`,
-              gridTemplateRows: `repeat(${GRID_H}, 1fr)`,
-              width: `${zoom * 100}%`,
-              height: `${zoom * 100}%`,
-              background: darkMode ? '#000' : '#fff',
+              gridTemplateColumns: `repeat(${gridW}, 1fr)`,
+              gridTemplateRows: `repeat(${gridH}, 1fr)`,
+              // largest square-celled grid that fits the play area, times the zoom; centred when it is smaller than the area
+              width: box.w && box.h ? `${Math.min(box.w / gridW, box.h / gridH) * gridW * zoom}px` : `${zoom * 100}%`,
+              height: box.w && box.h ? `${Math.min(box.w / gridW, box.h / gridH) * gridH * zoom}px` : `${zoom * 100}%`,
+              margin: 'auto',
+              flexShrink: 0,
+              background: dark ? '#000' : '#24201a',
               border: 'none',
               borderRadius: 0,
               overflow: 'hidden',
@@ -1306,75 +1775,83 @@ export default function LevelBuilder() {
               WebkitTouchCallout: 'none',
             }}
           >
-            {grid.map((row, r) => row.map((cellId, c) => {
-              const token = tokens.find(t => t.row === r && t.col === c)
-              const object = objectTile(objectGrid[r]?.[c])
-              const visible = visibility.visible[r]?.[c]
-              const torchlit = visibility.torchlit[r]?.[c]
-              const darkvision = visibility.darkvision[r]?.[c]
+            {!view3d && grid.map((row, r) => row.map((cellId, c) => {
+              const token = tokenAtCell.get(`${r}:${c}`)
               const doorOpen = Boolean(doorStates[r]?.[c])
-              const isDoor = cellId === 'door'
-              const isStair = cellId === 'stairs' || cellId === 'stairs-down'
-              const cellBase = isDoor && doorOpen ? 'floor' : cellId
-              const lightStrength = visibility.lightStrength[r]?.[c] || 0
-              const groundTile = TILES.find(tile => tile.id === cellBase)
               return (
-                <div
+                <PlayCell
                   key={`${r}-${c}`}
-                  data-map-cell
-                  data-row={r}
-                  data-col={c}
-                  onClick={event => handlePlayCellClick(event, r, c)}
-                  title={visible && isDoor ? (doorOpen ? 'Click to close door' : 'Click to open door') : visible && isStair ? 'Click to use stairs' : undefined}
-                  style={{
-                    minWidth: 0,
-                    minHeight: 0,
-                    background: darkMode && !visible ? '#000' : tileColor(cellBase),
-                    border: `0.5px solid ${darkMode && !visible ? 'transparent' : 'rgba(0,0,0,0.08)'}`,
-                    position: 'relative',
-                    filter: darkvision
-                      ? 'brightness(0.35)'
-                      : !isDm && darkMode && torchlit && lightStrength
-                        ? `brightness(${0.45 + lightStrength * 0.55})`
-                        : undefined,
-                    cursor: visible && (isDoor || isStair) ? 'pointer' : undefined,
-                  }}
-                >
-                  {groundTile?.imageUrl && visible && (
-                    <img
-                      src={groundTile.imageUrl}
-                      alt=""
-                      aria-hidden="true"
-                      draggable="false"
-                      style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', pointerEvents: 'none' }}
-                    />
-                  )}
-                  {groundTile?.iconUrl && visible && !(isDoor && doorOpen) && (
-                    <TileIconPlaceholder tile={groundTile} style={{ position: 'absolute', inset: '21%', width: '58%', height: '58%', filter: darkvision ? 'brightness(0.35)' : undefined }} />
-                  )}
-                  {object && visible && (
-                    <TileIconPlaceholder tile={object} style={{ position: 'absolute', zIndex: 1, filter: darkvision ? 'brightness(0.35)' : undefined }} />
-                  )}
-                  {token && (
-                    <Token
-                      token={token}
-                      cellSize={cellSize}
-                      onDragStart={startTokenDrag}
-                      dragging={dragTokenId === token.id}
-                    />
-                  )}
-                  {token?.lightSource && <span aria-hidden="true" style={{ position: 'absolute', top: -5, right: -3, zIndex: 11, fontSize: 10, pointerEvents: 'none' }}>🔥</span>}
-                </div>
+                  r={r}
+                  c={c}
+                  cellId={cellId}
+                  groundTile={TILES.find(tile => tile.id === (cellId === 'door' && doorOpen ? 'floor' : cellId))}
+                  object={objectTile(objectGrid[r]?.[c])}
+                  turn={rotationOf(cellId === 'door' && doorOpen ? 'floor' : cellId, rotations[r]?.[c], r, c) * 90}
+                  objectTurn={objectTurnOf(objectGrid[r]?.[c], objectRotations[r]?.[c], r, c) * 90}
+                  visible={visibility.visible[r]?.[c]}
+                  fade={dark && outdoor ? Math.min(1, visibility.lightFade[r]?.[c] || 0) : null}
+                  dmView={isDm && dmReveal && dark && !visibility.visible[r]?.[c]}
+                  torchlit={visibility.torchlit[r]?.[c]}
+                  darkvision={visibility.darkvision[r]?.[c]}
+                  lightStrength={visibility.lightStrength[r]?.[c] || 0}
+                  doorOpen={doorOpen}
+                  locked={Boolean(doorLocks[r]?.[c])}
+                  shade={shadeGrid?.[r]?.[c]}
+                  token={token}
+                  dragging={Boolean(token) && dragTokenId === token.id}
+                  darkMode={dark}
+                  isDm={isDm}
+                  cellSize={cellSize}
+                  torchSrc={torchSrc}
+                  onCellClick={onCellClick}
+                  onDragStart={onTokenDragStart}
+                />
               )
             }))}
           </div>
           </div>
+          {(knocks.length > 0 || doorMenu) && (
+            <div role="dialog" aria-label="Door" style={{ position: 'absolute', top: 10, left: '50%', transform: 'translateX(-50%)', zIndex: 30, display: 'flex', flexDirection: 'column', gap: 8, width: 'min(92%, 380px)' }}>
+              {knocks.map(k => (
+                <div key={`${k.userId}:${k.row}:${k.col}`} className="card" style={{ padding: 12, background: 'var(--surface)', border: '1px solid var(--gold)', borderRadius: 8, boxShadow: '0 4px 16px rgba(0,0,0,0.3)' }}>
+                  <div style={{ fontSize: 13, marginBottom: 8 }}><b>{k.name}</b> is trying the locked door. Let them through?</div>
+                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                    <button type="button" className="btn btn-primary btn-sm" onClick={() => answerKnock(k, 'open')}>Unlock and open</button>
+                    <button type="button" className="btn btn-ghost btn-sm" onClick={() => answerKnock(k, 'unlock')}>Just unlock</button>
+                    <button type="button" className="btn btn-ghost btn-sm" onClick={() => answerKnock(k, 'deny')}>Keep it locked</button>
+                  </div>
+                </div>
+              ))}
+              {doorMenu && (
+                <div className="card" style={{ padding: 12, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, boxShadow: '0 4px 16px rgba(0,0,0,0.3)' }}>
+                  <div style={{ fontSize: 13, marginBottom: 8 }}><b>Door</b> · {doorStates[doorMenu.row]?.[doorMenu.col] ? 'open' : doorLocks[doorMenu.row]?.[doorMenu.col] ? 'locked' : 'closed'}</div>
+                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                    <button type="button" className="btn btn-primary btn-sm" onClick={() => { toggleDoor(doorMenu.row, doorMenu.col); setDoorMenu(null) }}>{doorStates[doorMenu.row]?.[doorMenu.col] ? 'Close' : 'Open'}</button>
+                    <button type="button" className="btn btn-ghost btn-sm" onClick={() => { setDoorLocked(doorMenu.row, doorMenu.col, !doorLocks[doorMenu.row]?.[doorMenu.col]); setDoorMenu(null) }}>{doorLocks[doorMenu.row]?.[doorMenu.col] ? 'Unlock' : 'Lock'}</button>
+                    <button type="button" className="btn btn-ghost btn-sm" onClick={() => setDoorMenu(null)}>Cancel</button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+          {view3d && (
+            <Battle3DView
+              ground={grid} objects={objectGrid} objectRotations={objectRotations} heights={heights} doorStates={doorStates} doorLocks={doorLocks} theme={themeId}
+              tokens={tokens} levels={viewerLevelList} darkMode={dark}
+              focusId={isDm ? (tapToPlaceTokenId || '') : `char-${user?.id}`} classOf={classOfToken}
+              onClick={handleViewerClick} onKey={key => walkRef.current(key)}
+              tokensOpen={isDm && showTokens && !isFullscreen}
+            />
+          )}
           <div className="level-play-controls" data-tokens-open={isDm && showTokens && !isFullscreen} style={{ position: 'absolute', bottom: 18, display: 'flex', gap: 4, opacity: 0.35, transition: 'opacity .15s', zIndex: 20 }} onMouseEnter={e => { e.currentTarget.style.opacity = 0.95 }} onMouseLeave={e => { e.currentTarget.style.opacity = 0.35 }}>
             {[
               ...(isDm && !isFullscreen ? [{ label: '☰', title: showTokens ? 'Hide tokens panel' : 'Show tokens panel', onClick: () => setShowTokens(v => !v) }] : []),
-              { label: '−', title: 'Zoom out', onClick: () => changeZoom(-0.5), disabled: zoom <= 1 },
-              { label: `${Math.round(zoom * 100)}%`, title: 'Reset zoom', onClick: () => changeZoom(0, true), disabled: zoom === 1 },
-              { label: '+', title: 'Zoom in', onClick: () => changeZoom(0.5), disabled: zoom >= 4 },
+              { label: view3d ? '2D' : '3D', title: view3d ? 'Back to the flat board' : 'See the map in 3D', onClick: () => setView3d(v => !v) },
+              ...(view3d ? [] : [
+                { label: '−', title: 'Zoom out', onClick: () => changeZoom(-0.5), disabled: zoom <= 1 },
+                { label: `${Math.round(zoom * 100)}%`, title: 'Reset zoom', onClick: () => changeZoom(0, true), disabled: zoom === 1 },
+                { label: '+', title: 'Zoom in', onClick: () => changeZoom(0.5), disabled: zoom >= 4 },
+              ]),
               { label: isFullscreen ? '⤡' : '⤢', title: isFullscreen ? 'Exit fullscreen' : 'Fullscreen', onClick: toggleFullscreen },
             ].map(b => (
               <button key={b.title} type="button" title={b.title} aria-label={b.title} disabled={b.disabled} onClick={b.onClick}
@@ -1385,6 +1862,7 @@ export default function LevelBuilder() {
         {isDm && showTokens && !isFullscreen && (
         <div className="level-play-tokens" style={{ position: 'absolute', top: 0, right: 0, bottom: 0, zIndex: 15, width: 240, display: 'flex', flexDirection: 'column', background: 'var(--surface)', borderLeft: '1px solid var(--border)', overflow: 'hidden' }}>
         <div className="level-play-token-list">
+            <div style={{ padding: '6px 10px', fontSize: 11, color: 'var(--text-3)' }}>Players walk their own token with WASD or the arrow keys. Press Move on a token here to walk it yourself. Click a door to open, close, lock or unlock it.</div>
             {/* Section: Players */}
             {availableTokens.filter(t => t.type === 'player').length > 0 && (
               <>
@@ -1435,7 +1913,7 @@ export default function LevelBuilder() {
               <div className="level-play-on-map-list">
               {tokens.map(t => (
                 <div key={t.id} className="level-play-on-map-row">
-                  <div style={{ width: 20, height: 20, borderRadius: '50%', background: t.color, border: '1px solid rgba(255,255,255,0.3)', flexShrink: 0, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <div style={{ width: 20, height: 20, borderRadius: '50%', background: tokenColor(t), border: '1px solid rgba(255,255,255,0.3)', flexShrink: 0, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                     {t.avatar
                       ? <img src={t.avatar} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                       : <span style={{ fontSize: 9, color: '#fff', fontWeight: 700 }}>{t.name?.[0]}</span>
@@ -1445,7 +1923,7 @@ export default function LevelBuilder() {
                     <div style={{ fontSize: 11, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.name}</div>
                     {isDm && t.type === 'player' && (
                       <div style={{ display: 'flex', gap: 3, marginTop: 3 }}>
-                        <button type="button" aria-pressed={Boolean(t.lightSource)} onClick={() => toggleTokenVision(t.id, 'lightSource')} title="Toggle shared torchlight" style={{ padding: '2px 4px', border: '1px solid var(--border)', borderRadius: 4, background: t.lightSource ? 'var(--gold-bg)' : 'transparent', color: 'var(--text-2)', fontSize: 9 }}>🔥 Light {t.lightSource ? 'On' : 'Off'}</button>
+                        <button type="button" aria-pressed={Boolean(t.lightSource)} onClick={() => toggleTokenVision(t.id, 'lightSource')} title="Toggle shared torchlight" style={{ padding: '2px 4px', border: '1px solid var(--border)', borderRadius: 4, background: t.lightSource ? 'var(--gold-bg)' : 'transparent', color: 'var(--text-2)', fontSize: 9 }}>{torchSrc && <img src={torchSrc} alt="" aria-hidden="true" draggable={false} style={{ width: 12, height: 12, objectFit: 'contain', verticalAlign: '-2px', marginRight: 2 }} />}Light {t.lightSource ? 'On' : 'Off'}</button>
                         <button type="button" aria-pressed={Boolean(t.darkvision)} onClick={() => toggleTokenVision(t.id, 'darkvision')} title="Toggle this character’s darkvision" style={{ padding: '2px 4px', border: '1px solid var(--border)', borderRadius: 4, background: t.darkvision ? 'var(--gold-bg)' : 'transparent', color: 'var(--text-2)', fontSize: 9 }}>◉ Darkvision {t.darkvision ? 'On' : 'Off'}</button>
                       </div>
                     )}
@@ -1479,7 +1957,7 @@ export default function LevelBuilder() {
             transform: dragPreviewTransform(dragPosRef.current),
             borderRadius: '50%',
             overflow: 'hidden',
-            background: dragPreviewToken.color || '#6366f1',
+            background: tokenColor(dragPreviewToken),
             border: '2px solid rgba(255,255,255,0.9)',
             boxShadow: '0 4px 12px rgba(0,0,0,0.45)',
             display: 'flex',
@@ -1491,7 +1969,7 @@ export default function LevelBuilder() {
         >
           {dragPreviewToken.avatar
             ? <img src={dragPreviewToken.avatar} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-            : <span style={{ fontSize: Math.max(10, cellSize * 0.35), color: '#fff', fontWeight: 700, fontFamily: 'Cinzel, serif' }}>{dragPreviewToken.name?.[0]?.toUpperCase() || '?'}</span>
+            : <span style={{ fontSize: Math.max(10, cellSize * 0.35), color: '#fff', fontWeight: 700, fontFamily: 'var(--font-title)' }}>{dragPreviewToken.name?.[0]?.toUpperCase() || '?'}</span>
           }
         </div>,
         playRootRef.current || document.body,
@@ -1505,10 +1983,31 @@ export default function LevelBuilder() {
       {/* Header */}
       <div style={{ padding: '16px 24px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0, background: 'var(--surface)' }}>
         <div style={{ flex: 1 }}>
-          <h2 style={{ fontSize: 20, marginBottom: 2 }}>Battle Map</h2>
+          <h2 style={{ fontSize: 20, marginBottom: 2 }}>Maps</h2>
         </div>
-        {isDm && <button className="btn btn-primary" onClick={() => openEditor(null)}>+ Create New Map</button>}
+        {isDm && <Link className="btn btn-ghost" to="/map-generator">Generate a map</Link>}
+        {isDm && <button className="btn btn-primary" onClick={() => setShowSizePicker(true)}>+ Create New Map</button>}
       </div>
+
+      {showSizePicker && (
+        <div role="dialog" aria-modal="true" aria-label="Choose a map size" {...backdropClose(() => setShowSizePicker(false))}
+          style={{ position: 'fixed', inset: 0, zIndex: 1200, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+          <div className="card" onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: 520, padding: 22 }}>
+            <h3 style={{ fontSize: 18, margin: '0 0 4px' }}>Choose a map size</h3>
+            <p style={{ fontSize: 13, color: 'var(--text-2)', margin: '0 0 14px' }}>The size is fixed once the map is created.</p>
+            <div style={{ display: 'grid', gap: 10 }}>
+              {MAP_SIZES.map(sz => (
+                <button key={sz.id} type="button" className="btn btn-ghost" onClick={() => { setShowSizePicker(false); openEditor(null, sz) }}
+                  style={{ justifyContent: 'space-between', padding: '14px 16px', textAlign: 'left' }}>
+                  <span><b style={{ fontSize: 15 }}>{sz.label}</b><br /><span style={{ fontSize: 12, color: 'var(--text-3)', fontWeight: 400 }}>{sz.blurb}</span></span>
+                  <span style={{ fontSize: 12, color: 'var(--text-2)' }}>{sz.w} × {sz.h}</span>
+                </button>
+              ))}
+            </div>
+            <div style={{ textAlign: 'right', marginTop: 14 }}><button className="btn btn-ghost btn-sm" onClick={() => setShowSizePicker(false)}>Cancel</button></div>
+          </div>
+        </div>
+      )}
 
       {plansLoading ? (
         <div style={{ flex: 1, overflowY: 'auto', padding: 24 }}>
@@ -1551,7 +2050,7 @@ export default function LevelBuilder() {
               >
                 <MapThumb content={plan.content} theme={plan.theme} />
                 <div style={{ padding: '10px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <span style={{ fontFamily: 'Cinzel, serif', fontSize: 13, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{plan.title}</span>
+                  <span style={{ fontFamily: 'var(--font-title)', fontSize: 13, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{plan.title}</span>
                   {isDm && (
                     <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
                       <button onClick={e => { e.stopPropagation(); openEditor(plan) }} title="Edit tiles"
@@ -1619,7 +2118,7 @@ function SidebarToken({ token, placed, dragging, selected, onDragStart, onSelect
         touchAction: 'pan-x',
       }}
     >
-      <div style={{ width: 28, height: 28, borderRadius: '50%', background: token.color, border: '2px solid rgba(255,255,255,0.2)', flexShrink: 0, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <div style={{ width: 28, height: 28, borderRadius: '50%', background: tokenColor(token), border: '2px solid rgba(255,255,255,0.2)', flexShrink: 0, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         {token.avatar
           ? <img src={token.avatar} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
           : <span style={{ fontSize: 12, color: '#fff', fontWeight: 700 }}>{token.name?.[0]?.toUpperCase()}</span>

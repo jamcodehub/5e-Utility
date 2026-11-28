@@ -13,6 +13,7 @@ const loaders = {
   spells:      () => import('../data/srd/spells.json'),
   rules:       () => import('../data/srd/rules.json'),
   rulesIndex:  () => import('../data/srd/rulesIndex.json'),
+  monsters:    () => import('../data/srd/monsters.json'),
 }
 
 const cache = {}

@@ -2,6 +2,8 @@ import { Router } from 'express'
 import { Journal } from '../models/index.js'
 import { auth, isMember } from './campaigns.js'
 import { User } from '../models/index.js'
+import { hasPremium, hasPremiumAs } from '../lib/premium.js'
+import { FREE_JOURNAL_ENTRIES } from '../lib/limits.js'
 
 const router = Router()
 
@@ -26,9 +28,9 @@ router.post('/:campaignId', auth, async (req, res) => {
   try {
     if (!await isMember(req.params.campaignId, req.userId)) return res.status(403).json({ error: 'Not a campaign member' })
     const user = await User.findById(req.userId)
-    if (!user.isPremium) {
+    if (!hasPremium(user)) {
       const count = await Journal.countDocuments({ campaign: req.params.campaignId, author: req.userId })
-      if (count >= 15) return res.status(403).json({ error: 'Free accounts are limited to 15 journal/session planner entries. Upgrade to Premium for unlimited entries.' })
+      if (count >= FREE_JOURNAL_ENTRIES) return res.status(403).json({ error: `Free accounts are limited to ${FREE_JOURNAL_ENTRIES} journal/session planner entries per campaign. Upgrade to Premium for unlimited entries.` })
     }
     // Support both players (day field) and DMs (session field)
     const body = { ...req.body, campaign: req.params.campaignId, author: req.userId }

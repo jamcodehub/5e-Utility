@@ -26,6 +26,8 @@ export const THEMES = [
   { id: 'medieval', label: 'Medieval', available: true },
   { id: 'cartoon', label: 'Stylized Cartoon', available: true },
   { id: 'scifi', label: 'Sci Fi', available: true },
+  // Gothic is a 3D look from the map generator for now: the flat board still uses the Medieval tile art for it.
+  { id: 'gothic', label: 'Gothic (3D look)', available: true },
   { id: 'western', label: 'Western (Coming Soon)', available: false },
 ]
 

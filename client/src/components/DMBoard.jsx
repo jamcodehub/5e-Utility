@@ -3,10 +3,16 @@ import { api } from "../context/AuthContext";
 import { useNavigate } from "react-router-dom";
 import { useTheme } from "../context/ThemeContext";
 
+// Rounded pointer arrow: the Select tool's icon and the board's mouse cursor. A thick round-joined stroke rounds the corners.
+const ARROW_POINTS = "M38 18 L185 90 L115 115 L68 180 Z";
+const ARROW_ICON = `data:image/svg+xml,${encodeURIComponent(`<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 212 204'><path d='${ARROW_POINTS}' fill='#000' stroke='#000' stroke-width='26' stroke-linejoin='round'/></svg>`)}`;
+// Same arrow as a cursor, with a light outline so it stays visible on dark boards; the hotspot is the tip.
+const ARROW_CURSOR = `url("data:image/svg+xml,${encodeURIComponent(`<svg xmlns='http://www.w3.org/2000/svg' width='28' height='27' viewBox='0 0 212 204'><path d='${ARROW_POINTS}' fill='#1f1f1f' stroke='#f4e8c8' stroke-width='26' stroke-linejoin='round' paint-order='stroke'/></svg>`)}") 5 4, default`;
+
 /* ---------- ASSETS: swap these placeholder URLs for your own icons ---------- */
 export const ICONS = {
   // left tool bar
-  select: "https://res.cloudinary.com/crcbzpw6/image/upload/v1794569910/feather-pointed-solid-full-4.svg", text: "https://res.cloudinary.com/crcbzpw6/image/upload/v1794570299/i-cursor-solid-full.svg", pen: "https://res.cloudinary.com/crcbzpw6/image/upload/v1794570332/pen-nib-solid-full.svg", box: "https://res.cloudinary.com/crcbzpw6/image/upload/v1794570353/square-regular-full.svg", arrow: "https://res.cloudinary.com/crcbzpw6/image/upload/v1794570443/arrow-right-long-solid-full.svg", shapes: "https://res.cloudinary.com/crcbzpw6/image/upload/v1794570543/shapes-solid-full.svg",
+  select: ARROW_ICON, text: "https://res.cloudinary.com/crcbzpw6/image/upload/v1794570299/i-cursor-solid-full.svg", pen: "https://res.cloudinary.com/crcbzpw6/image/upload/v1794569910/feather-pointed-solid-full-4.svg", box: "https://res.cloudinary.com/crcbzpw6/image/upload/v1794570353/square-regular-full.svg", arrow: "https://res.cloudinary.com/crcbzpw6/image/upload/v1794570443/arrow-right-long-solid-full.svg", shapes: "https://res.cloudinary.com/crcbzpw6/image/upload/v1794570543/shapes-solid-full.svg",
   // shape picker
   rect: "https://res.cloudinary.com/crcbzpw6/image/upload/v1794570353/square-regular-full.svg", ellipse: "https://res.cloudinary.com/crcbzpw6/image/upload/v1794570762/circle-regular-full.svg", star: "https://res.cloudinary.com/crcbzpw6/image/upload/v1794570765/star-regular-full.svg",
   // campaign icons / cards
@@ -486,7 +492,7 @@ function BoardCanvas({ campaignId, boardId, style, topRight, children }) {
       <style>{CSS}</style>
       <div
         ref={ref} className="dmb-canvas" data-canvas="1"
-        style={{ cursor: tool === "hand" ? "grab" : QUILL_CURSOR }}
+        style={{ cursor: tool === "hand" ? "grab" : tool === "pen" ? QUILL_CURSOR : ARROW_CURSOR }}
         onPointerDownCapture={panDown} onPointerDown={down} onPointerMove={move} onPointerUp={up}
       >
         {/* world layer: pure DOM + SVG, re-rasterised at every zoom level so it stays sharp */}
@@ -715,7 +721,7 @@ function BoardsPanel({ campaignId, list, setList, activeId, setActiveId, open, o
         {list.folders.map((f) => (
           <div key={f._id} className="dmb-folder">
             <div className="dmb-folder-head">
-              <span className="dmb-row-name" onDoubleClick={() => setRenaming({ kind: "folder", id: f._id, value: f.name })}>📁 {nameField("folder", f._id, f.name)}</span>
+              <span className="dmb-row-name" onDoubleClick={() => setRenaming({ kind: "folder", id: f._id, value: f.name })}>▸ {nameField("folder", f._id, f.name)}</span>
               <button title="New board in folder" aria-label="New board in folder" disabled={atLimit} onClick={() => addBoard(f._id)}>＋</button>
               <button title="Rename folder" aria-label="Rename folder" onClick={() => setRenaming({ kind: "folder", id: f._id, value: f.name })}>✎</button>
               <button title="Delete folder" aria-label="Delete folder" onClick={() => removeFolder(f)}>✕</button>
@@ -813,19 +819,19 @@ const CSS = `
 .dmb-hit{fill:none;stroke:transparent;stroke-width:16;stroke-linecap:round;stroke-linejoin:round;cursor:pointer}
 .dmb-marq{fill:color-mix(in srgb,var(--dmb-line) 8%,transparent);stroke:var(--dmb-line);stroke-width:1.2;stroke-dasharray:5 4}
 .dmb-bar,.dmb-tl,.dmb-zoom,.dmb-tools,.dmb-pop{position:absolute;display:flex;gap:2px;align-items:center;background:var(--dmb-chrome);border:1px solid color-mix(in srgb,var(--dmb-rim) 60%,transparent);border-radius:10px;padding:4px;box-shadow:0 2px 10px rgba(0,0,0,.25)}
-.dmb-bar{left:50%;bottom:14px;transform:translateX(-50%);max-width:calc(100% - 24px);overflow-x:auto}
+.dmb-bar{padding:3px;left:50%;bottom:14px;transform:translateX(-50%);max-width:calc(100% - 24px);overflow-x:auto}
 .dmb-tl{left:12px;top:12px}
-.dmb-tools{left:12px;top:64px;flex-direction:column;border-radius:20px;padding:5px 4px;max-height:calc(100% - 240px);overflow-y:auto}
+.dmb-tools{left:12px;top:64px;flex-direction:column;border-radius:16px;padding:3px;gap:1px;max-height:calc(100% - 240px);overflow-y:auto}
 .dmb-pop{left:62px;top:64px;flex-direction:column;align-items:stretch;padding:8px;max-width:calc(100% - 80px);z-index:2}
 .dmb-pop-row{display:flex;flex-wrap:wrap;gap:2px}
 .dmb-pop-title{color:var(--dmb-chrome-text);opacity:.75;font:12px 'MedievalSharp',serif;text-transform:uppercase;letter-spacing:.08em}
 .dmb-zoom{left:12px;bottom:70px;color:var(--dmb-chrome-text);font:13px 'MedievalSharp',serif}
 .dmb-zoom span{min-width:46px;text-align:center}
-.dmb-root button{display:flex;align-items:center;justify-content:center;width:32px;height:32px;padding:0;background:none;border:1px solid transparent;border-radius:7px;color:var(--dmb-chrome-text);font:12px 'MedievalSharp',serif;cursor:pointer}
+.dmb-root button{display:flex;align-items:center;justify-content:center;width:28px;height:28px;padding:0;background:none;border:1px solid transparent;border-radius:6px;color:var(--dmb-chrome-text);font:12px 'MedievalSharp',serif;cursor:pointer}
 .dmb-zoom button,.dmb-status button,.dmb-panel button{width:auto;min-width:28px;height:28px;padding:0 7px}
 .dmb-root button.on,.dmb-root button:hover:not(:disabled){background:var(--dmb-chrome-hi);border-color:var(--dmb-rim)}
 .dmb-root button:disabled{opacity:.35;cursor:default}
-.dmb-bar img,.dmb-tl img,.dmb-tools img,.dmb-pop img{width:20px;height:20px;filter:var(--dmb-icon-filter)}
+.dmb-bar img,.dmb-tl img,.dmb-tools img,.dmb-pop img{width:18px;height:18px;filter:var(--dmb-icon-filter)}
 .dmb-top{position:absolute;right:12px;top:12px;display:flex;gap:8px;max-width:calc(100% - 100px)}
 .dmb-root .dmb-fs{width:auto;height:auto;padding:7px 12px;background:var(--dmb-rim);color:#1d1208;border:1px solid var(--dmb-chrome);font-size:14px;box-shadow:0 2px 10px rgba(0,0,0,.25);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
 .dmb-root .dmb-fs:hover{background:color-mix(in srgb,var(--dmb-rim) 82%,#fff);border-color:var(--dmb-chrome)}
@@ -834,8 +840,11 @@ const CSS = `
 .dmb-status.error,.dmb-status.conflict,.dmb-status.load-error{border-color:var(--dmb-danger)}
 .dmb-status button{display:inline-flex;margin-left:8px;text-decoration:underline}
 .dmb-overlay{position:absolute;inset:0;display:grid;place-content:center;padding:24px;text-align:center;background:color-mix(in srgb,var(--dmb-chrome) 90%,transparent);color:var(--dmb-chrome-text);font:20px 'IM Fell English',Georgia,serif;z-index:3}
-.dmb-panel{position:absolute;top:0;right:0;bottom:0;width:min(290px,100%);z-index:6;display:flex;flex-direction:column;gap:8px;padding:12px;box-sizing:border-box;background:var(--dmb-chrome);color:var(--dmb-chrome-text);border-left:1px solid var(--dmb-rim);box-shadow:-6px 0 18px rgba(0,0,0,.25);font:14px 'IM Fell English',Georgia,serif;transform:translateX(105%);transition:transform .22s ease;visibility:hidden}
-.dmb-panel.open{transform:none;visibility:visible}
+.dmb-panel{position:absolute;top:0;right:0;bottom:0;width:min(290px,100%);z-index:6;display:flex;flex-direction:column;gap:8px;padding:12px;box-sizing:border-box;background:var(--dmb-chrome);color:var(--dmb-chrome-text);border-left:1px solid var(--dmb-rim);box-shadow:-6px 0 18px rgba(0,0,0,.25);font:14px 'IM Fell English',Georgia,serif;transform:translateX(105%);visibility:hidden;
+ /* closing: slide out first, and only hide once the slide has finished (visibility is switched after the delay) */
+ transition:transform .26s cubic-bezier(.4,0,.2,1),visibility 0s linear .26s}
+.dmb-panel.open{transform:none;visibility:visible;transition:transform .26s cubic-bezier(.4,0,.2,1),visibility 0s}
+@media (prefers-reduced-motion:reduce){.dmb-panel,.dmb-panel.open{transition:none}}
 .dmb-panel-head{display:flex;align-items:center;justify-content:space-between;font-family:'MedievalSharp',serif;font-size:16px}
 .dmb-panel-actions{display:flex;gap:6px}
 .dmb-panel-actions button{border-color:var(--dmb-rim)}

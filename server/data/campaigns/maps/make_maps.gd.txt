@@ -1,0 +1,95 @@
+extends SceneTree
+const MapConfig = preload("res://scripts/map_config.gd")
+const MapGenerator = preload("res://scripts/map_generator.gd")
+const OUT := "/Users/jbmacpro/Documents/GitHub/5e-Utility/.claude/worktrees/website-feedback-impl-ddab4c/server/data/campaigns/maps"
+const S := MapConfig.Style
+const SIZES := {"small": [20, 14], "medium": [32, 22], "large": [48, 33]}
+
+# [campaign, slug, title, style, size, theme, seed, dark, overrides]
+const SPECS := [
+	["the-salt-road", "night-camp", "Night Camp on the White", S.CAMP, "medium", "medieval", 1101, false, {"tents": 8, "walls": 0.0, "reskin": "salt"}],
+	["the-salt-road", "wreck-forest", "The Wreck Forest", S.DESERT, "large", "medieval", 1102, false, {"ruins": 5, "relief": 0.35}],
+	["the-salt-road", "singing-hull", "The Singing Hull (the flooded hold)", S.DUNGEON, "medium", "gothic", 1103, false, {"room_count": 6, "water": 0.6, "torches": 0.4}],
+	["the-salt-road", "tallow-station", "Tallow Station", S.VILLAGE, "medium", "medieval", 1104, false, {"buildings": 7, "forest": 0.1, "reskin": "salt"}],
+	["the-salt-road", "glass-flats", "The Glass Flats and the Tide-Pool", S.DESERT, "medium", "medieval", 1105, false, {"ruins": 0, "relief": 0.0, "water": 0.6}],
+	["the-salt-road", "pressure-hall", "Pressure Hall, Dam of Nine Hands", S.DUNGEON, "medium", "medieval", 1106, false, {"room_count": 5, "pillars": 0.8, "water": 0.5, "torches": 0.6}],
+
+	["bells-of-underhallow", "underhallow", "Underhallow", S.VILLAGE, "medium", "gothic", 2101, false, {"buildings": 8, "forest": 0.5}],
+	["bells-of-underhallow", "chapel", "Chapel of Hollow Mercy", S.TEMPLE, "medium", "gothic", 2102, false, {"decay": 0.3, "relief": 0.2}],
+	["bells-of-underhallow", "ringing-chamber", "The Ringing Chamber", S.DUNGEON, "small", "gothic", 2103, false, {"room_count": 3, "torches": 0.6}],
+	["bells-of-underhallow", "crypt", "The Crypt of the Thirteenth Bell", S.DUNGEON, "small", "gothic", 2104, true, {"room_count": 3, "pillars": 0.7, "torches": 0.3}],
+	["bells-of-underhallow", "churchyard", "The Churchyard", S.GRAVEYARD, "medium", "gothic", 2105, false, {"graves": 26}],
+	["bells-of-underhallow", "gilt-lamb", "The Gilt Lamb", S.TAVERN, "medium", "gothic", 2106, false, {"buildings": 3}],
+
+	["the-last-winter-court", "last-embers", "Inn of Last Embers", S.TAVERN, "medium", "medieval", 3101, false, {"buildings": 2}],
+	["the-last-winter-court", "frozen-road", "The Frozen Road", S.MOUNTAINS, "large", "medieval", 3102, false, {"relief": 0.25, "steepness": 0.2, "reskin": "winter"}],
+	["the-last-winter-court", "long-dusk-fair", "The Long Dusk Fair", S.CITY, "large", "medieval", 3103, false, {"walls": 0.0, "reskin": "winter"}],
+	["the-last-winter-court", "court", "The Court of Hollin-Vael", S.CASTLE, "large", "gothic", 3104, false, {"buildings": 2, "reskin": "winter"}],
+	["the-last-winter-court", "pale-gardens", "The Pale Gardens", S.GRAVEYARD, "medium", "gothic", 3105, false, {"graves": 30, "reskin": "winter"}],
+	["the-last-winter-court", "larder", "The Larder of Years", S.DUNGEON, "medium", "gothic", 3106, true, {"room_count": 8, "pillars": 0.8, "torches": 0.2}],
+	["the-last-winter-court", "cracking-lake", "The Cracking Lake", S.COAST, "large", "medieval", 3107, false, {"steepness": 0.2, "buildings": 0, "reskin": "winter"}],
+
+	["ashes-of-the-meridian-line", "corrans-gate", "Corran’s Gate", S.CITY, "large", "medieval", 4101, false, {"walls": 1.0}],
+	["ashes-of-the-meridian-line", "counting-house", "The Counting House", S.DUNGEON, "medium", "medieval", 4102, false, {"room_count": 9, "furniture": 0.8}],
+	["ashes-of-the-meridian-line", "hearth-hall", "The Hearth Hall of Dunmark", S.CASTLE, "medium", "gothic", 4103, false, {"buildings": 1}],
+	["ashes-of-the-meridian-line", "quills-hut", "Quill’s Repair-Hut", S.TAVERN, "small", "medieval", 4104, false, {"buildings": 1}],
+	["ashes-of-the-meridian-line", "ashlands", "The Ashlands at Pillar Nine", S.DESERT, "large", "gothic", 4105, false, {"ruins": 3, "relief": 0.3}],
+	["ashes-of-the-meridian-line", "the-line", "The Line at Ashfall", S.TEMPLE, "large", "gothic", 4106, false, {"decay": 0.6, "relief": 0.7}],
+
+	["the-long-eclipse", "first-hearth", "The First Hearth", S.DUNGEON, "small", "medieval", 5101, false, {"room_count": 3, "torches": 0.9}],
+	["the-long-eclipse", "last-light-inn", "The Inn at Last Light", S.TAVERN, "medium", "medieval", 5102, false, {"buildings": 2}],
+	["the-long-eclipse", "road-of-lamps", "The Road of Lamps", S.RIVER, "large", "medieval", 5103, false, {"river_width": 6, "bridges": 1, "buildings": 4}],
+	["the-long-eclipse", "river-of-the-dead", "The River of the Dead", S.COAST, "large", "gothic", 5104, false, {"steepness": 0.3, "buildings": 0}],
+	["the-long-eclipse", "throne-of-dawn", "The Throne of Dawn", S.TEMPLE, "large", "medieval", 5105, false, {"decay": 0.0, "relief": 1.0}],
+	["the-long-eclipse", "long-night", "The Long Night", S.CAVES, "large", "gothic", 5106, true, {}],
+]
+
+func _init() -> void:
+	var made := 0
+	for spec in SPECS:
+		var cfg := MapConfig.new()
+		cfg.style = spec[3]
+		cfg.width = SIZES[spec[4]][0]
+		cfg.height = SIZES[spec[4]][1]
+		cfg.theme = spec[5]
+		cfg.map_seed = spec[6]
+		var skin := ""
+		for k in spec[8]:
+			if k == "reskin":
+				skin = spec[8][k]
+			else:
+				cfg.set(k, spec[8][k])
+		var m = MapGenerator.generate(cfg)
+		_reskin(m, skin)
+		var d: Dictionary = m.to_site_dict(spec[2])
+		var out := {"title": spec[2], "slug": spec[1], "theme": d["theme"], "darkMode": spec[7], "content": d["content"], "doorStates": d["doorStates"]}
+		var dir := "%s/%s" % [OUT, spec[0]]
+		DirAccess.make_dir_recursive_absolute(dir)
+		var f := FileAccess.open("%s/%s.json" % [dir, spec[1]], FileAccess.WRITE)
+		f.store_string(JSON.stringify(out))
+		f.close()
+		made += 1
+	print("made %d maps" % made)
+	quit()
+
+## Puts a generated outdoor map into a different climate: salt flats (no grass or trees) or winter (snow instead of grass and sand).
+func _reskin(m, mode: String) -> void:
+	if mode == "":
+		return
+	for y in m.height:
+		for x in m.width:
+			var g: String = m.get_ground(x, y)
+			var o: String = m.get_object(x, y)
+			var h := absi(((x * 73856093) ^ (y * 19349663)) % 100)
+			if mode == "salt":
+				if g == "grass" or g == "mossy-cobblestone":
+					m.set_ground(x, y, "sand" if h < 85 else "rocky-dirt")
+				if o == "tree" or o == "bush" or o == "yellow-flowers":
+					m.set_object(x, y, "rock-small" if h < 25 else ("rock-medium" if h < 33 else ""))
+			elif mode == "winter":
+				if g == "grass" or g == "sand":
+					m.set_ground(x, y, "snow" if h < 92 else "rocky-dirt")
+				elif g == "mossy-cobblestone":
+					m.set_ground(x, y, "floor")   # paving, not moss, in the cold
+				if o == "yellow-flowers":
+					m.set_object(x, y, "")

@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { ABILITIES, ABILITY_NAMES, fmtMod, featuresThrough, spellSlots } from '../utils/rules5e'
 import { collapseFamilies, featureUses } from '../utils/featureRolls'
@@ -10,11 +10,11 @@ import { COINS, FEATS, alwaysPrepared, derive, itemWeight, weaponStats } from '.
 const CSS = `
 .cs{font-family:Georgia,'Times New Roman',serif;color:#111;background:#fff;padding:14mm 12mm;max-width:210mm;margin:0 auto;font-size:11px;line-height:1.35}
 .cs *{box-sizing:border-box}
-.cs h1{font-family:Cinzel,Georgia,serif;font-size:24px;margin:0}
-.cs h2{font-family:Cinzel,Georgia,serif;font-size:11px;letter-spacing:.08em;text-transform:uppercase;border-bottom:1.5px solid #111;margin:12px 0 5px;padding-bottom:2px}
+.cs h1{font-family:'Fell Title','IM Fell English',Georgia,serif;font-size:24px;margin:0}
+.cs h2{font-family:'Fell Title','IM Fell English',Georgia,serif;font-size:11px;letter-spacing:.08em;text-transform:uppercase;border-bottom:1.5px solid #111;margin:12px 0 5px;padding-bottom:2px}
 .cs .row{display:flex;gap:8px;flex-wrap:wrap}
 .cs .box{border:1.5px solid #111;border-radius:5px;padding:4px 6px;text-align:center;min-width:62px}
-.cs .box b{display:block;font-size:17px;font-family:Cinzel,Georgia,serif}
+.cs .box b{display:block;font-size:17px;font-family:'Fell Title','IM Fell English',Georgia,serif}
 .cs .box small{font-size:8px;letter-spacing:.07em;text-transform:uppercase;color:#444}
 .cs .cols{display:grid;grid-template-columns:1fr 1fr;gap:0 18px}
 .cs .cols3{display:grid;grid-template-columns:repeat(3,1fr);gap:0 14px}
@@ -28,12 +28,28 @@ const CSS = `
 .cs .muted{color:#555}
 .cs .pg{break-inside:avoid}
 .cs .tag{font-size:8px;border:1px solid #111;border-radius:3px;padding:0 3px;margin-left:3px}
+/* One-page version: everything on a single A4 sheet, small type, features and spells as names */
+.cs.compact{position:relative;padding:8mm;max-width:210mm;font-size:9.8px;line-height:1.3;height:297mm;overflow:hidden}
+.cs.compact h1{font-size:22px}
+.cs.compact h2{font-size:9.6px;margin:9px 0 4px}
+.cs.compact .row{gap:5px}
+.cs.compact .box{padding:2px 4px;min-width:44px;border-radius:4px}
+.cs.compact .box b{font-size:15px}
+.cs.compact .box small{font-size:7.4px}
+.cs.compact .ln{padding:1px 0}
+.cs.compact .dot{width:6px;height:6px;margin-right:3px}
+.cs.compact .sq{width:8px;height:8px}
+.cs.compact td,.cs.compact th{padding:1px 3px;font-size:9.4px}
+.cs.compact th{font-size:7.8px}
+.cs.compact .cols3{grid-template-columns:repeat(3,minmax(0,1fr))}
+.cs.compact .flow{margin:0;text-align:left;overflow-wrap:anywhere}
 @media print{
   @page{size:A4;margin:0}
   body>*:not(.sheet-portal){display:none!important}
   .sheet-portal{position:static!important;overflow:visible!important;background:#fff!important}
   .sheet-portal .no-print{display:none!important}
   .cs{padding:12mm;max-width:none}
+  .cs.compact{padding:8mm;height:297mm;overflow:hidden;break-after:avoid}
   .cs .pagebreak{break-before:page}
 }
 `
@@ -45,7 +61,7 @@ const firstSentence = (desc) => {
   return t.length > 190 ? `${t.slice(0, 187).replace(/\s+\S*$/, '')}…` : t
 }
 
-export function CharacterSheet({ char, srd }) {
+export function CharacterSheet({ char, srd, compact = false }) {
   const d = useMemo(() => derive(char, srd), [char, srd])
   const { cls, race, level } = d
   const combat = char.combat || {}
@@ -68,6 +84,106 @@ export function CharacterSheet({ char, srd }) {
   const spellRows = mySpells.map(id => spellsById[id]).filter(Boolean)
   const langs = (char.srd?.languages || []).map(l => srd.core.languages?.find(x => x.id === l)?.name || l)
   const profList = (char.proficiencies || []).filter(p => !/^skill-|^saving-throw-/.test(p)).map(p => p.replace(/-/g, ' '))
+
+  if (compact) {
+    const LIMIT = (list, n) => ({ shown: list.slice(0, n), more: Math.max(0, list.length - n) })
+    const eq = LIMIT(d.items, 20)
+    const feat = LIMIT([...features.map(f => `${f.name} (${f.level})`), ...(char.srd?.feats || []).filter(id => FEATS[id]).map(id => `Feat: ${FEATS[id].name}`)], 44)
+    const trt = LIMIT(traits.map(t => t.name), 16)
+    const spellSorted = [...spellRows].sort((a, b) => a.level - b.level || a.name.localeCompare(b.name))
+    const spellGroups = [...new Set(spellSorted.map(x => x.level))].map(lv => ({ lv, names: spellSorted.filter(x => x.level === lv).map(x => `${x.name}${always.includes(x.id) ? '*' : ''}`) }))
+    const att = LIMIT(weapons, 6)
+    const insight = 10 + d.skillMod(srd.core.skills.find(x => x.id === 'insight') || { ability: 'wis' })
+    const invest = 10 + d.skillMod(srd.core.skills.find(x => x.id === 'investigation') || { ability: 'int' })
+    const trim = (t, n) => { const v = String(t || '').replace(/\s+/g, ' ').trim(); return v.length > n ? `${v.slice(0, n - 1).replace(/\s+\S*$/, '')}…` : v }
+    return (
+      <div className="cs compact">
+        <style>{CSS}</style>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', gap: 10 }}>
+          <div>
+            <h1>{char.name || 'Unnamed hero'}</h1>
+            <div className="muted" style={{ fontSize: 10 }}>{[char.race, char.class && `${char.class} ${level}`, char.background].filter(Boolean).join(' · ')}</div>
+          </div>
+          {char.avatarUrl && <img src={char.avatarUrl} alt="" style={{ width: 40, height: 40, objectFit: 'cover', borderRadius: 5, border: '1.5px solid #111' }} />}
+        </div>
+        <div className="row" style={{ marginTop: 6 }}>
+          {ABILITIES.map(a => <div key={a} className="box"><small>{ABILITY_NAMES[a]}</small><b>{fmtMod(d.mod(a))}</b><span style={{ fontSize: 9 }}>{d.stats[a] ?? 10}</span></div>)}
+          <div className="box"><small>Armor class</small><b>{char.ac ?? d.ac}</b></div>
+          <div className="box"><small>Initiative</small><b>{fmtMod(d.initiative)}</b></div>
+          <div className="box"><small>Speed</small><b>{d.baseSpeed}</b></div>
+          <div className="box"><small>Prof.</small><b>{fmtMod(d.prof)}</b></div>
+          <div className="box"><small>HP max / now</small><b>{hp.max} / {hp.current ?? hp.max}</b></div>
+          <div className="box"><small>Temp HP</small><b>{combat.tempHp || '\u00a0'}</b></div>
+          <div className="box"><small>Inspiration</small><b>{combat.inspiration ? '★' : '☐'}</b></div>
+        </div>
+        <div className="cols3" style={{ marginTop: 2 }}>
+          <div>
+            <h2>Saving throws</h2>
+            {ABILITIES.map(a => <div key={a} className="ln"><span><span className={`dot${d.saveProf(a) ? ' f' : ''}`} />{ABILITY_NAMES[a]}</span><b>{fmtMod(d.saveMod(a))}</b></div>)}
+            <h2>Skills</h2>
+            {[...srd.core.skills].sort((a, b) => a.name.localeCompare(b.name)).map(s => (
+              <div key={s.id} className="ln"><span><span className={`dot${d.skillProf(s) ? ' f' : ''}`} />{s.name} <span className="muted" style={{ fontSize: 6.5 }}>{s.ability.toUpperCase()}</span>{d.expertise(s) ? ' ◆' : ''}</span><b>{fmtMod(d.skillMod(s))}</b></div>
+            ))}
+            <h2>Senses</h2>
+            <div className="ln"><span>Passive Perception</span><b>{d.passive}</b></div>
+            <div className="ln"><span>Passive Insight</span><b>{insight}</b></div>
+            <div className="ln"><span>Passive Investigation</span><b>{invest}</b></div>
+          </div>
+          <div>
+            <h2>Hit points</h2>
+            <div>Hit Dice d{cls?.hitDie || '?'} × {level} <Squares n={level} /></div>
+            <div style={{ marginTop: 2 }}>Death saves  Succ. <Dots n={3} filled={combat.deathSaves?.successes || 0} /> Fail <Dots n={3} filled={combat.deathSaves?.failures || 0} /></div>
+            <div style={{ marginTop: 2 }}>Exhaustion <Dots n={6} filled={combat.exhaustion || 0} /></div>
+            {combat.conditions?.length > 0 && <div style={{ marginTop: 2 }}>Conditions: {combat.conditions.map(c => srd.core.conditions.find(x => x.id === c)?.name || c).join(', ')}</div>}
+            <h2>Attacks</h2>
+            <table>
+              <thead><tr><th>Weapon</th><th>Atk</th><th>Damage</th></tr></thead>
+              <tbody>
+                {att.shown.map((w, i) => { const st = weaponStats(w.def, d); return <tr key={i}><td>{w.def.name}</td><td>{fmtMod(st.atk)}</td><td>{st.dmg} {st.type}</td></tr> })}
+                <tr><td>Unarmed strike</td><td>{fmtMod(d.mod('str') + d.prof)}</td><td>{Math.max(1, 1 + d.mod('str'))} bludg.</td></tr>
+              </tbody>
+            </table>
+            {att.more > 0 && <div className="muted">+ {att.more} more weapons in Equipment</div>}
+            <h2>Coin</h2>
+            <div className="row">{COINS.map(([k]) => <div key={k} className="box" style={{ minWidth: 34 }}><small>{k}</small><b style={{ fontSize: 11 }}>{char.currency?.[k] || '\u00a0'}</b></div>)}</div>
+            <h2>Equipment · {Math.round(d.weight * 10) / 10} / {d.capacity} lb</h2>
+            {eq.shown.map((it, i) => (
+              <div key={i} className="ln"><span>{it.equipped ? '◆ ' : ''}{it.custom ? it.name : it.def?.name || it.id}{it.qty > 1 ? ` ×${it.qty}` : ''}{it.attuned ? ' (attuned)' : ''}</span><span className="muted">{Math.round(itemWeight(it) * 10) / 10 || ''}</span></div>
+            ))}
+            {eq.more > 0 && <div className="muted">+ {eq.more} more items</div>}
+            {!d.items.length && <div className="muted">—</div>}
+            <div className="muted" style={{ fontSize: 7 }}>◆ = equipped / worn</div>
+          </div>
+          <div>
+            <h2>{cls ? `${cls.name} features` : 'Features'}</h2>
+            <p className="flow">{feat.shown.join(' · ') || '—'}{feat.more > 0 ? ` · + ${feat.more} more` : ''}</p>
+            {trt.shown.length > 0 && (<>
+              <h2>{subrace?.name || race?.name} traits</h2>
+              <p className="flow">{trt.shown.join(' · ')}{trt.more > 0 ? ` · + ${trt.more} more` : ''}</p>
+            </>)}
+            {(profList.length > 0 || langs.length > 0) && (<>
+              <h2>Proficiencies & languages</h2>
+              {profList.length > 0 && <p className="flow" style={{ textTransform: 'capitalize' }}>{trim(profList.join(', '), 360)}</p>}
+              {langs.length > 0 && <p className="flow"><b>Languages:</b> {langs.join(', ')}</p>}
+            </>)}
+            {cls?.spellcasting && (<>
+              <h2>Spells · {cls.spellcasting.ability.toUpperCase()} · DC {d.spellDc} · atk {fmtMod(d.spellAtk)}</h2>
+              {Object.keys(slots).length > 0 && <div style={{ marginBottom: 3 }}>{Object.entries(slots).map(([l, n]) => <span key={l} style={{ marginRight: 7 }}><b>L{l}</b> <Squares n={n} /></span>)}</div>}
+              {spellGroups.map(g => <p key={g.lv} className="flow" style={{ marginBottom: 2 }}><b>{g.lv ? `Level ${g.lv}` : 'Cantrips'}:</b> {g.names.join(', ')}</p>)}
+              {always.length > 0 && <div className="muted" style={{ fontSize: 7 }}>* always prepared</div>}
+            </>)}
+            {char.personality && (<>
+              <h2>Personality</h2>
+              <p className="flow" style={{ whiteSpace: 'pre-wrap' }}>{trim(char.personality, 420)}</p>
+            </>)}
+          </div>
+        </div>
+        <div className="muted" style={{ fontSize: 6.5, position: 'absolute', left: '8mm', right: '8mm', bottom: '5mm' }}>
+          Rules content from the SRD 5.1 © Wizards of the Coast LLC, licensed under CC BY 4.0. Sheet made with 5e Utility.
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="cs">
@@ -212,14 +328,17 @@ export function CharacterSheet({ char, srd }) {
 
 // Full-screen preview with a Print button; the print stylesheet hides the rest of the app.
 export function PrintOverlay({ char, srd, onClose }) {
+  const [compact, setCompact] = useState(true)
   return createPortal(
     <div className="sheet-portal" style={{ position: 'fixed', inset: 0, zIndex: 2000, background: '#e9e6df', overflowY: 'auto' }}>
       <div className="no-print" style={{ position: 'sticky', top: 0, zIndex: 1, display: 'flex', gap: 8, justifyContent: 'center', alignItems: 'center', padding: 10, background: '#1c1a17', color: '#ddd', fontSize: 12 }}>
-        <span>Print preview · black &amp; white, A4 / Letter, 2 pages</span>
-        <button className="btn btn-primary btn-sm" onClick={() => window.print()}>🖨 Print / save as PDF</button>
+        <span>Print preview · black &amp; white, A4</span>
+        <button className={`btn btn-sm ${compact ? 'btn-primary' : 'btn-ghost'}`} aria-pressed={compact} onClick={() => setCompact(true)}>One page</button>
+        <button className={`btn btn-sm ${!compact ? 'btn-primary' : 'btn-ghost'}`} aria-pressed={!compact} onClick={() => setCompact(false)}>Full (2 pages)</button>
+        <button className="btn btn-primary btn-sm" onClick={() => window.print()}>Print / save as PDF</button>
         <button className="btn btn-ghost btn-sm" onClick={onClose}>Close</button>
       </div>
-      <CharacterSheet char={char} srd={srd} />
+      <CharacterSheet char={char} srd={srd} compact={compact} />
     </div>,
     document.body,
   )

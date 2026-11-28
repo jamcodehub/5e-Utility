@@ -6,12 +6,13 @@ import { Fragment } from 'react'
 
 function inline(text) {
   const parts = []
-  const re = /(\*\*[^*]+\*\*|\*[^*]+\*|_[^_]+_)/g
+  const re = /(\*\*\*[^*\n]+\*\*\*|\*\*[^*\n]+\*\*|\*[^*\n]+\*|(?<!\w)_[^_\n]+_(?!\w))/g
   let last = 0, m, i = 0
   while ((m = re.exec(text))) {
     if (m.index > last) parts.push(text.slice(last, m.index))
     const tok = m[0]
-    if (tok.startsWith('**')) parts.push(<strong key={i++}>{tok.slice(2, -2)}</strong>)
+    if (tok.startsWith('***')) parts.push(<strong key={i++}><em>{tok.slice(3, -3)}</em></strong>)
+    else if (tok.startsWith('**')) parts.push(<strong key={i++}>{tok.slice(2, -2)}</strong>)
     else parts.push(<em key={i++}>{tok.slice(1, -1)}</em>)
     last = m.index + tok.length
   }
@@ -21,12 +22,13 @@ function inline(text) {
 
 const cells = (line) => line.trim().replace(/^\||\|$/g, '').split('|').map(c => c.trim())
 
-export default function MiniMarkdown({ text, compact }) {
+// `breaks` keeps the line breaks of what was typed (journals); `large` is for reading long text.
+export default function MiniMarkdown({ text, compact, breaks = false, large = false }) {
   const src = Array.isArray(text) ? text.join('\n\n') : (text || '')
   const lines = src.split('\n')
   const out = []
   let i = 0, key = 0
-  const body = { fontSize: 13, color: 'var(--text-2)', lineHeight: 1.65, margin: compact ? '0 0 6px' : '0 0 10px' }
+  const body = large ? { fontSize: 15, color: 'var(--text)', lineHeight: 1.8, margin: '0 0 14px' } : { fontSize: 13, color: 'var(--text-2)', lineHeight: 1.65, margin: compact ? '0 0 6px' : '0 0 10px' }
 
   while (i < lines.length) {
     const line = lines[i]
@@ -35,7 +37,7 @@ export default function MiniMarkdown({ text, compact }) {
     const h = line.match(/^(#{1,6})\s+(.*)$/)
     if (h) {
       const size = h[1].length <= 2 ? 15 : 13
-      out.push(<div key={key++} style={{ fontFamily: 'Cinzel, serif', fontSize: size, color: 'var(--gold)', margin: '14px 0 6px' }}>{h[2]}</div>)
+      out.push(<div key={key++} style={{ fontFamily: 'var(--font-title)', fontSize: size, color: 'var(--gold)', margin: '14px 0 6px' }}>{h[2]}</div>)
       i++; continue
     }
 
@@ -64,7 +66,7 @@ export default function MiniMarkdown({ text, compact }) {
 
     const para = []
     while (i < lines.length && lines[i].trim() && !/^(#{1,6}\s|\s*[-*]\s+|\s*\|)/.test(lines[i])) { para.push(lines[i]); i++ }
-    out.push(<p key={key++} style={body}>{inline(para.join(' '))}</p>)
+    out.push(<p key={key++} style={body}>{breaks ? para.map((l, j) => <Fragment key={j}>{j > 0 && <br />}{inline(l)}</Fragment>) : inline(para.join(' '))}</p>)
   }
 
   return <Fragment>{out}</Fragment>

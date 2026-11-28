@@ -12,8 +12,19 @@ const UserSchema = new Schema({
   googleId:         { type: String, default: '', index: true, sparse: true },
   avatar:           { type: String, default: '' },
   isPremium:        { type: Boolean, default: false },
+  // By-hand premium switches (flip to true in MongoDB; Stripe never changes them). DM covers both sides.
+  playerPremiumGrant: { type: Boolean, default: false },
+  dmPremiumGrant:     { type: Boolean, default: false },
+  // Which role the subscription was bought for ('player' or 'dm'); '' on accounts made premium before this existed (= player).
+  premiumRole:      { type: String, enum: ['', 'player', 'dm'], default: '' },
+  // A DM's "test player": a placeholder account that cannot sign in (no password). Set on the DM's campaign it belongs to.
+  placeholderOf:       { type: Schema.Types.ObjectId, ref: 'User', default: null },
+  placeholderCampaign: { type: Schema.Types.ObjectId, ref: 'Campaign', default: null, index: true },
   stripeCustomerId: { type: String, default: '' },
   stripeSubId:      { type: String, default: '' },
+  // Failed-payment grace period: premium stays on until graceEndsAt.
+  graceEndsAt:      { type: Date, default: null },
+  graceReminderSent: { type: Boolean, default: false },
   twoFactorEnabled:     { type: Boolean, default: false },
   twoFactorCode:        { type: String, default: '' },
   twoFactorCodeExpires: { type: Date },
@@ -87,6 +98,12 @@ const DMBoardSchema = new Schema({
   folder: { type: Schema.Types.ObjectId, ref: 'DMBoardFolder', default: null },
   board: { type: Schema.Types.Mixed, required: true },
   version: { type: Number, required: true },
+}, { timestamps: true })
+
+// The DM's running battle (combatants, initiative, turn, round, log) so it survives reloads. One per campaign.
+const BattleStateSchema = new Schema({
+  campaign: { type: Schema.Types.ObjectId, ref: 'Campaign', required: true, unique: true },
+  state:    { type: Schema.Types.Mixed, required: true },
 }, { timestamps: true })
 
 const DMBoardFolderSchema = new Schema({
@@ -172,6 +189,11 @@ const LevelPlanSchema = new Schema({
   tokens:   { type: Schema.Types.Mixed, default: [] },
   darkMode: { type: Boolean, default: false },
   doorStates: { type: Schema.Types.Mixed, default: [] },
+  // Which doors are locked (grid of booleans, see lib/doors.js). A locked door only the DM can unlock.
+  doorLocks: { type: Schema.Types.Mixed, default: [] },
+  // Tile art theme. A map has exactly one theme (grids store tile ids; the theme only decides the artwork).
+  // Without this field Mongoose silently dropped the theme, so every saved map came back as Medieval.
+  theme:    { type: String, default: 'medieval' },
 }, { timestamps: true })
 
 const InventorySchema = new Schema({
@@ -211,7 +233,9 @@ const CampaignGuideSchema = new Schema({
     id:                { type: String },
     title:             { type: String, default: '' },
     description:       { type: String, default: '' },
-    status:            { type: String, enum: ['active', 'completed', 'failed'], default: 'active' },
+    status:            { type: String, enum: ['not-started', 'active', 'completed', 'failed'], default: 'active' },
+    kind:              { type: String, enum: ['main', 'side', ''], default: '' },   // 'main' = main story, 'side' = side quest, '' = not sorted
+    order:             { type: Number, default: 0 },                                  // place in its group, 1 is first
     characterRelation: { type: String, default: '' },
   }],
 }, { timestamps: true })
@@ -247,9 +271,20 @@ export const Lore          = model('Lore', LoreSchema)
 export const StoryCard     = model('StoryCard', StoryCardSchema)
 export const DMBoard       = model('DMBoard', DMBoardSchema)
 export const DMBoardFolder = model('DMBoardFolder', DMBoardFolderSchema)
+export const BattleState  = model('BattleState', BattleStateSchema)
 export const Character     = model('Character', CharacterSchema)
 export const LevelPlan     = model('LevelPlan', LevelPlanSchema)
+// What each subscriber has used of their monthly AI allowance (one document per user per month, 'YYYY-MM').
+const AiUsageSchema = new Schema({
+  user:   { type: Schema.Types.ObjectId, ref: 'User', required: true },
+  month:  { type: String, required: true },
+  guide:  { type: Number, default: 0 },
+  images: { type: Number, default: 0 },
+}, { timestamps: true })
+AiUsageSchema.index({ user: 1, month: 1 }, { unique: true })
+
 export const Inventory     = model('Inventory', InventorySchema)
+export const AiUsage       = model('AiUsage', AiUsageSchema)
 export const CampaignGuide = model('CampaignGuide', CampaignGuideSchema)
 export const MusicTrack    = model('MusicTrack', MusicTrackSchema)
 export const MusicSession  = model('MusicSession', MusicSessionSchema)

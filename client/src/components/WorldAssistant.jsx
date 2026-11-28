@@ -4,20 +4,23 @@ import { useWorldAssistant } from '../context/WorldAssistantContext'
 // A question-only world-building guide: it never writes campaign content, it asks the DM
 // questions so the DM stays the author. State lives in WorldAssistantContext, so a pending
 // reply keeps working while you move between pages.
-export default function WorldAssistant({ campaignId }) {
-  const { messages, busy, error, send, clear, markRead } = useWorldAssistant(campaignId)
+export default function WorldAssistant({ campaignId, onClose }) {
+  const { messages, busy, error, send, clear, markRead, usage, refreshUsage } = useWorldAssistant(campaignId)
   const [draft, setDraft] = useState('')
   const endRef = useRef(null)
 
   useEffect(() => { markRead() }, [messages.length]) // eslint-disable-line react-hooks/exhaustive-deps
-  useEffect(() => { endRef.current?.scrollIntoView({ block: 'end' }) }, [messages, busy])
+  useEffect(() => { refreshUsage() }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  const left = usage?.guide ? Math.max(0, usage.guide.limit - usage.guide.used) : null
+  // Scroll only the message list (scrollIntoView would also scroll the page sideways while the panel is off-screen).
+  useEffect(() => { const el = endRef.current?.parentElement; if (el) el.scrollTop = el.scrollHeight }, [messages, busy])
 
-  const submit = (text) => { const t = text.trim(); if (!t || busy) return; setDraft(''); send(t) }
+  const submit = (text, opts) => { const t = text.trim(); if (!t || busy) return; setDraft(''); send(t, opts) }
 
   const bubble = (m, i) => (
     <div key={i} style={{
       alignSelf: m.role === 'user' ? 'flex-end' : 'flex-start', maxWidth: '92%', whiteSpace: 'pre-wrap',
-      padding: '8px 11px', borderRadius: 10, fontSize: 13, lineHeight: 1.5,
+      padding: '8px 11px', borderRadius: 4, fontSize: 13, lineHeight: 1.5,
       background: m.role === 'user' ? 'var(--gold-bg)' : 'var(--surface2)',
       border: `1px solid ${m.role === 'user' ? 'var(--gold-border)' : 'var(--border)'}`,
       color: 'var(--text)',
@@ -28,7 +31,8 @@ export default function WorldAssistant({ campaignId }) {
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}>
       <div style={{ padding: '14px 14px 10px', borderBottom: '1px solid var(--border)' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <span style={{ fontFamily: 'Cinzel, serif', fontSize: 13, color: 'var(--gold)', letterSpacing: '0.04em' }}>World-building guide</span>
+          <span style={{ fontFamily: 'var(--font-title)', fontSize: 13, color: 'var(--gold)', letterSpacing: '0.04em' }}>World-building guide</span>
+          {onClose && <button className="btn btn-ghost btn-sm" onClick={onClose} aria-label="Close the guide" style={{ marginLeft: 'auto', marginRight: 6, padding: '4px 10px', fontSize: 13 }}>✕ Close</button>}
           {messages.length > 0 && <button className="btn btn-ghost btn-sm" onClick={() => { if (window.confirm('Clear this conversation?')) clear() }} style={{ padding: '2px 8px', fontSize: 11 }}>Clear</button>}
         </div>
         <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 4, lineHeight: 1.5 }}>Asks questions only. You write the world.</div>
@@ -49,7 +53,7 @@ export default function WorldAssistant({ campaignId }) {
           <div role="alert" style={{ fontSize: 12, color: 'var(--red)' }}>
             {error}
             {messages.length > 0 && messages[messages.length - 1].role === 'user' && (
-              <button className="btn btn-ghost btn-sm" style={{ marginLeft: 8, padding: '1px 8px', fontSize: 11 }} onClick={() => submit(messages[messages.length - 1].text)}>Retry</button>
+              <button className="btn btn-ghost btn-sm" style={{ marginLeft: 8, padding: '1px 8px', fontSize: 11 }} onClick={() => submit(messages[messages.length - 1].text, { retry: true })}>Retry</button>
             )}
           </div>
         )}
@@ -61,10 +65,11 @@ export default function WorldAssistant({ campaignId }) {
           className="input" rows={2} value={draft} placeholder="Answer, or say what you're unsure about…"
           onChange={(e) => setDraft(e.target.value)}
           onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submit(draft) } }}
-          style={{ flex: 1, resize: 'none', fontSize: 13 }} maxLength={2000}
+          style={{ flex: 1, resize: 'none', fontSize: 16 }} maxLength={2000}
         />
-        <button className="btn btn-primary btn-sm" type="submit" disabled={busy || !draft.trim()}>Send</button>
+        <button className="btn btn-primary btn-sm" type="submit" disabled={busy || !draft.trim() || left === 0}>Send</button>
       </form>
+      {left !== null && <div style={{ padding: '0 12px 10px', fontSize: 11, color: left === 0 ? 'var(--red)' : 'var(--text-3)' }}>{left === 0 ? `You have used this month's ${usage.guide.limit} guide messages. They start again on the 1st.` : `${left} of ${usage.guide.limit} guide messages left this month`}</div>}
     </div>
   )
 }

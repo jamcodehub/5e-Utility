@@ -4,6 +4,7 @@ import { api, useAuth } from '../context/AuthContext'
 import { useCampaign } from '../context/CampaignContext'
 import { useToast } from '../hooks/useToast'
 import { SkeletonBlock } from '../components/Skeleton'
+import MediaIcon from '../components/MediaIcon'
 
 const CLOUD_NAME = 'crcbzpw6'
 const UPLOAD_PRESET = '5e_utility_music'
@@ -298,12 +299,12 @@ export default function MusicPlayer() {
           alignItems: 'center',
           justifyContent: 'center',
           border: '2px dashed var(--gold)',
-          borderRadius: 12,
+          borderRadius: 5,
           backdropFilter: 'blur(4px)',
           pointerEvents: 'none'
         }}>
-          <div style={{ fontSize: 48, marginBottom: 12 }}>🎵</div>
-          <div style={{ fontFamily: 'Cinzel, serif', fontSize: 22, fontWeight: 700, color: 'var(--gold)', letterSpacing: '0.05em' }}>
+          <div style={{ fontSize: 48, marginBottom: 12 }}>♪</div>
+          <div style={{ fontFamily: 'var(--font-title)', fontSize: 22, fontWeight: 700, color: 'var(--gold)', letterSpacing: '0.05em' }}>
             Upload to Tracks
           </div>
           <div style={{ fontSize: 13, color: 'var(--text-2)', marginTop: 6 }}>
@@ -335,7 +336,7 @@ export default function MusicPlayer() {
 
           {uploading && <span style={{ fontSize: 12, color: 'var(--text-3)' }}>Uploading {uploadProgress}%…</span>}
           {atTrackLimit ? (
-            <span style={{ fontSize: 12, color: 'var(--gold)', background: 'var(--gold-bg)', border: '1px solid var(--gold-border)', borderRadius: 8, padding: '6px 12px' }}>
+            <span style={{ fontSize: 12, color: 'var(--gold)', background: 'var(--gold-bg)', border: '1px solid var(--gold-border)', borderRadius: 3, padding: '6px 12px' }}>
               {FREE_TRACK_LIMIT}/{FREE_TRACK_LIMIT} tracks — upgrade for more
             </span>
           ) : (
@@ -355,7 +356,7 @@ export default function MusicPlayer() {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 16, marginBottom: 20, alignItems: 'start' }}>
         {/* Your Tracks */}
         <div className="card" style={{ flex: 1, minWidth: 0, padding: '16px 18px', display: 'flex', flexDirection: 'column', gap: 12 }}>
-          <div style={{ fontFamily: 'Cinzel, serif', fontSize: 12, fontWeight: 600, color: 'var(--gold)', letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+          <div style={{ fontFamily: 'var(--font-title)', fontSize: 12, fontWeight: 600, color: 'var(--gold)', letterSpacing: '0.06em', textTransform: 'uppercase' }}>
             Your Tracks {!isPremium && <span style={{ fontSize: 10, fontFamily: 'sans-serif', fontWeight: 400, color: 'var(--text-3)', textTransform: 'none' }}>({playlist.length}/{FREE_TRACK_LIMIT} free)</span>}
           </div>
 
@@ -396,7 +397,7 @@ export default function MusicPlayer() {
                   className="btn btn-primary btn-sm"
                   style={{ flex: 1, justifyContent: 'center' }}
                 >
-                  {isCustomPlaying && activeTrack?._id === selectedTrackId ? '⏸ Pause' : 'Play'}
+                  {isCustomPlaying && activeTrack?._id === selectedTrackId ? 'Pause' : 'Play'}
                 </button>
 
                 <button
@@ -439,7 +440,7 @@ export default function MusicPlayer() {
 
               {/* Now playing bar */}
               {isCustomPlaying && activeTrack && (
-                <div style={{ padding: '10px 12px', background: 'var(--gold-bg)', border: '1px solid var(--gold-border)', borderRadius: 8, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <div style={{ padding: '10px 12px', background: 'var(--gold-bg)', border: '1px solid var(--gold-border)', borderRadius: 3, display: 'flex', flexDirection: 'column', gap: 6 }}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                     <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--gold)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '70%' }}>{activeTrack.name}</span>
                     <span style={{ fontSize: 11, color: 'var(--text-3)' }}>{fmt(trackTime)} / {fmt(trackDuration)}</span>
@@ -490,7 +491,7 @@ export default function MusicPlayer() {
 
         {/* Session Planner — sits side-by-side with Your Tracks */}
         <div className="card" style={{ padding: '16px 18px', minWidth: 0, display: 'flex', flexDirection: 'column', gap: 12, maxHeight: 480, overflow: 'hidden' }}>
-        <div style={{ fontFamily: 'Cinzel, serif', fontSize: 12, fontWeight: 600, color: 'var(--gold)', letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+        <div style={{ fontFamily: 'var(--font-title)', fontSize: 12, fontWeight: 600, color: 'var(--gold)', letterSpacing: '0.06em', textTransform: 'uppercase' }}>
           Session Planner
         </div>
         {!activeCampaign ? (
@@ -520,7 +521,7 @@ export default function MusicPlayer() {
                   const isOpen = expandedSessionId === session._id
                   const isEditingName = editingSessionId === session._id
                   return (
-                    <div key={session._id} style={{ border: '1px solid var(--border)', borderRadius: 8, overflow: 'hidden' }}>
+                    <div key={session._id} style={{ border: '1px solid var(--border)', borderRadius: 3, overflow: 'hidden' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px', background: 'var(--surface2)', cursor: 'pointer' }}
                         onClick={() => setExpandedSessionId(isOpen ? null : session._id)}>
                         <span style={{ fontSize: 12, color: 'var(--text-3)', flexShrink: 0 }}>{isOpen ? '▾' : '▸'}</span>
@@ -549,7 +550,7 @@ export default function MusicPlayer() {
                             <div key={cue._id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 8px', borderRadius: 6, background: 'var(--surface)', border: '1px solid var(--border)' }}>
                               <span style={{ fontSize: 11, color: 'var(--text-3)', width: 18, flexShrink: 0 }}>{i + 1}.</span>
                               <button onClick={() => playCue(cue)} disabled={!cue.track}
-                                style={{ flexShrink: 0, width: 24, height: 24, borderRadius: '50%', border: '1px solid var(--border)', background: 'transparent', color: 'var(--text-2)', cursor: cue.track ? 'pointer' : 'not-allowed', fontSize: 10, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>▶</button>
+                                style={{ flexShrink: 0, width: 24, height: 24, borderRadius: '50%', border: '1px solid var(--border)', background: 'transparent', color: 'var(--text-2)', cursor: cue.track ? 'pointer' : 'not-allowed', fontSize: 10, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><MediaIcon kind="play" size={10} /></button>
                               <div style={{ flex: 1, minWidth: 0 }}>
                                 <div style={{ fontSize: 13, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{cue.label}</div>
                                 <div style={{ fontSize: 10, color: 'var(--text-3)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{cue.track?.name || 'Track removed'}</div>

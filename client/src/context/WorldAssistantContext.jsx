@@ -6,10 +6,13 @@ import { api } from './AuthContext'
 const Ctx = createContext(null)
 const storeKey = (id) => `worldbuild:${id}`
 const loadSaved = (id) => { try { const v = JSON.parse(localStorage.getItem(storeKey(id))); return Array.isArray(v) ? v : [] } catch { return [] } }
-const REQUEST_TIMEOUT_MS = 70000
+const REQUEST_TIMEOUT_MS = 100000 // covers a cold-starting server plus the AI's own time
 
 export function WorldAssistantProvider({ children }) {
   const [convos, setConvos] = useState({}) // { [campaignId]: { messages, busy, error, unread } }
+  const [usage, setUsage] = useState(null)  // this month's AI allowance: { guide: { used, limit }, images: { used, limit } }
+  const mergeUsage = useCallback((u) => { if (u) setUsage(p => ({ ...(p || {}), ...u })) }, [])
+  const refreshUsage = useCallback(() => api('/ai/usage').then(mergeUsage).catch(() => {}), [mergeUsage])
   const ref = useRef(convos)
   ref.current = convos
 
@@ -21,34 +24,40 @@ export function WorldAssistantProvider({ children }) {
     return { ...all, [id]: next }
   }), [])
 
-  const send = useCallback(async (id, text) => {
+  const send = useCallback(async (id, text, opts = {}) => {
     const body = text.trim()
     if (!body || get(id).busy) return
-    const messages = [...get(id).messages, { role: 'user', text: body }]
+    const prev = get(id).messages
+    // A retry re-asks the unanswered last question instead of adding it a second time.
+    const messages = opts.retry && prev[prev.length - 1]?.role === 'user' ? prev : [...prev, { role: 'user', text: body }]
     patch(id, () => ({ messages, busy: true, error: '' }))
     const controller = new AbortController()
     const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
     try {
-      const { reply } = await api('/ai/worldbuild', { method: 'POST', body: { campaignId: id, messages: messages.slice(-20) }, signal: controller.signal })
+      const { reply, usage: u } = await api('/ai/worldbuild', { method: 'POST', body: { campaignId: id, messages: messages.slice(-20) }, signal: controller.signal })
+      mergeUsage(u)
       patch(id, b => ({ messages: [...b.messages, { role: 'assistant', text: reply }], busy: false, unread: true }))
     } catch (e) {
       patch(id, () => ({ busy: false, error: e.name === 'AbortError' ? 'The assistant took too long to answer. Please try again.' : (e.message || 'The assistant could not answer.') }))
     } finally { clearTimeout(timer) }
-  }, [patch]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [patch, mergeUsage]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const clear = useCallback((id) => patch(id, () => ({ messages: [], error: '', unread: false })), [patch])
   const markRead = useCallback((id) => { if (ref.current[id]?.unread) patch(id, () => ({ unread: false })) }, [patch])
 
-  return <Ctx.Provider value={{ get, send, clear, markRead, convos }}>{children}</Ctx.Provider>
+  return <Ctx.Provider value={{ get, send, clear, markRead, convos, usage, mergeUsage, refreshUsage }}>{children}</Ctx.Provider>
 }
 
+// Outside the provider (the public demo) there is no conversation or allowance to show, so this does nothing.
+const NONE = { convos: {}, send() {}, clear() {}, markRead() {}, usage: null, mergeUsage() {}, refreshUsage() {} }
 export const useWorldAssistant = (campaignId) => {
-  const c = useContext(Ctx)
+  const c = useContext(Ctx) || NONE
   const convo = c.convos[campaignId] || { messages: loadSaved(campaignId), busy: false, error: '', unread: false }
   return {
     ...convo,
-    send: (t) => c.send(campaignId, t),
+    send: (t, o) => c.send(campaignId, t, o),
     clear: () => c.clear(campaignId),
     markRead: () => c.markRead(campaignId),
+    usage: c.usage, mergeUsage: c.mergeUsage, refreshUsage: c.refreshUsage,
   }
 }

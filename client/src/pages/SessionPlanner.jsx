@@ -7,6 +7,8 @@ import { api, useAuth } from '../context/AuthContext'
 import { useCampaign } from '../context/CampaignContext'
 import { useToast } from '../hooks/useToast'
 import { SkeletonTextLines } from '../components/Skeleton'
+import NoteEditor from '../components/NoteEditor'
+import ConfirmNameDialog from '../components/ConfirmNameDialog'
 
 const wordCount = s => s.trim().split(/\s+/).filter(Boolean).length
 
@@ -90,11 +92,30 @@ export default function SessionPlanner() {
     setSaving(false)
   }, [])
 
-  const handleContentChange = (e) => {
-    const text = e.target.value
+  const handleContentChange = (text) => {
     setContent(text)
     const id = activeId
     scheduleSave(() => autosave(id, text))
+  }
+
+  const [deleting, setDeleting] = useState(false)
+  const [deleteBusy, setDeleteBusy] = useState(false)
+  const [deleteError, setDeleteError] = useState('')
+  const deleteEntry = async () => {
+    const id = activeId
+    if (!id) return
+    setDeleteBusy(true); setDeleteError('')
+    try {
+      flushSave()
+      await api(`/${apiBase}/${id}`, { method: 'DELETE' })
+      const rest = entries.filter(e => e._id !== id)
+      setEntries(rest)
+      const next = [...rest].sort((a, b) => (b.session ?? 0) - (a.session ?? 0))[0]
+      setActiveId(next ? next._id : null); setContent(next ? next.content : '')
+      setDeleting(false)
+      toast('Session deleted')
+    } catch { setDeleteError('Could not delete it. Please try again.') }
+    setDeleteBusy(false)
   }
 
   const startRename = (e, entry) => {
@@ -251,6 +272,7 @@ export default function SessionPlanner() {
             <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{wordCount(content)} words</span>
             {saving && <span style={{ fontSize: 11, color: 'var(--text-3)' }}>Saving…</span>}
             {!saving && activeId && <span style={{ fontSize: 11, color: 'var(--green)' }}>Saved</span>}
+            {active && <button type="button" className="btn btn-ghost btn-sm" onClick={() => { setDeleteError(''); setDeleting(true) }} title="Delete this session" style={{ color: 'var(--red)', padding: '3px 10px' }}>Delete</button>}
           </div>
         </div>
         <div style={{ flex: 1, overflowY: 'auto', padding: '24px 32px' }}>
@@ -271,16 +293,7 @@ export default function SessionPlanner() {
               <button className="btn btn-ghost" onClick={() => setEntriesReload(n => n + 1)}>Retry</button>
             </div>
           ) : activeId ? (
-            <textarea
-              value={content}
-              onChange={handleContentChange}
-              placeholder={placeholder}
-              style={{
-                width: '100%', minHeight: '100%', border: 'none', outline: 'none', resize: 'none',
-                fontSize: 15, lineHeight: 1.8, color: 'var(--text)', background: 'transparent',
-                fontFamily: 'Georgia, serif',
-              }}
-            />
+            <NoteEditor value={content} onChange={handleContentChange} placeholder={placeholder} />
           ) : (
             <div style={{ textAlign: 'center', color: 'var(--text-3)', marginTop: 60, fontSize: 13 }}>
               No session selected. Start a new one with +
@@ -292,6 +305,7 @@ export default function SessionPlanner() {
       {activeCampaign && !activeCampaign.isPersonal && <GuideAssistant campaignId={activeCampaign._id} />}
 
       <ToastContainer />
+      {deleting && active && <ConfirmNameDialog title={'Delete this session'} name={entryTitle(active)} message="This permanently deletes this session plan and everything written in it. It cannot be undone." working={deleteBusy} error={deleteError} onConfirm={deleteEntry} onClose={() => setDeleting(false)} />}
       {showUpgrade && <UpgradeModal onClose={() => setShowUpgrade(false)} />}
     </div>
   )

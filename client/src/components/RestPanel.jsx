@@ -17,7 +17,7 @@ export function limitedFeatures(char, srd) {
   return { cls, list }
 }
 
-export default function RestPanel({ char, srd, roller, onPatch }) {
+export default function RestPanel({ char, srd, roller, onPatch, bare = false }) {
   const { cls, list } = limitedFeatures(char, srd)
   const level = char.level || 1
   const hp = char.hp || { current: 10, max: 10 }
@@ -61,7 +61,7 @@ export default function RestPanel({ char, srd, roller, onPatch }) {
   }
 
   return (
-    <div className="card" style={{ padding: '12px 18px', marginBottom: 16 }}>
+    <div className={bare ? undefined : 'card'} style={bare ? undefined : { padding: '12px 18px', marginBottom: 16 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
         <div>
           <div style={label}>Rest</div>
@@ -72,7 +72,7 @@ export default function RestPanel({ char, srd, roller, onPatch }) {
           </div>
         </div>
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-          {cls && <button className="btn btn-ghost btn-sm" disabled={diceLeft < 1 || hp.current >= hp.max} onClick={spendHitDie} title="Short rest: roll a Hit Die + CON modifier to regain HP">🎲 Spend Hit Die</button>}
+          {cls && <button className="btn btn-ghost btn-sm" disabled={diceLeft < 1 || hp.current >= hp.max} onClick={spendHitDie} title="Short rest: roll a Hit Die + CON modifier to regain HP">Spend Hit Die</button>}
           <button className="btn btn-ghost btn-sm" onClick={shortRest} title="At least 1 hour. Recharges short-rest features.">Short rest</button>
           <button className="btn btn-primary btn-sm" onClick={longRest} title="At least 8 hours. Restores HP, slots, features and half your Hit Dice.">Long rest</button>
         </div>

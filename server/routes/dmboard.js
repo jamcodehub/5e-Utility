@@ -1,6 +1,7 @@
 import { Router } from 'express'
 import mongoose from 'mongoose'
 import { Campaign, DMBoard, DMBoardFolder, User } from '../models/index.js'
+import { hasPremium, hasPremiumAs } from '../lib/premium.js'
 import { auth } from './campaigns.js'
 
 const router = Router()
@@ -36,12 +37,12 @@ router.use('/:campaignId', auth, async (req, res, next) => {
     // Access follows ownership of a real campaign plus having the DM identity, not the
     // currently active mode, so the final save still lands after switching to player.
     const [user, campaign] = await Promise.all([
-      User.findById(req.userId).select('role roles isPremium'),
+      User.findById(req.userId).select('role roles isPremium premiumRole playerPremiumGrant dmPremiumGrant'),
       Campaign.findOne({ _id: req.params.campaignId, owner: req.userId, isPersonal: { $ne: true } }).select('_id'),
     ])
     const isDM = user?.role === 'dm' || (user?.roles || []).includes('dm')
     if (!isDM || !campaign) return res.status(403).json({ error: 'Only the campaign DM can access this board.' })
-    req.isPremium = !!user.isPremium
+    req.isPremium = hasPremiumAs(user, 'dm')
     next()
   } catch (error) {
     console.error('Failed to authorize DM board:', error)

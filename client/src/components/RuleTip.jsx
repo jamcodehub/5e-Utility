@@ -28,11 +28,11 @@ export default function RuleTip({ tip, children, style, as: Tag = 'span' }) {
       {open && createPortal(
         <div ref={bubble} role="tooltip" style={{
           position: 'fixed', left: pos.left, top: pos.top, zIndex: 3000, width: 260, pointerEvents: 'none',
-          background: 'var(--surface)', color: 'var(--text)', border: '1px solid var(--gold-border)', borderRadius: 10,
+          background: 'var(--surface)', color: 'var(--text)', border: '1px solid var(--gold-border)', borderRadius: 4,
           padding: '10px 12px', boxShadow: '0 10px 30px rgba(0,0,0,.35)', fontSize: 12, lineHeight: 1.5,
         }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'baseline' }}>
-            <strong style={{ fontFamily: 'Cinzel, serif', fontSize: 13, color: 'var(--gold)' }}>{tip.title}</strong>
+            <strong style={{ fontFamily: 'var(--font-title)', fontSize: 13, color: 'var(--gold)' }}>{tip.title}</strong>
             <span style={{ fontSize: 10, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '.05em', whiteSpace: 'nowrap' }}>{tip.tag}</span>
           </div>
           {tip.stats.map((s, i) => <div key={i} style={{ marginTop: 4, color: 'var(--text-2)' }}>{s}</div>)}

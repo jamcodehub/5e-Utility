@@ -3,6 +3,7 @@ import { loadSrdMany } from '../utils/srd'
 import { ABILITIES, ABILITY_NAMES, abilityMod, fmtMod, proficiencyBonus, hpAtFirstLevel, averageHpGain } from '../utils/rules5e'
 import { useCampaign } from '../context/CampaignContext'
 import SrdAttribution from './SrdAttribution'
+import { backdropClose } from '../utils/backdrop'
 
 const STEPS = ['Campaign', 'Race', 'Class', 'Abilities', 'Background', 'Review']
 const chip = (on) => ({
@@ -86,7 +87,7 @@ export default function CustomCharacterBuilder({ onClose, onComplete, draftKey =
 
   const overlay = { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }
   return (
-    <div style={overlay} onClick={onClose}>
+    <div style={overlay} {...backdropClose(onClose)}>
       <div className="card" style={{ width: '100%', maxWidth: 680, maxHeight: '90vh', display: 'flex', flexDirection: 'column', padding: 0 }} onClick={e => e.stopPropagation()}>
         <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div>
@@ -102,7 +103,7 @@ export default function CustomCharacterBuilder({ onClose, onComplete, draftKey =
               <span style={label}>Which campaign is this character for?</span>
               {realCampaigns.length === 0 && <div style={{ fontSize: 13, color: 'var(--text-2)' }}>You need to join a campaign first.</div>}
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {realCampaigns.map(c => <span key={c._id} style={{ ...chip(campaignId === c._id), borderRadius: 8, fontSize: 13 }} onClick={() => setCampaignId(c._id)}>{c.name}</span>)}
+                {realCampaigns.map(c => <span key={c._id} style={{ ...chip(campaignId === c._id), borderRadius: 3, fontSize: 13 }} onClick={() => setCampaignId(c._id)}>{c.name}</span>)}
               </div>
             </>
           )}

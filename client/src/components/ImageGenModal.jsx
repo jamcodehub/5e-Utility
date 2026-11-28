@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef } from 'react'
 import { api } from '../context/AuthContext'
 import { uploadToCloudinary } from '../utils/uploadToCloudinary'
+import { backdropClose } from '../utils/backdrop'
+import { useWorldAssistant } from '../context/WorldAssistantContext'
 
 // Generates scene images, shows them for review, and only uploads the one the DM confirms.
 export default function ImageGenModal({ campaignId, title, description, onUse, onClose }) {
@@ -12,14 +14,17 @@ export default function ImageGenModal({ campaignId, title, description, onUse, o
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const alive = useRef(true)
+  const { usage, mergeUsage, refreshUsage } = useWorldAssistant(campaignId)
+  const left = usage?.images ? Math.max(0, usage.images.limit - usage.images.used) : null
 
   const generate = async () => {
     setBusy(true); setError(''); setImages([]); setPicked(0)
     try {
       const res = await api('/ai/storyboard-image', { method: 'POST', body: { campaignId, prompt: `${title || ''}. ${description || ''}`.trim() } })
       if (!alive.current) return
+      mergeUsage(res.usage)
       setImages(res.images || []); setSource(res.source); setUsed(res.usedAvatars || 0)
-    } catch (e) { if (alive.current) setError(e.message || 'Could not generate an image') }
+    } catch (e) { if (alive.current) setError(e.message || 'Could not generate an image'); refreshUsage() }
     if (alive.current) setBusy(false)
   }
   useEffect(() => { alive.current = true; generate(); return () => { alive.current = false } }, []) // eslint-disable-line react-hooks/exhaustive-deps
@@ -35,7 +40,7 @@ export default function ImageGenModal({ campaignId, title, description, onUse, o
   }
 
   return (
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', zIndex: 1200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }} onClick={() => !saving && onClose()}>
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', zIndex: 1200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }} {...backdropClose(() => !saving && onClose())}>
       <div className="card" role="dialog" aria-modal="true" aria-label="Generated scene images" onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: 760, maxHeight: '92vh', overflowY: 'auto', padding: 20 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
           <h3 style={{ fontSize: 16, margin: 0 }}>Choose a scene image</h3>
@@ -47,14 +52,14 @@ export default function ImageGenModal({ campaignId, title, description, onUse, o
             : ''}
         </div>
 
-        {busy && <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 10 }}>
-          {[0, 1, 2, 3].map(i => <div key={i} className="skeleton-shimmer" style={{ aspectRatio: '16 / 9', borderRadius: 8 }} />)}
+        {busy && <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 10 }}>
+          {[0].map(i => <div key={i} className="skeleton-shimmer" style={{ aspectRatio: '16 / 9', borderRadius: 3 }} />)}
         </div>}
 
         {!busy && images.length > 0 && (
           <div style={{ display: 'grid', gridTemplateColumns: images.length === 1 ? '1fr' : 'repeat(auto-fill, minmax(260px, 1fr))', gap: 10 }}>
             {images.map((src, i) => (
-              <button key={i} type="button" onClick={() => setPicked(i)} aria-pressed={picked === i} style={{ padding: 0, border: `3px solid ${picked === i ? 'var(--gold)' : 'transparent'}`, borderRadius: 10, overflow: 'hidden', cursor: 'pointer', background: 'var(--surface2)', lineHeight: 0 }}>
+              <button key={i} type="button" onClick={() => setPicked(i)} aria-pressed={picked === i} style={{ padding: 0, border: `3px solid ${picked === i ? 'var(--gold)' : 'transparent'}`, borderRadius: 4, overflow: 'hidden', cursor: 'pointer', background: 'var(--surface2)', lineHeight: 0 }}>
                 <img src={src} alt={`Option ${i + 1}`} style={{ width: '100%', aspectRatio: '16 / 9', objectFit: 'cover', display: 'block' }} />
               </button>
             ))}
@@ -64,7 +69,8 @@ export default function ImageGenModal({ campaignId, title, description, onUse, o
         {error && <div role="alert" style={{ color: 'var(--red)', fontSize: 13, marginTop: 10 }}>{error}</div>}
 
         <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 16, flexWrap: 'wrap' }}>
-          <button className="btn btn-ghost" onClick={generate} disabled={busy || saving}>↻ Regenerate</button>
+          {left !== null && <span style={{ marginRight: 'auto', alignSelf: 'center', fontSize: 12, color: left === 0 ? 'var(--red)' : 'var(--text-3)' }}>{left === 0 ? 'No scene images left this month' : `${left} of ${usage.images.limit} scene images left this month`}</span>}
+          <button className="btn btn-ghost" onClick={generate} disabled={busy || saving || left === 0} title={left !== null ? 'A new picture uses one of your monthly scene images' : undefined}>↻ Regenerate</button>
           <button className="btn btn-ghost" onClick={onClose} disabled={saving}>Cancel</button>
           <button className="btn btn-primary" onClick={confirm} disabled={busy || saving || !images.length}>{saving ? 'Saving…' : 'Use this image'}</button>
         </div>

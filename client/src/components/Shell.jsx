@@ -1,12 +1,19 @@
+import MediaIcon from './MediaIcon'
 import { NavLink, useNavigate, useLocation } from 'react-router-dom'
 import { useAuth, api } from '../context/AuthContext'
 import { useCampaign } from '../context/CampaignContext'
 import { useMusic, MOODS } from '../context/MusicContext'
 import { useTheme } from '../context/ThemeContext'
 import { getSocket } from '../utils/socket'
-import { useState, useEffect, useRef } from 'react'
-import SettingsModal from './SettingsModal'
-import CharacterOverview from './CharacterSidebar'
+import { useState, useEffect, useRef, lazy, Suspense } from 'react'
+
+// Only needed once opened, so they stay out of the first download.
+const NewCampaignDialog = lazy(() => import('./NewCampaignDialog'))
+const SettingsModal = lazy(() => import('./SettingsModal'))
+const CharacterOverview = lazy(() => import('./CharacterSidebar'))
+const lazyBox = (node) => <Suspense fallback={null}>{node}</Suspense>
+import { FREE_CAMPAIGNS } from '../utils/limits'
+import ProfileAvatar from './ProfileAvatar'
 import { CloudinaryImage } from '@cloudinary/url-gen'
 import { quality, format } from '@cloudinary/url-gen/actions/delivery'
 import { auto as autoQuality } from '@cloudinary/url-gen/qualifiers/quality'
@@ -130,15 +137,15 @@ function PersistentPlayerBar({ compact }) {
       borderRadius: compact ? 999 : 10,
       margin: compact ? 0 : '0 0 10px',
     }}>
-      <span style={{ fontSize: 14, flexShrink: 0 }}>{isTrack ? '🎵' : '♪'}</span>
+      <span style={{ fontSize: 14, flexShrink: 0 }}>♪</span>
       <span style={{ flex: 1, minWidth: 0, fontSize: 12, color: 'var(--text-2)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{label}</span>
       <div style={{ display: 'flex', alignItems: 'center', gap: 2, flexShrink: 0 }}>
         {canSkip && (
-          <button onClick={skipPrev} title="Previous" style={{ width: 22, height: 22, border: 'none', background: 'none', color: 'var(--text-2)', cursor: 'pointer', fontSize: 13, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>⏮</button>
+          <button onClick={skipPrev} title="Previous" style={{ width: 22, height: 22, border: 'none', background: 'none', color: 'var(--text-2)', cursor: 'pointer', fontSize: 13, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><MediaIcon kind="prev" /></button>
         )}
-        <button onClick={togglePlay} title={playing ? 'Pause' : 'Play'} style={{ width: 24, height: 24, borderRadius: '50%', border: 'none', background: 'var(--gold)', color: '#2a1a00', cursor: 'pointer', fontSize: 11, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{playing ? '⏸' : '▶'}</button>
+        <button onClick={togglePlay} title={playing ? 'Pause' : 'Play'} style={{ width: 24, height: 24, borderRadius: '50%', border: 'none', background: 'var(--gold-fill, var(--gold))', color: '#2a1a00', cursor: 'pointer', fontSize: 11, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><MediaIcon kind={playing ? 'pause' : 'play'} size={11} /></button>
         {canSkip && (
-          <button onClick={skipNext} title="Next" style={{ width: 22, height: 22, border: 'none', background: 'none', color: 'var(--text-2)', cursor: 'pointer', fontSize: 13, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>⏭</button>
+          <button onClick={skipNext} title="Next" style={{ width: 22, height: 22, border: 'none', background: 'none', color: 'var(--text-2)', cursor: 'pointer', fontSize: 13, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><MediaIcon kind="next" /></button>
         )}
       </div>
     </div>
@@ -152,13 +159,13 @@ function MusicMiniPlayer({ bottomOffset }) {
   return (
     <div style={{ position: 'fixed', right: 16, bottom: bottomOffset, zIndex: 60 }}>
       {open && (
-        <div style={{ marginBottom: 10, width: 220, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, padding: 12, boxShadow: '0 12px 32px rgba(0,0,0,0.35)' }}>
+        <div style={{ marginBottom: 10, width: 220, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 5, padding: 12, boxShadow: '0 12px 32px rgba(0,0,0,0.35)' }}>
           <div style={{ fontSize: 11, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 8 }}>Ambient Music</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 10 }}>
             {MOODS.map(m => (
-              <button key={m.id} onClick={() => play(m.id)} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', textAlign: 'left', padding: '6px 8px', borderRadius: 8, border: 'none', cursor: 'pointer', fontSize: 12, background: current === m.id ? 'var(--gold-bg)' : 'transparent', color: current === m.id ? 'var(--gold)' : 'var(--text-2)' }}>
+              <button key={m.id} onClick={() => play(m.id)} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', textAlign: 'left', padding: '6px 8px', borderRadius: 3, border: 'none', cursor: 'pointer', fontSize: 12, background: current === m.id ? 'var(--gold-bg)' : 'transparent', color: current === m.id ? 'var(--gold)' : 'var(--text-2)' }}>
                 <span>{m.label}</span>
-                <span style={{ fontSize: 12, width: 16, textAlign: 'center' }}>{current === m.id ? '⏸' : '▶'}</span>
+                <span style={{ fontSize: 12, width: 16, textAlign: 'center' }}><MediaIcon kind={current === m.id ? 'pause' : 'play'} size={11} /></span>
               </button>
             ))}
           </div>
@@ -166,7 +173,7 @@ function MusicMiniPlayer({ bottomOffset }) {
             <span style={{ fontSize: 11, color: 'var(--text-3)' }}>Vol</span>
             <input type="range" min={0} max={1} step={0.05} value={volume} onChange={e => setVol(+e.target.value)} style={{ flex: 1 }} />
           </div>
-          {current && <button onClick={stop} style={{ marginTop: 8, width: '100%', background: 'transparent', border: '1px solid var(--border)', color: 'var(--text-3)', borderRadius: 8, padding: '5px 0', fontSize: 11, cursor: 'pointer' }}>Stop</button>}
+          {current && <button onClick={stop} style={{ marginTop: 8, width: '100%', background: 'transparent', border: '1px solid var(--border)', color: 'var(--text-3)', borderRadius: 3, padding: '5px 0', fontSize: 11, cursor: 'pointer' }}>Stop</button>}
         </div>
       )}
       <button onClick={() => setOpen(o => !o)} title="Music" style={{ width: 48, height: 48, borderRadius: '50%', cursor: 'pointer', background: current ? 'var(--gold)' : 'var(--surface)', color: current ? '#2a1a00' : 'var(--text-2)', boxShadow: '0 8px 20px rgba(0,0,0,0.3)', fontSize: 18, display: 'flex', alignItems: 'center', justifyContent: 'center', border: current ? 'none' : '1px solid var(--border)' }}>
@@ -183,7 +190,7 @@ const NAV_PLAYER = [
   { to: '/character',  label: 'Character',  iconUrl: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1791791397/circle-user-solid-full.svg' },
   { to: '/roleplay',   label: 'Roleplay',   iconUrl: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1791792735/comment-solid-full.svg' },
   { to: '/rules',      label: 'Rules',      iconUrl: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1791793208/gavel-solid-full.svg' },
-  { to: '/levels',     label: 'Battle Map', iconUrl: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1791792887/map-solid-full.svg' },
+  { to: '/levels',     label: 'Maps',       iconUrl: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1791792887/map-solid-full.svg' },
   { to: '/dice',       label: 'Dice',       iconUrl: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1791790757/01_fantasy_01_d20_gem.png' },
 ]
 
@@ -195,7 +202,7 @@ const NAV_DM = [
   { to: '/lore',       label: 'Lore',           iconUrl: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1791791415/scroll-solid-full.svg' },
   { to: '/inventory',  label: 'ShopItems',      iconUrl: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1791792290/coins-solid-full.svg' },
   { to: '/ideas',      label: 'Ideas',          iconUrl: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1791792794/lightbulb-solid-full.svg' },
-  { to: '/levels',     label: 'BattleMap',      iconUrl: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1791792887/map-solid-full.svg' },
+  { to: '/levels',     label: 'Maps',           iconUrl: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1791792887/map-solid-full.svg' },
   { to: '/combat',     label: 'Combat',         iconUrl: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1791791406/hand-fist-solid-full.svg' },
   { to: '/rules',      label: 'Rules',          iconUrl: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1791793208/gavel-solid-full.svg' },
   { to: '/music',      label: 'Music',          iconUrl: 'https://res.cloudinary.com/crcbzpw6/image/upload/v1791793410/mix-brands-solid-full.svg' },
@@ -214,7 +221,7 @@ function useIsMobile() {
 
 export default function Shell({ children }) {
   const { user, logout, isPremium } = useAuth()
-  const { campaigns, activeCampaign, setActive, createCampaign, joinCampaign } = useCampaign()
+  const { campaigns, activeCampaign, setActive, createCampaign, joinCampaign, joinRequestId } = useCampaign()
   const { theme, lightMode } = useTheme()
   const navigate = useNavigate()
   const isMobile = useIsMobile()
@@ -244,17 +251,15 @@ export default function Shell({ children }) {
       position: 'fixed', top: 52, bottom: 72, right: 0, width: SIDEBAR_W, zIndex: 55, background: 'var(--surface)', borderLeft: '1px solid var(--border)',
       overflowY: 'auto', transform: charOpen ? 'none' : 'translateX(100%)', visibility: charOpen ? 'visible' : 'hidden',
       transition: `transform .32s ${EASE}, visibility .32s`, boxShadow: charOpen ? '-8px 0 24px rgba(0,0,0,.25)' : 'none',
-    }}><CharacterOverview campaignId={activeCampaign._id} refreshKey={location.pathname} /></aside>
+    }}><Suspense fallback={<div style={{ padding: 16, fontSize: 12, color: 'var(--text-3)' }}>Loading your character…</div>}><CharacterOverview campaignId={activeCampaign._id} refreshKey={location.pathname} /></Suspense></aside>
   ) : (
     <aside aria-hidden={!charOpen} style={{
       width: charOpen ? 320 : 0, flexShrink: 0, overflow: 'hidden', background: 'var(--surface)', borderLeft: charOpen ? '1px solid var(--border)' : '0 solid transparent',
       transition: `width .32s ${EASE}`,
-    }}><div style={{ width: 320, height: '100%', overflowY: 'auto' }}><CharacterOverview campaignId={activeCampaign._id} refreshKey={location.pathname} /></div></aside>
+    }}><div style={{ width: 320, height: '100%', overflowY: 'auto' }}><Suspense fallback={<div style={{ padding: 16, fontSize: 12, color: 'var(--text-3)' }}>Loading your character…</div>}><CharacterOverview campaignId={activeCampaign._id} refreshKey={location.pathname} /></Suspense></div></aside>
   ))
 
   const [creating, setCreating] = useState(false)
-  const [newName, setNewName]   = useState('')
-  const [error, setError]       = useState('')
   const [joining, setJoining]   = useState(false)
   const [joinCode, setJoinCode] = useState('')
   const [joinError, setJoinError] = useState('')
@@ -274,6 +279,8 @@ export default function Shell({ children }) {
 
   const [showSettings, setShowSettings] = useState(false)
   const [joinPending, setJoinPending] = useState(false)
+  // The DM approved the request (the campaign is now selected for us): the "Joining pending" note is no longer true.
+  useEffect(() => { if (!joinRequestId) setJoinPending(false) }, [joinRequestId])
   const [pendingMembers, setPendingMembers] = useState([])
 
   useEffect(() => {
@@ -288,8 +295,11 @@ export default function Shell({ children }) {
       navigate(`/levels?map=${encodeURIComponent(planId)}`)
     }
     socket.on('level:show', onShowMap)
-    memberCampaigns.forEach(campaign => socket.emit('campaign:join', campaign._id))
+    const joinRooms = () => memberCampaigns.forEach(campaign => socket.emit('campaign:join', campaign._id))
+    joinRooms()
+    socket.on('connect', joinRooms)   // after a dropped connection the server has forgotten the rooms: join them again
     return () => {
+      socket.off('connect', joinRooms)
       socket.off('level:show', onShowMap)
       memberCampaigns.forEach(campaign => socket.emit('campaign:leave', campaign._id))
     }
@@ -310,13 +320,14 @@ export default function Shell({ children }) {
     setPendingMembers(p => p.filter(m => m._id !== userId))
   }
 
-  const handleCreate = async (e) => {
-    e.preventDefault()
-    if (!newName.trim()) return
-    const err = await createCampaign({ name: newName.trim() })
-    if (err) { setError(err); return }
-    setNewName(''); setCreating(false); setError(''); setShowCampaigns(false)
+  // Called by the New Campaign dialog with the name (and the ready-made campaign, if one was chosen). Returns an error text, or null.
+  const handleCreate = async (body) => {
+    const err = await createCampaign(body)
+    if (err) return err
+    setCreating(false); setShowCampaigns(false)
+    return null
   }
+  const createDialog = creating ? lazyBox(<NewCampaignDialog onCreate={handleCreate} onClose={() => setCreating(false)} onUpgrade={() => { setCreating(false); setShowCampaigns(false); navigate('/premium') }} />) : null
 
   const handleJoin = async (e) => {
     e.preventDefault()
@@ -328,8 +339,8 @@ export default function Shell({ children }) {
   }
 
   const realCampaigns = campaigns.filter(c => !c.isPersonal)
-  const canCreate = isDM && (isPremium || realCampaigns.length === 0)
-  const canJoin = !isDM && (isPremium || realCampaigns.length === 0)
+  const canCreate = isDM && (isPremium || realCampaigns.length < FREE_CAMPAIGNS)
+  const canJoin = !isDM && (isPremium || realCampaigns.length < FREE_CAMPAIGNS)
 
   const navLinkStyle = (isActive) => ({
     display: 'flex', flexDirection: 'row',
@@ -350,16 +361,17 @@ export default function Shell({ children }) {
   if (isMobile) {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden' }}>
+        {createDialog}
         {/* Mobile top bar */}
         <div style={{ background: 'var(--surface)', borderBottom: '1px solid var(--border)', padding: '8px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
           <img src={logoUrl} alt="5e Utility" style={{ height: 32, width: 'auto', objectFit: 'contain', display: 'block', filter: 'var(--logo-filter, none)' }} />
           
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-            <button onClick={() => showCampaigns ? closeCampaigns() : openCampaigns()} style={{ background: 'var(--gold-bg)', border: '1px solid var(--gold-border)', color: 'var(--gold)', padding: '8px 12px', borderRadius: 10, fontSize: 11, cursor: 'pointer', fontFamily: 'Cinzel, serif', maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            <button onClick={() => showCampaigns ? closeCampaigns() : openCampaigns()} style={{ background: 'var(--gold-bg)', border: '1px solid var(--gold-border)', color: 'var(--gold)', padding: '8px 12px', borderRadius: 4, fontSize: 11, cursor: 'pointer', fontFamily: 'var(--font-title)', maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
               {(activeCampaign && !activeCampaign.isPersonal) ? activeCampaign.name : 'Campaign'} ▾
             </button>
-            {!isPremium && <button onClick={() => navigate('/premium')} style={{ background: 'none', border: 'none', color: 'var(--gold)', fontSize: 18, padding: 8, borderRadius: 10, cursor: 'pointer' }}>✦</button>}
-            <button onClick={() => setShowSettings(true)} title="Settings" style={{ background: 'none', border: 'none', color: 'var(--text-3)', fontSize: 18, cursor: 'pointer', padding: 8, borderRadius: 10, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+            {!isPremium && <button onClick={() => navigate('/premium')} style={{ background: 'none', border: 'none', color: 'var(--gold)', fontSize: 18, padding: 8, borderRadius: 4, cursor: 'pointer' }}>✦</button>}
+            <button onClick={() => setShowSettings(true)} title="Settings" style={{ background: 'none', border: 'none', color: 'var(--text-3)', fontSize: 18, cursor: 'pointer', padding: 8, borderRadius: 4, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
               <img src="https://res.cloudinary.com/crcbzpw6/image/upload/v1791966298/ellipsis-solid-full.svg" alt="Settings" style={{ width: 18, height: 18 }} />
             </button>
           </div>
@@ -386,16 +398,7 @@ export default function Shell({ children }) {
                 ))}
               </div>
             )}
-            {creating ? (
-              <form onSubmit={handleCreate} style={{ marginTop: 6 }}>
-                <input autoFocus className="input" style={{ marginBottom: 6, padding: '6px 8px', fontSize: 12 }} placeholder="Campaign name..." value={newName} onChange={e => setNewName(e.target.value)} />
-                {error && <div style={{ fontSize: 11, color: 'var(--red)', marginBottom: 6 }}>{error}</div>}
-                <div style={{ display: 'flex', gap: 4 }}>
-                  <button type="submit" className="btn btn-primary btn-sm" style={{ flex: 1 }}>Create</button>
-                  <button type="button" className="btn btn-ghost btn-sm" onClick={() => { setCreating(false); setError('') }}>✕</button>
-                </div>
-              </form>
-            ) : joining ? (
+            {joining ? (
               <form onSubmit={handleJoin} style={{ marginTop: 6 }}>
                 <input autoFocus className="input" style={{ marginBottom: 6, padding: '6px 8px', fontSize: 12, textTransform: 'uppercase' }} placeholder="Join code..." value={joinCode} onChange={e => setJoinCode(e.target.value)} />
                 {joinError && <div style={{ fontSize: 11, color: 'var(--red)', marginBottom: 6 }}>{joinError}</div>}
@@ -405,7 +408,7 @@ export default function Shell({ children }) {
                 </div>
               </form>
             ) : joinPending ? (
-              <div style={{ marginTop: 6, padding: '8px 10px', background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
+              <div style={{ marginTop: 6, padding: '8px 10px', background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 3, display: 'flex', alignItems: 'center', gap: 8 }}>
                 <div style={{ flex: 1 }}>
                   <div style={{ fontSize: 12, fontWeight: 500 }}>Joining pending…</div>
                   <div style={{ fontSize: 10, color: 'var(--text-3)', lineHeight: 1.4 }}>Waiting for the DM to approve your request.</div>
@@ -419,7 +422,7 @@ export default function Shell({ children }) {
                     <div>
                       <div style={{ fontSize: 11, color: 'var(--text-3)', padding: '4px 4px 6px', lineHeight: 1.5 }}>You're a Dungeon Master — create your first campaign.</div>
                       {canCreate
-                        ? <button onClick={() => setCreating(true)} style={{ fontSize: 12, color: 'var(--gold)', background: 'var(--gold-bg)', border: '1px solid var(--gold-border)', borderRadius: 8, cursor: 'pointer', padding: '7px 12px', fontWeight: 600, width: '100%' }}>✦ Create Campaign</button>
+                        ? <button onClick={() => setCreating(true)} style={{ fontSize: 12, color: 'var(--gold)', background: 'var(--gold-bg)', border: '1px solid var(--gold-border)', borderRadius: 3, cursor: 'pointer', padding: '7px 12px', fontWeight: 600, width: '100%' }}>✦ Create Campaign</button>
                         : <button onClick={() => { navigate('/premium'); closeCampaigns() }} style={{ fontSize: 12, color: 'var(--gold)', background: 'none', border: 'none', cursor: 'pointer', padding: '6px 4px' }}>✦ Upgrade for more</button>}
                     </div>
                   ) : (
@@ -432,8 +435,8 @@ export default function Shell({ children }) {
                     <div>
                       <div style={{ fontSize: 11, color: 'var(--text-3)', padding: '4px 4px 6px', lineHeight: 1.5 }}>Ask your DM for a join code to enter their campaign.</div>
                       {canJoin
-                        ? <button onClick={() => setJoining(true)} style={{ fontSize: 12, color: 'var(--text-2)', background: 'transparent', border: '1px solid var(--border)', borderRadius: 8, cursor: 'pointer', padding: '7px 12px', fontWeight: 600, width: '100%' }}>Join a Campaign</button>
-                        : <button onClick={() => { navigate('/premium'); closeCampaigns() }} style={{ fontSize: 12, color: 'var(--gold)', background: 'var(--gold-bg)', border: '1px solid var(--gold-border)', borderRadius: 8, cursor: 'pointer', padding: '7px 12px', fontWeight: 600, width: '100%' }}>✦ Upgrade for more</button>}
+                        ? <button onClick={() => setJoining(true)} style={{ fontSize: 12, color: 'var(--text-2)', background: 'transparent', border: '1px solid var(--border)', borderRadius: 3, cursor: 'pointer', padding: '7px 12px', fontWeight: 600, width: '100%' }}>Join a Campaign</button>
+                        : <button onClick={() => { navigate('/premium'); closeCampaigns() }} style={{ fontSize: 12, color: 'var(--gold)', background: 'var(--gold-bg)', border: '1px solid var(--gold-border)', borderRadius: 3, cursor: 'pointer', padding: '7px 12px', fontWeight: 600, width: '100%' }}>✦ Upgrade for more</button>}
                     </div>
                   ) : (
                     canJoin
@@ -480,7 +483,7 @@ export default function Shell({ children }) {
           <SwipeNav items={NAV} navLinkStyle={navLinkStyle} darkMode={darkMode} />
         </nav>
 
-        {showSettings && <SettingsModal onClose={() => setShowSettings(false)} />}
+        {showSettings && lazyBox(<SettingsModal onClose={() => setShowSettings(false)} />)}
       </div>
     )
   }
@@ -488,6 +491,7 @@ export default function Shell({ children }) {
   // Desktop layout — unchanged
   return (
     <div style={{ display: 'flex', height: '100vh', overflow: 'hidden' }}>
+      {createDialog}
       <aside style={{ width: 232, flexShrink: 0, background: 'var(--surface)', borderRight: '1px solid var(--border)', display: 'flex', flexDirection: 'column' }}>
         <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <img src="https://res.cloudinary.com/crcbzpw6/image/upload/v1794483597/5E_UTILITY_Pure_Black_2000.png" alt="5e Utility" style={{ width: '100%', maxWidth: 160, height: 'auto', objectFit: 'contain', display: 'block', filter: 'var(--logo-filter, none)' }} />
@@ -496,7 +500,7 @@ export default function Shell({ children }) {
         <div style={{ padding: '12px 14px', borderBottom: '1px solid var(--border)' }}>
           <div style={{ fontSize: 11, color: 'var(--text-3)', marginBottom: 6, fontWeight: 500, letterSpacing: '0.05em', textTransform: 'uppercase' }}>Campaign</div>
           {campaigns.filter(c => !c.isPersonal).map(c => (
-            <button key={c._id} onClick={() => setActive(c)} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '7px 10px', borderRadius: 8, border: 'none', background: activeCampaign?._id === c._id ? 'var(--gold-bg)' : 'transparent', color: activeCampaign?._id === c._id ? 'var(--gold)' : 'var(--text-2)', fontSize: 13, fontWeight: activeCampaign?._id === c._id ? 500 : 400, cursor: 'pointer', marginBottom: 2, borderLeft: activeCampaign?._id === c._id ? '2px solid var(--gold)' : '2px solid transparent' }}>{c.name}</button>
+            <button key={c._id} onClick={() => setActive(c)} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '7px 10px', borderRadius: 3, border: 'none', background: activeCampaign?._id === c._id ? 'var(--gold-bg)' : 'transparent', color: activeCampaign?._id === c._id ? 'var(--gold)' : 'var(--text-2)', fontSize: 13, fontWeight: activeCampaign?._id === c._id ? 500 : 400, cursor: 'pointer', marginBottom: 2, borderLeft: activeCampaign?._id === c._id ? '2px solid var(--gold)' : '2px solid transparent' }}>{c.name}</button>
           ))}
           {isDM && activeCampaign?.joinCode && (
             <div style={{ padding: '2px 10px 6px' }}>
@@ -513,16 +517,7 @@ export default function Shell({ children }) {
               ))}
             </div>
           )}
-          {creating ? (
-            <form onSubmit={handleCreate} style={{ marginTop: 4 }}>
-              <input autoFocus className="input" style={{ marginBottom: 4, padding: '6px 8px', fontSize: 12 }} placeholder="Campaign name..." value={newName} onChange={e => setNewName(e.target.value)} />
-              {error && <div style={{ fontSize: 11, color: 'var(--red)', marginBottom: 6, lineHeight: 1.4 }}>{error} <button type="button" onClick={() => navigate('/premium')} style={{ background: 'none', border: 'none', color: 'var(--gold)', cursor: 'pointer', fontSize: 11 }}>Upgrade →</button></div>}
-              <div style={{ display: 'flex', gap: 4 }}>
-                <button type="submit" className="btn btn-primary btn-sm" style={{ flex: 1 }}>Create</button>
-                <button type="button" className="btn btn-ghost btn-sm" onClick={() => { setCreating(false); setError('') }}>✕</button>
-              </div>
-            </form>
-          ) : joining ? (
+          {joining ? (
             <form onSubmit={handleJoin} style={{ marginTop: 4 }}>
               <input autoFocus className="input" style={{ marginBottom: 4, padding: '6px 8px', fontSize: 12, textTransform: 'uppercase' }} placeholder="Join code..." value={joinCode} onChange={e => setJoinCode(e.target.value)} />
               {joinError && <div style={{ fontSize: 11, color: 'var(--red)', marginBottom: 6 }}>{joinError}</div>}
@@ -532,7 +527,7 @@ export default function Shell({ children }) {
               </div>
             </form>
           ) : joinPending ? (
-            <div style={{ marginTop: 4, padding: '8px 10px', background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 8 }}>
+            <div style={{ marginTop: 4, padding: '8px 10px', background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 3 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
                 <div style={{ fontSize: 12, fontWeight: 500 }}>Joining pending…</div>
                 <button onClick={() => setJoinPending(false)} style={{ marginLeft: 'auto', background: 'none', border: 'none', color: 'var(--text-3)', cursor: 'pointer', fontSize: 13, padding: 0 }}>✕</button>
@@ -546,26 +541,26 @@ export default function Shell({ children }) {
                   <div style={{ marginBottom: 6 }}>
                     <div style={{ fontSize: 11, color: 'var(--text-3)', marginBottom: 6, lineHeight: 1.5 }}>You're a Dungeon Master — create your first campaign to get started.</div>
                     {canCreate
-                      ? <button onClick={() => setCreating(true)} style={{ display: 'flex', alignItems: 'center', gap: 6, width: '100%', padding: '7px 10px', borderRadius: 8, border: '1px solid var(--gold-border)', background: 'var(--gold-bg)', color: 'var(--gold)', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>✦ Create Campaign</button>
-                      : <button onClick={() => navigate('/premium')} style={{ display: 'flex', alignItems: 'center', gap: 6, width: '100%', padding: '7px 10px', borderRadius: 8, border: 'none', background: 'var(--gold-bg)', color: 'var(--gold)', fontSize: 12, cursor: 'pointer', borderLeft: '2px solid var(--gold-border)' }}>✦ Upgrade for more</button>}
+                      ? <button onClick={() => setCreating(true)} style={{ display: 'flex', alignItems: 'center', gap: 6, width: '100%', padding: '7px 10px', borderRadius: 3, border: '1px solid var(--gold-border)', background: 'var(--gold-bg)', color: 'var(--gold)', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>✦ Create Campaign</button>
+                      : <button onClick={() => navigate('/premium')} style={{ display: 'flex', alignItems: 'center', gap: 6, width: '100%', padding: '7px 10px', borderRadius: 3, border: 'none', background: 'var(--gold-bg)', color: 'var(--gold)', fontSize: 12, cursor: 'pointer', borderLeft: '2px solid var(--gold-border)' }}>✦ Upgrade for more</button>}
                   </div>
                 ) : (
                   canCreate
-                    ? <button onClick={() => setCreating(true)} style={{ display: 'flex', alignItems: 'center', gap: 6, width: '100%', padding: '6px 10px', borderRadius: 8, border: 'none', background: 'transparent', color: 'var(--text-3)', fontSize: 12, cursor: 'pointer' }}>+ New Campaign</button>
-                    : <button onClick={() => navigate('/premium')} style={{ display: 'flex', alignItems: 'center', gap: 6, width: '100%', padding: '6px 10px', borderRadius: 8, border: 'none', background: 'var(--gold-bg)', color: 'var(--gold)', fontSize: 12, cursor: 'pointer', borderLeft: '2px solid var(--gold-border)' }}>✦ Upgrade for more</button>
+                    ? <button onClick={() => setCreating(true)} style={{ display: 'flex', alignItems: 'center', gap: 6, width: '100%', padding: '6px 10px', borderRadius: 3, border: 'none', background: 'transparent', color: 'var(--text-3)', fontSize: 12, cursor: 'pointer' }}>+ New Campaign</button>
+                    : <button onClick={() => navigate('/premium')} style={{ display: 'flex', alignItems: 'center', gap: 6, width: '100%', padding: '6px 10px', borderRadius: 3, border: 'none', background: 'var(--gold-bg)', color: 'var(--gold)', fontSize: 12, cursor: 'pointer', borderLeft: '2px solid var(--gold-border)' }}>✦ Upgrade for more</button>
                 )
               ) : (
                 realCampaigns.length === 0 ? (
                   <div style={{ marginBottom: 6 }}>
                     <div style={{ fontSize: 11, color: 'var(--text-3)', marginBottom: 6, lineHeight: 1.5 }}>Ask your DM for a join code to enter their campaign.</div>
                     {canJoin
-                      ? <button onClick={() => setJoining(true)} style={{ display: 'flex', alignItems: 'center', gap: 6, width: '100%', padding: '7px 10px', borderRadius: 8, border: '1px solid var(--border)', background: 'transparent', color: 'var(--text-2)', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>⚔ Join a Campaign</button>
-                      : <button onClick={() => navigate('/premium')} style={{ display: 'flex', alignItems: 'center', gap: 6, width: '100%', padding: '7px 10px', borderRadius: 8, border: 'none', background: 'var(--gold-bg)', color: 'var(--gold)', fontSize: 12, cursor: 'pointer', borderLeft: '2px solid var(--gold-border)' }}>✦ Upgrade for more</button>}
+                      ? <button onClick={() => setJoining(true)} style={{ display: 'flex', alignItems: 'center', gap: 6, width: '100%', padding: '7px 10px', borderRadius: 3, border: '1px solid var(--border)', background: 'transparent', color: 'var(--text-2)', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>Join a Campaign</button>
+                      : <button onClick={() => navigate('/premium')} style={{ display: 'flex', alignItems: 'center', gap: 6, width: '100%', padding: '7px 10px', borderRadius: 3, border: 'none', background: 'var(--gold-bg)', color: 'var(--gold)', fontSize: 12, cursor: 'pointer', borderLeft: '2px solid var(--gold-border)' }}>✦ Upgrade for more</button>}
                   </div>
                 ) : (
                   canJoin
-                    ? <button onClick={() => setJoining(true)} style={{ display: 'flex', alignItems: 'center', gap: 6, width: '100%', padding: '6px 10px', borderRadius: 8, border: 'none', background: 'transparent', color: 'var(--text-3)', fontSize: 12, cursor: 'pointer' }}>+ Join Campaign</button>
-                    : <button onClick={() => navigate('/premium')} style={{ display: 'flex', alignItems: 'center', gap: 6, width: '100%', padding: '6px 10px', borderRadius: 8, border: 'none', background: 'var(--gold-bg)', color: 'var(--gold)', fontSize: 12, cursor: 'pointer', borderLeft: '2px solid var(--gold-border)' }}>✦ Upgrade for more</button>
+                    ? <button onClick={() => setJoining(true)} style={{ display: 'flex', alignItems: 'center', gap: 6, width: '100%', padding: '6px 10px', borderRadius: 3, border: 'none', background: 'transparent', color: 'var(--text-3)', fontSize: 12, cursor: 'pointer' }}>+ Join Campaign</button>
+                    : <button onClick={() => navigate('/premium')} style={{ display: 'flex', alignItems: 'center', gap: 6, width: '100%', padding: '6px 10px', borderRadius: 3, border: 'none', background: 'var(--gold-bg)', color: 'var(--gold)', fontSize: 12, cursor: 'pointer', borderLeft: '2px solid var(--gold-border)' }}>✦ Upgrade for more</button>
                 )
               )}
             </div>
@@ -593,7 +588,7 @@ export default function Shell({ children }) {
             <button onClick={() => navigate('/premium')} className="btn btn-gold" style={{ width: '100%', justifyContent: 'center', marginBottom: 10, fontSize: 12 }}>✦ Upgrade to Premium</button>
           )}
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <div style={{ width: 32, height: 32, borderRadius: '50%', flexShrink: 0, background: 'var(--gold-bg)', border: '1px solid var(--gold-border)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'Cinzel, serif', fontSize: 13, color: 'var(--gold)' }}>{user?.username?.[0]?.toUpperCase()}</div>
+            <ProfileAvatar size={32} fontSize={13} />
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontSize: 13, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user?.username}{isPremium && <span style={{ fontSize: 10, color: 'var(--gold)', marginLeft: 4 }}>✦ PRO</span>}</div>
               <div style={{ fontSize: 11, color: 'var(--text-3)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user?.email}</div>
@@ -607,7 +602,7 @@ export default function Shell({ children }) {
 
       <main style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column', minWidth: 0 }}>{children}</main>
       {charPanel}{charToggle}
-      {showSettings && <SettingsModal onClose={() => setShowSettings(false)} />}
+      {showSettings && lazyBox(<SettingsModal onClose={() => setShowSettings(false)} />)}
     </div>
   )
 }
