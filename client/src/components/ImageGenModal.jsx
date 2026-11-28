@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { api } from '../context/AuthContext'
 import { uploadToCloudinary } from '../utils/uploadToCloudinary'
 import { backdropClose } from '../utils/backdrop'
+import { useWorldAssistant } from '../context/WorldAssistantContext'
 
 // Generates scene images, shows them for review, and only uploads the one the DM confirms.
 export default function ImageGenModal({ campaignId, title, description, onUse, onClose }) {
@@ -13,14 +14,17 @@ export default function ImageGenModal({ campaignId, title, description, onUse, o
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const alive = useRef(true)
+  const { usage, mergeUsage, refreshUsage } = useWorldAssistant(campaignId)
+  const left = usage?.images ? Math.max(0, usage.images.limit - usage.images.used) : null
 
   const generate = async () => {
     setBusy(true); setError(''); setImages([]); setPicked(0)
     try {
       const res = await api('/ai/storyboard-image', { method: 'POST', body: { campaignId, prompt: `${title || ''}. ${description || ''}`.trim() } })
       if (!alive.current) return
+      mergeUsage(res.usage)
       setImages(res.images || []); setSource(res.source); setUsed(res.usedAvatars || 0)
-    } catch (e) { if (alive.current) setError(e.message || 'Could not generate an image') }
+    } catch (e) { if (alive.current) setError(e.message || 'Could not generate an image'); refreshUsage() }
     if (alive.current) setBusy(false)
   }
   useEffect(() => { alive.current = true; generate(); return () => { alive.current = false } }, []) // eslint-disable-line react-hooks/exhaustive-deps
@@ -65,7 +69,8 @@ export default function ImageGenModal({ campaignId, title, description, onUse, o
         {error && <div role="alert" style={{ color: 'var(--red)', fontSize: 13, marginTop: 10 }}>{error}</div>}
 
         <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 16, flexWrap: 'wrap' }}>
-          <button className="btn btn-ghost" onClick={generate} disabled={busy || saving}>↻ Regenerate</button>
+          {left !== null && <span style={{ marginRight: 'auto', alignSelf: 'center', fontSize: 12, color: left === 0 ? 'var(--red)' : 'var(--text-3)' }}>{left === 0 ? 'No scene images left this month' : `${left} of ${usage.images.limit} scene images left this month`}</span>}
+          <button className="btn btn-ghost" onClick={generate} disabled={busy || saving || left === 0} title={left !== null ? 'A new picture uses one of your monthly scene images' : undefined}>↻ Regenerate</button>
           <button className="btn btn-ghost" onClick={onClose} disabled={saving}>Cancel</button>
           <button className="btn btn-primary" onClick={confirm} disabled={busy || saving || !images.length}>{saving ? 'Saving…' : 'Use this image'}</button>
         </div>

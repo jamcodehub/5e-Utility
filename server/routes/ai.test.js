@@ -2,7 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import express from 'express'
 import jwt from 'jsonwebtoken'
-import { Campaign, CampaignGuide, Character, User } from '../models/index.js'
+import { Campaign, CampaignGuide, Character, User, AiUsage } from '../models/index.js'
 import router from './ai.js'
 
 test('AI routes are DM-only, keep the coach prompt, and only fetch Cloudinary avatars', async t => {
@@ -13,6 +13,9 @@ test('AI routes are DM-only, keep the coach prompt, and only fetch Cloudinary av
   const dm = '507f1f77bcf86cd799439011', player = '507f1f77bcf86cd799439012', freeDm = '507f1f77bcf86cd799439013', campaignId = '507f1f77bcf86cd799439014'
   stub(User, 'findById', id => ({ select: async () => ({ role: id === player ? 'player' : 'dm', roles: [], isPremium: id === dm, premiumRole: id === dm ? 'dm' : '' }) }))
   stub(Campaign, 'findOne', query => ({ select: async () => ((query.owner === dm || query.owner === freeDm) ? { _id: campaignId, name: 'Realm', setting: 'Salt marsh' } : null) }))
+  const counts = { guide: 0, images: 0 }
+  stub(AiUsage, 'findOneAndUpdate', async (q, u) => { const k = Object.keys(u.$inc)[0]; counts[k] += 1; return { ...counts } })
+  stub(AiUsage, 'updateOne', async (q, u) => { const k = Object.keys(u.$inc)[0]; counts[k] -= 1; return {} })
   stub(CampaignGuide, 'findOne', () => ({ select: async () => ({ story: 'A drowned empire' }) }))
   stub(Character, 'find', () => ({ select: () => ({ limit: async () => [
     { name: 'Mira', avatarUrl: 'https://res.cloudinary.com/x/mira.png' },

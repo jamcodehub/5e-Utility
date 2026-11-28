@@ -5,11 +5,13 @@ import { useWorldAssistant } from '../context/WorldAssistantContext'
 // questions so the DM stays the author. State lives in WorldAssistantContext, so a pending
 // reply keeps working while you move between pages.
 export default function WorldAssistant({ campaignId, onClose }) {
-  const { messages, busy, error, send, clear, markRead } = useWorldAssistant(campaignId)
+  const { messages, busy, error, send, clear, markRead, usage, refreshUsage } = useWorldAssistant(campaignId)
   const [draft, setDraft] = useState('')
   const endRef = useRef(null)
 
   useEffect(() => { markRead() }, [messages.length]) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { refreshUsage() }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  const left = usage?.guide ? Math.max(0, usage.guide.limit - usage.guide.used) : null
   // Scroll only the message list (scrollIntoView would also scroll the page sideways while the panel is off-screen).
   useEffect(() => { const el = endRef.current?.parentElement; if (el) el.scrollTop = el.scrollHeight }, [messages, busy])
 
@@ -65,8 +67,9 @@ export default function WorldAssistant({ campaignId, onClose }) {
           onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submit(draft) } }}
           style={{ flex: 1, resize: 'none', fontSize: 16 }} maxLength={2000}
         />
-        <button className="btn btn-primary btn-sm" type="submit" disabled={busy || !draft.trim()}>Send</button>
+        <button className="btn btn-primary btn-sm" type="submit" disabled={busy || !draft.trim() || left === 0}>Send</button>
       </form>
+      {left !== null && <div style={{ padding: '0 12px 10px', fontSize: 11, color: left === 0 ? 'var(--red)' : 'var(--text-3)' }}>{left === 0 ? `You have used this month's ${usage.guide.limit} guide messages. They start again on the 1st.` : `${left} of ${usage.guide.limit} guide messages left this month`}</div>}
     </div>
   )
 }

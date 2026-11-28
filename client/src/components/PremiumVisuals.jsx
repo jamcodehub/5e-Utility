@@ -29,8 +29,8 @@ const ROWS = [
   ['Campaigns', `${FREE_CAMPAIGNS} campaigns`, 'Unlimited'],
   ['Journal entries', `${FREE_JOURNAL_ENTRIES} per campaign`, 'Unlimited'],
   ['Themes', 'Light and Dark', 'Every class theme'],
-  AI_ENABLED ? ['AI world-building guide', '—', '60 questions an hour'] : ['AI world-building guide', 'Coming soon', 'Coming soon'],
-  AI_ENABLED ? ['AI storyboard scene images', '—', '40 a day'] : ['AI storyboard scene images', 'Coming soon', 'Coming soon'],
+  AI_ENABLED ? ['AI world-building guide', '—', '600 questions a month'] : ['AI world-building guide', 'Coming soon', 'Coming soon'],
+  AI_ENABLED ? ['AI storyboard scene images', '—', '25 a month'] : ['AI storyboard scene images', 'Coming soon', 'Coming soon'],
 ]
 
 export function PlanTable() {

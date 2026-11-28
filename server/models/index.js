@@ -274,7 +274,17 @@ export const DMBoardFolder = model('DMBoardFolder', DMBoardFolderSchema)
 export const BattleState  = model('BattleState', BattleStateSchema)
 export const Character     = model('Character', CharacterSchema)
 export const LevelPlan     = model('LevelPlan', LevelPlanSchema)
+// What each subscriber has used of their monthly AI allowance (one document per user per month, 'YYYY-MM').
+const AiUsageSchema = new Schema({
+  user:   { type: Schema.Types.ObjectId, ref: 'User', required: true },
+  month:  { type: String, required: true },
+  guide:  { type: Number, default: 0 },
+  images: { type: Number, default: 0 },
+}, { timestamps: true })
+AiUsageSchema.index({ user: 1, month: 1 }, { unique: true })
+
 export const Inventory     = model('Inventory', InventorySchema)
+export const AiUsage       = model('AiUsage', AiUsageSchema)
 export const CampaignGuide = model('CampaignGuide', CampaignGuideSchema)
 export const MusicTrack    = model('MusicTrack', MusicTrackSchema)
 export const MusicSession  = model('MusicSession', MusicSessionSchema)
