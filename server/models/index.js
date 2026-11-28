@@ -12,6 +12,9 @@ const UserSchema = new Schema({
   googleId:         { type: String, default: '', index: true, sparse: true },
   avatar:           { type: String, default: '' },
   isPremium:        { type: Boolean, default: false },
+  // By-hand premium switches (flip to true in MongoDB; Stripe never changes them). DM covers both sides.
+  playerPremiumGrant: { type: Boolean, default: false },
+  dmPremiumGrant:     { type: Boolean, default: false },
   // Which role the subscription was bought for ('player' or 'dm'); '' on accounts made premium before this existed (= player).
   premiumRole:      { type: String, enum: ['', 'player', 'dm'], default: '' },
   // A DM's "test player": a placeholder account that cannot sign in (no password). Set on the DM's campaign it belongs to.

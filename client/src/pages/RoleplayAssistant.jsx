@@ -5,6 +5,7 @@ import { useToast } from '../hooks/useToast'
 import { SkeletonRoleplayPage } from '../components/Skeleton'
 import { isPublicDemoPath } from '../utils/demoRuntime'
 import UpgradeModal from '../components/UpgradeModal'
+import { deeperItems } from '../utils/deeperLore'
 
 // ─── Template engine ────────────────────────────────────────────────────────
 // Builds a personalised 4-phase checklist from the rich context the player
@@ -40,7 +41,7 @@ const RACE_HOOKS = {
 
 // ─── Checklist builder ───────────────────────────────────────────────────────
 
-function buildChecklist(ctx, dmGuide = {}) {
+function buildChecklist(ctx, dmGuide = {}, session = 1) {
   const cls      = (ctx.characterClass || '').toLowerCase().replace(/\s+/g, '')
   const race     = (ctx.race || '').toLowerCase()
   const name     = ctx.name || 'Your character'
@@ -140,6 +141,12 @@ function buildChecklist(ctx, dmGuide = {}) {
   })()
 
   return [
+    {
+      phase: `Go Deeper: Session #${session}`,
+      headerColor: '#9a7b1c',
+      headerBg: 'rgba(201,162,39,0.10)',
+      items: deeperItems(ctx, dmGuide, session),
+    },
     {
       phase: 'Phase 1: Pre-Session Preparation',
       headerColor: '#7e22ce',
@@ -437,7 +444,7 @@ export default function RoleplayAssistant() {
         body: { background: ctx.background, personality: ctx.personality, goals: ctx.goals, lore: ctx.lore },
       }).catch(() => {})
       const id = `plan_${Date.now()}`
-      setPlans(ps => [...ps, { id, label: `Session #${res.sessionCount}`, checklist: buildChecklist(ctx, dmGuide), checklistLevel: Number(ctx.level) || null, checked: {} }])
+      setPlans(ps => [...ps, { id, label: `Session #${res.sessionCount}`, session: res.sessionCount, checklist: buildChecklist(ctx, dmGuide, res.sessionCount), checklistLevel: Number(ctx.level) || null, checked: {} }])
       setActivePlanId(id)
       setStep('checklist')
     } catch (err) {
@@ -467,7 +474,7 @@ export default function RoleplayAssistant() {
       if (fresh) { guide = fresh; setDmGuide(fresh) }
     } catch { /* fall back to cached guide */ }
     updatePlan(activePlan.id, {
-      checklist: buildChecklist(ctx, guide),
+      checklist: buildChecklist(ctx, guide, activePlan.session || sessionCount || 1),
       checked: {},
       ...(level !== undefined ? { checklistLevel: level } : {}),
     })

@@ -4,7 +4,14 @@
 export const premiumRoleOf = (user) => (user?.premiumRole === 'dm' ? 'dm' : 'player')
 
 // Is this account premium for the given side (what its tools check)?
-export const hasPremiumAs = (user, role) => !!user?.isPremium && (role === 'player' || premiumRoleOf(user) === 'dm')
+// `dmPremiumGrant` / `playerPremiumGrant` are by-hand switches (set them to true on the user in MongoDB) for free access without
+// Stripe: friends, testers, your own account. Stripe never touches them. DM Premium covers both sides, like the paid plan.
+export const hasPremiumAs = (user, role) => {
+  if (!user) return false
+  if (user.dmPremiumGrant) return true
+  if (role === 'player' && user.playerPremiumGrant) return true
+  return !!user.isPremium && (role === 'player' || premiumRoleOf(user) === 'dm')
+}
 
 // Both sides at a glance, for the site to read: Player Premium, and DM Premium (which includes Player Premium).
 export const planFlags = (user) => ({ isPlayerPremium: hasPremiumAs(user, 'player'), isDmPremium: hasPremiumAs(user, 'dm') })

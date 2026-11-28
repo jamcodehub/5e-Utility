@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { api } from '../context/AuthContext'
+import { backdropClose } from '../utils/backdrop'
 
 const overlay = { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }
 const option = { textAlign: 'left', padding: '16px 18px', borderRadius: 4, border: '1px solid var(--border)', background: 'var(--surface)', cursor: 'pointer', color: 'var(--text)', display: 'block', width: '100%' }
@@ -24,7 +25,7 @@ export default function NewCharacterChooser({ initial = 'choose', onClose, onCre
   }
 
   return (
-    <div style={overlay} onClick={onClose}>
+    <div style={overlay} {...backdropClose(onClose)}>
       <div className="card" style={{ width: '100%', maxWidth: 520, padding: 24 }} onClick={e => e.stopPropagation()} role="dialog" aria-label="New character">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
           <h3 style={{ margin: 0, fontSize: 18 }}>{step === 'choose' ? 'New character' : 'Import from D&D Beyond'}</h3>

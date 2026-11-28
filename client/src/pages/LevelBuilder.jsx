@@ -20,6 +20,7 @@ import { emptyHistory, endStroke as endHistoryStroke, undo as undoHistory, redo 
 import { isOutdoorMap } from '../utils/outdoor'
 import { rotationOf, nextRotation, rotationLabel, readRotations, compactRotations, withRotation, dragSide, objectTurnOf, TORCH_ID } from '../utils/tileRotation'
 import Battle3DView from '../components/Battle3DView'
+import { backdropClose } from '../utils/backdrop'
 // Note: module-level TILES / OBJECT_TILES above are the base (Medieval) set, used for
 // logic that doesn't depend on artwork. MapThumb and LevelBuilder shadow them with the
 // active theme's tiles (same ids, different art).
@@ -1989,7 +1990,7 @@ export default function LevelBuilder() {
       </div>
 
       {showSizePicker && (
-        <div role="dialog" aria-modal="true" aria-label="Choose a map size" onClick={() => setShowSizePicker(false)}
+        <div role="dialog" aria-modal="true" aria-label="Choose a map size" {...backdropClose(() => setShowSizePicker(false))}
           style={{ position: 'fixed', inset: 0, zIndex: 1200, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
           <div className="card" onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: 520, padding: 22 }}>
             <h3 style={{ fontSize: 18, margin: '0 0 4px' }}>Choose a map size</h3>

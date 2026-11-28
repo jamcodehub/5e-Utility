@@ -23,6 +23,7 @@ import { auto as autoQuality } from '@cloudinary/url-gen/qualifiers/quality'
 import { auto as autoFormat } from '@cloudinary/url-gen/qualifiers/format'
 import { thumbnail } from '@cloudinary/url-gen/actions/resize'
 import { autoGravity } from '@cloudinary/url-gen/qualifiers/gravity'
+import { backdropClose } from '../utils/backdrop'
 
 const CLOUD_NAME = 'crcbzpw6' //cloud id
 
@@ -57,6 +58,10 @@ const DEFAULT = {
 // returning to the Character page shows that character again instead of
 // always resetting to the primary one.
 const lastCharKey = (campaignId) => `lastChar:${campaignId}`
+// The tab that was open (Stats, Actions, Gear...) is remembered too, so coming back lands on it.
+const TABS = ['stats', 'actions', 'gear', 'inventory', 'backstory', 'notes']
+const recallTab = () => { try { const t = localStorage.getItem('characterTab'); return TABS.includes(t) ? t : 'actions' } catch { return 'actions' } }
+const rememberTab = (t) => { try { localStorage.setItem('characterTab', t) } catch { /* ignore */ } }
 const recallLastChar = (campaignId) => { try { return localStorage.getItem(lastCharKey(campaignId)) } catch { return null } }
 const rememberLastChar = (campaignId, charId) => { try { localStorage.setItem(lastCharKey(campaignId), charId) } catch { /* ignore */ } }
 
@@ -64,7 +69,8 @@ export default function Character() {
   const { activeCampaign, setActive, campaigns } = useCampaign()
   const { isPremium } = useAuth()
   const { toast, ToastContainer } = useToast()
-  const [tab, setTab]       = useState('actions')
+  const [tab, setTabState] = useState(recallTab)
+  const setTab = (t) => { setTabState(t); rememberTab(t) }
   const [characters, setCharacters] = useState([])
   const [activeCharId, setActiveCharId] = useState(null)
   const [char, setChar]     = useState(null)
@@ -88,7 +94,7 @@ export default function Character() {
     if ((tab === 'actions' || tab === 'gear' || hpOpen || printing || sharing) && !srdData) {
       loadSrdMany('core', 'classes', 'races', 'traits', 'features', 'equipment', 'spells').then(setSrdData).catch(() => toast('Could not load the rules data'))
     }
-  }, [tab, hpOpen]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [tab, hpOpen, printing, sharing]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // The popover closes on a click outside it or Escape (and while the sheet is being edited).
   useEffect(() => {
@@ -511,7 +517,7 @@ export default function Character() {
 
       {/* Tabs */}
       <div style={{ display: 'flex', gap: 4, marginBottom: 16, flexWrap: 'wrap' }}>
-        {['stats', 'actions', 'gear', 'inventory', 'backstory', 'notes'].map(t => (
+        {TABS.map(t => (
           <button key={t} onClick={() => setTab(t)} className={`btn btn-sm ${tab === t ? 'btn-primary' : 'btn-ghost'}`}>
             {t.charAt(0).toUpperCase() + t.slice(1)}
           </button>
@@ -525,7 +531,7 @@ export default function Character() {
           ? <><CombatPanel char={char} srd={srdData} d={derive(char, srdData)} roller={roller} onPatch={patchChar} /><CharacterActions char={char} srd={srdData} roller={roller} onPatch={patchChar} /></>
           : <GearTab char={char} srd={srdData} d={derive(char, srdData)} onPatch={patchChar} />
       )}
-      {tab === 'inventory' && <InventoryPanel toast={toast} />}
+      {tab === 'inventory' && <InventoryPanel toast={toast} char={char} onCurrency={c => patchChar({ currency: c })} />}
       {char && (tab === 'actions' || roller.history.length > 0) && <RollPanel roller={roller} />}
 
       {tab === 'stats' && (
@@ -577,7 +583,7 @@ export default function Character() {
       {printing && srdData && char && <PrintOverlay char={char} srd={srdData} onClose={() => setPrinting(false)} />}
       {printing && !srdData && <div style={{ position: 'fixed', inset: 0, zIndex: 2000, background: 'rgba(0,0,0,.5)', color: '#fff', display: 'grid', placeItems: 'center' }}>Preparing sheet…</div>}
       {sharing && char && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }} onClick={() => setSharing(false)}>
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }} {...backdropClose(() => setSharing(false))}>
           <div className="card" style={{ width: '100%', maxWidth: 460, padding: 22 }} onClick={e => e.stopPropagation()}>
             <div style={{ fontFamily: 'var(--font-title)', fontSize: 17, color: 'var(--gold)', marginBottom: 8 }}>Share {char.name || 'this character'}</div>
             <div style={{ fontSize: 13, color: 'var(--text-2)', lineHeight: 1.5, marginBottom: 12 }}>Anyone with the link can view a read-only sheet and print it, even without an account. Your notes, lore and goals are never shared.</div>
@@ -596,7 +602,7 @@ export default function Character() {
       )}
       <ToastContainer />
       {deleteTarget && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.65)', zIndex: 1100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }} onClick={closeDeleteModal}>
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.65)', zIndex: 1100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }} {...backdropClose(closeDeleteModal)}>
           <div className="card" role="dialog" aria-modal="true" aria-labelledby="delete-char-title" style={{ width: '100%', maxWidth: 380, padding: 22 }} onClick={e => e.stopPropagation()}>
             <div id="delete-char-title" style={{ fontFamily: 'var(--font-title)', fontSize: 16, fontWeight: 600, color: 'var(--red)', marginBottom: 10 }}>Delete Character</div>
             <div style={{ fontSize: 13, color: 'var(--text-2)', marginBottom: 14, lineHeight: 1.6 }}>

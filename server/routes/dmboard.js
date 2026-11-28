@@ -37,7 +37,7 @@ router.use('/:campaignId', auth, async (req, res, next) => {
     // Access follows ownership of a real campaign plus having the DM identity, not the
     // currently active mode, so the final save still lands after switching to player.
     const [user, campaign] = await Promise.all([
-      User.findById(req.userId).select('role roles isPremium premiumRole'),
+      User.findById(req.userId).select('role roles isPremium premiumRole playerPremiumGrant dmPremiumGrant'),
       Campaign.findOne({ _id: req.params.campaignId, owner: req.userId, isPersonal: { $ne: true } }).select('_id'),
     ])
     const isDM = user?.role === 'dm' || (user?.roles || []).includes('dm')

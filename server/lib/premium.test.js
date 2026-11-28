@@ -53,3 +53,14 @@ test('older paying accounts are stamped Player Premium, nobody else is touched',
   assert.deepEqual(seen.update, { premiumRole: 'player' })
   assert.equal(await stampLegacyPlans({ updateMany: async () => ({}) }), 0)
 })
+
+test('by-hand grants: DM grant covers both sides, Player grant only the player side, and neither needs Stripe', () => {
+  const dmGrant = { dmPremiumGrant: true, isPremium: false, role: 'player' }
+  assert.equal(hasPremiumAs(dmGrant, 'dm'), true)
+  assert.equal(hasPremiumAs(dmGrant, 'player'), true)
+  assert.equal(hasPremium({ ...dmGrant, role: 'dm' }), true)
+  const playerGrant = { playerPremiumGrant: true }
+  assert.equal(hasPremiumAs(playerGrant, 'player'), true)
+  assert.equal(hasPremiumAs(playerGrant, 'dm'), false)
+  assert.equal(hasPremiumAs({ playerPremiumGrant: false, dmPremiumGrant: false }, 'dm'), false)
+})

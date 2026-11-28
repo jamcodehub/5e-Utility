@@ -5,6 +5,7 @@ import { api, useAuth, useAuthConfig } from '../context/AuthContext'
 import { useCampaign } from '../context/CampaignContext'
 import GoogleButton from './GoogleButton'
 import ProfileAvatar from './ProfileAvatar'
+import { backdropClose } from '../utils/backdrop'
 
 export default function SettingsModal({ onClose }) {
   const { theme, setTheme, lightMode, setLightMode } = useTheme()
@@ -152,7 +153,7 @@ export default function SettingsModal({ onClose }) {
   const currentThemeLabel = THEMES[theme]?.label || theme
 
   return (
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }} onClick={onClose}>
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }} {...backdropClose(onClose)}>
       <div className="card" style={{ width: '100%', maxWidth: 480, padding: 28, maxHeight: '90vh', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
           <h2 style={{ fontSize: 18 }}>Settings</h2>
@@ -354,7 +355,7 @@ export default function SettingsModal({ onClose }) {
 
       {/* Add a test player */}
       {testOpen && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.65)', zIndex: 1100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }} onClick={() => setTestOpen(false)}>
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.65)', zIndex: 1100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }} {...backdropClose(() => setTestOpen(false))}>
           <form className="card" style={{ width: '100%', maxWidth: 380, padding: 22 }} onClick={e => e.stopPropagation()} onSubmit={addTestPlayer} role="dialog" aria-label="Add a test player">
             <div style={{ fontFamily: 'var(--font-title)', fontSize: 16, fontWeight: 600, marginBottom: 10 }}>Add a test player</div>
             <div style={{ fontSize: 13, color: 'var(--text-2)', marginBottom: 14, lineHeight: 1.6 }}>They join this campaign straight away with a ready-made character, and show up in the token tray, battle tracker and player list. You can remove them any time.</div>
@@ -383,7 +384,7 @@ export default function SettingsModal({ onClose }) {
 
       {/* Type-to-confirm: removing a player from the campaign */}
       {removeTarget && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.65)', zIndex: 1100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }} onClick={() => setRemoveTarget(null)}>
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.65)', zIndex: 1100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }} {...backdropClose(() => setRemoveTarget(null))}>
           <div className="card" style={{ width: '100%', maxWidth: 380, padding: 22 }} onClick={e => e.stopPropagation()} role="dialog" aria-label="Remove player">
             <div style={{ fontFamily: 'var(--font-title)', fontSize: 16, fontWeight: 600, color: 'var(--red)', marginBottom: 10 }}>Remove player</div>
             <div style={{ fontSize: 13, color: 'var(--text-2)', marginBottom: 14, lineHeight: 1.6 }}>
@@ -408,7 +409,7 @@ export default function SettingsModal({ onClose }) {
       {/* Type-to-confirm modal for Leave/Delete campaign — case-sensitive
           exact name match required, to guard against accidental taps. */}
       {confirmAction && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.65)', zIndex: 1100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }} onClick={() => setConfirmAction(null)}>
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.65)', zIndex: 1100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }} {...backdropClose(() => setConfirmAction(null))}>
           <div className="card" style={{ width: '100%', maxWidth: 380, padding: 22 }} onClick={e => e.stopPropagation()}>
             <div style={{ fontFamily: 'var(--font-title)', fontSize: 16, fontWeight: 600, color: 'var(--red)', marginBottom: 10 }}>
               {confirmAction === 'delete' ? 'Delete Campaign' : 'Leave Campaign'}

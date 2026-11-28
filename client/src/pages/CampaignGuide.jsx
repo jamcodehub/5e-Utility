@@ -6,6 +6,7 @@ import { api, useAuth } from '../context/AuthContext'
 import { useCampaign } from '../context/CampaignContext'
 import { useToast } from '../hooks/useToast'
 import { SkeletonCampaignGuideContent } from '../components/Skeleton'
+import { backdropClose } from '../utils/backdrop'
 
 const nanoid = () => Math.random().toString(36).slice(2, 9)
 const emptyGuide = () => ({ story: '', currentArc: '', lastSession: '', worldNotes: '', npcs: [], quests: [] })
@@ -161,7 +162,7 @@ function CharModal({ player, onClose }) {
   ) : null
 
   return (
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.65)', zIndex: 300, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }} onClick={onClose}>
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.65)', zIndex: 300, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }} {...backdropClose(onClose)}>
       <div className="card" style={{ padding: '22px 24px', width: '100%', maxWidth: 460, maxHeight: '88vh', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
 
         <div style={{ display: 'flex', gap: 12, alignItems: 'center', marginBottom: 16, paddingBottom: 14, borderBottom: '1px solid var(--border)' }}>

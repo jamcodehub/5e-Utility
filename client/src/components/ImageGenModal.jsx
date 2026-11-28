@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { api } from '../context/AuthContext'
 import { uploadToCloudinary } from '../utils/uploadToCloudinary'
+import { backdropClose } from '../utils/backdrop'
 
 // Generates scene images, shows them for review, and only uploads the one the DM confirms.
 export default function ImageGenModal({ campaignId, title, description, onUse, onClose }) {
@@ -35,7 +36,7 @@ export default function ImageGenModal({ campaignId, title, description, onUse, o
   }
 
   return (
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', zIndex: 1200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }} onClick={() => !saving && onClose()}>
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', zIndex: 1200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }} {...backdropClose(() => !saving && onClose())}>
       <div className="card" role="dialog" aria-modal="true" aria-label="Generated scene images" onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: 760, maxHeight: '92vh', overflowY: 'auto', padding: 20 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
           <h3 style={{ fontSize: 16, margin: 0 }}>Choose a scene image</h3>

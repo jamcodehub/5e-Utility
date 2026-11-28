@@ -158,7 +158,7 @@ const requireDM = async (req, res, next) => {
     const campaignId = req.body?.campaignId
     if (!mongoose.isValidObjectId(campaignId)) return res.status(400).json({ error: 'Invalid campaign' })
     const [user, campaign] = await Promise.all([
-      User.findById(req.userId).select('role roles isPremium premiumRole'),
+      User.findById(req.userId).select('role roles isPremium premiumRole playerPremiumGrant dmPremiumGrant'),
       Campaign.findOne({ _id: campaignId, owner: req.userId, isPersonal: { $ne: true } }).select('name description setting'),
     ])
     const isDM = user?.role === 'dm' || (user?.roles || []).includes('dm')

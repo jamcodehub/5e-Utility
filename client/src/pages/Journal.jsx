@@ -6,6 +6,8 @@ import { api, useAuth } from '../context/AuthContext'
 import { useCampaign } from '../context/CampaignContext'
 import { useToast } from '../hooks/useToast'
 import { SkeletonTextLines } from '../components/Skeleton'
+import NoteEditor from '../components/NoteEditor'
+import ConfirmNameDialog from '../components/ConfirmNameDialog'
 import { isPublicDemoPath } from '../utils/demoRuntime'
 
 const fmtDate = d => d ? new Date(d).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' }) : ''
@@ -102,12 +104,31 @@ export default function Journal() {
     setSaving(false)
   }, [])
 
-  const handleContentChange = (e) => {
-    const text = e.target.value
+  const handleContentChange = (text) => {
     setContent(text)
     setHasEditedContent(true)
     const id = activeId
     scheduleSave(() => autosave(id, text))
+  }
+
+  const [deleting, setDeleting] = useState(false)
+  const [deleteBusy, setDeleteBusy] = useState(false)
+  const [deleteError, setDeleteError] = useState('')
+  const deleteEntry = async () => {
+    const id = activeId
+    if (!id) return
+    setDeleteBusy(true); setDeleteError('')
+    try {
+      flushSave()
+      await api(`/${apiBase}/${id}`, { method: 'DELETE' })
+      const rest = entries.filter(e => e._id !== id)
+      setEntries(rest)
+      const next = [...rest].sort((a, b) => (b.day ?? 0) - (a.day ?? 0))[0]
+      setActiveId(next ? next._id : null); setContent(next ? next.content : '')
+      setDeleting(false)
+      toast('Day deleted')
+    } catch { setDeleteError('Could not delete it. Please try again.') }
+    setDeleteBusy(false)
   }
 
   const startRename = (e, entry) => {
@@ -278,6 +299,7 @@ export default function Journal() {
             ) : (
               !saving && activeId && <span style={{ fontSize: 11, color: 'var(--green)' }}>Saved</span>
             )}
+            {active && !isPublicDemoPath() && <button type="button" className="btn btn-ghost btn-sm" onClick={() => { setDeleteError(''); setDeleting(true) }} title="Delete this day" style={{ color: 'var(--red)', padding: '3px 10px' }}>Delete</button>}
           </div>
         </div>
         {active && activeCampaign && (
@@ -306,16 +328,7 @@ export default function Journal() {
             </div>
           ) : activeId ? (
             <>
-              <textarea
-                value={content}
-                onChange={handleContentChange}
-                placeholder={placeholder}
-                style={{
-                  width: '100%', minHeight: '100%', border: 'none', outline: 'none', resize: 'none',
-                  fontSize: 15, lineHeight: 1.8, color: 'var(--text)', background: 'transparent',
-                  fontFamily: 'Georgia, serif',
-                }}
-              />
+              <NoteEditor value={content} onChange={handleContentChange} placeholder={placeholder} />
             </>
           ) : (
             <div style={{ textAlign: 'center', color: 'var(--text-3)', marginTop: 60, fontSize: 13 }}>
@@ -326,6 +339,7 @@ export default function Journal() {
       </div>
 
       <ToastContainer />
+      {deleting && active && <ConfirmNameDialog title={'Delete this day'} name={entryTitle(active)} message="This permanently deletes this journal entry and everything written in it. It cannot be undone." working={deleteBusy} error={deleteError} onConfirm={deleteEntry} onClose={() => setDeleting(false)} />}
       {showUpgrade && <UpgradeModal onClose={() => setShowUpgrade(false)} />}
     </div>
   )

@@ -7,6 +7,7 @@ import { buildTestCharacter, MAX_TEST_PLAYERS } from '../lib/testPlayer.js'
 import { notifyUser } from '../lib/notify.js'
 import { FREE_CAMPAIGNS } from '../lib/limits.js'
 import { findTemplate, templateSummaries, seedCampaign } from '../lib/campaignTemplates.js'
+import { cleanHomebrewGuide } from '../lib/homebrewGuide.js'
 
 const router = Router()
 
@@ -78,6 +79,11 @@ router.post('/', auth, async (req, res) => {
     if (!fields.name?.trim() && template) fields.name = template.title
     const campaign = await Campaign.create({ ...fields, owner: req.userId, joinCode })
     if (template) await seedCampaign(campaign, template, req.userId)
+    else {
+      // Homebrew started with the step-by-step questions: the answers fill in the Campaign Guide.
+      const guide = cleanHomebrewGuide(req.body?.guide)
+      if (guide) await CampaignGuide.create({ campaign: campaign._id, ...guide })
+    }
     res.json(campaign)
   } catch (e) { res.status(500).json({ error: e.message }) }
 })
